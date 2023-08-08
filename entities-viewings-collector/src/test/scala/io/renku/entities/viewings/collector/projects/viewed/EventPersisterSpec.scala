@@ -56,7 +56,7 @@ class EventPersisterSpec
         val project = anyProjectEntities.generateOne
         upload(to = projectsDataset, project)
 
-        val event = projectViewedEvents.generateOne.copy(path = project.path)
+        val event = projectViewedEvents.generateOne.copy(slug = project.slug)
 
         givenEventDeduplication(project, returning = ().pure[IO])
 
@@ -75,7 +75,7 @@ class EventPersisterSpec
         val project = anyProjectEntities.generateOne
         upload(to = projectsDataset, project)
 
-        val event = projectViewedEvents.generateOne.copy(path = project.path)
+        val event = projectViewedEvents.generateOne.copy(slug = project.slug)
         givenEventDeduplication(project, returning = ().pure[IO])
         givenPersonViewingPersisting(event, project, returning = ().pure[IO])
 
@@ -99,7 +99,7 @@ class EventPersisterSpec
       val project = anyProjectEntities.generateOne
       upload(to = projectsDataset, project)
 
-      val event = projectViewedEvents.generateOne.copy(path = project.path)
+      val event = projectViewedEvents.generateOne.copy(slug = project.slug)
 
       givenEventDeduplication(project, returning = ().pure[IO])
       givenPersonViewingPersisting(event, project, returning = ().pure[IO])
@@ -145,7 +145,7 @@ class EventPersisterSpec
       event.maybeUserId.map(userId =>
         (personViewingPersister.persist _)
           .expects(
-            GLUserViewedProject(userId, collector.persons.Project(project.resourceId, project.path), event.dateViewed)
+            GLUserViewedProject(userId, collector.persons.Project(project.resourceId, project.slug), event.dateViewed)
           )
           .returning(returning)
       )

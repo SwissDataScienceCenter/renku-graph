@@ -21,7 +21,7 @@ package io.renku.graph.tokenrepository
 import cats.effect.Async
 import cats.syntax.all._
 import io.renku.control.Throttler
-import io.renku.graph.model.projects.{GitLabId, Path}
+import io.renku.graph.model.projects.{GitLabId, Slug}
 import io.renku.http.client.{AccessToken, RestClient}
 import org.typelevel.log4cats.Logger
 
@@ -57,14 +57,13 @@ object AccessTokenFinder {
 
   trait Implicits {
     import io.renku.http.client.UrlEncoder.urlEncode
-    implicit val projectPathToPath: Path => String     = path => urlEncode(path.value)
+    implicit val projectSlugToPath: Slug => String     = path => urlEncode(path.value)
     implicit val projectIdToPath:   GitLabId => String = _.toString
   }
   object Implicits extends Implicits
 
   def apply[F[_]](implicit ev: AccessTokenFinder[F]): AccessTokenFinder[F] = ev
 
-  def apply[F[_]: Async: Logger](): F[AccessTokenFinder[F]] = for {
-    tokenRepositoryUrl <- TokenRepositoryUrl[F]()
-  } yield new AccessTokenFinderImpl[F](tokenRepositoryUrl)
+  def apply[F[_]: Async: Logger](): F[AccessTokenFinder[F]] =
+    TokenRepositoryUrl[F]().map(new AccessTokenFinderImpl[F](_))
 }

@@ -105,12 +105,12 @@ class EventDecoderSpec extends AnyWordSpec with IOSpec with MockFactory with sho
   private implicit lazy val encoder: Encoder[(CompoundEventId, Project)] =
     Encoder.instance { case (eventId, project) =>
       json"""{
-      "categoryName": "TRIPLES_GENERATED",
-      "id": ${eventId.id},
-      "project": {
-        "id":   ${project.id},
-        "path": ${project.path}
-      }
-    }"""
+        "categoryName": "TRIPLES_GENERATED",
+        "id": ${eventId.id},
+        "project": {
+          "id":   ${project.id},
+          "slug": ${project.slug}
+        }
+      }"""
     }
 }

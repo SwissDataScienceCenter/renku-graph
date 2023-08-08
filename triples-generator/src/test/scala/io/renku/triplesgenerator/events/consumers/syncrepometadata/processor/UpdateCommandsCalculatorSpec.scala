@@ -58,8 +58,8 @@ class UpdateCommandsCalculatorSpec
     val project = anyProjectEntities.generateOne.to[entities.Project]
 
     val tsData           = tsDataFrom(project)
-    val glData           = glDataExtracts(project.path).generateOne
-    val maybePayloadData = payloadDataExtracts(project.path).generateOption
+    val glData           = glDataExtracts(project.slug).generateOne
+    val maybePayloadData = payloadDataExtracts(project.slug).generateOption
 
     val newValue = projectNames.generateOne
     givenNewValuesFinding(tsData, glData, maybePayloadData, returning = NewValues.empty.copy(maybeName = newValue.some))
@@ -83,8 +83,8 @@ class UpdateCommandsCalculatorSpec
     val project = anyProjectEntities.generateOne.to[entities.Project]
 
     val tsData           = tsDataFrom(project)
-    val glData           = glDataExtracts(project.path).generateOne
-    val maybePayloadData = payloadDataExtracts(project.path).generateOption
+    val glData           = glDataExtracts(project.slug).generateOne
+    val maybePayloadData = payloadDataExtracts(project.slug).generateOption
 
     val newValue = projectVisibilities.generateOne
     givenNewValuesFinding(tsData,
@@ -101,7 +101,7 @@ class UpdateCommandsCalculatorSpec
 
       _ <- updatesCalculator
              .calculateUpdateCommands(tsData, glData, maybePayloadData)
-             .asserting(_ shouldBe List(UpdateCommand.Event(StatusChangeEvent.RedoProjectTransformation(tsData.path))))
+             .asserting(_ shouldBe List(UpdateCommand.Event(StatusChangeEvent.RedoProjectTransformation(tsData.slug))))
 
       _ <- dataInProjectGraph(project).asserting(_.value shouldBe tsData)
       _ <- dataInProjectsGraph(project).asserting(_.value shouldBe tsData)
@@ -113,8 +113,8 @@ class UpdateCommandsCalculatorSpec
     val project = anyProjectEntities.generateOne.to[entities.Project]
 
     val tsData           = tsDataFrom(project)
-    val glData           = glDataExtracts(project.path).generateOne
-    val maybePayloadData = payloadDataExtracts(project.path).generateOption
+    val glData           = glDataExtracts(project.slug).generateOne
+    val maybePayloadData = payloadDataExtracts(project.slug).generateOption
 
     val newValue = projectModifiedDates(project.dateModified.value).generateSome
     givenNewValuesFinding(tsData,
@@ -142,8 +142,8 @@ class UpdateCommandsCalculatorSpec
     val project = anyProjectEntities.generateOne.to[entities.Project]
 
     val tsData           = tsDataFrom(project)
-    val glData           = glDataExtracts(project.path).generateOne
-    val maybePayloadData = payloadDataExtracts(project.path).generateOption
+    val glData           = glDataExtracts(project.slug).generateOne
+    val maybePayloadData = payloadDataExtracts(project.slug).generateOption
 
     val newValue = projectDescriptions.generateSome
     givenNewValuesFinding(tsData, glData, maybePayloadData, returning = NewValues.empty.copy(maybeDesc = newValue.some))
@@ -170,8 +170,8 @@ class UpdateCommandsCalculatorSpec
       .to[entities.Project]
 
     val tsData           = tsDataFrom(project)
-    val glData           = glDataExtracts(project.path).generateOne
-    val maybePayloadData = payloadDataExtracts(project.path).generateOption
+    val glData           = glDataExtracts(project.slug).generateOne
+    val maybePayloadData = payloadDataExtracts(project.slug).generateOption
 
     givenNewValuesFinding(tsData, glData, maybePayloadData, returning = NewValues.empty.copy(maybeDesc = Some(None)))
     val updatedTsData = tsData.copy(maybeDesc = None)
@@ -197,8 +197,8 @@ class UpdateCommandsCalculatorSpec
       .to[entities.Project]
 
     val tsData           = tsDataFrom(project)
-    val glData           = glDataExtracts(project.path).generateOne
-    val maybePayloadData = payloadDataExtracts(project.path).generateOption
+    val glData           = glDataExtracts(project.slug).generateOne
+    val maybePayloadData = payloadDataExtracts(project.slug).generateOption
 
     val newValue = projectKeywords.generateSet(min = 1)
     givenNewValuesFinding(tsData,
@@ -229,8 +229,8 @@ class UpdateCommandsCalculatorSpec
       .to[entities.Project]
 
     val tsData           = tsDataFrom(project)
-    val glData           = glDataExtracts(project.path).generateOne
-    val maybePayloadData = payloadDataExtracts(project.path).generateOption
+    val glData           = glDataExtracts(project.slug).generateOne
+    val maybePayloadData = payloadDataExtracts(project.slug).generateOption
 
     val newValue = Set.empty[projects.Keyword]
     givenNewValuesFinding(tsData,
@@ -258,8 +258,8 @@ class UpdateCommandsCalculatorSpec
     val project = anyProjectEntities.generateOne.to[entities.Project]
 
     val tsData           = tsDataFrom(project)
-    val glData           = glDataExtracts(project.path).generateOne
-    val maybePayloadData = payloadDataExtracts(project.path).generateOption
+    val glData           = glDataExtracts(project.slug).generateOne
+    val maybePayloadData = payloadDataExtracts(project.slug).generateOption
 
     val newValue = imageUris.generateList(min = 1)
     givenNewValuesFinding(tsData,
@@ -290,8 +290,8 @@ class UpdateCommandsCalculatorSpec
       .to[entities.Project]
 
     val tsData           = tsDataFrom(project)
-    val glData           = glDataExtracts(project.path).generateOne
-    val maybePayloadData = payloadDataExtracts(project.path).generateOption
+    val glData           = glDataExtracts(project.slug).generateOne
+    val maybePayloadData = payloadDataExtracts(project.slug).generateOption
 
     val newValue = List.empty[Image]
     givenNewValuesFinding(tsData,
@@ -319,8 +319,8 @@ class UpdateCommandsCalculatorSpec
     val project = anyProjectEntities.map(replaceProjectKeywords(Set.empty)).generateOne.to[entities.Project]
 
     val tsData           = tsDataFrom(project)
-    val glData           = glDataExtracts(project.path).generateOne
-    val maybePayloadData = payloadDataExtracts(project.path).generateOption
+    val glData           = glDataExtracts(project.slug).generateOne
+    val maybePayloadData = payloadDataExtracts(project.slug).generateOption
 
     val newValue = projectKeywords.generateSet(min = 1)
     givenNewValuesFinding(tsData,
@@ -348,8 +348,8 @@ class UpdateCommandsCalculatorSpec
     val project = anyProjectEntities.generateOne.to[entities.Project]
 
     val tsData           = tsDataFrom(project)
-    val glData           = glDataExtracts(project.path).generateOne
-    val maybePayloadData = payloadDataExtracts(project.path).generateOption
+    val glData           = glDataExtracts(project.slug).generateOne
+    val maybePayloadData = payloadDataExtracts(project.slug).generateOption
 
     givenNewValuesFinding(tsData, glData, maybePayloadData, returning = NewValues.empty)
 
@@ -378,13 +378,13 @@ class UpdateCommandsCalculatorSpec
       SparqlQuery.ofUnsafe(
         "UpdateCommandsCalculator Project fetch",
         Prefixes of (renku -> "renku", schema -> "schema"),
-        sparql"""|SELECT ?id ?path ?name ?visibility ?maybeDateModified ?maybeDesc
+        sparql"""|SELECT ?id ?slug ?name ?visibility ?maybeDateModified ?maybeDesc
                  |  (GROUP_CONCAT(DISTINCT ?keyword; separator=',') AS ?keywords)
                  |  (GROUP_CONCAT(?encodedImageUrl; separator=',') AS ?images)
                  |WHERE {
                  |  BIND (${GraphClass.Project.id(project.resourceId)} AS ?id)
                  |  GRAPH ?id {
-                 |    ?id renku:projectPath ?path;
+                 |    ?id renku:projectPath ?slug;
                  |        schema:name ?name;
                  |        renku:projectVisibility ?visibility.
                  |    OPTIONAL { ?id schema:dateModified ?maybeDateModified }
@@ -398,7 +398,7 @@ class UpdateCommandsCalculatorSpec
                  |    }
                  |  }
                  |}
-                 |GROUP BY ?id ?path ?name ?visibility ?maybeDateModified ?maybeDesc
+                 |GROUP BY ?id ?slug ?name ?visibility ?maybeDateModified ?maybeDesc
                  |""".stripMargin
       )
     ).map(toDataExtract).flatMap(toOptionOrFail)
@@ -409,13 +409,13 @@ class UpdateCommandsCalculatorSpec
       SparqlQuery.ofUnsafe(
         "UpdateCommandsCalculator Projects fetch",
         Prefixes of (renku -> "renku", schema -> "schema"),
-        sparql"""|SELECT ?id ?path ?name ?visibility ?maybeDateModified ?maybeDesc
+        sparql"""|SELECT ?id ?slug ?name ?visibility ?maybeDateModified ?maybeDesc
                  |  (GROUP_CONCAT(DISTINCT ?keyword; separator=',') AS ?keywords)
                  |  (GROUP_CONCAT(?encodedImageUrl; separator=',') AS ?images)
                  |WHERE {
                  |  BIND (${project.resourceId.asEntityId} AS ?id)
                  |  GRAPH ${GraphClass.Projects.id} {
-                 |    ?id renku:projectPath ?path;
+                 |    ?id renku:projectPath ?slug;
                  |        schema:name ?name;
                  |        renku:projectVisibility ?visibility.
                  |    OPTIONAL { ?id schema:dateModified ?maybeDateModified }
@@ -429,7 +429,7 @@ class UpdateCommandsCalculatorSpec
                  |    }
                  |  }
                  |}
-                 |GROUP BY ?id ?path ?name ?visibility ?maybeDateModified ?maybeDesc
+                 |GROUP BY ?id ?slug ?name ?visibility ?maybeDateModified ?maybeDesc
                  |""".stripMargin
       )
     ).map(toDataExtract).flatMap(toOptionOrFail)
@@ -437,7 +437,7 @@ class UpdateCommandsCalculatorSpec
   private lazy val toDataExtract: List[Map[String, String]] => List[DataExtract.TS] =
     _.flatMap { row =>
       (row.get("id").map(projects.ResourceId),
-       row.get("path").map(projects.Path),
+       row.get("slug").map(projects.Slug),
        row.get("name").map(projects.Name),
        row.get("visibility").map(projects.Visibility),
        Some(row.get("maybeDateModified").map(Instant.parse).map(projects.DateModified)),

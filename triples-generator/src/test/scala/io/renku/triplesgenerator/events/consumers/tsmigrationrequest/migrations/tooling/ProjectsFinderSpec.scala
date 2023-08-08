@@ -46,16 +46,16 @@ class ProjectsFinderSpec
 
       projects foreach (upload(to = projectsDataset, _))
 
-      projectsFinder.findProjects.unsafeRunSync() should contain theSameElementsAs projects.map(_.path)
+      projectsFinder.findProjects.unsafeRunSync() should contain theSameElementsAs projects.map(_.slug)
     }
   }
 
   private trait TestCase {
-    val query = SparqlQuery.of(
-      "find path",
+    private val query = SparqlQuery.of(
+      "find slug",
       Prefixes of (schema -> "schema", renku -> "renku"),
-      """|SELECT DISTINCT ?path
-         |WHERE { GRAPH ?g { ?id a schema:Project; renku:projectPath ?path } }""".stripMargin
+      """|SELECT DISTINCT ?slug
+         |WHERE { GRAPH ?g { ?id a schema:Project; renku:projectPath ?slug } }""".stripMargin
     )
     private implicit val logger:       TestLogger[IO]              = TestLogger[IO]()
     private implicit val timeRecorder: SparqlQueryTimeRecorder[IO] = TestSparqlQueryTimeRecorder[IO].unsafeRunSync()

@@ -31,7 +31,7 @@ import io.renku.generators.Generators._
 import io.renku.generators.Generators.Implicits._
 import io.renku.graph.model.{entities, projects}
 import io.renku.graph.model.entities.Project
-import io.renku.graph.model.projects.Path
+import io.renku.graph.model.projects.Slug
 import io.renku.graph.model.testentities._
 import io.renku.graph.tokenrepository.AccessTokenFinder
 import io.renku.http.client.AccessToken
@@ -62,7 +62,7 @@ class EventProcessorSpec extends AnyWordSpec with IOSpec with MockFactory with s
     "succeed and send ProjectActivated event " +
       "if events are successfully turned into triples" in new TestCase {
 
-        givenFetchingAccessToken(forProjectPath = event.project.path)
+        givenFetchingAccessToken(forProjectSlug = event.project.slug)
           .returning(maybeAccessToken.pure[IO])
 
         val project = anyNonRenkuProjectEntities.generateOne.to[entities.Project]
@@ -72,7 +72,7 @@ class EventProcessorSpec extends AnyWordSpec with IOSpec with MockFactory with s
 
         successfulTriplesTransformationAndUpload(project)
 
-        givenProjectActivatedEventSent(event.project.path, returning = ().pure[IO])
+        givenProjectActivatedEventSent(event.project.slug, returning = ().pure[IO])
 
         eventProcessor.process(event).unsafeRunSync() shouldBe ()
 
@@ -82,7 +82,7 @@ class EventProcessorSpec extends AnyWordSpec with IOSpec with MockFactory with s
 
     "do nothing if the project already exists in the TS" in new TestCase {
 
-      givenFetchingAccessToken(forProjectPath = event.project.path)
+      givenFetchingAccessToken(forProjectSlug = event.project.slug)
         .returning(maybeAccessToken.pure[IO])
 
       val project = anyNonRenkuProjectEntities.generateOne.to[entities.Project]
@@ -98,7 +98,7 @@ class EventProcessorSpec extends AnyWordSpec with IOSpec with MockFactory with s
 
     "log an error if entity building fails with LogWorthyRecoverableError" in new TestCase {
 
-      givenFetchingAccessToken(forProjectPath = event.project.path)
+      givenFetchingAccessToken(forProjectSlug = event.project.slug)
         .returning(maybeAccessToken.pure[IO])
 
       val processingError = logWorthyRecoverableErrors.generateOne
@@ -112,7 +112,7 @@ class EventProcessorSpec extends AnyWordSpec with IOSpec with MockFactory with s
 
     "log an error if entity building fails with a non-ProcessingNonRecoverableError.MalformedRepository" in new TestCase {
 
-      givenFetchingAccessToken(forProjectPath = event.project.path)
+      givenFetchingAccessToken(forProjectSlug = event.project.slug)
         .returning(maybeAccessToken.pure[IO])
 
       val exception = exceptions.generateOne
@@ -126,7 +126,7 @@ class EventProcessorSpec extends AnyWordSpec with IOSpec with MockFactory with s
 
     "do not log an error if entity building fails with SilentRecoverableError" in new TestCase {
 
-      givenFetchingAccessToken(forProjectPath = event.project.path)
+      givenFetchingAccessToken(forProjectSlug = event.project.slug)
         .returning(maybeAccessToken.pure[IO])
 
       val processingError = silentRecoverableErrors.generateOne
@@ -139,7 +139,7 @@ class EventProcessorSpec extends AnyWordSpec with IOSpec with MockFactory with s
 
     "do not log an error if entity building fails with ProcessingNonRecoverableError.MalformedRepository" in new TestCase {
 
-      givenFetchingAccessToken(forProjectPath = event.project.path)
+      givenFetchingAccessToken(forProjectSlug = event.project.slug)
         .returning(maybeAccessToken.pure[IO])
 
       val exception = nonRecoverableMalformedRepoErrors.generateOne
@@ -153,7 +153,7 @@ class EventProcessorSpec extends AnyWordSpec with IOSpec with MockFactory with s
 
     "log an error if transforming triples fails with a LogWorthyRecoverableError" in new TestCase {
 
-      givenFetchingAccessToken(forProjectPath = event.project.path)
+      givenFetchingAccessToken(forProjectSlug = event.project.slug)
         .returning(maybeAccessToken.pure[IO])
 
       val project = anyProjectEntities.generateOne.to[entities.Project]
@@ -173,7 +173,7 @@ class EventProcessorSpec extends AnyWordSpec with IOSpec with MockFactory with s
 
     "do not log an error if transforming triples fails with a SilentRecoverableError" in new TestCase {
 
-      givenFetchingAccessToken(forProjectPath = event.project.path)
+      givenFetchingAccessToken(forProjectSlug = event.project.slug)
         .returning(maybeAccessToken.pure[IO])
 
       val project = anyProjectEntities.generateOne.to[entities.Project]
@@ -192,7 +192,7 @@ class EventProcessorSpec extends AnyWordSpec with IOSpec with MockFactory with s
 
     "do not log an error if transforming triples fails with SilentRecoverableError" in new TestCase {
 
-      givenFetchingAccessToken(forProjectPath = event.project.path)
+      givenFetchingAccessToken(forProjectSlug = event.project.slug)
         .returning(maybeAccessToken.pure[IO])
 
       val project = anyRenkuProjectEntities.generateOne.to[entities.Project]
@@ -212,7 +212,7 @@ class EventProcessorSpec extends AnyWordSpec with IOSpec with MockFactory with s
 
     "log an error if transforming triples fails with an unknown Exception" in new TestCase {
 
-      givenFetchingAccessToken(forProjectPath = event.project.path)
+      givenFetchingAccessToken(forProjectSlug = event.project.slug)
         .returning(maybeAccessToken.pure[IO])
 
       val project = anyRenkuProjectEntities.generateOne.to[entities.Project]
@@ -231,7 +231,7 @@ class EventProcessorSpec extends AnyWordSpec with IOSpec with MockFactory with s
 
     "log an error if uploading triples fails with RecoverableFailure" in new TestCase {
 
-      givenFetchingAccessToken(forProjectPath = event.project.path)
+      givenFetchingAccessToken(forProjectSlug = event.project.slug)
         .returning(maybeAccessToken.pure[IO])
 
       val project = anyProjectEntities.generateOne.to[entities.Project]
@@ -251,7 +251,7 @@ class EventProcessorSpec extends AnyWordSpec with IOSpec with MockFactory with s
 
     "log an error if uploading triples to the store fails with a NonRecoverableFailure" in new TestCase {
 
-      givenFetchingAccessToken(forProjectPath = event.project.path)
+      givenFetchingAccessToken(forProjectSlug = event.project.slug)
         .returning(maybeAccessToken.pure[IO])
 
       val project = anyProjectEntities.generateOne.to[entities.Project]
@@ -271,7 +271,7 @@ class EventProcessorSpec extends AnyWordSpec with IOSpec with MockFactory with s
     "log an error if finding project access token fails" in new TestCase {
 
       val exception = exceptions.generateOne
-      givenFetchingAccessToken(forProjectPath = event.project.path)
+      givenFetchingAccessToken(forProjectSlug = event.project.slug)
         .returning(exception.raiseError[IO, Option[AccessToken]])
 
       eventProcessor.process(event).unsafeRunSync() shouldBe ()
@@ -281,7 +281,7 @@ class EventProcessorSpec extends AnyWordSpec with IOSpec with MockFactory with s
 
     "log an error when sending ProjectActivated event fails" in new TestCase {
 
-      givenFetchingAccessToken(forProjectPath = event.project.path)
+      givenFetchingAccessToken(forProjectSlug = event.project.slug)
         .returning(maybeAccessToken.pure[IO])
 
       val project = anyNonRenkuProjectEntities.generateOne.to[entities.Project]
@@ -292,7 +292,7 @@ class EventProcessorSpec extends AnyWordSpec with IOSpec with MockFactory with s
       successfulTriplesTransformationAndUpload(project)
 
       val exception = exceptions.generateOne
-      givenProjectActivatedEventSent(event.project.path, returning = exception.raiseError[IO, Unit])
+      givenProjectActivatedEventSent(event.project.slug, returning = exception.raiseError[IO, Unit])
 
       eventProcessor.process(event).unsafeRunSync() shouldBe ()
 
@@ -326,10 +326,10 @@ class EventProcessorSpec extends AnyWordSpec with IOSpec with MockFactory with s
                                                     executionTimeRecorder
     )
 
-    def givenFetchingAccessToken(forProjectPath: Path) =
+    def givenFetchingAccessToken(forProjectSlug: Slug) =
       (accessTokenFinder
-        .findAccessToken(_: Path)(_: Path => String))
-        .expects(forProjectPath, projectPathToPath)
+        .findAccessToken(_: Slug)(_: Slug => String))
+        .expects(forProjectSlug, projectSlugToPath)
 
     def successfulTriplesTransformationAndUpload(project: Project) =
       successfulStepsCreation(project, runningToReturn = DeliverySuccess.pure[IO])
@@ -362,10 +362,10 @@ class EventProcessorSpec extends AnyWordSpec with IOSpec with MockFactory with s
         .expects(event, maybeAccessToken)
         .returning(returning)
 
-    def givenProjectActivatedEventSent(path: projects.Path, returning: IO[Unit]) =
+    def givenProjectActivatedEventSent(slug: projects.Slug, returning: IO[Unit]) =
       (tgClient
         .send(_: ProjectActivated))
-        .expects(where((ev: ProjectActivated) => ev.path == path))
+        .expects(where((ev: ProjectActivated) => ev.slug == slug))
         .returning(returning)
 
     def logSummary(event: MinProjectInfoEvent, message: String): Assertion = logger.logged(

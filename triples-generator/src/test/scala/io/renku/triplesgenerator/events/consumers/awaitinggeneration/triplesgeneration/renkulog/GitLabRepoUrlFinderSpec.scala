@@ -41,27 +41,27 @@ class GitLabRepoUrlFinderSpec extends AnyWordSpec with MockFactory with should.M
     protocols foreach { protocol =>
       val host = nonEmptyStrings().generateOne
       val port = positiveInts(9999).generateOne
-      val path = projectPaths.generateOne
+      val slug = projectSlugs.generateOne
 
-      s"return '$protocol://$host:$port/$path.git' when no access token" in new TestCase {
+      s"return '$protocol://$host:$port/$slug.git' when no access token" in new TestCase {
 
         implicit val maybeAccessToken: Option[AccessToken] = Option.empty
 
         val repoUrlFinder = newRepoUrlFinder(GitLabUrl(s"$protocol://$host:$port"))
 
-        repoUrlFinder.findRepositoryUrl(path) shouldBe
-          ServiceUrl(s"$protocol://$host:$port/$path.git").pure[Try]
+        repoUrlFinder.findRepositoryUrl(slug) shouldBe
+          ServiceUrl(s"$protocol://$host:$port/$slug.git").pure[Try]
       }
 
-      s"return '$protocol://gitlab-ci-token:<token>@$host:$port/$path.git' for Personal Access Token" in new TestCase {
+      s"return '$protocol://gitlab-ci-token:<token>@$host:$port/$slug.git' for Personal Access Token" in new TestCase {
 
         val accessToken = personalAccessTokens.generateOne
         implicit val iat: Option[AccessToken] = accessToken.some
 
         val repoUrlFinder = newRepoUrlFinder(GitLabUrl(s"$protocol://$host:$port"))
 
-        repoUrlFinder.findRepositoryUrl(path) shouldBe
-          ServiceUrl(s"$protocol://gitlab-ci-token:${accessToken.value}@$host:$port/$path.git").pure[Try]
+        repoUrlFinder.findRepositoryUrl(slug) shouldBe
+          ServiceUrl(s"$protocol://gitlab-ci-token:${accessToken.value}@$host:$port/$slug.git").pure[Try]
       }
 
       forAll {
@@ -71,14 +71,14 @@ class GitLabRepoUrlFinderSpec extends AnyWordSpec with MockFactory with should.M
           "User OAuth Access Token" -> userOAuthAccessTokens.generateOne
         )
       } { (tokenType, accessToken: AccessToken) =>
-        s"return '$protocol://oauth2:<token>@$host:$port/$path.git' for $tokenType" in new TestCase {
+        s"return '$protocol://oauth2:<token>@$host:$port/$slug.git' for $tokenType" in new TestCase {
 
           implicit val someToken: Option[AccessToken] = accessToken.some
 
           val repoUrlFinder = newRepoUrlFinder(GitLabUrl(s"$protocol://$host:$port"))
 
-          repoUrlFinder.findRepositoryUrl(path) shouldBe
-            ServiceUrl(s"$protocol://oauth2:${accessToken.value}@$host:$port/$path.git").pure[Try]
+          repoUrlFinder.findRepositoryUrl(slug) shouldBe
+            ServiceUrl(s"$protocol://oauth2:${accessToken.value}@$host:$port/$slug.git").pure[Try]
         }
       }
     }

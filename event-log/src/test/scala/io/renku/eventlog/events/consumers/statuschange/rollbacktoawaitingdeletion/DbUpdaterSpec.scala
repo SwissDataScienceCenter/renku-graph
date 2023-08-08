@@ -27,7 +27,7 @@ import io.renku.events.consumers.Project
 import io.renku.generators.Generators.Implicits._
 import io.renku.generators.Generators.timestampsNotInTheFuture
 import io.renku.graph.model.EventsGenerators.{eventBodies, eventIds, eventStatuses}
-import io.renku.graph.model.GraphModelGenerators.{projectIds, projectPaths}
+import io.renku.graph.model.GraphModelGenerators.{projectIds, projectSlugs}
 import io.renku.graph.model.events.EventStatus._
 import io.renku.graph.model.events._
 import io.renku.metrics.TestMetricsRegistry
@@ -54,9 +54,9 @@ class DbUpdaterSpec
       val event2Id    = addEvent(otherStatus)
       val event3Id    = addEvent(Deleting)
       sessionResource
-        .useK(dbUpdater updateDB RollbackToAwaitingDeletion(Project(projectId, projectPath)))
+        .useK(dbUpdater updateDB RollbackToAwaitingDeletion(Project(projectId, projectSlug)))
         .unsafeRunSync() shouldBe DBUpdateResults.ForProjects(
-        projectPath,
+        projectSlug,
         Map(Deleting -> -2, AwaitingDeletion -> 2)
       )
 
@@ -70,7 +70,7 @@ class DbUpdaterSpec
   private trait TestCase {
 
     val projectId   = projectIds.generateOne
-    val projectPath = projectPaths.generateOne
+    val projectSlug = projectSlugs.generateOne
 
     val currentTime = mockFunction[Instant]
     private implicit val metricsRegistry:  TestMetricsRegistry[IO]   = TestMetricsRegistry[IO]
@@ -89,7 +89,7 @@ class DbUpdaterSpec
         timestampsNotInTheFuture.generateAs(ExecutionDate),
         timestampsNotInTheFuture.generateAs(EventDate),
         eventBodies.generateOne,
-        projectPath = projectPath
+        projectSlug = projectSlug
       )
       eventId.id
     }

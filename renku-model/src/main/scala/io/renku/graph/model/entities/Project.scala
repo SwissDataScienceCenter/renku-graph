@@ -38,7 +38,7 @@ import Ordered.orderingToOrdered
 
 sealed trait Project extends Product with Serializable {
   val resourceId:       ResourceId
-  val path:             Path
+  val slug:             Slug
   val name:             Name
   val maybeDescription: Option[Description]
   val dateCreated:      DateCreated
@@ -52,8 +52,8 @@ sealed trait Project extends Product with Serializable {
   val activities: List[Activity]
   val datasets:   List[Dataset[Dataset.Provenance]]
   val plans:      List[Plan]
-  lazy val namespaces:     List[Namespace]       = path.toNamespaces
-  lazy val identification: ProjectIdentification = ProjectIdentification(resourceId, path)
+  lazy val namespaces:     List[Namespace]       = slug.toNamespaces
+  lazy val identification: ProjectIdentification = ProjectIdentification(resourceId, slug)
 
   def fold[P](rnp:  RenkuProject.WithoutParent => P,
               rwp:  RenkuProject.WithParent => P,
@@ -76,7 +76,7 @@ sealed trait Parent {
 object NonRenkuProject {
 
   final case class WithoutParent(resourceId:       ResourceId,
-                                 path:             Path,
+                                 slug:             Slug,
                                  name:             Name,
                                  maybeDescription: Option[Description],
                                  dateCreated:      DateCreated,
@@ -96,7 +96,7 @@ object NonRenkuProject {
 
   object WithoutParent extends ProjectFactory {
     def from(resourceId:       ResourceId,
-             path:             Path,
+             slug:             Slug,
              name:             Name,
              maybeDescription: Option[Description],
              dateCreated:      DateCreated,
@@ -109,7 +109,7 @@ object NonRenkuProject {
     ): ValidatedNel[String, NonRenkuProject.WithoutParent] =
       validateDates(dateCreated, dateModified).as(
         NonRenkuProject.WithoutParent(resourceId,
-                                      path,
+                                      slug,
                                       name,
                                       maybeDescription,
                                       dateCreated,
@@ -124,7 +124,7 @@ object NonRenkuProject {
   }
 
   final case class WithParent(resourceId:       ResourceId,
-                              path:             Path,
+                              slug:             Slug,
                               name:             Name,
                               maybeDescription: Option[Description],
                               dateCreated:      DateCreated,
@@ -146,7 +146,7 @@ object NonRenkuProject {
 
   object WithParent extends ProjectFactory {
     def from(resourceId:       ResourceId,
-             path:             Path,
+             slug:             Slug,
              name:             Name,
              maybeDescription: Option[Description],
              dateCreated:      DateCreated,
@@ -160,7 +160,7 @@ object NonRenkuProject {
     ): ValidatedNel[String, NonRenkuProject.WithParent] =
       validateDates(dateCreated, dateModified).as(
         NonRenkuProject.WithParent(resourceId,
-                                   path,
+                                   slug,
                                    name,
                                    maybeDescription,
                                    dateCreated,
@@ -187,7 +187,7 @@ sealed trait RenkuProject extends Project with Product with Serializable {
 
 object RenkuProject {
   final case class WithoutParent(resourceId:       ResourceId,
-                                 path:             Path,
+                                 slug:             Slug,
                                  name:             Name,
                                  maybeDescription: Option[Description],
                                  agent:            CliVersion,
@@ -213,7 +213,7 @@ object RenkuProject {
   object WithoutParent extends ProjectFactory {
 
     def from(resourceId:       ResourceId,
-             path:             Path,
+             slug:             Slug,
              name:             Name,
              maybeDescription: Option[Description],
              agent:            CliVersion,
@@ -238,7 +238,7 @@ object RenkuProject {
         syncPersons(projectPersons = members ++ maybeCreator, activities, datasets, updatedPlans)
       RenkuProject.WithoutParent(
         resourceId,
-        path,
+        slug,
         name,
         maybeDescription,
         agent,
@@ -300,7 +300,7 @@ object RenkuProject {
   }
 
   final case class WithParent(resourceId:       ResourceId,
-                              path:             Path,
+                              slug:             Slug,
                               name:             Name,
                               maybeDescription: Option[Description],
                               agent:            CliVersion,
@@ -328,7 +328,7 @@ object RenkuProject {
   object WithParent extends ProjectFactory {
 
     def from(resourceId:       ResourceId,
-             path:             Path,
+             slug:             Slug,
              name:             Name,
              maybeDescription: Option[Description],
              agent:            CliVersion,
@@ -355,7 +355,7 @@ object RenkuProject {
         syncPersons(projectPersons = members ++ maybeCreator, activities, datasets, updatedPlans)
       RenkuProject.WithParent(
         resourceId,
-        path,
+        slug,
         name,
         maybeDescription,
         agent,
@@ -620,8 +620,9 @@ object Project {
           project.resourceId.asEntityId,
           entityTypes,
           schema / "name"             -> project.name.asJsonLD,
-          renku / "projectPath"       -> project.path.asJsonLD,
-          renku / "projectNamespace"  -> project.path.toNamespace.asJsonLD,
+          renku / "slug"              -> project.slug.asJsonLD,
+          renku / "projectPath"       -> project.slug.asJsonLD,
+          renku / "projectNamespace"  -> project.slug.toNamespace.asJsonLD,
           renku / "projectNamespaces" -> project.namespaces.asJsonLD,
           schema / "description"      -> project.maybeDescription.asJsonLD,
           schema / "agent"            -> project.agent.asJsonLD,
@@ -650,8 +651,9 @@ object Project {
           project.resourceId.asEntityId,
           entityTypes,
           schema / "name"             -> project.name.asJsonLD,
-          renku / "projectPath"       -> project.path.asJsonLD,
-          renku / "projectNamespace"  -> project.path.toNamespace.asJsonLD,
+          renku / "slug"              -> project.slug.asJsonLD,
+          renku / "projectPath"       -> project.slug.asJsonLD,
+          renku / "projectNamespace"  -> project.slug.toNamespace.asJsonLD,
           renku / "projectNamespaces" -> project.namespaces.asJsonLD,
           schema / "description"      -> project.maybeDescription.asJsonLD,
           schema / "dateCreated"      -> project.dateCreated.asJsonLD,
@@ -679,6 +681,7 @@ object Project {
     val image:   Property = schema / "image"
 
     val nameProperty:         DataProperty.Def = DataProperty(schema / "name", xsd / "string")
+    val slugProperty:         DataProperty.Def = DataProperty(renku / "slug", xsd / "string")
     val pathProperty:         DataProperty.Def = DataProperty(renku / "projectPath", xsd / "string")
     val descriptionProperty:  DataProperty.Def = DataProperty(schema / "description", xsd / "string")
     val dateCreatedProperty:  DataProperty.Def = DataProperty(schema / "dateCreated", xsd / "dateTime")
@@ -704,6 +707,7 @@ object Project {
           ObjectProperty(image, Image.Ontology.typeDef)
         ),
         DataProperties(
+          slugProperty,
           nameProperty,
           pathProperty,
           DataProperty(renku / "projectNamespace", xsd / "string"),
@@ -720,7 +724,7 @@ object Project {
 
   final case class GitLabProjectInfo(id:               GitLabId,
                                      name:             Name,
-                                     path:             Path,
+                                     slug:             Slug,
                                      dateCreated:      DateCreated,
                                      dateModified:     DateModified,
                                      maybeDescription: Option[Description],
@@ -728,7 +732,7 @@ object Project {
                                      keywords:         Set[Keyword],
                                      members:          Set[ProjectMember],
                                      visibility:       Visibility,
-                                     maybeParentPath:  Option[Path],
+                                     maybeParentSlug:  Option[Slug],
                                      avatarUrl:        Option[ImageUri]
   )
 

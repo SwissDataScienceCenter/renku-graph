@@ -41,7 +41,7 @@ import org.scalatest.matchers.should
 import org.scalatest.prop.TableDrivenPropertyChecks
 import org.scalatest.wordspec.AnyWordSpec
 
-class ProjectPathFinderSpec
+class ProjectSlugFinderSpec
     extends AnyWordSpec
     with IOSpec
     with should.Matchers
@@ -49,7 +49,7 @@ class ProjectPathFinderSpec
     with GitLabClientTools[IO]
     with TableDrivenPropertyChecks {
 
-  "findProjectPath" should {
+  "findProjectSlug" should {
 
     forAll {
       Table(
@@ -59,23 +59,23 @@ class ProjectPathFinderSpec
         "Personal Access Token"   -> personalAccessTokens.generateOne
       )
     } { (tokenType, accessToken: AccessToken) =>
-      s"return fetched Project's path if service responds with OK and a valid body - case when $tokenType given" in new TestCase {
+      s"return fetched Project's slug if service responds with OK and a valid body - case when $tokenType given" in new TestCase {
 
         val endpointName: String Refined NonEmpty = "single-project"
         (gitLabClient
-          .get(_: Uri, _: String Refined NonEmpty)(_: ResponseMappingF[IO, Option[projects.Path]])(
+          .get(_: Uri, _: String Refined NonEmpty)(_: ResponseMappingF[IO, Option[projects.Slug]])(
             _: Option[AccessToken]
           ))
           .expects(uri"projects" / projectId.value, endpointName, *, Option(accessToken))
-          .returning(projectPath.some.pure[IO])
+          .returning(projectSlug.some.pure[IO])
 
-        pathFinder.findProjectPath(projectId, accessToken).value.unsafeRunSync() shouldBe projectPath.some
+        slugFinder.findProjectSlug(projectId, accessToken).value.unsafeRunSync() shouldBe projectSlug.some
       }
     }
 
-    "map OK response body to project path" in new TestCase {
+    "map OK response body to project slug" in new TestCase {
       mapResponse(Status.Ok, Request[IO](), Response[IO](Status.Ok).withEntity(projectJson))
-        .unsafeRunSync() shouldBe projectPath.some
+        .unsafeRunSync() shouldBe projectSlug.some
     }
 
     Status.Unauthorized :: Status.Forbidden :: Status.NotFound :: Nil foreach { status =>
@@ -103,20 +103,20 @@ class ProjectPathFinderSpec
 
   private trait TestCase {
     val projectId   = projectIds.generateOne
-    val projectPath = projectPaths.generateOne
+    val projectSlug = projectSlugs.generateOne
 
     private implicit val logger: TestLogger[IO]   = TestLogger[IO]()
     implicit val gitLabClient:   GitLabClient[IO] = mock[GitLabClient[IO]]
-    val pathFinder = new ProjectPathFinderImpl[IO]
+    val slugFinder = new ProjectSlugFinderImpl[IO]
 
     lazy val projectJson = json"""{
-      "id": ${projectId.value},
-      "path_with_namespace": ${projectPath.value}
+      "id":                  $projectId,
+      "path_with_namespace": $projectSlug
     }"""
 
     lazy val mapResponse = captureMapping(gitLabClient)(
-      findingMethod = pathFinder.findProjectPath(projectId, accessTokens.generateOne).value.unsafeRunSync(),
-      resultGenerator = projectPaths.generateOption
+      findingMethod = slugFinder.findProjectSlug(projectId, accessTokens.generateOne).value.unsafeRunSync(),
+      resultGenerator = projectSlugs.generateOption
     )
   }
 }

@@ -59,7 +59,7 @@ class BacklogCreatorSpec
   "createBacklog" should {
 
     "find all projects that are either in schema v9 or have no schema but date created before migration start date " +
-      "and copy their paths into the migrations DS" in new TestCase {
+      "and copy their slugs into the migrations DS" in new TestCase {
 
         givenMigrationDateFinding(returning = Instant.now().pure[IO])
 
@@ -76,7 +76,7 @@ class BacklogCreatorSpec
 
         backlogCreator.createBacklog().unsafeRunSync() shouldBe ()
 
-        fetchBacklogProjects.toSet shouldBe projects.map(_.path).toSet
+        fetchBacklogProjects.toSet shouldBe projects.map(_.slug).toSet
       }
 
     "skip projects in schema different than v9" in new TestCase {
@@ -111,7 +111,7 @@ class BacklogCreatorSpec
 
       backlogCreator.createBacklog().unsafeRunSync() shouldBe ()
 
-      fetchBacklogProjects.toSet shouldBe Set(v9Project1.path, v9Project2.path)
+      fetchBacklogProjects.toSet shouldBe Set(v9Project1.slug, v9Project2.slug)
     }
 
     "skip projects without schema but dateCreated before the migration start time" in new TestCase {
@@ -142,7 +142,7 @@ class BacklogCreatorSpec
 
       backlogCreator.createBacklog().unsafeRunSync() shouldBe ()
 
-      fetchBacklogProjects.toSet shouldBe Set(oldProject1.path, oldProject2.path)
+      fetchBacklogProjects.toSet shouldBe Set(oldProject1.slug, oldProject2.slug)
     }
   }
 
@@ -167,13 +167,13 @@ class BacklogCreatorSpec
         SparqlQuery.ofUnsafe(
           "test V10 backlog",
           Prefixes of renku -> "renku",
-          s"""|SELECT ?path
+          s"""|SELECT ?slug
               |WHERE {
-              |  ${MigrationToV10.name.asEntityId.asSparql.sparql} renku:toBeMigrated ?path
+              |  ${MigrationToV10.name.asEntityId.asSparql.sparql} renku:toBeMigrated ?slug
               |}
               |""".stripMargin
         )
-      ).unsafeRunSync().flatMap(_.get("path").map(projects.Path))
+      ).unsafeRunSync().flatMap(_.get("slug").map(projects.Slug))
   }
 
   private def setSchema(version: SchemaVersion): Project => Project =

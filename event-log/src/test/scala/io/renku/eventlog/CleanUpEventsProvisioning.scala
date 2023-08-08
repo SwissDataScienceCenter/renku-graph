@@ -31,31 +31,31 @@ trait CleanUpEventsProvisioning {
   self: InMemoryEventLogDb =>
 
   protected def insertCleanUpEvent(project: consumers.Project, date: OffsetDateTime = OffsetDateTime.now()): Unit =
-    insertCleanUpEvent(project.id, project.path, date)
+    insertCleanUpEvent(project.id, project.slug, date)
 
   protected def insertCleanUpEvent(projectId:   projects.GitLabId,
-                                   projectPath: projects.Path,
+                                   projectSlug: projects.Slug,
                                    date:        OffsetDateTime
   ): Unit =
     execute {
       Kleisli { session =>
-        val query: Command[OffsetDateTime *: projects.GitLabId *: projects.Path *: EmptyTuple] = sql"""
-          INSERT INTO clean_up_events_queue (date, project_id, project_path)
-          VALUES ($timestamptz, $projectIdEncoder, $projectPathEncoder)""".command
+        val query: Command[OffsetDateTime *: projects.GitLabId *: projects.Slug *: EmptyTuple] = sql"""
+          INSERT INTO clean_up_events_queue (date, project_id, project_slug)
+          VALUES ($timestamptz, $projectIdEncoder, $projectSlugEncoder)""".command
         session
           .prepare(query)
-          .flatMap(_.execute(date *: projectId *: projectPath *: EmptyTuple))
+          .flatMap(_.execute(date *: projectId *: projectSlug *: EmptyTuple))
           .void
       }
     }
 
-  protected def findCleanUpEvents: List[(projects.GitLabId, projects.Path)] = execute {
+  protected def findCleanUpEvents: List[(projects.GitLabId, projects.Slug)] = execute {
     Kleisli { session =>
-      val query: Query[Void, projects.GitLabId ~ projects.Path] = sql"""
-        SELECT project_id, project_path
+      val query: Query[Void, projects.GitLabId ~ projects.Slug] = sql"""
+        SELECT project_id, project_slug
         FROM clean_up_events_queue
         ORDER BY date DESC"""
-        .query(projectIdDecoder ~ projectPathDecoder)
+        .query(projectIdDecoder ~ projectSlugDecoder)
       session.prepare(query).flatMap(_.stream(Void, 32).compile.toList)
     }
   }

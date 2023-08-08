@@ -49,12 +49,12 @@ class RecentEntitiesFinderSpec extends SearchTestBase {
     upload(projectsDataset, person)
     provisionTestProjects(project1, project2).unsafeRunSync()
 
-    storeProjectViewed(person.maybeGitLabId.get, Instant.now().minus(1, ChronoUnit.DAYS), project1.path)
+    storeProjectViewed(person.maybeGitLabId.get, Instant.now().minus(1, ChronoUnit.DAYS), project1.slug)
     storeDatasetViewed(person.maybeGitLabId.get,
                        Instant.now().minus(2, ChronoUnit.DAYS),
                        dataset1.identification.identifier
     )
-    storeProjectViewed(person.maybeGitLabId.get, Instant.now().minus(3, ChronoUnit.DAYS), project2.path)
+    storeProjectViewed(person.maybeGitLabId.get, Instant.now().minus(3, ChronoUnit.DAYS), project2.slug)
     storeDatasetViewed(person.maybeGitLabId.get,
                        Instant.now().minus(4, ChronoUnit.DAYS),
                        dataset2.identification.identifier
@@ -64,9 +64,9 @@ class RecentEntitiesFinderSpec extends SearchTestBase {
     val result   = finder.findRecentlyViewedEntities(criteria).unsafeRunSync()
 
     val expect = List(
-      EntityType.Project -> project1.path.value,
+      EntityType.Project -> project1.slug.value,
       EntityType.Dataset -> dataset1.provenance.topmostSameAs.value,
-      EntityType.Project -> project2.path.value,
+      EntityType.Project -> project2.slug.value,
       EntityType.Dataset -> dataset2.provenance.topmostSameAs.value
     )
 
@@ -75,7 +75,7 @@ class RecentEntitiesFinderSpec extends SearchTestBase {
     result.results
       .collect {
         case e: SearchEntity.Dataset => EntityType.Dataset -> e.sameAs.value
-        case e: SearchEntity.Project => EntityType.Project -> e.path.value
+        case e: SearchEntity.Project => EntityType.Project -> e.slug.value
       } shouldBe expect
   }
 
@@ -94,8 +94,8 @@ class RecentEntitiesFinderSpec extends SearchTestBase {
     upload(projectsDataset, person)
     provisionTestProjects(project1, project2).unsafeRunSync()
 
-    storeProjectViewed(person.maybeGitLabId.get, Instant.now().minus(1, ChronoUnit.DAYS), project1.path)
-    storeProjectViewed(person.maybeGitLabId.get, Instant.now(), project2.path)
+    storeProjectViewed(person.maybeGitLabId.get, Instant.now().minus(1, ChronoUnit.DAYS), project1.slug)
+    storeProjectViewed(person.maybeGitLabId.get, Instant.now(), project2.slug)
 
     val criteria = Criteria(Set(EntityType.Project), AuthUser(person.maybeGitLabId.get, token), 5)
     val result   = finder.findRecentlyViewedEntities(criteria).unsafeRunSync()
@@ -104,7 +104,7 @@ class RecentEntitiesFinderSpec extends SearchTestBase {
     result.results.head shouldMatchTo
       SearchEntity.Project(
         matchingScore = MatchingScore(1f),
-        path = project2.path,
+        slug = project2.slug,
         name = project2.name,
         visibility = project2.visibility,
         date = project2.dateCreated,
@@ -131,8 +131,8 @@ class RecentEntitiesFinderSpec extends SearchTestBase {
     upload(projectsDataset, person)
     provisionTestProjects(project1, project2).unsafeRunSync()
 
-    storeProjectViewed(person.maybeGitLabId.get, Instant.now().minus(1, ChronoUnit.DAYS), project1.path)
-    storeProjectViewed(person.maybeGitLabId.get, Instant.now(), project2.path)
+    storeProjectViewed(person.maybeGitLabId.get, Instant.now().minus(1, ChronoUnit.DAYS), project1.slug)
+    storeProjectViewed(person.maybeGitLabId.get, Instant.now(), project2.slug)
 
     val criteria = Criteria(Set(EntityType.Project), AuthUser(person.maybeGitLabId.get, token), 1)
     val result   = finder.findRecentlyViewedEntities(criteria).unsafeRunSync()
@@ -142,7 +142,7 @@ class RecentEntitiesFinderSpec extends SearchTestBase {
     result.results.head shouldMatchTo
       SearchEntity.Project(
         matchingScore = MatchingScore(1f),
-        path = project2.path,
+        slug = project2.slug,
         name = project2.name,
         visibility = project2.visibility,
         date = project2.dateCreated,

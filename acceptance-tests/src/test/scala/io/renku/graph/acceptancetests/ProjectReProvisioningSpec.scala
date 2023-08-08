@@ -59,7 +59,7 @@ class ProjectReProvisioningSpec extends AcceptanceSpec with ApplicationServices 
 
       eventually {
         knowledgeGraphClient
-          .GET(s"knowledge-graph/projects/${project.path}", accessToken)
+          .GET(s"knowledge-graph/projects/${project.slug}", accessToken)
           .jsonBody
           .as[Json]
           .flatMap(_.hcursor.downField("version").as[SchemaVersion]) shouldBe project.entitiesProject.version.asRight
@@ -78,7 +78,7 @@ class ProjectReProvisioningSpec extends AcceptanceSpec with ApplicationServices 
       eventLogClient.sendEvent(json"""{
         "categoryName": "CLEAN_UP_REQUEST",
         "project": {
-          "path": ${project.path}
+          "slug": ${project.slug}
         }
       }""")
 
@@ -87,7 +87,7 @@ class ProjectReProvisioningSpec extends AcceptanceSpec with ApplicationServices 
 
       eventually {
         knowledgeGraphClient
-          .GET(s"knowledge-graph/projects/${project.path}", accessToken)
+          .GET(s"knowledge-graph/projects/${project.slug}", accessToken)
           .jsonBody
           .as[Json]
           .flatMap(_.hcursor.downField("version").as[SchemaVersion]) shouldBe newProjectVersion.asRight

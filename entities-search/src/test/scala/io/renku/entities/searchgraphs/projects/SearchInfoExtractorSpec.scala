@@ -34,7 +34,7 @@ class SearchInfoExtractorSpec extends AnyFlatSpec with should.Matchers {
     SearchInfoExtractor.extractSearchInfo(project) shouldBe ProjectSearchInfo(
       project.resourceId,
       project.name,
-      project.path,
+      project.slug,
       project.visibility,
       project.dateCreated,
       project.dateModified,

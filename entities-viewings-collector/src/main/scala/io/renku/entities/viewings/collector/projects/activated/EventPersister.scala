@@ -79,7 +79,7 @@ private class EventPersisterImpl[F[_]: MonadThrow](tsClient: TSClient[F], dedupl
                |WHERE {
                |  GRAPH ?id {
                |    ?id a schema:Project;
-               |        renku:projectPath ${event.path.asObject}
+               |        renku:projectPath ${event.slug.asObject}
                |  }
                |}
                |""".stripMargin

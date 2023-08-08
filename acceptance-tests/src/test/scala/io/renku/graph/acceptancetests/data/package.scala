@@ -80,18 +80,18 @@ package object data extends TSData with ProjectFunctions {
   private lazy val starsCounts: Gen[StarsCount] = nonNegativeInts() map (v => StarsCount(v.value))
   private lazy val sshUrls: Gen[SshUrl] = for {
     hostParts   <- nonEmptyList(nonBlankStrings())
-    projectPath <- projectPaths
-  } yield SshUrl(s"git@${hostParts.toList.mkString(".")}:$projectPath.git")
+    projectSlug <- projectSlugs
+  } yield SshUrl(s"git@${hostParts.toList.mkString(".")}:$projectSlug.git")
 
   private lazy val httpUrls: Gen[HttpUrl] = for {
     url         <- urls()
-    projectPath <- projectPaths
-  } yield HttpUrl(s"$url/$projectPath.git")
+    projectSlug <- projectSlugs
+  } yield HttpUrl(s"$url/$projectSlug.git")
 
   private lazy val readmeUrls: Gen[ReadmeUrl] = for {
     url         <- urls()
-    projectPath <- projectPaths
-  } yield ReadmeUrl(s"$url/$projectPath/blob/master/README.md")
+    projectSlug <- projectSlugs
+  } yield ReadmeUrl(s"$url/$projectSlug/blob/master/README.md")
 
   private lazy val webUrls: Gen[WebUrl] = urls() map WebUrl.apply
 

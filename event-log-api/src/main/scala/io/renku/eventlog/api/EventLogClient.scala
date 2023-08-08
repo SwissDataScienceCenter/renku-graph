@@ -27,7 +27,7 @@ import io.renku.graph.config.EventLogUrl
 import io.renku.graph.model.eventlogapi._
 import io.renku.graph.model.events._
 import io.renku.graph.model.projects
-import io.renku.graph.model.projects.{Path => ProjectPath}
+import io.renku.graph.model.projects.{Slug => ProjectSlug}
 import io.renku.http.rest.paging.model.{Page, PerPage}
 import org.http4s.Uri
 import org.typelevel.log4cats.Logger
@@ -45,7 +45,7 @@ trait EventLogClient[F[_]] {
       .rethrow
       .flatMap(Stream.emits) ++ getAllEvents(criteria.nextPage)
 
-  def getEventPayload(eventId: EventId, projectPath: ProjectPath): F[Result[Option[EventPayload]]]
+  def getEventPayload(eventId: EventId, projectSlug: ProjectSlug): F[Result[Option[EventPayload]]]
 
   def getStatus: F[Result[ServiceStatus]]
 }
@@ -89,14 +89,14 @@ object EventLogClient {
         case Ior.Both(_, s)    => Ior.both(id, s)
       })
 
-    def setProjectPath(id: projects.Identifier): SearchCriteria =
+    def setProjectSlug(id: projects.Identifier): SearchCriteria =
       copy(projectAndStatus = Ior.left(id))
 
     def withStatus(status: EventStatus): SearchCriteria =
       copy(projectAndStatus = projectAndStatus match {
-        case Ior.Left(path) => Ior.both(path, status)
-        case Ior.Right(_)   => Ior.right(status)
-        case Ior.Both(p, _) => Ior.both(p, status)
+        case Ior.Left(identifier) => Ior.both(identifier, status)
+        case Ior.Right(_)         => Ior.right(status)
+        case Ior.Both(p, _)       => Ior.both(p, status)
       })
 
     def setStatus(status: EventStatus): SearchCriteria =
@@ -118,8 +118,8 @@ object EventLogClient {
       copy(page = page.value + 1)
 
     val status: Option[EventStatus] = projectAndStatus.right
-    val projectPath: Option[projects.Path] =
-      projectAndStatus.left collect { case path: projects.Path => path }
+    val projectSlug: Option[projects.Slug] =
+      projectAndStatus.left collect { case slug: projects.Slug => slug }
     val projectId: Option[projects.GitLabId] =
       projectAndStatus.left collect { case id: projects.GitLabId => id }
   }

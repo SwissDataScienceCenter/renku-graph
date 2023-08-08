@@ -64,7 +64,7 @@ private class EventProcessorImpl[F[_]: MonadThrow: AccessTokenFinder: Logger](
   override def process(event: MinProjectInfoEvent): F[Unit] = {
     for {
       _                                   <- Logger[F].info(s"${prefix(event)} accepted")
-      implicit0(mat: Option[AccessToken]) <- findAccessToken(event.project.path)
+      implicit0(mat: Option[AccessToken]) <- findAccessToken(event.project.slug)
       result                              <- measureExecutionTime(transformAndUpload(event))
       _                                   <- logSummary(event)(result)
       _                                   <- sendProjectActivatedEvent(event)(result)
@@ -122,7 +122,7 @@ private class EventProcessorImpl[F[_]: MonadThrow: AccessTokenFinder: Logger](
   ): ((ElapsedTime, EventUploadingResult)) => F[Unit] = {
     case (_, Uploaded(_)) =>
       tgClient
-        .send(ProjectActivated.forProject(event.project.path))
+        .send(ProjectActivated.forProject(event.project.slug))
         .handleErrorWith(Logger[F].error(_)(s"${prefix(event)} sending ${ProjectActivated.categoryName} event failed"))
     case _ => ().pure[F]
   }

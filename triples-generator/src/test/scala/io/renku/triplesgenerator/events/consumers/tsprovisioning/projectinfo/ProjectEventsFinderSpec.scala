@@ -31,7 +31,7 @@ import io.renku.generators.CommonGraphGenerators.accessTokens
 import io.renku.generators.Generators.Implicits._
 import io.renku.generators.Generators._
 import io.renku.graph.model.EventsGenerators.commitIds
-import io.renku.graph.model.GraphModelGenerators.{personGitLabIds, personNames, projectIds, projectPaths}
+import io.renku.graph.model.GraphModelGenerators.{personGitLabIds, personNames, projectIds, projectSlugs}
 import io.renku.graph.model.entities.Project.ProjectMember
 import io.renku.graph.model.events.CommitId
 import io.renku.graph.model.testentities.generators.EntitiesGenerators.projectMembersNoEmail
@@ -148,7 +148,7 @@ class ProjectEventsFinderSpec
 
   private trait TestCase {
 
-    val project = Project(projectIds.generateOne, projectPaths.generateOne)
+    val project = Project(projectIds.generateOne, projectSlugs.generateOne)
     val member  = projectMembersNoEmail.generateOne
     implicit val maybeAccessToken: Option[AccessToken] = accessTokens.generateOption
 
@@ -157,7 +157,7 @@ class ProjectEventsFinderSpec
     val finder = new ProjectEventsFinderImpl[IO]
 
     val mapResponse = captureMapping(gitLabClient)(
-      finder.find(Project(projectIds.generateOne, projectPaths.generateOne), nonNegativeInts().generateOne),
+      finder.find(Project(projectIds.generateOne, projectSlugs.generateOne), nonNegativeInts().generateOne),
       Gen.const(EitherT(IO(Option.empty[(persons.Name, persons.Email)].asRight[ProcessingRecoverableError])))
     )
   }

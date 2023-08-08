@@ -46,10 +46,10 @@ class CleanUpEventSpec extends AnyWordSpec with should.Matchers with EitherValue
         "categoryName": "CLEAN_UP",
         "project": {
           "id":   123,
-          "path": "space/name"
+          "slug": "space/name"
         }
       }""".hcursor.as[CleanUpEvent].value shouldBe CleanUpEvent(
-        Project(projects.GitLabId(123), projects.Path("space/name"))
+        Project(projects.GitLabId(123), projects.Slug("space/name"))
       )
     }
 

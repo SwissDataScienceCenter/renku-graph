@@ -73,7 +73,7 @@ object Microservice extends IOMicroservice {
         eventLogMetrics                                     <- EventLogMetrics(statsFinder)
         implicit0(eventStatusGauges: EventStatusGauges[IO]) <- EventStatusGauges[IO](statsFinder)
         metricsResetScheduler <-
-          GaugeResetScheduler[IO, projects.Path](eventStatusGauges.asList, MetricsConfigProvider())
+          GaugeResetScheduler[IO, projects.Slug](eventStatusGauges.asList, MetricsConfigProvider())
         creationSubscription            <- events.consumers.creation.SubscriptionFactory[IO]
         zombieEventsSubscription        <- events.consumers.zombieevents.SubscriptionFactory[IO]
         commitSyncRequestSubscription   <- events.consumers.commitsyncrequest.SubscriptionFactory[IO]

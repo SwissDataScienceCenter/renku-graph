@@ -67,7 +67,7 @@ class CommitAuthorFinderSpec
           .get(_: Uri, _: String Refined NonEmpty)(
             _: ResponseMappingF[IO, Option[(persons.Name, persons.Email)]]
           )(_: Option[AccessToken]))
-          .expects(uri"projects" / projectPath.show / "repository" / "commits" / commitId.show,
+          .expects(uri"projects" / projectSlug.show / "repository" / "commits" / commitId.show,
                    endpointName,
                    *,
                    maybeAccessToken
@@ -75,7 +75,7 @@ class CommitAuthorFinderSpec
           .returning(expectation.pure[IO])
 
         finder
-          .findCommitAuthor(projectPath, commitId)
+          .findCommitAuthor(projectSlug, commitId)
           .value
           .unsafeRunSync() shouldBe (authorName -> authorEmail).some.asRight
       }
@@ -100,7 +100,7 @@ class CommitAuthorFinderSpec
           .get(_: Uri, _: String Refined NonEmpty)(
             _: ResponseMappingF[IO, Option[(persons.Name, persons.Email)]]
           )(_: Option[AccessToken]))
-          .expects(uri"projects" / projectPath.show / "repository" / "commits" / commitId.show,
+          .expects(uri"projects" / projectSlug.show / "repository" / "commits" / commitId.show,
                    endpointName,
                    *,
                    maybeAccessToken
@@ -108,7 +108,7 @@ class CommitAuthorFinderSpec
           .returning(error.raiseError[IO, Option[(persons.Name, persons.Email)]])
 
         val Left(result) = finder
-          .findCommitAuthor(projectPath, commitId)
+          .findCommitAuthor(projectSlug, commitId)
           .value
           .unsafeRunSync()
 
@@ -145,7 +145,7 @@ class CommitAuthorFinderSpec
 
   private trait TestCase {
     implicit val maybeAccessToken: Option[AccessToken] = accessTokens.generateOption
-    val projectPath = projectPaths.generateOne
+    val projectSlug = projectSlugs.generateOne
     val commitId    = commitIds.generateOne
 
     private implicit val logger: TestLogger[IO]   = TestLogger[IO]()
@@ -153,7 +153,7 @@ class CommitAuthorFinderSpec
     val finder = new CommitAuthorFinderImpl[IO]
 
     val mapResponse = captureMapping(gitLabClient)(
-      finder.findCommitAuthor(projectPaths.generateOne, commitIds.generateOne),
+      finder.findCommitAuthor(projectSlugs.generateOne, commitIds.generateOne),
       Gen.const(EitherT(IO(Option.empty[(persons.Name, persons.Email)].asRight[ProcessingRecoverableError])))
     )
   }

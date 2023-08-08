@@ -52,9 +52,9 @@ private[gitlab] trait Http4sDslUtils {
       CommitId.from(str).toOption
   }
 
-  object ProjectPath {
-    def unapply(str: String): Option[projects.Path] =
-      projects.Path.from(str).toOption
+  object ProjectSlug {
+    def unapply(str: String): Option[projects.Slug] =
+      projects.Slug.from(str).toOption
   }
 
   object ProjectId {

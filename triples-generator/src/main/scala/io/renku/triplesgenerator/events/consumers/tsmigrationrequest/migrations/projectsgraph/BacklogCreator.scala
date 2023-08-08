@@ -45,11 +45,11 @@ private object BacklogCreator {
     migrationsDSClient      <- MigrationsConnectionConfig[F]().map(TSClient[F](_))
   } yield new BacklogCreatorImpl[F](recordsFinder, migrationsDSClient)
 
-  def asToBeMigratedInserts(implicit ru: RenkuUrl): List[projects.Path] => Option[SparqlQuery] =
+  def asToBeMigratedInserts(implicit ru: RenkuUrl): List[projects.Slug] => Option[SparqlQuery] =
     toTriples andThen toInsertQuery
 
-  private def toTriples(implicit ru: RenkuUrl): List[projects.Path] => List[Triple] =
-    _.map(path => Triple(ProvisionProjectsGraph.name.asEntityId, renku / "toBeMigrated", path.asObject))
+  private def toTriples(implicit ru: RenkuUrl): List[projects.Slug] => List[Triple] =
+    _.map(slug => Triple(ProvisionProjectsGraph.name.asEntityId, renku / "toBeMigrated", slug.asObject))
 
   private lazy val toInsertQuery: List[Triple] => Option[SparqlQuery] = {
     case Nil => None
@@ -80,18 +80,18 @@ private class BacklogCreatorImpl[F[_]: Async](recordsFinder: RecordsFinder[F], m
     currentPage
       .getAndUpdate(_ + 1)
       .map(query)
-      .flatMap(findRecords[projects.Path])
+      .flatMap(findRecords[projects.Slug])
       .map(asToBeMigratedInserts)
       .flatMap(storeInBacklog(currentPage))
 
   private def query(page: Int) = SparqlQuery.ofUnsafe(
     show"${ProvisionProjectsGraph.name} - projects to migrate",
     Prefixes of (schema -> "schema", renku -> "renku"),
-    sparql"""|SELECT DISTINCT ?path
+    sparql"""|SELECT DISTINCT ?slug
              |WHERE {
              |  GRAPH ?id {
              |    ?id a schema:Project;
-             |        renku:projectPath ?path.
+             |        renku:projectPath ?slug.
              |  }
              |  FILTER NOT EXISTS {
              |    GRAPH ${GraphClass.Projects.id} {
@@ -99,14 +99,14 @@ private class BacklogCreatorImpl[F[_]: Async](recordsFinder: RecordsFinder[F], m
              |    }
              |  }
              |}
-             |ORDER BY ?path
+             |ORDER BY ?slug
              |LIMIT $pageSize
              |OFFSET ${(page - 1) * pageSize}
              |""".stripMargin
   )
 
-  private implicit lazy val decoder: Decoder[List[projects.Path]] = ResultsDecoder[List, projects.Path] {
-    implicit cur => extract[projects.Path]("path")
+  private implicit lazy val decoder: Decoder[List[projects.Slug]] = ResultsDecoder[List, projects.Slug] {
+    implicit cur => extract[projects.Slug]("slug")
   }
 
   private def storeInBacklog(currentPage: Ref[F, Int]): Option[SparqlQuery] => F[Unit] = {

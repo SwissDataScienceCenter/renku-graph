@@ -27,7 +27,7 @@ import io.renku.events.Generators.subscriberUrls
 import io.renku.generators.Generators._
 import io.renku.generators.Generators.Implicits._
 import io.renku.graph.model.EventContentGenerators.eventDates
-import io.renku.graph.model.GraphModelGenerators.{projectIds, projectPaths}
+import io.renku.graph.model.GraphModelGenerators.{projectIds, projectSlugs}
 import io.renku.graph.model.events.LastSyncedDate
 import io.renku.interpreters.TestLogger
 import io.renku.metrics.TestMetricsRegistry
@@ -46,7 +46,7 @@ class DispatchRecoverySpec
 
     s"delete the row from the subscription_category_sync_times table for the $categoryName and project" in new TestCase {
 
-      upsertProject(event.projectId, event.projectPath, eventDates.generateOne)
+      upsertProject(event.projectId, event.projectSlug, eventDates.generateOne)
       upsertCategorySyncTime(event.projectId, categoryName, timestampsNotInTheFuture.generateAs(LastSyncedDate))
 
       findProjectCategorySyncTimes(event.projectId).map(_._1) shouldBe List(categoryName)
@@ -73,7 +73,7 @@ class DispatchRecoverySpec
 
     s"delete the row from the subscription_category_sync_times table for the $categoryName and project" in new TestCase {
 
-      upsertProject(event.projectId, event.projectPath, eventDates.generateOne)
+      upsertProject(event.projectId, event.projectSlug, eventDates.generateOne)
       upsertCategorySyncTime(event.projectId, categoryName, timestampsNotInTheFuture.generateAs(LastSyncedDate))
 
       findProjectCategorySyncTimes(event.projectId).map(_._1) shouldBe List(categoryName)
@@ -94,7 +94,7 @@ class DispatchRecoverySpec
   }
 
   private trait TestCase {
-    val event = ProjectSyncEvent(projectIds.generateOne, projectPaths.generateOne)
+    val event = ProjectSyncEvent(projectIds.generateOne, projectSlugs.generateOne)
 
     private implicit val logger:           TestLogger[IO]            = TestLogger[IO]()
     private implicit val metricsRegistry:  TestMetricsRegistry[IO]   = TestMetricsRegistry[IO]

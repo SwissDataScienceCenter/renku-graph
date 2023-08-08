@@ -22,7 +22,7 @@ import cats.syntax.all._
 import io.renku.generators.CommonGraphGenerators.authUsers
 import io.renku.generators.Generators.Implicits._
 import io.renku.graph.http.server.security.Authorizer.SecurityRecord
-import io.renku.graph.model.RenkuTinyTypeGenerators.{personGitLabIds, projectPaths, projectVisibilities}
+import io.renku.graph.model.RenkuTinyTypeGenerators.{personGitLabIds, projectSlugs, projectVisibilities}
 import org.scalacheck.Gen
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.TryValues
@@ -31,46 +31,46 @@ import org.scalatest.wordspec.AnyWordSpec
 
 import scala.util.Try
 
-class ProjectPathRecordsFinderSpec extends AnyWordSpec with should.Matchers with MockFactory with TryValues {
+class ProjectSlugRecordsFinderSpec extends AnyWordSpec with should.Matchers with MockFactory with TryValues {
 
   "apply" should {
 
     "return SecurityRecords from the TS when found" in new TestCase {
 
       val securityRecords = securityRecordsGen.generateList(min = 1)
-      givenTSPathRecordsFinder(returning = securityRecords.pure[Try])
+      givenTSSlugRecordsFinder(returning = securityRecords.pure[Try])
 
-      recordsFinder(projectPath, maybeAuthUser).success.value shouldBe securityRecords
+      recordsFinder(projectSlug, maybeAuthUser).success.value shouldBe securityRecords
     }
 
     "return SecurityRecords from the GL when no records found in TS" in new TestCase {
 
-      givenTSPathRecordsFinder(returning = Nil.pure[Try])
+      givenTSSlugRecordsFinder(returning = Nil.pure[Try])
 
       val securityRecords = securityRecordsGen.generateList(min = 1)
-      givenGLPathRecordsFinder(returning = securityRecords.pure[Try])
+      givenGLSlugRecordsFinder(returning = securityRecords.pure[Try])
 
-      recordsFinder(projectPath, maybeAuthUser).success.value shouldBe securityRecords
+      recordsFinder(projectSlug, maybeAuthUser).success.value shouldBe securityRecords
     }
   }
 
   private trait TestCase {
 
-    val projectPath   = projectPaths.generateOne
+    val projectSlug   = projectSlugs.generateOne
     val maybeAuthUser = authUsers.generateOption
 
-    private val tsPathRecordsFinder = mock[TSPathRecordsFinder[Try]]
-    private val glPathRecordsFinder = mock[GitLabPathRecordsFinder[Try]]
-    val recordsFinder               = new ProjectPathRecordsFinderImpl[Try](tsPathRecordsFinder, glPathRecordsFinder)
+    private val tsSlugRecordsFinder = mock[TSSlugRecordsFinder[Try]]
+    private val glSlugRecordsFinder = mock[GLSlugRecordsFinder[Try]]
+    val recordsFinder               = new ProjectSlugRecordsFinderImpl[Try](tsSlugRecordsFinder, glSlugRecordsFinder)
 
-    def givenTSPathRecordsFinder(returning: Try[List[SecurityRecord]]) =
-      (tsPathRecordsFinder.apply _).expects(projectPath, maybeAuthUser).returning(returning)
+    def givenTSSlugRecordsFinder(returning: Try[List[SecurityRecord]]) =
+      (tsSlugRecordsFinder.apply _).expects(projectSlug, maybeAuthUser).returning(returning)
 
-    def givenGLPathRecordsFinder(returning: Try[List[SecurityRecord]]) =
-      (glPathRecordsFinder.apply _).expects(projectPath, maybeAuthUser).returning(returning)
+    def givenGLSlugRecordsFinder(returning: Try[List[SecurityRecord]]) =
+      (glSlugRecordsFinder.apply _).expects(projectSlug, maybeAuthUser).returning(returning)
 
     val securityRecordsGen: Gen[SecurityRecord] =
       (projectVisibilities, personGitLabIds.toGeneratorOfSet(min = 0))
-        .mapN(SecurityRecord(_, projectPath, _))
+        .mapN(SecurityRecord(_, projectSlug, _))
   }
 }

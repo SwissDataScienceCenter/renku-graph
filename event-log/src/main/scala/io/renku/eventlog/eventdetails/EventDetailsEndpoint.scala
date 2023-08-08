@@ -57,11 +57,11 @@ class EventDetailsEndpointImpl[F[_]: Concurrent: Logger](eventDetailsFinder: Eve
 
   private implicit lazy val encoder: Encoder[EventDetails] = Encoder.instance[EventDetails] { eventDetails =>
     json"""{
-      "id": ${eventDetails.id.value},
+      "id": ${eventDetails.id},
       "project": {
-        "id": ${eventDetails.projectId.value}
+        "id": ${eventDetails.projectId}
       },
-      "body": ${eventDetails.eventBody.value}
+      "body": ${eventDetails.eventBody}
     }"""
   }
 }

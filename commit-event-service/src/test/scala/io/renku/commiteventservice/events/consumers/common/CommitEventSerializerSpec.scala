@@ -42,7 +42,7 @@ class CommitEventSerializerSpec extends AnyWordSpec with ScalaCheckPropertyCheck
           "parents"       -> Json.fromValues(commitEvent.parents.map(parent => Json.fromString(parent.value))),
           "project" -> Json.obj(
             "id"   -> Json.fromInt(commitEvent.project.id.value),
-            "path" -> Json.fromString(commitEvent.project.path.value)
+            "slug" -> Json.fromString(commitEvent.project.slug.value)
           )
         ).asRight
       }

@@ -43,8 +43,8 @@ trait NonRenkuProjectEntitiesGenerators {
       creatorGen:     Gen[Person] = personEntities(withGitLabId),
       forksCountGen:  Gen[ForksCount] = anyForksCount
   ): Gen[NonRenkuProject.WithoutParent] = for {
-    path             <- projectPaths
-    name             <- Gen.const(path.toName)
+    slug             <- projectSlugs
+    name             <- Gen.const(slug.toName)
     maybeDescription <- projectDescriptions.toGeneratorOfOptions
     dateCreated      <- projectCreatedDates(minDateCreated.value)
     dateModified     <- projectModifiedDates(dateCreated.value)
@@ -55,7 +55,7 @@ trait NonRenkuProjectEntitiesGenerators {
     members          <- personEntities(withGitLabId).toGeneratorOfSet(min = 0)
     images           <- imageUris.toGeneratorOfList()
   } yield NonRenkuProject.WithoutParent(
-    path,
+    slug,
     name,
     maybeDescription,
     dateCreated,

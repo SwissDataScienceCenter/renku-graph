@@ -54,7 +54,7 @@ class EndpointSpec
     with should.Matchers
     with IOSpec {
 
-  "GET /projects/:path" should {
+  "GET /projects/:slug" should {
 
     forAll {
       Table(
@@ -67,21 +67,21 @@ class EndpointSpec
         "respond with OK with application/json and the found project details " +
         s"when there's $caze header in the request" in new TestCase {
 
-          givenProjectFinding(project.path, returning = project.some.pure[IO])
+          givenProjectFinding(project.slug, returning = project.some.pure[IO])
 
           val json = jsons.generateOne
           (projectJsonEncoder.encode(_: Project)(_: GitLabUrl)).expects(project, gitLabUrl).returns(json)
 
-          givenProjectViewedEventSent(project.path, returning = ().pure[IO])
+          givenProjectViewedEventSent(project.slug, returning = ().pure[IO])
 
-          val response = endpoint.`GET /projects/:path`(project.path, maybeAuthUser)(request).unsafeRunSync()
+          val response = endpoint.`GET /projects/:slug`(project.slug, maybeAuthUser)(request).unsafeRunSync()
 
           response.status                   shouldBe Ok
           response.contentType              shouldBe Some(`Content-Type`(application.json))
           response.as[Json].unsafeRunSync() shouldBe json
 
           logger.loggedOnly(
-            Warn(s"Finding '${project.path}' details finished${executionTimeRecorder.executionTimeInfo}")
+            Warn(s"Finding '${project.slug}' details finished${executionTimeRecorder.executionTimeInfo}")
           )
           logger.reset()
         }
@@ -91,22 +91,22 @@ class EndpointSpec
       "respond with OK with application/ld+json and the found project details " +
       "when there's Accept: application/ld+json header in the request" in new TestCase {
 
-        givenProjectFinding(project.path, returning = project.some.pure[IO])
+        givenProjectFinding(project.slug, returning = project.some.pure[IO])
 
         val jsonLD = jsonLDEntities.generateOne
         (projectJsonLDEncoder.encode _).expects(project).returns(jsonLD)
 
-        givenProjectViewedEventSent(project.path, returning = ().pure[IO])
+        givenProjectViewedEventSent(project.slug, returning = ().pure[IO])
 
         val request  = Request[IO](headers = Headers(Accept(application.`ld+json`)))
-        val response = endpoint.`GET /projects/:path`(project.path, maybeAuthUser)(request).unsafeRunSync()
+        val response = endpoint.`GET /projects/:slug`(project.slug, maybeAuthUser)(request).unsafeRunSync()
 
         response.status                   shouldBe Ok
         response.contentType              shouldBe Some(`Content-Type`(application.`ld+json`))
         response.as[Json].unsafeRunSync() shouldBe jsonLD.toJson
 
         logger.loggedOnly(
-          Warn(s"Finding '${project.path}' details finished${executionTimeRecorder.executionTimeInfo}")
+          Warn(s"Finding '${project.slug}' details finished${executionTimeRecorder.executionTimeInfo}")
         )
       }
 
@@ -121,43 +121,43 @@ class EndpointSpec
         )
       )
     } { case (caze, request, contentType) =>
-      s"respond with NOT_FOUND if there is no project with the given path - $caze header" in new TestCase {
+      s"respond with NOT_FOUND if there is no project with the given slug - $caze header" in new TestCase {
 
-        givenProjectFinding(project.path, returning = None.pure[IO])
+        givenProjectFinding(project.slug, returning = None.pure[IO])
 
-        val response = endpoint.`GET /projects/:path`(project.path, maybeAuthUser)(request).unsafeRunSync()
+        val response = endpoint.`GET /projects/:slug`(project.slug, maybeAuthUser)(request).unsafeRunSync()
 
         response.status                          shouldBe NotFound
         response.contentType                     shouldBe Some(`Content-Type`(contentType))
-        response.as[Json].unsafeRunSync().noSpaces should include(s"No '${project.path}' project found")
+        response.as[Json].unsafeRunSync().noSpaces should include(s"No '${project.slug}' project found")
       }
 
       s"respond with INTERNAL_SERVER_ERROR if finding project details fails - $caze header" in new TestCase {
 
         val exception = exceptions.generateOne
-        givenProjectFinding(project.path, returning = exception.raiseError[IO, Option[Project]])
+        givenProjectFinding(project.slug, returning = exception.raiseError[IO, Option[Project]])
 
-        val response = endpoint.`GET /projects/:path`(project.path, maybeAuthUser)(request).unsafeRunSync()
+        val response = endpoint.`GET /projects/:slug`(project.slug, maybeAuthUser)(request).unsafeRunSync()
 
         response.status      shouldBe InternalServerError
         response.contentType shouldBe Some(`Content-Type`(contentType))
 
-        response.as[Json].unsafeRunSync().noSpaces should include(s"Finding '${project.path}' project failed")
+        response.as[Json].unsafeRunSync().noSpaces should include(s"Finding '${project.slug}' project failed")
 
-        logger.loggedOnly(Error(s"Finding '${project.path}' project failed", exception))
+        logger.loggedOnly(Error(s"Finding '${project.slug}' project failed", exception))
       }
     }
 
     "do not fail if sending PROJECT_VIEWED event fails" in new TestCase {
 
-      givenProjectFinding(project.path, returning = project.some.pure[IO])
+      givenProjectFinding(project.slug, returning = project.some.pure[IO])
 
       (projectJsonEncoder.encode(_: Project)(_: GitLabUrl)).expects(project, gitLabUrl).returns(jsons.generateOne)
 
       val exception = exceptions.generateOne
-      givenProjectViewedEventSent(project.path, returning = exception.raiseError[IO, Unit])
+      givenProjectViewedEventSent(project.slug, returning = exception.raiseError[IO, Unit])
 
-      endpoint.`GET /projects/:path`(project.path, maybeAuthUser)(Request[IO]()).unsafeRunSync().status shouldBe Ok
+      endpoint.`GET /projects/:slug`(project.slug, maybeAuthUser)(Request[IO]()).unsafeRunSync().status shouldBe Ok
 
       logger.logged(Error(show"sending ${ProjectViewedEvent.categoryName} event failed", exception))
     }
@@ -188,15 +188,15 @@ class EndpointSpec
       now
     )
 
-    def givenProjectFinding(path: projects.Path, returning: IO[Option[Project]]) =
+    def givenProjectFinding(slug: projects.Slug, returning: IO[Option[Project]]) =
       (projectFinder.findProject _)
-        .expects(path, maybeAuthUser)
+        .expects(slug, maybeAuthUser)
         .returning(returning)
 
-    def givenProjectViewedEventSent(path: projects.Path, returning: IO[Unit]) =
+    def givenProjectViewedEventSent(slug: projects.Slug, returning: IO[Unit]) =
       (tgClient
         .send(_: ProjectViewedEvent))
-        .expects(ProjectViewedEvent.forProjectAndUserId(path, maybeAuthUser.map(_.id), now))
+        .expects(ProjectViewedEvent.forProjectAndUserId(slug, maybeAuthUser.map(_.id), now))
         .returning(returning)
   }
 }

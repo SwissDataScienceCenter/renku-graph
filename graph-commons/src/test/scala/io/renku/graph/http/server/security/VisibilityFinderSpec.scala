@@ -56,14 +56,14 @@ class VisibilityFinderSpec
       val visibility = projectVisibilities.generateSome
       givenFindingVisibility(returning = visibility.pure[IO])
 
-      finder.findVisibility(projectPath).unsafeRunSync() shouldBe visibility
+      finder.findVisibility(projectSlug).unsafeRunSync() shouldBe visibility
     }
 
     "return no visibility if not found" in new TestCase {
 
       givenFindingVisibility(returning = None.pure[IO])
 
-      finder.findVisibility(projectPath).unsafeRunSync() shouldBe None
+      finder.findVisibility(projectSlug).unsafeRunSync() shouldBe None
     }
 
     "return visibility if OK and relevant property exists in the response" in new TestCase {
@@ -88,7 +88,7 @@ class VisibilityFinderSpec
 
   private trait TestCase {
 
-    val projectPath = projectPaths.generateOne
+    val projectSlug = projectSlugs.generateOne
     implicit val maybeAccessToken: Option[AccessToken] = accessTokens.generateOption
 
     private implicit val logger: TestLogger[IO]   = TestLogger[IO]()
@@ -97,7 +97,7 @@ class VisibilityFinderSpec
 
     def givenFindingVisibility(returning: IO[Option[projects.Visibility]]) = {
       val endpointName: String Refined NonEmpty = "single-project"
-      val uri = uri"projects" / projectPath
+      val uri = uri"projects" / projectSlug
 
       (gitLabClient
         .get(_: Uri, _: String Refined NonEmpty)(_: ResponseMappingF[IO, Option[projects.Visibility]])(
@@ -109,7 +109,7 @@ class VisibilityFinderSpec
 
     val mapResponse =
       captureMapping(gitLabClient)(
-        finder.findVisibility(projectPath)(maybeAccessToken).unsafeRunSync(),
+        finder.findVisibility(projectSlug)(maybeAccessToken).unsafeRunSync(),
         projectVisibilities.generateOption
       )
   }

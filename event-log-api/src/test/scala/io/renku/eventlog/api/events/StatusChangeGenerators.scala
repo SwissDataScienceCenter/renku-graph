@@ -55,7 +55,7 @@ trait StatusChangeGenerators {
 
   lazy val toFailureEvents: Gen[ToFailure] = for {
     eventId        <- EventsGenerators.compoundEventIds
-    projectPath    <- projectPaths
+    projectSlug    <- projectSlugs
     message        <- EventContentGenerators.eventMessages
     executionDelay <- executionDelays.toGeneratorOfOptions
     failure <- Gen.oneOf(GenerationRecoverableFailure,
@@ -63,7 +63,7 @@ trait StatusChangeGenerators {
                          TransformationRecoverableFailure,
                          TransformationNonRecoverableFailure
                )
-  } yield ToFailure(eventId.id, Project(eventId.projectId, projectPath), message, failure, executionDelay)
+  } yield ToFailure(eventId.id, Project(eventId.projectId, projectSlug), message, failure, executionDelay)
 
   private def executionDelays: Gen[JDuration] = Gen.choose(0L, 10L).map(JDuration.ofSeconds)
 
@@ -81,9 +81,7 @@ trait StatusChangeGenerators {
   } yield ToTriplesStore(id, project, processingTime)
 
   val redoProjectTransformationEvents: Gen[RedoProjectTransformation] =
-    for {
-      path <- projectPaths
-    } yield RedoProjectTransformation(path)
+    projectSlugs.map(RedoProjectTransformation(_))
 
   val allEventsToNewEvents: Gen[AllEventsToNew.type] =
     Gen.const(AllEventsToNew)

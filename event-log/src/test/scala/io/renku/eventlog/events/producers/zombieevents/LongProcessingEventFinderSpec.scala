@@ -25,7 +25,7 @@ import io.renku.generators.Generators.Implicits._
 import io.renku.generators.Generators._
 import io.renku.graph.model.EventContentGenerators._
 import io.renku.graph.model.EventsGenerators._
-import io.renku.graph.model.GraphModelGenerators.projectPaths
+import io.renku.graph.model.GraphModelGenerators.projectSlugs
 import io.renku.graph.model.events.EventStatus._
 import io.renku.graph.model.events.{CompoundEventId, EventStatus, ExecutionDate}
 import io.renku.metrics.TestMetricsRegistry
@@ -76,7 +76,7 @@ class LongProcessingEventFinderSpec
           upsertEventDeliveryInfo(tooYoungEventId)
 
           finder.popEvent().unsafeRunSync() shouldBe Some(
-            ZombieEvent(finder.processName, oldEnoughEventId, projectPath, status)
+            ZombieEvent(finder.processName, oldEnoughEventId, projectSlug, status)
           )
           finder.popEvent().unsafeRunSync() shouldBe None
         }
@@ -102,7 +102,7 @@ class LongProcessingEventFinderSpec
           )
 
           finder.popEvent().unsafeRunSync() shouldBe Some(
-            ZombieEvent(finder.processName, eventId, projectPath, status)
+            ZombieEvent(finder.processName, eventId, projectSlug, status)
           )
           finder.popEvent().unsafeRunSync() shouldBe None
         }
@@ -111,7 +111,7 @@ class LongProcessingEventFinderSpec
 
   private trait TestCase {
 
-    val projectPath = projectPaths.generateOne
+    val projectSlug = projectSlugs.generateOne
 
     private implicit val metricsRegistry:  TestMetricsRegistry[IO]   = TestMetricsRegistry[IO]
     private implicit val queriesExecTimes: QueriesExecutionTimes[IO] = QueriesExecutionTimes[IO]().unsafeRunSync()
@@ -124,7 +124,7 @@ class LongProcessingEventFinderSpec
         executionDate,
         eventDates.generateOne,
         eventBodies.generateOne,
-        projectPath = projectPath
+        projectSlug = projectSlug
       )
   }
 }

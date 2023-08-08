@@ -59,8 +59,8 @@ class DbUpdaterSpec extends AnyWordSpec with should.Matchers with MockFactory {
   }
 
   private trait TestCase {
-    val event = GraphModelGenerators.projectPaths
-      .map(StatusChangeEvent.ProjectPath.apply)
+    val event = GraphModelGenerators.projectSlugs
+      .map(StatusChangeEvent.ProjectSlug.apply)
       .map(RedoProjectTransformation(_))
       .generateOne
     val session = mock[Session[Try]]

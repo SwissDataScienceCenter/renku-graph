@@ -31,7 +31,7 @@ import skunk.data.Completion
 import java.time.OffsetDateTime
 
 private trait CleanUpEventsQueue[F[_]] {
-  def offer(projectId: projects.GitLabId, projectPath: projects.Path): F[Unit]
+  def offer(projectId: projects.GitLabId, projectSlug: projects.Slug): F[Unit]
 }
 
 private object CleanUpEventsQueue {
@@ -50,20 +50,20 @@ private class CleanUpEventsQueueImpl[F[_]: Async: SessionResource: QueriesExecut
   import skunk.codec.all._
   import skunk.implicits._
 
-  override def offer(projectId: projects.GitLabId, projectPath: projects.Path): F[Unit] = SessionResource[F].useK {
+  override def offer(projectId: projects.GitLabId, projectSlug: projects.Slug): F[Unit] = SessionResource[F].useK {
     measureExecutionTime {
       SqlStatement[F](name = "clean_up_events_queue - offer")
-        .command[OffsetDateTime *: projects.GitLabId *: projects.Path *: EmptyTuple](
-          sql"""INSERT INTO clean_up_events_queue (date, project_id, project_path)
-                VALUES ($timestamptz, $projectIdEncoder, $projectPathEncoder)
+        .command[OffsetDateTime *: projects.GitLabId *: projects.Slug *: EmptyTuple](
+          sql"""INSERT INTO clean_up_events_queue (date, project_id, project_slug)
+                VALUES ($timestamptz, $projectIdEncoder, $projectSlugEncoder)
                 ON CONFLICT DO NOTHING
           """.command
         )
-        .arguments(now() *: projectId *: projectPath *: EmptyTuple)
+        .arguments(now() *: projectId *: projectSlug *: EmptyTuple)
         .build
     } flatMapF {
       case Completion.Insert(0 | 1) => ().pure[F]
-      case other => new Exception(show"$categoryName: offering $projectPath failed with $other").raiseError[F, Unit]
+      case other => new Exception(show"$categoryName: offering $projectSlug failed with $other").raiseError[F, Unit]
     }
   }
 }

@@ -189,13 +189,13 @@ class EndpointSpec extends AnyWordSpec with MockFactory with ScalaCheckPropertyC
     }
 
     private implicit lazy val imagesEncoder: Encoder[(List[ImageUri], ExemplarProject)] =
-      Encoder.instance[(List[ImageUri], ExemplarProject)] { case (images, ExemplarProject(_, path)) =>
+      Encoder.instance[(List[ImageUri], ExemplarProject)] { case (images, ExemplarProject(_, slug)) =>
         Json.arr(images.map {
           case uri: ImageUri.Relative => json"""{
             "location": $uri,
             "_links": [{
               "rel":  "view",
-              "href": ${s"$gitLabUrl/$path/raw/master/$uri"}
+              "href": ${s"$gitLabUrl/$slug/raw/master/$uri"}
             }]
           }"""
           case uri: ImageUri.Absolute => json"""{
@@ -234,7 +234,7 @@ class EndpointSpec extends AnyWordSpec with MockFactory with ScalaCheckPropertyC
     maybeDescription,
     creators.map(_.to[DatasetCreator]).toList,
     dates,
-    ExemplarProject(exemplarProjectId, exemplarProjectId.toUnsafe[projects.Path]),
+    ExemplarProject(exemplarProjectId, exemplarProjectId.toUnsafe[projects.Slug]),
     projectsCount,
     keywords,
     images

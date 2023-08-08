@@ -99,15 +99,15 @@ class ZombieEventDetectionSpec
   }
 
   private def insertProjectToDB(project: data.Project, eventDate: EventDate): Int = EventLog.execute { session =>
-    val query: Command[GitLabId *: Path *: EventDate *: EmptyTuple] =
-      sql"""INSERT INTO project (project_id, project_path, latest_event_date)
-          VALUES ($projectIdEncoder, $projectPathEncoder, $eventDateEncoder)
-          ON CONFLICT (project_id)
-          DO UPDATE SET latest_event_date = excluded.latest_event_date WHERE excluded.latest_event_date > project.latest_event_date
-          """.command
+    val query: Command[GitLabId *: Slug *: EventDate *: EmptyTuple] =
+      sql"""INSERT INTO project (project_id, project_slug, latest_event_date)
+            VALUES ($projectIdEncoder, $projectSlugEncoder, $eventDateEncoder)
+            ON CONFLICT (project_id)
+            DO UPDATE SET latest_event_date = excluded.latest_event_date WHERE excluded.latest_event_date > project.latest_event_date
+            """.command
     session
       .prepare(query)
-      .flatMap(_.execute(project.id *: project.path *: eventDate *: EmptyTuple))
+      .flatMap(_.execute(project.id *: project.slug *: eventDate *: EmptyTuple))
       .flatMap {
         case Completion.Insert(n) => n.pure[IO]
         case completion =>
@@ -143,10 +143,10 @@ class ZombieEventDetectionSpec
             eventDate *:
             BatchDate(eventDate.value) *:
             EventBody(json"""{
-                      "id": ${commitId.value},
+                      "id": $commitId,
                       "project": {
-                        "id":   ${project.id.value},
-                        "path": ${project.path.value}
+                        "id":   ${project.id},
+                        "slug": ${project.slug}
                       },
                       "parents": []
                     }""".noSpaces) *:

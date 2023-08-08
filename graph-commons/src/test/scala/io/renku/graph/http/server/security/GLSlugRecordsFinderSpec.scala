@@ -30,7 +30,7 @@ import org.scalamock.scalatest.MockFactory
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
 
-class GitLabPathRecordsFinderSpec extends AnyWordSpec with should.Matchers with IOSpec with MockFactory {
+class GLSlugRecordsFinderSpec extends AnyWordSpec with should.Matchers with IOSpec with MockFactory {
 
   "apply" should {
 
@@ -42,8 +42,8 @@ class GitLabPathRecordsFinderSpec extends AnyWordSpec with should.Matchers with 
       val members = personGitLabIds.generateSet()
       givenFindingMembers(returning = members.pure[IO])
 
-      recordsFinder(projectPath, maybeAuthUser).unsafeRunSync() shouldBe List(
-        Authorizer.SecurityRecord(visibility, projectPath, members)
+      recordsFinder(projectSlug, maybeAuthUser).unsafeRunSync() shouldBe List(
+        Authorizer.SecurityRecord(visibility, projectSlug, members)
       )
     }
 
@@ -54,29 +54,29 @@ class GitLabPathRecordsFinderSpec extends AnyWordSpec with should.Matchers with 
       val members = personGitLabIds.generateSet()
       givenFindingMembers(returning = members.pure[IO])
 
-      recordsFinder(projectPath, maybeAuthUser).unsafeRunSync() shouldBe Nil
+      recordsFinder(projectSlug, maybeAuthUser).unsafeRunSync() shouldBe Nil
     }
   }
 
   private trait TestCase {
 
-    val projectPath   = projectPaths.generateOne
+    val projectSlug   = projectSlugs.generateOne
     val maybeAuthUser = authUsers.generateOption
 
     implicit val visibilityFinder: VisibilityFinder[IO] = mock[VisibilityFinder[IO]]
     implicit val membersFinder:    MembersFinder[IO]    = mock[MembersFinder[IO]]
-    val recordsFinder = new GitLabPathRecordsFinderImpl[IO](visibilityFinder, membersFinder)
+    val recordsFinder = new GLSlugRecordsFinderImpl[IO](visibilityFinder, membersFinder)
 
     def givenFindingVisibility(returning: IO[Option[projects.Visibility]]) =
       (visibilityFinder
-        .findVisibility(_: projects.Path)(_: Option[AccessToken]))
-        .expects(projectPath, maybeAuthUser.map(_.accessToken))
+        .findVisibility(_: projects.Slug)(_: Option[AccessToken]))
+        .expects(projectSlug, maybeAuthUser.map(_.accessToken))
         .returning(returning)
 
     def givenFindingMembers(returning: IO[Set[persons.GitLabId]]) =
       (membersFinder
-        .findMembers(_: projects.Path)(_: Option[AccessToken]))
-        .expects(projectPath, maybeAuthUser.map(_.accessToken))
+        .findMembers(_: projects.Slug)(_: Option[AccessToken]))
+        .expects(projectSlug, maybeAuthUser.map(_.accessToken))
         .returning(returning)
   }
 }

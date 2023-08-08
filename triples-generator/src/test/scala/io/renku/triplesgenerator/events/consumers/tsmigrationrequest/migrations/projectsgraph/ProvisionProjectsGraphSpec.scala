@@ -24,7 +24,7 @@ import cats.effect.IO
 import cats.syntax.all._
 import io.renku.generators.Generators.Implicits._
 import io.renku.graph.model._
-import GraphModelGenerators.projectPaths
+import GraphModelGenerators.projectSlugs
 import cats.MonadThrow
 import io.renku.entities.searchgraphs.projects.ProjectsGraphProvisioner
 import io.renku.generators.Generators.{exceptions, nonEmptyStrings, positiveInts}
@@ -80,23 +80,23 @@ class ProvisionProjectsGraphSpec
 
         givenBacklogCreated()
 
-        val allProjectPaths = projectPaths.generateList(min = pageSize, max = pageSize * 2)
+        val allProjectSlugs = projectSlugs.generateList(min = pageSize, max = pageSize * 2)
 
-        val projectPathsPages = allProjectPaths
+        val projectSlugsPages = allProjectSlugs
           .sliding(pageSize, pageSize)
           .toList
-        givenProjectsPagesReturned(projectPathsPages :+ List.empty[projects.Path])
+        givenProjectsPagesReturned(projectSlugsPages :+ List.empty[projects.Slug])
 
-        givenProgressInfoFinding(returning = nonEmptyStrings().generateOne.pure[IO], times = allProjectPaths.size)
+        givenProgressInfoFinding(returning = nonEmptyStrings().generateOne.pure[IO], times = allProjectSlugs.size)
 
-        allProjectPaths foreach { path =>
+        allProjectSlugs foreach { slug =>
           val project = anyProjectEntities
-            .map(_.fold(_.copy(path = path), _.copy(path = path), _.copy(path = path), _.copy(path = path)))
+            .map(_.fold(_.copy(slug = slug), _.copy(slug = slug), _.copy(slug = slug), _.copy(slug = slug)))
             .generateOne
             .to[entities.Project]
-          givenProjectDataFetching(path, returning = project.some.pure[IO])
+          givenProjectDataFetching(slug, returning = project.some.pure[IO])
           givenProjectsGraphProvisioning(project, returning = ().pure[IO])
-          verifyProjectNotedDone(path)
+          verifyProjectNotedDone(slug)
         }
 
         migration.migrate().value.unsafeRunSync().value shouldBe ()
@@ -106,28 +106,28 @@ class ProvisionProjectsGraphSpec
 
       givenBacklogCreated()
 
-      val projectPath1 = projectPaths.generateOne
-      val projectPath2 = projectPaths.generateOne
-      val projectPath3 = projectPaths.generateOne
+      val projectSlug1 = projectSlugs.generateOne
+      val projectSlug2 = projectSlugs.generateOne
+      val projectSlug3 = projectSlugs.generateOne
 
-      val projectPathsPage = List(projectPath1, projectPath2, projectPath3)
+      val projectSlugsPage = List(projectSlug1, projectSlug2, projectSlug3)
 
-      givenProjectsPagesReturned(List(projectPathsPage) :+ List.empty[projects.Path])
+      givenProjectsPagesReturned(List(projectSlugsPage) :+ List.empty[projects.Slug])
 
-      givenProgressInfoFinding(returning = nonEmptyStrings().generateOne.pure[IO], times = projectPathsPage.size)
+      givenProgressInfoFinding(returning = nonEmptyStrings().generateOne.pure[IO], times = projectSlugsPage.size)
 
-      List(projectPath1, projectPath3) foreach { path =>
+      List(projectSlug1, projectSlug3) foreach { slug =>
         val project = anyProjectEntities
-          .map(_.fold(_.copy(path = path), _.copy(path = path), _.copy(path = path), _.copy(path = path)))
+          .map(_.fold(_.copy(slug = slug), _.copy(slug = slug), _.copy(slug = slug), _.copy(slug = slug)))
           .generateOne
           .to[entities.Project]
-        givenProjectDataFetching(path, returning = project.some.pure[IO])
+        givenProjectDataFetching(slug, returning = project.some.pure[IO])
         givenProjectsGraphProvisioning(project, returning = ().pure[IO])
-        verifyProjectNotedDone(path)
+        verifyProjectNotedDone(slug)
       }
 
-      givenProjectDataFetching(projectPath2, returning = None.pure[IO])
-      verifyProjectNotedDone(projectPath2)
+      givenProjectDataFetching(projectSlug2, returning = None.pure[IO])
+      verifyProjectNotedDone(projectSlug2)
 
       migration.migrate().value.unsafeRunSync().value shouldBe ()
     }
@@ -139,7 +139,7 @@ class ProvisionProjectsGraphSpec
       val exception = exceptions.generateOne
       (() => projectsFinder.nextProjectsPage())
         .expects()
-        .returning(exception.raiseError[IO, List[projects.Path]])
+        .returning(exception.raiseError[IO, List[projects.Slug]])
 
       migration.migrate().value.unsafeRunSync().left.value shouldBe recoverableError
     }
@@ -190,7 +190,7 @@ class ProvisionProjectsGraphSpec
         .expects()
         .returning(().pure[IO])
 
-    def givenProjectsPagesReturned(pages: List[List[projects.Path]]): Unit =
+    def givenProjectsPagesReturned(pages: List[List[projects.Slug]]): Unit =
       pages foreach { page =>
         (projectsFinder.nextProjectsPage _)
           .expects()
@@ -203,9 +203,9 @@ class ProvisionProjectsGraphSpec
         .returning(returning)
         .repeat(times)
 
-    def givenProjectDataFetching(path: projects.Path, returning: IO[Option[entities.Project]]) =
+    def givenProjectDataFetching(slug: projects.Slug, returning: IO[Option[entities.Project]]) =
       (projectFetcher.fetchProject _)
-        .expects(path)
+        .expects(slug)
         .returning(returning)
 
     def givenProjectsGraphProvisioning(project: entities.Project, returning: IO[Unit]) =
@@ -213,9 +213,9 @@ class ProvisionProjectsGraphSpec
         .expects(project)
         .returning(returning)
 
-    def verifyProjectNotedDone(path: projects.Path) =
+    def verifyProjectNotedDone(slug: projects.Slug) =
       (projectDonePersister.noteDone _)
-        .expects(path)
+        .expects(slug)
         .returning(().pure[IO])
 
     def verifyMigrationExecutionRegistered =

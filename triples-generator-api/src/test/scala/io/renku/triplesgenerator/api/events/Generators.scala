@@ -40,16 +40,16 @@ object Generators {
     (datasetIdentifiers, datasetViewedDates(), personGitLabIds.toGeneratorOfOptions).mapN(DatasetViewedEvent.apply)
 
   val projectActivatedEvents: Gen[ProjectActivated] =
-    (projectPaths -> timestampsNotInTheFuture.toGeneratorOf(ProjectActivated.DateActivated))
+    (projectSlugs -> timestampsNotInTheFuture.toGeneratorOf(ProjectActivated.DateActivated))
       .mapN(ProjectActivated.apply)
 
   val userIds: Gen[UserId] = Gen.oneOf(personGitLabIds.map(UserId(_)), personEmails.map(UserId(_)))
 
   val projectViewedEvents: Gen[ProjectViewedEvent] =
-    (projectPaths, projectViewedDates(), userIds.toGeneratorOfOptions).mapN(ProjectViewedEvent.apply)
+    (projectSlugs, projectViewedDates(), userIds.toGeneratorOfOptions).mapN(ProjectViewedEvent.apply)
 
   val projectViewingDeletions: Gen[ProjectViewingDeletion] =
-    projectPaths.map(ProjectViewingDeletion.apply)
+    projectSlugs.map(ProjectViewingDeletion.apply)
 
   def zippedEventPayloads[F[_]: Sync]: F[Gen[ZippedEventPayload]] =
     zippedContent(jsonLDEntities.map(_.toJson.noSpaces)).map(_.map(ZippedEventPayload(_)))
@@ -64,5 +64,5 @@ object Generators {
     contentGen.map(Zip.zip[F](_)).sequence
 
   val syncRepoMetadataEvents: Gen[SyncRepoMetadata] =
-    projectPaths.map(SyncRepoMetadata(_))
+    projectSlugs.map(SyncRepoMetadata(_))
 }

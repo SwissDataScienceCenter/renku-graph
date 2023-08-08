@@ -32,9 +32,9 @@ class DBUpdateResultsSpec extends AnyWordSpec with should.Matchers {
   "combine" should {
 
     "merge status count for each project" in {
-      val project1         = projectPaths.generateOne
+      val project1         = projectSlugs.generateOne
       val project1Count    = EventStatus.all.map(_ -> Gen.choose(-200, 200).generateOne).toMap
-      val project2         = projectPaths.generateOne
+      val project2         = projectSlugs.generateOne
       val project2Count    = EventStatus.all.map(_ -> Gen.choose(-200, 200).generateOne).toMap
       val uniqueProject    = ForProjects(Set(project1 -> project1Count))
       val multipleProjects = ForProjects(Set(project1 -> project1Count, project2 -> project2Count))
@@ -48,9 +48,9 @@ class DBUpdateResultsSpec extends AnyWordSpec with should.Matchers {
   "DBUpdateResults.ForProjects.apply" should {
 
     "return the statuses count for the given project" in {
-      val project1      = projectPaths.generateOne
+      val project1      = projectSlugs.generateOne
       val project1Count = EventStatus.all.map(_ -> Gen.choose(-200, 200).generateOne).toMap
-      val project2      = projectPaths.generateOne
+      val project2      = projectSlugs.generateOne
       val project2Count = EventStatus.all.map(_ -> Gen.choose(-200, 200).generateOne).toMap
 
       val updateResults = ForProjects(Set(project1 -> project1Count, project2 -> project2Count))
@@ -59,7 +59,7 @@ class DBUpdateResultsSpec extends AnyWordSpec with should.Matchers {
     }
 
     "return no statuses count if the given project does not exists in the results" in {
-      ForProjects.empty(projectPaths.generateOne) shouldBe Map.empty
+      ForProjects.empty(projectSlugs.generateOne) shouldBe Map.empty
     }
   }
 }

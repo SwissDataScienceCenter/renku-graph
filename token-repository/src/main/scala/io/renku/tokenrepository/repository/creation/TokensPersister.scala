@@ -26,9 +26,8 @@ import cats.data.Kleisli
 import cats.effect._
 import cats.syntax.all._
 import io.renku.db.{DbClient, SqlStatement}
-import io.renku.graph.model.projects.{GitLabId, Path}
+import io.renku.graph.model.projects.{GitLabId, Slug}
 import io.renku.tokenrepository.repository.metrics.QueriesExecutionTimes
-import org.typelevel.twiddles.syntax._
 import skunk._
 import skunk.data.Completion
 import skunk.data.Completion.Delete
@@ -36,7 +35,7 @@ import skunk.implicits._
 
 private[repository] trait TokensPersister[F[_]] {
   def persistToken(storingInfo: TokenStoringInfo): F[Unit]
-  def updatePath(project:       Project):          F[Unit]
+  def updateSlug(project:       Project):          F[Unit]
 }
 
 private[repository] object TokensPersister {
@@ -55,24 +54,24 @@ private class TokensPersisterImpl[F[_]: MonadCancelThrow: SessionResource: Queri
     }
   }
 
-  override def updatePath(project: Project): F[Unit] = SessionResource[F].useK(
-    updatePathQuery(project)
+  override def updateSlug(project: Project): F[Unit] = SessionResource[F].useK(
+    updateSlugQuery(project)
   )
 
   private def deleteAssociation(project: Project) = measureExecutionTime {
     SqlStatement
       .named("associate token - delete")
-      .command[GitLabId *: Path *: EmptyTuple](sql"""
+      .command[GitLabId *: Slug *: EmptyTuple](sql"""
         DELETE FROM projects_tokens 
-        WHERE project_id = $projectIdEncoder OR project_path = $projectPathEncoder
+        WHERE project_id = $projectIdEncoder OR project_slug = $projectSlugEncoder
       """.command)
-      .arguments(project.id, project.path)
+      .arguments(project.id, project.slug)
       .build
       .flatMapResult {
         case Delete(_) => ().pure[F]
         case completion =>
           new Exception(
-            s"re-associating token for projectId = ${project.id}, projectPath = ${project.path} failed: $completion"
+            s"re-associating token for projectId = ${project.id}, projectSlug = ${project.slug} failed: $completion"
           ).raiseError[F, Unit]
       }
   }
@@ -80,13 +79,13 @@ private class TokensPersisterImpl[F[_]: MonadCancelThrow: SessionResource: Queri
   private def insert(storingInfo: TokenStoringInfo) = measureExecutionTime {
     SqlStatement
       .named("associate token - insert")
-      .command[GitLabId *: Path *: EncryptedAccessToken *: CreatedAt *: ExpiryDate *: EmptyTuple](sql"""
-        INSERT INTO projects_tokens (project_id, project_path, token, created_at, expiry_date)
-        VALUES ($projectIdEncoder, $projectPathEncoder, $encryptedAccessTokenEncoder, $createdAtEncoder, $expiryDateEncoder)
+      .command[GitLabId *: Slug *: EncryptedAccessToken *: CreatedAt *: ExpiryDate *: EmptyTuple](sql"""
+        INSERT INTO projects_tokens (project_id, project_slug, token, created_at, expiry_date)
+        VALUES ($projectIdEncoder, $projectSlugEncoder, $encryptedAccessTokenEncoder, $createdAtEncoder, $expiryDateEncoder)
       """.command)
       .arguments(
         (storingInfo.project.id,
-         storingInfo.project.path,
+         storingInfo.project.slug,
          storingInfo.encryptedToken,
          storingInfo.dates.createdAt,
          storingInfo.dates.expiryDate
@@ -96,15 +95,15 @@ private class TokensPersisterImpl[F[_]: MonadCancelThrow: SessionResource: Queri
       .void
   } recoverWith { case SqlState.UniqueViolation(_) => Kleisli.pure(()) }
 
-  private def updatePathQuery(project: Project) = measureExecutionTime {
+  private def updateSlugQuery(project: Project) = measureExecutionTime {
     SqlStatement
-      .named("associate token - update path")
-      .command[Path *: GitLabId *: EmptyTuple](sql"""
+      .named("associate token - update slug")
+      .command[Slug *: GitLabId *: EmptyTuple](sql"""
         UPDATE projects_tokens
-        SET project_path = $projectPathEncoder
+        SET project_slug = $projectSlugEncoder
         WHERE project_id = $projectIdEncoder
     """.command)
-      .arguments(project.path -> project.id)
+      .arguments(project.slug -> project.id)
       .build
       .flatMapResult(failIfMultiUpdate(project.id))
   }
@@ -112,7 +111,7 @@ private class TokensPersisterImpl[F[_]: MonadCancelThrow: SessionResource: Queri
   private def failIfMultiUpdate(projectId: GitLabId): Completion => F[Unit] = {
     case Completion.Update(0 | 1) => ().pure[F]
     case completion =>
-      new RuntimeException(s"Updating path for a projectId: $projectId failed with completion code $completion")
+      new RuntimeException(s"Updating slug for a projectId: $projectId failed with completion code $completion")
         .raiseError[F, Unit]
   }
 }

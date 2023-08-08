@@ -67,17 +67,17 @@ class ProjectIdOnCleanUpTableSpec
     "fill in the new 'project_id' column with data from the 'project' table " +
       "and remove rows without matching project" in new TestCase {
 
-        val projectPath1 = projectPaths.generateOne
-        insertToQueue(projectPath1)
+        val projectSlug1 = projectSlugs.generateOne
+        insertToQueue(projectSlug1)
         val projectId1 = projectIds.generateOne
-        insertToProject(projectPath1, projectId1)
+        insertToProject(projectSlug1, projectId1)
 
-        val projectPath2 = projectPaths.generateOne
-        insertToQueue(projectPath2)
+        val projectSlug2 = projectSlugs.generateOne
+        insertToQueue(projectSlug2)
 
         migrator.run.unsafeRunSync() shouldBe ()
 
-        findQueueRows shouldBe List(projectPath1 -> projectId1)
+        findQueueRows shouldBe List(projectSlug1 -> projectId1)
       }
   }
 
@@ -86,26 +86,26 @@ class ProjectIdOnCleanUpTableSpec
     val migrator = new ProjectIdOnCleanUpTableImpl[IO]
   }
 
-  private def insertToQueue(path: projects.Path): Unit = executeCommand {
+  private def insertToQueue(slug: projects.Slug): Unit = executeCommand {
     sql"""INSERT INTO clean_up_events_queue(date, project_path)
-          VALUES(now(), '#${path.show}')
+          VALUES(now(), '#${slug.show}')
        """.command
   }
 
-  private def insertToProject(path: projects.Path, id: projects.GitLabId): Unit = executeCommand {
+  private def insertToProject(slug: projects.Slug, id: projects.GitLabId): Unit = executeCommand {
     sql"""INSERT INTO project(project_id, project_path, latest_event_date)
-          VALUES (#${id.show}, '#${path.show}', now())
+          VALUES (#${id.show}, '#${slug.show}', now())
        """.command
   }
 
-  private def findQueueRows: List[(projects.Path, projects.GitLabId)] =
-    execute[List[(projects.Path, projects.GitLabId)]] {
+  private def findQueueRows: List[(projects.Slug, projects.GitLabId)] =
+    execute[List[(projects.Slug, projects.GitLabId)]] {
       Kleisli { session =>
-        val query: Query[Void, projects.Path ~ projects.GitLabId] = sql"""
+        val query: Query[Void, projects.Slug ~ projects.GitLabId] = sql"""
           SELECT project_path, project_id 
           FROM clean_up_events_queue"""
-          .query(projectPathDecoder ~ projectIdDecoder)
-          .map { case (path: projects.Path, id: projects.GitLabId) => path -> id }
+          .query(projectSlugDecoder ~ projectIdDecoder)
+          .map { case (slug: projects.Slug, id: projects.GitLabId) => slug -> id }
         session.execute(query)
       }
     }

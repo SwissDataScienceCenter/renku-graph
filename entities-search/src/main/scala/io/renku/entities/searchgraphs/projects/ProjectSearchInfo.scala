@@ -26,7 +26,7 @@ import io.renku.graph.model.projects
 
 private final case class ProjectSearchInfo(id:               projects.ResourceId,
                                            name:             projects.Name,
-                                           path:             projects.Path,
+                                           slug:             projects.Slug,
                                            visibility:       projects.Visibility,
                                            dateCreated:      projects.DateCreated,
                                            dateModified:     projects.DateModified,
@@ -41,7 +41,7 @@ private object ProjectSearchInfo {
   implicit val show: Show[ProjectSearchInfo] = Show.show {
     case ProjectSearchInfo(id,
                            name,
-                           path,
+                           slug,
                            visibility,
                            dateCreated,
                            dateModified,
@@ -53,7 +53,7 @@ private object ProjectSearchInfo {
       List(
         show"id = $id".some,
         show"name = $name".some,
-        show"path = $path".some,
+        show"slug = $slug".some,
         show"visibility = $visibility".some,
         show"dateCreated = $dateCreated".some,
         show"dateModified = $dateModified".some,

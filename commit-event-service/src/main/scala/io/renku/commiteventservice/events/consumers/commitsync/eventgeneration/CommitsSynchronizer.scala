@@ -106,7 +106,7 @@ private[commitsync] class CommitsSynchronizerImpl[F[_]: MonadThrow: Logger: Acce
       EventRequestContent.NoPayload(
         json"""{
           "categoryName": "GLOBAL_COMMIT_SYNC_REQUEST", 
-          "project":{ "id": ${event.project.id.value}, "path": ${event.project.path.value}}
+          "project":{ "id": ${event.project.id}, "slug": ${event.project.slug}}
         }"""
       ),
       EventSender.EventContext(CategoryName("GLOBAL_COMMIT_SYNC_REQUEST"),
@@ -220,11 +220,12 @@ private[commitsync] class CommitsSynchronizerImpl[F[_]: MonadThrow: Logger: Acce
   }
 
   private def logMessageFor(eventId: CommitId, project: Project, message: String) =
-    s"$categoryName: id = $eventId, projectId = ${project.id}, projectPath = ${project.path} -> $message"
+    s"$categoryName: id = $eventId, projectId = ${project.id}, projectSlug = ${project.slug} -> $message"
 }
 
 private[commitsync] object CommitsSynchronizer {
-  def apply[F[_]: Async: GitLabClient: AccessTokenFinder: Logger: MetricsRegistry: ExecutionTimeRecorder] = for {
+  def apply[F[_]: Async: GitLabClient: AccessTokenFinder: Logger: MetricsRegistry: ExecutionTimeRecorder]
+      : F[CommitsSynchronizerImpl[F]] = for {
     latestCommitFinder  <- LatestCommitFinder[F]
     eventDetailsFinder  <- EventDetailsFinder[F]
     commitInfoFinder    <- CommitInfoFinder[F]

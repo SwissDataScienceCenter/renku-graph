@@ -58,7 +58,7 @@ private[awaitinggeneration] class RenkuLogTriplesGenerator[F[_]: Async] private[
   override def generateTriples(
       commitEvent: CommitEvent
   )(implicit maybeAccessToken: Option[AccessToken]): EitherT[F, ProcessingRecoverableError, JsonLD] = EitherT {
-    createRepositoryDirectory(commitEvent.project.path)
+    createRepositoryDirectory(commitEvent.project.slug)
       .bracket(path => cloneCheckoutGenerate(commitEvent)(maybeAccessToken, RepositoryPath(path)))(deleteDirectory)
       .recoverWith(meaningfulError(commitEvent, maybeAccessToken))
   }
@@ -80,7 +80,7 @@ private[awaitinggeneration] class RenkuLogTriplesGenerator[F[_]: Async] private[
       maybeAccessToken: Option[AccessToken],
       repoDirectory:    RepositoryPath
   ): EitherT[F, ProcessingRecoverableError, Unit] = for {
-    repositoryUrl <- liftF(findRepositoryUrl(commitEvent.project.path))
+    repositoryUrl <- liftF(findRepositoryUrl(commitEvent.project.slug))
     _             <- git clone (repositoryUrl, workDirectory)
     _             <- liftF(git checkout commitEvent.commitId)
   } yield ()
@@ -118,7 +118,7 @@ private[awaitinggeneration] class RenkuLogTriplesGenerator[F[_]: Async] private[
     EitherT {
       JsonLD
         .entity(
-          projects.ResourceId(commitEvent.project.path).asEntityId,
+          projects.ResourceId(commitEvent.project.slug).asEntityId,
           entities.Project.entityTypes,
           Map.empty[Property, JsonLD]
         )
@@ -128,13 +128,13 @@ private[awaitinggeneration] class RenkuLogTriplesGenerator[F[_]: Async] private[
         )
     }
 
-  private def createRepositoryDirectory(projectPath: projects.Path): F[Path] =
-    mkdir(tempDirectoryName(repositoryNameFrom(projectPath)))
+  private def createRepositoryDirectory(projectSlug: projects.Slug): F[Path] =
+    mkdir(tempDirectoryName(repositoryNameFrom(projectSlug)))
 
   private def tempDirectoryName(repositoryName: String) =
     workDirectory / s"$repositoryName-${randomLong()}"
 
-  private def repositoryNameFrom(projectPath: projects.Path): String = projectPath.value match {
+  private def repositoryNameFrom(projectSlug: projects.Slug): String = projectSlug.value match {
     case repositoryDirectoryFinder(folderName) => folderName
   }
 

@@ -44,7 +44,7 @@ private class EventHandler[F[_]: MonadCancelThrow: Logger](
 
   private lazy val decode: EventRequestContent => Either[Exception, ProjectActivated] = { req =>
     import io.renku.tinytypes.json.TinyTypeDecoders._
-    (req.event.getProjectPath, req.event.hcursor.downField("date").as[ProjectActivated.DateActivated])
+    (req.event.getProjectSlug, req.event.hcursor.downField("date").as[ProjectActivated.DateActivated])
       .mapN(ProjectActivated.apply)
   }
 

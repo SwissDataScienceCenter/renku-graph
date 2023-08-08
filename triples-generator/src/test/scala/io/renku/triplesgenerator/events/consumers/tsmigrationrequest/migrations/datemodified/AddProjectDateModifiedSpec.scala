@@ -24,7 +24,7 @@ import cats.effect.IO
 import cats.syntax.all._
 import io.renku.generators.Generators.Implicits._
 import io.renku.graph.model._
-import GraphModelGenerators.{projectCreatedDates, projectPaths, projectResourceIds}
+import GraphModelGenerators.{projectCreatedDates, projectSlugs, projectResourceIds}
 import cats.MonadThrow
 import io.renku.generators.Generators.{exceptions, nonEmptyStrings, positiveInts}
 import io.renku.interpreters.TestLogger
@@ -78,20 +78,20 @@ class AddProjectDateModifiedSpec
 
         givenBacklogCreated()
 
-        val allProjectPaths = projectPaths.generateList(min = pageSize, max = pageSize * 2)
+        val allProjectSlugs = projectSlugs.generateList(min = pageSize, max = pageSize * 2)
 
-        val projectPathsPages = allProjectPaths
+        val projectSlugsPages = allProjectSlugs
           .sliding(pageSize, pageSize)
           .toList
-        givenProjectsPagesReturned(projectPathsPages :+ List.empty[projects.Path])
+        givenProjectsPagesReturned(projectSlugsPages :+ List.empty[projects.Slug])
 
-        givenProgressInfoFinding(returning = nonEmptyStrings().generateOne.pure[IO], times = allProjectPaths.size)
+        givenProgressInfoFinding(returning = nonEmptyStrings().generateOne.pure[IO], times = allProjectSlugs.size)
 
-        allProjectPaths foreach { path =>
-          val projectInfo = ProjectInfo(projectResourceIds.generateOne, path, projectCreatedDates().generateOne)
-          givenProjectDataFetching(path, returning = projectInfo.some.pure[IO])
+        allProjectSlugs foreach { slug =>
+          val projectInfo = ProjectInfo(projectResourceIds.generateOne, slug, projectCreatedDates().generateOne)
+          givenProjectDataFetching(slug, returning = projectInfo.some.pure[IO])
           givenDatePersisting(projectInfo, returning = ().pure[IO])
-          verifyProjectNotedDone(path)
+          verifyProjectNotedDone(slug)
         }
 
         migration.migrate().value.asserting(_.value shouldBe ())
@@ -101,25 +101,25 @@ class AddProjectDateModifiedSpec
 
       givenBacklogCreated()
 
-      val projectPath1 = projectPaths.generateOne
-      val projectPath2 = projectPaths.generateOne
-      val projectPath3 = projectPaths.generateOne
+      val projectSlug1 = projectSlugs.generateOne
+      val projectSlug2 = projectSlugs.generateOne
+      val projectSlug3 = projectSlugs.generateOne
 
-      val projectPathsPage = List(projectPath1, projectPath2, projectPath3)
+      val projectSlugsPage = List(projectSlug1, projectSlug2, projectSlug3)
 
-      givenProjectsPagesReturned(List(projectPathsPage) :+ List.empty[projects.Path])
+      givenProjectsPagesReturned(List(projectSlugsPage) :+ List.empty[projects.Slug])
 
-      givenProgressInfoFinding(returning = nonEmptyStrings().generateOne.pure[IO], times = projectPathsPage.size)
+      givenProgressInfoFinding(returning = nonEmptyStrings().generateOne.pure[IO], times = projectSlugsPage.size)
 
-      List(projectPath1, projectPath3) foreach { path =>
-        val projectInfo = ProjectInfo(projectResourceIds.generateOne, path, projectCreatedDates().generateOne)
-        givenProjectDataFetching(path, returning = projectInfo.some.pure[IO])
+      List(projectSlug1, projectSlug3) foreach { slug =>
+        val projectInfo = ProjectInfo(projectResourceIds.generateOne, slug, projectCreatedDates().generateOne)
+        givenProjectDataFetching(slug, returning = projectInfo.some.pure[IO])
         givenDatePersisting(projectInfo, returning = ().pure[IO])
-        verifyProjectNotedDone(path)
+        verifyProjectNotedDone(slug)
       }
 
-      givenProjectDataFetching(projectPath2, returning = None.pure[IO])
-      verifyProjectNotedDone(projectPath2)
+      givenProjectDataFetching(projectSlug2, returning = None.pure[IO])
+      verifyProjectNotedDone(projectSlug2)
 
       migration.migrate().value.unsafeRunSync().value shouldBe ()
     }
@@ -131,7 +131,7 @@ class AddProjectDateModifiedSpec
       val exception = exceptions.generateOne
       (() => projectsFinder.nextProjectsPage())
         .expects()
-        .returning(exception.raiseError[IO, List[projects.Path]])
+        .returning(exception.raiseError[IO, List[projects.Slug]])
 
       migration.migrate().value.unsafeRunSync().left.value shouldBe recoverableError
     }
@@ -181,7 +181,7 @@ class AddProjectDateModifiedSpec
       .expects()
       .returning(().pure[IO])
 
-  private def givenProjectsPagesReturned(pages: List[List[projects.Path]]): Unit =
+  private def givenProjectsPagesReturned(pages: List[List[projects.Slug]]): Unit =
     pages foreach { page =>
       (projectsFinder.nextProjectsPage _)
         .expects()
@@ -194,9 +194,9 @@ class AddProjectDateModifiedSpec
       .returning(returning)
       .repeat(times)
 
-  private def givenProjectDataFetching(path: projects.Path, returning: IO[Option[ProjectInfo]]) =
+  private def givenProjectDataFetching(slug: projects.Slug, returning: IO[Option[ProjectInfo]]) =
     (projectFetcher.fetchProject _)
-      .expects(path)
+      .expects(slug)
       .returning(returning)
 
   private def givenDatePersisting(projectInfo: ProjectInfo, returning: IO[Unit]) =
@@ -204,9 +204,9 @@ class AddProjectDateModifiedSpec
       .expects(projectInfo)
       .returning(returning)
 
-  private def verifyProjectNotedDone(path: projects.Path) =
+  private def verifyProjectNotedDone(slug: projects.Slug) =
     (projectDonePersister.noteDone _)
-      .expects(path)
+      .expects(slug)
       .returning(().pure[IO])
 
   private def verifyMigrationExecutionRegistered =

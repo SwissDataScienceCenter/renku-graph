@@ -21,7 +21,7 @@ package io.renku.triplesgenerator.events.consumers.tsmigrationrequest.migrations
 import io.circe.literal._
 import io.renku.events.CategoryName
 import io.renku.generators.Generators.Implicits._
-import io.renku.graph.model.GraphModelGenerators.projectPaths
+import io.renku.graph.model.GraphModelGenerators.projectSlugs
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
 
@@ -29,17 +29,18 @@ class CleanUpEventsProducerSpec extends AnyWordSpec with should.Matchers {
 
   "CleanUpEventsProducer" should {
 
-    "transform the given Project Path to CleanUpEvent request" in {
-      val path = projectPaths.generateOne
+    "transform the given ProjectSlug to CleanUpEvent request" in {
 
-      val (actualPath, eventRequest, categoryName) = CleanUpEventsProducer(path)
+      val slug = projectSlugs.generateOne
 
-      actualPath   shouldBe path
+      val (actualSlug, eventRequest, categoryName) = CleanUpEventsProducer(slug)
+
+      actualSlug   shouldBe slug
       categoryName shouldBe CategoryName("TS_MIGRATION_REQUEST")
       eventRequest.event shouldBe json"""{
         "categoryName": "CLEAN_UP_REQUEST",
         "project": {
-          "path": ${path.value}
+          "slug": $slug
         }
       }"""
     }

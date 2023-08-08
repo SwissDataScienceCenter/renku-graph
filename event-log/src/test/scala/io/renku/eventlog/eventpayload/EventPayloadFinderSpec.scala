@@ -37,7 +37,7 @@ class EventPayloadFinderSpec extends AnyWordSpec with IOSpec with InMemoryEventL
 
     "return the payload if present" in {
       val eventId     = EventsGenerators.compoundEventIds.generateOne
-      val projectPath = GraphModelGenerators.projectPaths.generateOne
+      val projectSlug = GraphModelGenerators.projectSlugs.generateOne
       val payload     = ByteVector.fromValidHex("caffee")
       storeEvent(
         compoundEventId = eventId,
@@ -45,37 +45,37 @@ class EventPayloadFinderSpec extends AnyWordSpec with IOSpec with InMemoryEventL
         executionDate = EventContentGenerators.executionDates.generateOne,
         eventDate = EventContentGenerators.eventDates.generateOne,
         eventBody = EventsGenerators.eventBodies.generateOne,
-        projectPath = projectPath,
+        projectSlug = projectSlug,
         maybeEventPayload = Some(ZippedEventPayload(payload.toArray))
       )
 
       val finder = EventPayloadFinder[IO]
-      val result = finder.findEventPayload(eventId.id, projectPath).unsafeRunSync()
+      val result = finder.findEventPayload(eventId.id, projectSlug).unsafeRunSync()
       result shouldBe Some(PayloadData(payload))
     }
 
     "return none if event is not present" in {
       val eventId     = EventsGenerators.compoundEventIds.generateOne
-      val projectPath = GraphModelGenerators.projectPaths.generateOne
+      val projectSlug = GraphModelGenerators.projectSlugs.generateOne
       val finder      = EventPayloadFinder[IO]
-      val result      = finder.findEventPayload(eventId.id, projectPath).unsafeRunSync()
+      val result      = finder.findEventPayload(eventId.id, projectSlug).unsafeRunSync()
       result shouldBe None
     }
 
     "return none if event payload is not present" in {
       val eventId     = EventsGenerators.compoundEventIds.generateOne
-      val projectPath = GraphModelGenerators.projectPaths.generateOne
+      val projectSlug = GraphModelGenerators.projectSlugs.generateOne
       storeEvent(
         compoundEventId = eventId,
         eventStatus = EventStatus.TriplesStore,
         executionDate = EventContentGenerators.executionDates.generateOne,
         eventDate = EventContentGenerators.eventDates.generateOne,
         eventBody = EventsGenerators.eventBodies.generateOne,
-        projectPath = projectPath
+        projectSlug = projectSlug
       )
 
       val finder = EventPayloadFinder[IO]
-      val result = finder.findEventPayload(eventId.id, projectPath).unsafeRunSync()
+      val result = finder.findEventPayload(eventId.id, projectSlug).unsafeRunSync()
       result shouldBe None
     }
   }

@@ -119,7 +119,7 @@ object DatasetQuery extends (Criteria => Option[SparqlQuery]) {
                |
                |    Graph ?projectId {
                |      ?projectId a schema:Project;
-               |                 renku:projectPath ${v.projectPath};
+               |                 renku:projectPath ${v.projectSlug};
                |                 renku:projectVisibility ${v.projectVisibility}.
                |    }
                |  }

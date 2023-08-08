@@ -27,7 +27,7 @@ import io.renku.graph.model.events.EventStatus._
 import io.renku.graph.model.projects
 import io.renku.metrics._
 
-trait AwaitingDeletionGauge[F[_]] extends LabeledGauge[F, projects.Path]
+trait AwaitingDeletionGauge[F[_]] extends LabeledGauge[F, projects.Slug]
 
 object AwaitingDeletionGauge {
 
@@ -36,7 +36,7 @@ object AwaitingDeletionGauge {
   def apply[F[_]: Async: MetricsRegistry](statsFinder: StatsFinder[F]): F[AwaitingDeletionGauge[F]] =
     MetricsRegistry[F]
       .register {
-        new PositiveValuesLabeledGauge[F, projects.Path](
+        new PositiveValuesLabeledGauge[F, projects.Slug](
           name = "events_awaiting_deletion_count",
           help = "Number of Events waiting to clean up or re-provisioned",
           labelName = "project",

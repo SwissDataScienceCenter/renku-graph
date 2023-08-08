@@ -86,7 +86,7 @@ class StatusChangerSpec
       findAllEventDeliveries       shouldBe List(eventId -> subscriberId)
 
       val event = ToTriplesGenerated(eventId.id,
-                                     Project(eventId.projectId, projectPaths.generateOne),
+                                     Project(eventId.projectId, projectSlugs.generateOne),
                                      eventProcessingTimes.generateOne,
                                      zippedEventPayloads.generateOne
       ).widen
@@ -152,7 +152,7 @@ class StatusChangerSpec
           )
           .arguments(eventId.id)
           .build
-          .mapResult(_ => genUpdateResult(projectPaths.generateOne).generateOne)
+          .mapResult(_ => genUpdateResult(projectSlugs.generateOne).generateOne)
           .queryExecution
 
         val failingQuery = SqlStatement[IO](name = "failing dbUpdater query")
@@ -164,7 +164,7 @@ class StatusChangerSpec
           )
           .arguments(eventId.id)
           .build
-          .mapResult(_ => genUpdateResult(projectPaths.generateOne).generateOne)
+          .mapResult(_ => genUpdateResult(projectSlugs.generateOne).generateOne)
           .queryExecution
 
         passingQuery.run(session) >> failingQuery.run(session)
@@ -197,39 +197,39 @@ class StatusChangerSpec
     case AllEventsToNew                       => Gen.const(DBUpdateResults.ForAllProjects)
     case ProjectEventsToNew(_)                => Gen.const(DBUpdateResults.ForProjects.empty)
     case RedoProjectTransformation(_)         => Gen.const(DBUpdateResults.ForProjects.empty)
-    case ToTriplesGenerated(_, project, _, _) => genUpdateResult(project.path)
-    case ToTriplesStore(_, project, _)        => genUpdateResult(project.path)
+    case ToTriplesGenerated(_, project, _, _) => genUpdateResult(project.slug)
+    case ToTriplesStore(_, project, _)        => genUpdateResult(project.slug)
     case ev @ ToFailure(_, project, _, newStatus, _) =>
       Gen.const(
-        DBUpdateResults.ForProjects(project.path, Map(ev.currentStatus -> -1, newStatus -> 1))
+        DBUpdateResults.ForProjects(project.slug, Map(ev.currentStatus -> -1, newStatus -> 1))
       )
     case RollbackToNew(_, project) =>
       Gen.const(
-        DBUpdateResults.ForProjects(project.path, Map(EventStatus.GeneratingTriples -> -1, EventStatus.New -> 1))
+        DBUpdateResults.ForProjects(project.slug, Map(EventStatus.GeneratingTriples -> -1, EventStatus.New -> 1))
       )
     case RollbackToTriplesGenerated(_, project) =>
       Gen.const(
-        DBUpdateResults.ForProjects(project.path,
+        DBUpdateResults.ForProjects(project.slug,
                                     Map(EventStatus.TransformingTriples -> -1, EventStatus.TriplesGenerated -> 1)
         )
       )
     case ToAwaitingDeletion(_, project) =>
       Gen.const(
-        DBUpdateResults.ForProjects(project.path,
+        DBUpdateResults.ForProjects(project.slug,
                                     Map(eventStatuses.generateOne -> -1, EventStatus.AwaitingDeletion -> 1)
         )
       )
-    case RollbackToAwaitingDeletion(Project(_, projectPath)) =>
+    case RollbackToAwaitingDeletion(Project(_, projectSlug)) =>
       val updatedRows = Generators.positiveInts(max = 40).generateOne
       Gen.const(
         DBUpdateResults.ForProjects(
-          projectPath,
+          projectSlug,
           Map(EventStatus.Deleting -> -updatedRows, EventStatus.AwaitingDeletion -> updatedRows)
         )
       )
   }
 
-  private def genUpdateResult(forProject: projects.Path) = for {
+  private def genUpdateResult(forProject: projects.Slug) = for {
     statuses <- eventStatuses.toGeneratorOfSet()
     counts   <- statuses.toList.map(s => nonNegativeInts().map(count => s -> count.value)).sequence
   } yield DBUpdateResults.ForProjects(forProject, counts.toMap)

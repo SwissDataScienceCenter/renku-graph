@@ -25,7 +25,7 @@ import eu.timepit.refined.auto._
 import io.renku.graph.http.server.security.Authorizer.AuthContext
 import io.renku.graph.model.Schemas._
 import io.renku.graph.model.entities.Person
-import io.renku.graph.model.projects.{Path, ResourceId, Visibility}
+import io.renku.graph.model.projects.{Slug, ResourceId, Visibility}
 import io.renku.graph.model.{GraphClass, datasets, projects}
 import io.renku.http.server.security.model.AuthUser
 import io.renku.jsonld.syntax._
@@ -51,7 +51,7 @@ private class ProjectsFinderImpl[F[_]: Async: Logger: SparqlQueryTimeRecorder](s
   private def query(ds: Dataset, maybeAuthUser: Option[AuthUser]) = SparqlQuery.of(
     name = "ds by id - projects",
     Prefixes of (prov -> "prov", renku -> "renku", schema -> "schema"),
-    sparql"""|SELECT DISTINCT ?projectId ?projectPath ?projectName ?projectVisibility ?projectDSId
+    sparql"""|SELECT DISTINCT ?projectId ?projectSlug ?projectName ?projectVisibility ?projectDSId
              |WHERE {
              |  GRAPH ${GraphClass.Project.id(ds.project.id)} {
              |    ${ds.resourceId.asEntityId} a schema:Dataset;
@@ -68,7 +68,7 @@ private class ProjectsFinderImpl[F[_]: Async: Logger: SparqlQueryTimeRecorder](s
              |  GRAPH ?projectId {
              |    ${allowedProjectFilterQuery(maybeAuthUser)}
              |    ?projectId schema:name ?projectName;
-             |               renku:projectPath ?projectPath;
+             |               renku:projectPath ?projectSlug;
              |               renku:projectVisibility ?projectVisibility.
              |    ?projectDS schema:identifier ?projectDSId.
              |  }
@@ -107,11 +107,11 @@ private object ProjectsFinderImpl {
       import io.renku.tinytypes.json.TinyTypeDecoders._
       for {
         id          <- extract[projects.ResourceId]("projectId")
-        path        <- extract[projects.Path]("projectPath")
+        slug        <- extract[projects.Slug]("projectSlug")
         name        <- extract[projects.Name]("projectName")
         visibility  <- extract[projects.Visibility]("projectVisibility")
         projectDSId <- extract[datasets.Identifier]("projectDSId")
-      } yield DatasetProject(id, path, name, visibility, projectDSId)
+      } yield DatasetProject(id, slug, name, visibility, projectDSId)
   }
 }
 

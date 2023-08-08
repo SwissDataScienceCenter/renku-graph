@@ -39,7 +39,7 @@ import org.typelevel.ci._
 import org.typelevel.log4cats.Logger
 
 private trait ProjectMembersFinder[F[_]] {
-  def findProjectMembers(path: projects.Path)(implicit
+  def findProjectMembers(slug: projects.Slug)(implicit
       maybeAccessToken: Option[AccessToken]
   ): EitherT[F, ProcessingRecoverableError, Set[ProjectMember]]
 }
@@ -57,9 +57,9 @@ private class ProjectMembersFinderImpl[F[_]: Async: NonEmptyParallel: GitLabClie
   import io.renku.tinytypes.json.TinyTypeDecoders._
 
   override def findProjectMembers(
-      path: projects.Path
+      slug: projects.Slug
   )(implicit mat: Option[AccessToken]): EitherT[F, ProcessingRecoverableError, Set[ProjectMember]] = EitherT {
-    fetch(uri"projects" / path / "members" / "all")
+    fetch(uri"projects" / slug / "members" / "all")
       .map(_.asRight[ProcessingRecoverableError])
       .recoverWith(recoveryStrategy.maybeRecoverableError)
   }

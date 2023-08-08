@@ -52,8 +52,8 @@ class CommitSyncForcerSpec
       "if it exists" in new TestCase {
 
         val projectId   = projectIds.generateOne
-        val projectPath = projectPaths.generateOne
-        upsertProject(projectId, projectPath, eventDates.generateOne)
+        val projectSlug = projectSlugs.generateOne
+        upsertProject(projectId, projectSlug, eventDates.generateOne)
 
         val otherCategoryName = categoryNames.generateOne
         upsertCategorySyncTime(projectId, commitsync.categoryName, lastSyncedDates.generateOne)
@@ -62,7 +62,7 @@ class CommitSyncForcerSpec
         findSyncTime(projectId, commitsync.categoryName) shouldBe a[Some[_]]
         findSyncTime(projectId, otherCategoryName)       shouldBe a[Some[_]]
 
-        forcer.forceCommitSync(projectId, projectPath).unsafeRunSync() shouldBe ()
+        forcer.forceCommitSync(projectId, projectSlug).unsafeRunSync() shouldBe ()
 
         findSyncTime(projectId, commitsync.categoryName) shouldBe None
         findSyncTime(projectId, otherCategoryName)       shouldBe a[Some[_]]
@@ -73,14 +73,14 @@ class CommitSyncForcerSpec
       "and there's no project in the project table" in new TestCase {
 
         val projectId   = projectIds.generateOne
-        val projectPath = projectPaths.generateOne
+        val projectSlug = projectSlugs.generateOne
 
         findSyncTime(projectId, commitsync.categoryName) shouldBe None
 
-        forcer.forceCommitSync(projectId, projectPath).unsafeRunSync() shouldBe ()
+        forcer.forceCommitSync(projectId, projectSlug).unsafeRunSync() shouldBe ()
 
         findSyncTime(projectId, commitsync.categoryName) shouldBe None
-        findProjects shouldBe List((projectId, projectPath, EventDate(Instant.EPOCH)))
+        findProjects shouldBe List((projectId, projectSlug, EventDate(Instant.EPOCH)))
       }
 
     "do nothing " +
@@ -88,17 +88,17 @@ class CommitSyncForcerSpec
       "but the project exists in the project table" in new TestCase {
 
         val projectId   = projectIds.generateOne
-        val projectPath = projectPaths.generateOne
+        val projectSlug = projectSlugs.generateOne
 
-        upsertProject(projectId, projectPath, eventDates.generateOne)
-        findProjects.map(proj => proj._1 -> proj._2) shouldBe List(projectId -> projectPath)
-
-        findSyncTime(projectId, commitsync.categoryName) shouldBe None
-
-        forcer.forceCommitSync(projectId, projectPath).unsafeRunSync() shouldBe ()
+        upsertProject(projectId, projectSlug, eventDates.generateOne)
+        findProjects.map(proj => proj._1 -> proj._2) shouldBe List(projectId -> projectSlug)
 
         findSyncTime(projectId, commitsync.categoryName) shouldBe None
-        findProjects.map(proj => proj._1 -> proj._2)     shouldBe List(projectId -> projectPath)
+
+        forcer.forceCommitSync(projectId, projectSlug).unsafeRunSync() shouldBe ()
+
+        findSyncTime(projectId, commitsync.categoryName) shouldBe None
+        findProjects.map(proj => proj._1 -> proj._2)     shouldBe List(projectId -> projectSlug)
       }
   }
 

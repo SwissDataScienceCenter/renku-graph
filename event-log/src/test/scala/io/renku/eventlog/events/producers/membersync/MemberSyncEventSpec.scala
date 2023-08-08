@@ -20,7 +20,7 @@ package io.renku.eventlog.events.producers.membersync
 
 import cats.implicits.toShow
 import io.renku.generators.Generators.Implicits._
-import io.renku.graph.model.GraphModelGenerators.projectPaths
+import io.renku.graph.model.GraphModelGenerators.projectSlugs
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
 
@@ -28,9 +28,9 @@ class MemberSyncEventSpec extends AnyWordSpec with should.Matchers {
 
   "show" should {
 
-    "print out the projectPath" in {
-      val event = MemberSyncEvent(projectPaths.generateOne)
-      event.show shouldBe s"projectPath = ${event.projectPath}"
+    "print out the projectSlug" in {
+      val event = MemberSyncEvent(projectSlugs.generateOne)
+      event.show shouldBe s"projectSlug = ${event.projectSlug}"
     }
   }
 }

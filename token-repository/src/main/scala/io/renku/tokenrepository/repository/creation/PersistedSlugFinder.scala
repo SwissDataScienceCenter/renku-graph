@@ -26,34 +26,34 @@ import io.renku.tokenrepository.repository.ProjectsTokensDB.SessionResource
 import io.renku.tokenrepository.repository.TokenRepositoryTypeSerializers
 import io.renku.tokenrepository.repository.metrics.QueriesExecutionTimes
 
-private trait PersistedPathFinder[F[_]] {
-  def findPersistedProjectPath(projectId: projects.GitLabId): F[projects.Path]
+private trait PersistedSlugFinder[F[_]] {
+  def findPersistedProjectSlug(projectId: projects.GitLabId): F[projects.Slug]
 }
 
-private object PersistedPathFinder {
-  def apply[F[_]: MonadCancelThrow: SessionResource: QueriesExecutionTimes]: PersistedPathFinder[F] =
-    new PersistedPathFinderImpl[F]
+private object PersistedSlugFinder {
+  def apply[F[_]: MonadCancelThrow: SessionResource: QueriesExecutionTimes]: PersistedSlugFinder[F] =
+    new PersistedSlugFinderImpl[F]
 }
 
-private class PersistedPathFinderImpl[F[_]: MonadCancelThrow: SessionResource: QueriesExecutionTimes]
+private class PersistedSlugFinderImpl[F[_]: MonadCancelThrow: SessionResource: QueriesExecutionTimes]
     extends DbClient[F](Some(QueriesExecutionTimes[F]))
-    with PersistedPathFinder[F]
+    with PersistedSlugFinder[F]
     with TokenRepositoryTypeSerializers {
 
   import io.renku.db.SqlStatement
   import skunk.implicits._
 
-  override def findPersistedProjectPath(projectId: projects.GitLabId): F[projects.Path] =
+  override def findPersistedProjectSlug(projectId: projects.GitLabId): F[projects.Slug] =
     SessionResource[F].useK(measureExecutionTime(query(projectId)))
 
   private def query(projectId: projects.GitLabId) =
     SqlStatement
-      .named("find path for token")
-      .select[projects.GitLabId, projects.Path](
-        sql"""SELECT project_path
+      .named("find slug for token")
+      .select[projects.GitLabId, projects.Slug](
+        sql"""SELECT project_slug
               FROM projects_tokens
               WHERE project_id = $projectIdEncoder"""
-          .query(projectPathDecoder)
+          .query(projectSlugDecoder)
       )
       .arguments(projectId)
       .build[Id](_.unique)

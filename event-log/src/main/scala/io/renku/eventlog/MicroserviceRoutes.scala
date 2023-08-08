@@ -65,7 +65,7 @@ private class MicroserviceRoutes[F[_]: Sync](
   import EventStatusParameter._
   import EventsEndpoint.Criteria.Sort.sort
   import ProjectIdParameter._
-  import ProjectPathParameter._
+  import ProjectSlugParameter._
   import eventDetailsEndpoint._
   import eventEndpoint._
   import eventsEndpoint._
@@ -78,28 +78,29 @@ private class MicroserviceRoutes[F[_]: Sync](
   // format: off
   lazy val routes: Resource[F, HttpRoutes[F]] = HttpRoutes.of[F] {
     case request @ GET  -> Root / "events" :? `project-id`(validatedProjectId) +&
-      `project-path`(validatedProjectPath) +&
+      `project-slug`(validatedProjectSlug) +&
       status(status) +&
       since(since) +&
       until(until) +&
       page(page) +&
       perPage(perPage) +&
-      sort(sortBy) => 
-      respond503IfMigrating(maybeFindEvents(validatedProjectId, validatedProjectPath, status, since, until, page, perPage, sortBy, request))
-    case request @ POST -> Root / "events"                                            => respond503IfMigrating(processEvent(request))
-    case           GET  -> Root / "events" / EventId(eventId) / ProjectId(projectId)  => respond503IfMigrating(getDetails(CompoundEventId(eventId, projectId)))
-    case           GET  -> Root / "events" / EventId(eventId) / ProjectPath(projectPath) / "payload"  => respond503IfMigrating(eventPayloadEndpoint.getEventPayload(eventId, projectPath))
-    case           GET  -> Root / "ping"                                              => Ok("pong")
-    case           GET  -> Root / "migration-status"                                  => isMigrating.get.flatMap {isMigrating => Ok(json"""{"isMigrating": $isMigrating}""")}
-    case           GET  -> Root / "status"                                            => respond503IfMigrating(`GET /status`)
-    case request @ POST -> Root / "subscriptions"                                     => respond503IfMigrating(addSubscription(request))
+      sort(sortBy) =>
+      respond503IfMigrating(maybeFindEvents(validatedProjectId, validatedProjectSlug, status, since, until, page, perPage, sortBy, request))
+    case req @ POST -> Root / "events"                                            => respond503IfMigrating(processEvent(req))
+    case       GET  -> Root / "events" / EventId(eventId) / ProjectId(projectId)  => respond503IfMigrating(getDetails(CompoundEventId(eventId, projectId)))
+    case       GET  -> Root / "events" / EventId(eventId) / ProjectSlug(projectSlug) / "payload"  => respond503IfMigrating(eventPayloadEndpoint.getEventPayload(eventId, projectSlug))
+    case       GET  -> Root / "ping"                                              => Ok("pong")
+    case       GET  -> Root / "migration-status"                                  => isMigrating.get.flatMap {isMigrating => Ok(json"""{"isMigrating": $isMigrating}""")}
+    case       GET  -> Root / "status"                                            => respond503IfMigrating(`GET /status`)
+    case req @ POST -> Root / "subscriptions"                                     => respond503IfMigrating(addSubscription(req))
   }.withMetrics.map(_  <+> versionRoutes())
   // format: on
 
-  def respond503IfMigrating(otherwise: => F[Response[F]]): F[Response[F]] = isMigrating.get.flatMap {
-    case true  => ServiceUnavailable()
-    case false => otherwise
-  }
+  private def respond503IfMigrating(otherwise: => F[Response[F]]): F[Response[F]] =
+    isMigrating.get >>= {
+      case true  => ServiceUnavailable()
+      case false => otherwise
+    }
 
   private object ProjectIdParameter {
     private implicit val queryParameterDecoder: QueryParamDecoder[projects.GitLabId] =
@@ -118,16 +119,16 @@ private class MicroserviceRoutes[F[_]: Sync](
     }
   }
 
-  private object ProjectPathParameter {
-    private implicit val queryParameterDecoder: QueryParamDecoder[projects.Path] =
+  private object ProjectSlugParameter {
+    private implicit val queryParameterDecoder: QueryParamDecoder[projects.Slug] =
       (value: QueryParameterValue) =>
-        projects.Path
+        projects.Slug
           .from(value.value)
-          .leftMap(_ => ParseFailure(s"'${`project-path`}' parameter with invalid value", ""))
+          .leftMap(_ => ParseFailure(s"'${`project-slug`}' parameter with invalid value", ""))
           .toValidatedNel
 
-    object `project-path` extends OptionalValidatingQueryParamDecoderMatcher[projects.Path]("project-path") {
-      val parameterName:     String = "project-path"
+    object `project-slug` extends OptionalValidatingQueryParamDecoderMatcher[projects.Slug]("project-slug") {
+      val parameterName:     String = "project-slug"
       override val toString: String = parameterName
     }
   }
@@ -164,7 +165,7 @@ private class MicroserviceRoutes[F[_]: Sync](
   }
 
   private def maybeFindEvents(maybeProjectId:   Option[ValidatedNel[ParseFailure, projects.GitLabId]],
-                              maybeProjectPath: Option[ValidatedNel[ParseFailure, projects.Path]],
+                              maybeProjectSlug: Option[ValidatedNel[ParseFailure, projects.Slug]],
                               maybeStatus:      Option[ValidatedNel[ParseFailure, EventStatus]],
                               maybeSince:       Option[ValidatedNel[ParseFailure, EventDate]],
                               maybeUntil:       Option[ValidatedNel[ParseFailure, EventDate]],
@@ -183,7 +184,7 @@ private class MicroserviceRoutes[F[_]: Sync](
       case _ => None
     }
 
-    (maybeProjectId orElse maybeProjectPath, maybeStatus, filtersOnDate) match {
+    (maybeProjectId orElse maybeProjectSlug, maybeStatus, filtersOnDate) match {
       case (None, None, None) => resourceNotFound
       case (Some(validatedIdentifier), maybeStatus, maybeDates) =>
         (
@@ -192,10 +193,10 @@ private class MicroserviceRoutes[F[_]: Sync](
           maybeDates.sequence,
           maybeSortBy,
           PagingRequest(maybePage, maybePerPage)
-        ).mapN { case (path, maybeStatus, maybeDates, sorting, paging) =>
+        ).mapN { case (identifier, maybeStatus, maybeDates, sorting, paging) =>
           val sortOrDefault = Sorting.fromList(sorting).getOrElse(EventsEndpoint.Criteria.Sort.default)
           findEvents(
-            EventsEndpoint.Criteria(Filters.ProjectEvents(path, maybeStatus, maybeDates), sortOrDefault, paging),
+            EventsEndpoint.Criteria(Filters.ProjectEvents(identifier, maybeStatus, maybeDates), sortOrDefault, paging),
             request
           )
         }.fold(toBadRequest, identity)

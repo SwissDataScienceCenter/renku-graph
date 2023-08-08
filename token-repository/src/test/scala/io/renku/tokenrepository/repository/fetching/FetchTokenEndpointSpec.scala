@@ -85,18 +85,18 @@ class FetchTokenEndpointSpec extends AnyWordSpec with IOSpec with MockFactory wi
       logger.expectNoLogs()
     }
 
-    "respond with OK with the token if one is found in the repository for the given project path" in new TestCase {
+    "respond with OK with the token if one is found in the repository for the given project slug" in new TestCase {
       import endpoint._
 
       val accessToken: AccessToken = userOAuthAccessTokens.generateOne
-      val projectPath = projectPaths.generateOne
+      val projectSlug = projectSlugs.generateOne
 
       (tokensFinder
-        .findToken(_: projects.Path))
-        .expects(projectPath)
+        .findToken(_: projects.Slug))
+        .expects(projectSlug)
         .returning(OptionT.some[IO](accessToken))
 
-      val response = fetchToken(projectPath).unsafeRunSync()
+      val response = fetchToken(projectSlug).unsafeRunSync()
 
       response.status                   shouldBe Status.Ok
       response.contentType              shouldBe Some(`Content-Type`(MediaType.application.json))

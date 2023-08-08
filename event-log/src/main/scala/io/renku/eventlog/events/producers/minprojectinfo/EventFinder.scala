@@ -54,7 +54,7 @@ private class EventFinderImpl[F[_]: MonadCancelThrow: SessionResource: QueriesEx
     SqlStatement
       .named(s"${categoryName.show.toLowerCase} - find event")
       .select[Void, MinProjectInfoEvent](
-        sql"""SELECT p.project_id, p.project_path
+        sql"""SELECT p.project_id, p.project_slug
               FROM project p
               WHERE NOT EXISTS (
                 SELECT project_id 
@@ -68,8 +68,8 @@ private class EventFinderImpl[F[_]: MonadCancelThrow: SessionResource: QueriesEx
                   AND e.status = '#${TriplesStore.value}'
               )
               LIMIT 1
-      """.query(projectIdDecoder ~ projectPathDecoder)
-          .map { case (id: projects.GitLabId) ~ (path: projects.Path) => MinProjectInfoEvent(id, path) }
+      """.query(projectIdDecoder ~ projectSlugDecoder)
+          .map { case (id: projects.GitLabId) ~ (slug: projects.Slug) => MinProjectInfoEvent(id, slug) }
       )
       .arguments(Void)
       .build(_.option)

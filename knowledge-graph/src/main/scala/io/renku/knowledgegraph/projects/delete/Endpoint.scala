@@ -37,7 +37,7 @@ import org.typelevel.log4cats.Logger
 import scala.concurrent.duration._
 
 trait Endpoint[F[_]] {
-  def `DELETE /projects/:path`(path: projects.Path, authUser: AuthUser): F[Response[F]]
+  def `DELETE /projects/:slug`(slug: projects.Slug, authUser: AuthUser): F[Response[F]]
 }
 
 object Endpoint {
@@ -58,36 +58,36 @@ private class EndpointImpl[F[_]: Async: Logger](glProjectFinder: GLProjectFinder
 
   import projectRemover.deleteProject
 
-  override def `DELETE /projects/:path`(path: projects.Path, authUser: AuthUser): F[Response[F]] = {
+  override def `DELETE /projects/:slug`(slug: projects.Slug, authUser: AuthUser): F[Response[F]] = {
     implicit val at: AccessToken = authUser.accessToken
 
-    findProject(path) >>= {
+    findProject(slug) >>= {
       case None =>
         NotFound(Message.Info("Project does not exist"))
       case Some(project) =>
         deleteProject(project.id) >>
-          Spawn[F].start(waitForDeletion(project.path) >> sendEvents(project)) >>
+          Spawn[F].start(waitForDeletion(project.slug) >> sendEvents(project)) >>
           Accepted(Message.Info("Project deleted"))
     }
-  }.handleErrorWith(httpResult(path))
+  }.handleErrorWith(httpResult(slug))
 
-  private def waitForDeletion(path: projects.Path)(implicit ac: AccessToken): F[Unit] =
-    glProjectFinder.findProject(path) >>= {
+  private def waitForDeletion(slug: projects.Slug)(implicit ac: AccessToken): F[Unit] =
+    glProjectFinder.findProject(slug) >>= {
       case None    => ().pure[F]
-      case Some(_) => Temporal[F].delayBy(waitForDeletion(path), waitBeforeNextCheck)
+      case Some(_) => Temporal[F].delayBy(waitForDeletion(slug), waitBeforeNextCheck)
     }
 
-  private def findProject(path: projects.Path)(implicit ac: AccessToken): F[Option[Project]] =
-    glProjectFinder.findProject(path) >>= {
-      case None        => elProjectFinder.findProject(path)
+  private def findProject(slug: projects.Slug)(implicit ac: AccessToken): F[Option[Project]] =
+    glProjectFinder.findProject(slug) >>= {
+      case None        => elProjectFinder.findProject(slug)
       case someProject => someProject.pure[F]
     }
 
   private def sendEvents(project: Project): F[Unit] =
     elClient.send(CommitSyncRequest(project)) >> tgClient.send(CleanUpEvent(project))
 
-  private def httpResult(path: projects.Path): Throwable => F[Response[F]] = { exception =>
-    Logger[F].error(exception)(show"Deleting '$path' project failed") >>
+  private def httpResult(slug: projects.Slug): Throwable => F[Response[F]] = { exception =>
+    Logger[F].error(exception)(show"Deleting '$slug' project failed") >>
       InternalServerError(Message.Error.unsafeApply(s"Project deletion failure: ${exception.getMessage}"))
   }
 }

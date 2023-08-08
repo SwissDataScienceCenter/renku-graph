@@ -36,7 +36,7 @@ class EventHandlerSpec extends AnyWordSpec with should.Matchers with IOSpec with
 
   "handlingDefinition.decode" should {
 
-    "decode the Project path from the event" in new TestCase {
+    "decode the Project slug from the event" in new TestCase {
       handler
         .createHandlingDefinition()
         .decode(EventRequestContent.NoPayload(event.asJson))

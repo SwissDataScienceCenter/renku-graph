@@ -48,7 +48,7 @@ class DispatchRecoverySpec extends AnyWordSpec with IOSpec with should.Matchers 
         "id":           ${event.id.id},
         "project": {
           "id":   ${event.id.projectId},
-          "path": ${event.projectPath}
+          "slug": ${event.projectSlug}
         },
         "subCategory": "RollbackToTriplesGenerated"
       }""")
@@ -79,7 +79,7 @@ class DispatchRecoverySpec extends AnyWordSpec with IOSpec with should.Matchers 
         "id":           ${event.id.id},
         "project": {
           "id":   ${event.id.projectId},
-          "path": ${event.projectPath}
+          "slug": ${event.projectSlug}
         },
         "subCategory": "ToFailure",
         "message": ${EventMessage(exception)},

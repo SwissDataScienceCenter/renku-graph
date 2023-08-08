@@ -296,7 +296,7 @@ class EntitiesFinderSpec
       val query = nonBlankStrings(minLength = 6).generateOne
 
       val soleProject = renkuProjectEntities(visibilityPublic)
-        .modify(_.copy(path = projects.Path(s"$query/${relativePaths(maxSegments = 2).generateOne}")))
+        .modify(_.copy(slug = projects.Slug(s"$query/${relativePaths(maxSegments = 2).generateOne}")))
         .generateOne
 
       val results = IOBody {
@@ -617,7 +617,7 @@ class EntitiesFinderSpec
           finder
             .findEntities(
               Criteria(
-                Filters(namespaces = Set(matchingProject.path.toNamespace)),
+                Filters(namespaces = Set(matchingProject.slug.toNamespace)),
                 paging = PagingRequest(Page.first, PerPage(50))
               )
             )

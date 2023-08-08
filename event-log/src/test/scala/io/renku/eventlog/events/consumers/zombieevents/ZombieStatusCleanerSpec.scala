@@ -64,7 +64,7 @@ class ZombieStatusCleanerSpec
 
           findEvent(eventId) shouldBe (executionDate, currentStatus, Some(zombieMessage)).some
 
-          updater.cleanZombieStatus(ZombieEvent(eventId, projectPath, currentStatus)).unsafeRunSync() shouldBe Updated
+          updater.cleanZombieStatus(ZombieEvent(eventId, projectSlug, currentStatus)).unsafeRunSync() shouldBe Updated
 
           findEvent(eventId) shouldBe (ExecutionDate(now), afterUpdateStatus, None).some
         }
@@ -78,7 +78,7 @@ class ZombieStatusCleanerSpec
           findEvent(eventId)               shouldBe (executionDate, currentStatus, Some(zombieMessage)).some
           findAllEventDeliveries.map(_._1) shouldBe List(eventId)
 
-          updater.cleanZombieStatus(ZombieEvent(eventId, projectPath, currentStatus)).unsafeRunSync() shouldBe Updated
+          updater.cleanZombieStatus(ZombieEvent(eventId, projectSlug, currentStatus)).unsafeRunSync() shouldBe Updated
 
           findEvent(eventId)               shouldBe (ExecutionDate(now), afterUpdateStatus, None).some
           findAllEventDeliveries.map(_._1) shouldBe Nil
@@ -94,7 +94,7 @@ class ZombieStatusCleanerSpec
       findEvent(eventId) shouldBe (executionDate, GeneratingTriples, Some(zombieMessage)).some
 
       updater
-        .cleanZombieStatus(ZombieEvent(otherEventId, projectPath, GeneratingTriples))
+        .cleanZombieStatus(ZombieEvent(otherEventId, projectSlug, GeneratingTriples))
         .unsafeRunSync() shouldBe NotUpdated
 
       findEvent(eventId) shouldBe (executionDate, GeneratingTriples, Some(zombieMessage)).some
@@ -108,7 +108,7 @@ class ZombieStatusCleanerSpec
     val updater = new ZombieStatusCleanerImpl[IO](currentTime)
 
     val eventId       = compoundEventIds.generateOne
-    val projectPath   = projectPaths.generateOne
+    val projectSlug   = projectSlugs.generateOne
     val executionDate = executionDates.generateOne
     val zombieMessage = EventMessage("Zombie Event")
 
@@ -120,7 +120,7 @@ class ZombieStatusCleanerSpec
                                                                executionDate,
                                                                eventDates.generateOne,
                                                                eventBodies.generateOne,
-                                                               projectPath = projectPath,
+                                                               projectSlug = projectSlug,
                                                                maybeMessage = Some(zombieMessage)
     )
   }

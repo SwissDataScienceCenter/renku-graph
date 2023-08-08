@@ -26,7 +26,7 @@ import cats.effect.Async
 import cats.syntax.all._
 import eu.timepit.refined.auto._
 import io.renku.db.{DbClient, SqlStatement}
-import io.renku.eventlog.TypeSerializers.{projectIdEncoder, projectPathEncoder}
+import io.renku.eventlog.TypeSerializers.{projectIdEncoder, projectSlugEncoder}
 import io.renku.eventlog.metrics.QueriesExecutionTimes
 import io.renku.events.consumers.Project
 import io.renku.graph.model.projects
@@ -71,7 +71,7 @@ private[statuschange] class ProjectCleanerImpl[F[_]: Async: Logger: QueriesExecu
 
   private def sendProjectViewingDeletion(project: Project) =
     tgClient
-      .send(ProjectViewingDeletion(project.path))
+      .send(ProjectViewingDeletion(project.slug))
       .handleErrorWith(logError(project, "sending ProjectViewingDeletion"))
 
   private def removeWebhookAndToken(project: Project) =
@@ -85,36 +85,36 @@ private[statuschange] class ProjectCleanerImpl[F[_]: Async: Logger: QueriesExecu
 
   private def removeCleanUpEvents(project: Project) = measureExecutionTime {
     SqlStatement(name = "project_to_new - clean_up_events_queue removal")
-      .command[projects.GitLabId *: projects.Path *: EmptyTuple](sql"""
+      .command[projects.GitLabId *: projects.Slug *: EmptyTuple](sql"""
         DELETE FROM clean_up_events_queue 
-        WHERE project_id = $projectIdEncoder AND project_path = $projectPathEncoder""".command)
-      .arguments(project.id *: project.path *: EmptyTuple)
+        WHERE project_id = $projectIdEncoder AND project_slug = $projectSlugEncoder""".command)
+      .arguments(project.id *: project.slug *: EmptyTuple)
       .build
       .void
   }
 
   private def removeProjectSubscriptionSyncTimes(project: Project) = measureExecutionTime {
     SqlStatement(name = "project_to_new - subscription_time removal")
-      .command[projects.GitLabId *: projects.Path *: EmptyTuple](sql"""
+      .command[projects.GitLabId *: projects.Slug *: EmptyTuple](sql"""
         DELETE FROM subscription_category_sync_time 
         WHERE project_id IN (
           SELECT st.project_id
           FROM subscription_category_sync_time st
           JOIN project p ON st.project_id = p.project_id 
             AND p.project_id = $projectIdEncoder
-            AND p.project_path = $projectPathEncoder
+            AND p.project_slug = $projectSlugEncoder
         )""".command)
-      .arguments(project.id *: project.path *: EmptyTuple)
+      .arguments(project.id *: project.slug *: EmptyTuple)
       .build
       .void
   }
 
   private def removeProject(project: Project) = measureExecutionTime {
     SqlStatement(name = "project_to_new - remove project")
-      .command[projects.GitLabId *: projects.Path *: EmptyTuple](sql"""
+      .command[projects.GitLabId *: projects.Slug *: EmptyTuple](sql"""
         DELETE FROM project 
-        WHERE project_id = $projectIdEncoder AND project_path = $projectPathEncoder""".command)
-      .arguments(project.id *: project.path *: EmptyTuple)
+        WHERE project_id = $projectIdEncoder AND project_slug = $projectSlugEncoder""".command)
+      .arguments(project.id *: project.slug *: EmptyTuple)
       .build
       .mapResult {
         case Completion.Delete(1) => true

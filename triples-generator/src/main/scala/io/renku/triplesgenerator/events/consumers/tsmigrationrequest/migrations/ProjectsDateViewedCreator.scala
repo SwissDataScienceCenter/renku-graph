@@ -69,11 +69,11 @@ private class ProjectsDateViewedCreator[F[_]: Async: Logger](
       SparqlQuery.ofUnsafe(
         show"$name - find projects",
         Prefixes of (renku -> "renku", schema -> "schema"),
-        s"""|SELECT DISTINCT ?path ?date
+        s"""|SELECT DISTINCT ?slug ?date
             |WHERE {
             |  GRAPH ?id {
             |    ?id a schema:Project;
-            |        renku:projectPath ?path;
+            |        renku:projectPath ?slug;
             |        schema:dateCreated ?date.
             |  }
             |}
@@ -87,7 +87,7 @@ private class ProjectsDateViewedCreator[F[_]: Async: Logger](
   private implicit lazy val toEvent: Decoder[List[ProjectViewedEvent]] = ResultsDecoder[List, ProjectViewedEvent] {
     implicit cur =>
       import io.renku.tinytypes.json.TinyTypeDecoders._
-      (extract[projects.Path]("path") -> extract[projects.DateViewed]("date"))
+      (extract[projects.Slug]("slug") -> extract[projects.DateViewed]("date"))
         .mapN(ProjectViewedEvent(_, _, maybeUserId = None))
   }
 
@@ -96,7 +96,7 @@ private class ProjectsDateViewedCreator[F[_]: Async: Logger](
     elClient
       .getEvents(
         SearchCriteria
-          .forProject(event.path)
+          .forProject(event.slug)
           .sortBy(SearchCriteria.Sort.EventDateDesc)
           .withPerPage(PerPage(1))
       )

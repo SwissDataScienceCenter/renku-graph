@@ -20,6 +20,7 @@ package io.renku.knowledgegraph.projects.details
 
 import ProjectsGenerators._
 import cats.syntax.all._
+import io.circe.DecodingFailure
 import io.renku.generators.Generators.Implicits._
 import io.renku.graph.model.Schemas._
 import io.renku.graph.model._
@@ -47,7 +48,9 @@ class ProjectJsonLDEncoderSpec extends AnyWordSpec with should.Matchers with Sca
       for {
         resourceId   <- cursor.downEntityId.as[projects.ResourceId]
         identifier   <- cursor.downField(schema / "identifier").as[projects.GitLabId]
-        path         <- cursor.downField(renku / "projectPath").as[projects.Path]
+        path         <- cursor.downField(renku / "projectPath").as[projects.Slug]
+        slug         <- cursor.downField(renku / "slug").as[projects.Slug]
+        _            <- Either.cond(path == slug, (), DecodingFailure("path != slug", Nil))
         name         <- cursor.downField(schema / "name").as[Option[projects.Name]].flatMap(projects.Name.failIfNone)
         maybeDesc    <- cursor.downField(schema / "description").as[Option[projects.Description]]
         visibility   <- cursor.downField(renku / "projectVisibility").as[projects.Visibility]
@@ -61,7 +64,7 @@ class ProjectJsonLDEncoderSpec extends AnyWordSpec with should.Matchers with Sca
       } yield Project(
         resourceId,
         identifier,
-        path,
+        slug,
         name,
         maybeDesc,
         visibility,
@@ -92,10 +95,10 @@ class ProjectJsonLDEncoderSpec extends AnyWordSpec with should.Matchers with Sca
     JsonLDDecoder.entity(entities.Project.entityTypes) { cursor =>
       for {
         resourceId   <- cursor.downEntityId.as[projects.ResourceId]
-        path         <- cursor.downField(renku / "projectPath").as[projects.Path]
+        slug         <- cursor.downField(renku / "projectPath").as[projects.Slug]
         name         <- cursor.downField(schema / "name").as[Option[projects.Name]].flatMap(projects.Name.failIfNone)
         dateCreated  <- cursor.downField(schema / "dateCreated").as[projects.DateCreated]
         maybeCreator <- cursor.downField(schema / "creator").as[Option[Creator]]
-      } yield ParentProject(resourceId, path, name, Creation(dateCreated, maybeCreator))
+      } yield ParentProject(resourceId, slug, name, Creation(dateCreated, maybeCreator))
     }
 }

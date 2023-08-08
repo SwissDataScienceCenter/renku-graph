@@ -83,7 +83,7 @@ private class EventFinderImpl[F[_]: Async: Parallel: SessionResource: QueriesExe
       .named(s"${SubscriptionCategory.categoryName.value.toLowerCase} - find projects")
       .select[ExecutionDate *: ExecutionDate *: Int *: EmptyTuple, ProjectInfo](
         sql"""
-          SELECT p.project_id, p.project_path, p.latest_event_date,
+          SELECT p.project_id, p.project_slug, p.latest_event_date,
 	        (SELECT count(event_id) FROM event evt_int WHERE evt_int.project_id = p.project_id AND evt_int.status = '#${GeneratingTriples.value}') AS current_occupancy
           FROM (
             SELECT DISTINCT project_id, MAX(event_date) AS max_event_date
@@ -113,10 +113,10 @@ private class EventFinderImpl[F[_]: Async: Parallel: SessionResource: QueriesExe
           ORDER BY p.latest_event_date DESC
           LIMIT $int4
           """
-          .query(projectIdDecoder ~ projectPathDecoder ~ eventDateDecoder ~ int8)
+          .query(projectIdDecoder ~ projectSlugDecoder ~ eventDateDecoder ~ int8)
           .map {
-            case (id: projects.GitLabId) ~ (path: projects.Path) ~ (eventDate: EventDate) ~ (currentOccupancy: Long) =>
-              ProjectInfo(id, path, eventDate, Refined.unsafeApply(currentOccupancy.toInt))
+            case (id: projects.GitLabId) ~ (slug: projects.Slug) ~ (eventDate: EventDate) ~ (currentOccupancy: Long) =>
+              ProjectInfo(id, slug, eventDate, Refined.unsafeApply(currentOccupancy.toInt))
           }
       )
       .arguments(ExecutionDate(now()) *: ExecutionDate(now()) *: projectsFetchingLimit.value *: EmptyTuple)
@@ -133,14 +133,14 @@ private class EventFinderImpl[F[_]: Async: Parallel: SessionResource: QueriesExe
       .build[Id](_.unique)
   }
 
-  private def findLatestEvent(idAndPath: producers.ProjectIds) = measureExecutionTime {
+  private def findLatestEvent(idAndSlug: producers.ProjectIds) = measureExecutionTime {
     val executionDate = ExecutionDate(now())
     SqlStatement
       .named(s"${SubscriptionCategory.categoryName.value.toLowerCase} - find latest")
-      .select[projects.Path *: projects.GitLabId *: ExecutionDate *: ExecutionDate *: EmptyTuple,
+      .select[projects.Slug *: projects.GitLabId *: ExecutionDate *: ExecutionDate *: EmptyTuple,
               AwaitingGenerationEvent
       ](sql"""
-        SELECT evt.event_id, evt.project_id, $projectPathEncoder AS project_path, evt.event_body
+        SELECT evt.event_id, evt.project_id, $projectSlugEncoder AS project_slug, evt.event_body
         FROM (
           SELECT project_id, max(event_date) AS max_event_date
           FROM event
@@ -155,19 +155,19 @@ private class EventFinderImpl[F[_]: Async: Parallel: SessionResource: QueriesExe
           AND execution_date < $executionDateEncoder
         LIMIT 1
         """.query(awaitingGenerationEventGet))
-      .arguments(idAndPath.path *: idAndPath.id *: executionDate *: executionDate *: EmptyTuple)
+      .arguments(idAndSlug.slug *: idAndSlug.id *: executionDate *: executionDate *: EmptyTuple)
       .build(_.option)
   }
 
   private lazy val selectProject: List[(producers.ProjectIds, Priority)] => Option[producers.ProjectIds] = {
     case Nil                          => None
-    case (projectIdAndPath, _) :: Nil => Some(projectIdAndPath)
+    case (projectIdAndSlug, _) :: Nil => Some(projectIdAndSlug)
     case many                         => pickRandomly(prioritiesList(from = many))
   }
 
   private def prioritiesList(from: List[(producers.ProjectIds, Priority)]): List[producers.ProjectIds] =
-    from.foldLeft(List.empty[producers.ProjectIds]) { case (acc, (projectIdAndPath, priority)) =>
-      acc :++ List.fill((priority.value * 10).setScale(2, RoundingMode.HALF_UP).toInt)(projectIdAndPath)
+    from.foldLeft(List.empty[producers.ProjectIds]) { case (acc, (projectIdAndSlug, priority)) =>
+      acc :++ List.fill((priority.value * 10).setScale(2, RoundingMode.HALF_UP).toInt)(projectIdAndSlug)
     }
 
   private lazy val markAsProcessing
@@ -206,15 +206,15 @@ private class EventFinderImpl[F[_]: Async: Parallel: SessionResource: QueriesExe
 
   private def maybeUpdateMetrics(maybeProject: Option[producers.ProjectIds],
                                  maybeBody:    Option[AwaitingGenerationEvent]
-  ) = (maybeBody, maybeProject) mapN { case (_, producers.ProjectIds(_, projectPath)) =>
+  ) = (maybeBody, maybeProject) mapN { case (_, producers.ProjectIds(_, projectSlug)) =>
     Kleisli.liftF {
-      (EventStatusGauges[F].awaitingGeneration decrement projectPath) >>
-        (EventStatusGauges[F].underGeneration increment projectPath)
+      (EventStatusGauges[F].awaitingGeneration decrement projectSlug) >>
+        (EventStatusGauges[F].underGeneration increment projectSlug)
     }
   } getOrElse Kleisli.pure[F, Session[F], Unit](())
 
   private val awaitingGenerationEventGet: Decoder[AwaitingGenerationEvent] =
-    (compoundEventIdDecoder *: projectPathDecoder *: eventBodyDecoder).to[AwaitingGenerationEvent]
+    (compoundEventIdDecoder *: projectSlugDecoder *: eventBodyDecoder).to[AwaitingGenerationEvent]
 }
 
 private object EventFinder {

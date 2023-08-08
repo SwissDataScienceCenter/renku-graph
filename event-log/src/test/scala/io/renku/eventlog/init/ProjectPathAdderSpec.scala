@@ -28,7 +28,7 @@ import io.renku.graph.model.EventContentGenerators._
 import io.renku.graph.model.EventsGenerators._
 import io.renku.graph.model.events._
 import io.renku.graph.model.projects
-import io.renku.graph.model.projects.Path
+import io.renku.graph.model.projects.Slug
 import io.renku.interpreters.TestLogger
 import io.renku.interpreters.TestLogger.Level.Info
 import io.renku.testtools.IOSpec
@@ -91,7 +91,7 @@ class ProjectPathAdderSpec
 
       projectPathAdder.run.unsafeRunSync() shouldBe ()
 
-      findProjectPaths shouldBe Set(event1.project.path, event2.project.path)
+      findProjectSlugs shouldBe Set(event1.project.slug, event2.project.slug)
 
       verifyIndexExists("event_log", "idx_project_path") shouldBe true
 
@@ -143,15 +143,15 @@ class ProjectPathAdderSpec
 
   private def toJson(event: Event): String = json"""{
     "project": {
-      "id":   ${event.project.id.value},
-      "path": ${event.project.path.value}
+      "id":   ${event.project.id},
+      "slug": ${event.project.slug}
     }
   }""".noSpaces
 
-  private def findProjectPaths: Set[Path] = sessionResource
+  private def findProjectSlugs: Set[Slug] = sessionResource
     .useK {
       Kleisli { session =>
-        val query: Query[Void, projects.Path] = sql"select project_path from event_log".query(projectPathDecoder)
+        val query: Query[Void, projects.Slug] = sql"select project_path from event_log".query(projectSlugDecoder)
         session.execute(query)
       }
     }

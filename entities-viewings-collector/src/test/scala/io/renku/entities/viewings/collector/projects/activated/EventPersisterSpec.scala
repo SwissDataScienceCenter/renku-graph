@@ -52,7 +52,7 @@ class EventPersisterSpec
         val project = anyProjectEntities.generateOne
         upload(to = projectsDataset, project)
 
-        val event = projectActivatedEvents.generateOne.copy(path = project.path)
+        val event = projectActivatedEvents.generateOne.copy(slug = project.slug)
 
         givenEventDeduplication(project, returning = ().pure[IO])
 
@@ -66,7 +66,7 @@ class EventPersisterSpec
       val project = anyProjectEntities.generateOne
       upload(to = projectsDataset, project)
 
-      val event = projectActivatedEvents.generateOne.copy(path = project.path)
+      val event = projectActivatedEvents.generateOne.copy(slug = project.slug)
 
       givenEventDeduplication(project, returning = ().pure[IO])
 

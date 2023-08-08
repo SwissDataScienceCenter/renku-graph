@@ -38,9 +38,9 @@ class ProjectQuerySpec extends SearchTestBase {
     val userId = person.maybeGitLabId.get
 
     provisionTestProjects(project).unsafeRunSync()
-    storeProjectViewed(userId, Instant.now().minusSeconds(60), project.path)
-    storeProjectViewed(userId, Instant.now().minusSeconds(30), project.path)
-    storeProjectViewed(userId, Instant.now(), project.path)
+    storeProjectViewed(userId, Instant.now().minusSeconds(60), project.slug)
+    storeProjectViewed(userId, Instant.now().minusSeconds(30), project.slug)
+    storeProjectViewed(userId, Instant.now(), project.slug)
 
     val query = ProjectQuery.makeQuery(Criteria(Set.empty, AuthUser(userId, token), 5))
 
@@ -48,7 +48,7 @@ class ProjectQuerySpec extends SearchTestBase {
     decoded.head shouldMatchTo
       SearchEntity.Project(
         matchingScore = MatchingScore(1f),
-        path = project.path,
+        slug = project.slug,
         name = project.name,
         visibility = project.visibility,
         date = project.dateCreated,
@@ -71,7 +71,7 @@ class ProjectQuerySpec extends SearchTestBase {
     val userId = person.maybeGitLabId.get
 
     provisionTestProjects(project).unsafeRunSync()
-    storeProjectViewed(userId, Instant.now(), project.path)
+    storeProjectViewed(userId, Instant.now(), project.slug)
 
     val query = ProjectQuery.makeQuery(Criteria(Set.empty, AuthUser(userId, token), 5))
 
@@ -79,7 +79,7 @@ class ProjectQuerySpec extends SearchTestBase {
     decoded.head shouldMatchTo
       SearchEntity.Project(
         matchingScore = MatchingScore(1f),
-        path = project.path,
+        slug = project.slug,
         name = project.name,
         visibility = project.visibility,
         date = project.dateCreated,
@@ -104,8 +104,8 @@ class ProjectQuerySpec extends SearchTestBase {
     upload(projectsDataset, person1, person2)
     provisionTestProjects(project1, project2).unsafeRunSync()
 
-    storeProjectViewed(person1.maybeGitLabId.get, Instant.now(), project1.path)
-    storeProjectViewed(person2.maybeGitLabId.get, Instant.now(), project2.path)
+    storeProjectViewed(person1.maybeGitLabId.get, Instant.now(), project1.slug)
+    storeProjectViewed(person2.maybeGitLabId.get, Instant.now(), project2.slug)
 
     val query = ProjectQuery.makeQuery(Criteria(Set.empty, AuthUser(person1.maybeGitLabId.get, token), 5))
 
@@ -113,7 +113,7 @@ class ProjectQuerySpec extends SearchTestBase {
     decoded.head shouldMatchTo
       SearchEntity.Project(
         matchingScore = MatchingScore(1f),
-        path = project1.path,
+        slug = project1.slug,
         name = project1.name,
         visibility = project1.visibility,
         date = project1.dateCreated,

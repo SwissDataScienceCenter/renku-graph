@@ -52,10 +52,10 @@ class DSInfoFinderSpec
       upload(to = projectsDataset, project)
 
       finder.findDSInfo(ds.identification.identifier).unsafeRunSync().value shouldBe
-        DSInfo(project.path, toCollectorDataset(ds))
+        DSInfo(project.slug, toCollectorDataset(ds))
     }
 
-    "return path of the project where the modified DS with the given identifier exists" in new TestCase {
+    "return slug of the project where the modified DS with the given identifier exists" in new TestCase {
 
       val _ -> modifiedDS -> project = anyRenkuProjectEntities
         .addDatasetAndModification(datasetEntities(provenanceNonModified))
@@ -65,10 +65,10 @@ class DSInfoFinderSpec
       upload(to = projectsDataset, project)
 
       finder.findDSInfo(modifiedDS.identification.identifier).unsafeRunSync().value shouldBe
-        DSInfo(project.path, toCollectorDataset(modifiedDS.to[entities.Dataset[entities.Dataset.Provenance.Modified]]))
+        DSInfo(project.slug, toCollectorDataset(modifiedDS.to[entities.Dataset[entities.Dataset.Provenance.Modified]]))
     }
 
-    "return path of the parent project where the DS with the given identifier exists" in new TestCase {
+    "return slug of the parent project where the DS with the given identifier exists" in new TestCase {
 
       val parentProject -> project = anyRenkuProjectEntities
         .withDatasets(datasetEntities(provenanceNonModified))
@@ -84,7 +84,7 @@ class DSInfoFinderSpec
       val ds = project.datasets.headOption.value
 
       finder.findDSInfo(ds.identification.identifier).unsafeRunSync().value shouldBe
-        DSInfo(parentProject.path, toCollectorDataset(parentProject.datasets.headOption.value))
+        DSInfo(parentProject.slug, toCollectorDataset(parentProject.datasets.headOption.value))
     }
   }
 

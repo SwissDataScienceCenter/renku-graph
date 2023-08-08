@@ -29,7 +29,7 @@ import io.renku.http.client.GitLabClient
 import java.time.Instant
 
 private trait GLDataFinder[F[_]] {
-  def fetchGLData(path: projects.Path): F[Option[DataExtract.GL]]
+  def fetchGLData(slug: projects.Slug): F[Option[DataExtract.GL]]
 }
 
 private object GLDataFinder {
@@ -49,9 +49,9 @@ private class GLDataFinderImpl[F[_]: Async: GitLabClient: AccessTokenFinder] ext
   import org.http4s.circe.CirceEntityDecoder._
   import org.http4s.implicits._
 
-  override def fetchGLData(path: projects.Path): F[Option[DataExtract.GL]] =
-    OptionT(findAccessToken(path))
-      .flatMapF(at => GitLabClient[F].get(uri"projects" / path, "single-project")(mapResponse)(at.some))
+  override def fetchGLData(slug: projects.Slug): F[Option[DataExtract.GL]] =
+    OptionT(findAccessToken(slug))
+      .flatMapF(at => GitLabClient[F].get(uri"projects" / slug, "single-project")(mapResponse)(at.some))
       .value
 
   private lazy val mapResponse: PartialFunction[(Status, Request[F], Response[F]), F[Option[DataExtract.GL]]] = {
@@ -62,7 +62,7 @@ private class GLDataFinderImpl[F[_]: Async: GitLabClient: AccessTokenFinder] ext
   private implicit lazy val decoder: Decoder[DataExtract.GL] = Decoder.instance { cursor =>
     import io.renku.tinytypes.json.TinyTypeDecoders._
 
-    (cursor.downField("path_with_namespace").as[projects.Path],
+    (cursor.downField("path_with_namespace").as[projects.Slug],
      cursor.downField("name").as[projects.Name],
      cursor.downField("visibility").as[projects.Visibility],
      cursor.downField("updated_at").as[Option[Instant]],

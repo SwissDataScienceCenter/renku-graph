@@ -22,7 +22,7 @@ import Converters._
 import GitLabProjectFinder.GitLabProject
 import io.renku.generators.Generators.Implicits._
 import io.renku.generators.Generators.{nonBlankStrings, nonEmptyList, nonNegativeInts, httpUrls => urls}
-import io.renku.graph.model.GraphModelGenerators.{projectIds, projectPaths, projectVisibilities}
+import io.renku.graph.model.GraphModelGenerators.{projectIds, projectSlugs, projectVisibilities}
 import io.renku.graph.model.testentities.{Project => _, _}
 import model.Forking.ForksCount
 import model.Permissions._
@@ -40,7 +40,7 @@ private object ProjectsGenerators {
   } yield Project(
     resourceId = kgProject.resourceId,
     id = gitLabProject.id,
-    path = kgProject.path,
+    slug = kgProject.slug,
     name = kgProject.name,
     maybeDescription = kgProject.maybeDescription,
     visibility = kgProject.visibility,
@@ -55,7 +55,7 @@ private object ProjectsGenerators {
       kgProject.maybeParent.map { parent =>
         ParentProject(
           parent.resourceId,
-          parent.path,
+          parent.slug,
           parent.name,
           Creation(
             parent.created.date,
@@ -94,18 +94,18 @@ private object ProjectsGenerators {
 
   private implicit lazy val sshUrls: Gen[SshUrl] = for {
     hostParts   <- nonEmptyList(nonBlankStrings())
-    projectPath <- projectPaths
-  } yield SshUrl(s"git@${hostParts.toList.mkString(".")}:$projectPath.git")
+    projectSlug <- projectSlugs
+  } yield SshUrl(s"git@${hostParts.toList.mkString(".")}:$projectSlug.git")
 
   private implicit lazy val httpUrls: Gen[HttpUrl] = for {
     url         <- urls()
-    projectPath <- projectPaths
-  } yield HttpUrl(s"$url/$projectPath.git")
+    projectSlug <- projectSlugs
+  } yield HttpUrl(s"$url/$projectSlug.git")
 
   private implicit lazy val readmeUrls: Gen[ReadmeUrl] = for {
     url         <- urls()
-    projectPath <- projectPaths
-  } yield ReadmeUrl(s"$url/$projectPath/blob/master/README.md")
+    projectSlug <- projectSlugs
+  } yield ReadmeUrl(s"$url/$projectSlug/blob/master/README.md")
 
   private implicit lazy val webUrls: Gen[WebUrl] = urls() map WebUrl.apply
 

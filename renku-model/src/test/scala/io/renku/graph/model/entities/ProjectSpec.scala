@@ -157,7 +157,7 @@ class ProjectSpec
     }
 
     "turn CliProject entity with parent into the Project object" in new TestCase {
-      forAll(gitLabProjectInfos.map(projectInfoMaybeParent.set(projectPaths.generateSome))) { projectInfo =>
+      forAll(gitLabProjectInfos.map(projectInfoMaybeParent.set(projectSlugs.generateSome))) { projectInfo =>
         val creator            = projectMembersWithEmail.generateOne
         val member1            = projectMembersNoEmail.generateOne
         val member2            = projectMembersWithEmail.generateOne
@@ -232,7 +232,7 @@ class ProjectSpec
     }
 
     "turn non-renku CliProject entity with parent into the NonRenkuProject object" in {
-      forAll(gitLabProjectInfos.map(projectInfoMaybeParent.set(projectPaths.generateSome))) { projectInfo =>
+      forAll(gitLabProjectInfos.map(projectInfoMaybeParent.set(projectSlugs.generateSome))) { projectInfo =>
         val creator = projectMembersWithEmail.generateOne
         val members = projectMembers.generateSet()
         val info    = projectInfo.copy(maybeCreator = creator.some, members = members)
@@ -253,7 +253,7 @@ class ProjectSpec
       Table(
         "Project type"   -> "Project Info",
         "without parent" -> gitLabProjectInfos.map(projectInfoMaybeParent.set(None)).generateOne,
-        "with parent"    -> gitLabProjectInfos.map(projectInfoMaybeParent.set(projectPaths.generateSome)).generateOne
+        "with parent"    -> gitLabProjectInfos.map(projectInfoMaybeParent.set(projectSlugs.generateSome)).generateOne
       )
     } { (projectType, info) =>
       s"match persons in plan.creators for project $projectType" in new TestCase {
@@ -607,8 +607,8 @@ class ProjectSpec
 
     "convert project when there's an internal or modified Dataset entity created before project with parent" in new TestCase {
 
-      val parentPath  = projectPaths.generateOne
-      val projectInfo = gitLabProjectInfos.map(projectInfoMaybeParent.set(parentPath.some)).generateOne
+      val parentSlug  = projectSlugs.generateOne
+      val projectInfo = gitLabProjectInfos.map(projectInfoMaybeParent.set(parentSlug.some)).generateOne
       val dataset1 = datasetEntities(provenanceInternal(cliShapedPersons))
         .withDateBefore(projectInfo.dateCreated)
         .generateOne
@@ -703,7 +703,7 @@ class ProjectSpec
     "return Invalid when there's a modified Dataset that is derived from a non-existing dataset" in new TestCase {
       Set(
         gitLabProjectInfos.map(projectInfoMaybeParent.set(None)).generateOne,
-        gitLabProjectInfos.map(projectInfoMaybeParent.set(projectPaths.generateSome)).generateOne
+        gitLabProjectInfos.map(projectInfoMaybeParent.set(projectSlugs.generateSome)).generateOne
       ) foreach { projectInfo =>
         val (original, modified) = datasetAndModificationEntities(provenanceInternal(cliShapedPersons),
                                                                   projectInfo.dateCreated,
@@ -734,7 +734,7 @@ class ProjectSpec
       val earliestDate = List(gitlabDate, cliDate).min
       val projectInfo = gitLabProjectInfos
         .map(
-          _.copy(maybeParentPath = None,
+          _.copy(maybeParentSlug = None,
                  dateCreated = gitlabDate,
                  dateModified = projectModifiedDates(gitlabDate.value).generateOne
           )
@@ -763,7 +763,7 @@ class ProjectSpec
       val cliDate      = projectCreatedDates().generateOne
       val earliestDate = List(gitlabDate, cliDate).min
       val projectInfo = gitLabProjectInfos.generateOne.copy(
-        maybeParentPath = None,
+        maybeParentSlug = None,
         dateCreated = gitlabDate,
         dateModified = projectModifiedDates(gitlabDate.value).generateOne,
         maybeDescription = projectDescriptions.generateSome,
@@ -799,7 +799,7 @@ class ProjectSpec
       val cliDate      = projectCreatedDates().generateOne
       val earliestDate = List(gitlabDate, cliDate).min
       val projectInfo = gitLabProjectInfos.generateOne.copy(
-        maybeParentPath = None,
+        maybeParentSlug = None,
         dateCreated = gitlabDate,
         dateModified = projectModifiedDates(gitlabDate.value).generateOne,
         maybeDescription = projectDescriptions.generateSome,
@@ -834,7 +834,7 @@ class ProjectSpec
       val cliDate      = projectCreatedDates().generateOne
       val earliestDate = List(gitlabDate, cliDate).min
       val projectInfo = gitLabProjectInfos.generateOne.copy(
-        maybeParentPath = None,
+        maybeParentSlug = None,
         dateCreated = gitlabDate,
         dateModified = projectModifiedDates(gitlabDate.value).generateOne,
         maybeDescription = projectDescriptions.generateNone,
@@ -876,7 +876,7 @@ class ProjectSpec
       RenkuProject.WithParent
         .from(
           projectResourceIds.generateOne,
-          projectPaths.generateOne,
+          projectSlugs.generateOne,
           projectNames.generateOne,
           maybeDescription = None,
           cliVersions.generateOne,
@@ -910,7 +910,7 @@ class ProjectSpec
       RenkuProject.WithoutParent
         .from(
           projectResourceIds.generateOne,
-          projectPaths.generateOne,
+          projectSlugs.generateOne,
           projectNames.generateOne,
           maybeDescription = None,
           cliVersions.generateOne,
@@ -943,7 +943,7 @@ class ProjectSpec
       NonRenkuProject.WithParent
         .from(
           projectResourceIds.generateOne,
-          projectPaths.generateOne,
+          projectSlugs.generateOne,
           projectNames.generateOne,
           maybeDescription = None,
           dateCreated,
@@ -972,7 +972,7 @@ class ProjectSpec
       NonRenkuProject.WithoutParent
         .from(
           projectResourceIds.generateOne,
-          projectPaths.generateOne,
+          projectSlugs.generateOne,
           projectNames.generateOne,
           maybeDescription = None,
           dateCreated,
@@ -1008,8 +1008,9 @@ class ProjectSpec
               EntityId.of(project.resourceId.show),
               entities.Project.entityTypes,
               schema / "name"             -> project.name.asJsonLD,
-              renku / "projectPath"       -> project.path.asJsonLD,
-              renku / "projectNamespace"  -> project.path.toNamespace.asJsonLD,
+              renku / "slug"              -> project.slug.asJsonLD,
+              renku / "projectPath"       -> project.slug.asJsonLD,
+              renku / "projectNamespace"  -> project.slug.toNamespace.asJsonLD,
               renku / "projectNamespaces" -> project.namespaces.asJsonLD,
               schema / "description"      -> project.maybeDescription.asJsonLD,
               schema / "agent"            -> project.agent.asJsonLD,
@@ -1044,8 +1045,9 @@ class ProjectSpec
               EntityId.of(project.resourceId.show),
               entities.Project.entityTypes,
               schema / "name"             -> project.name.asJsonLD,
-              renku / "projectPath"       -> project.path.asJsonLD,
-              renku / "projectNamespace"  -> project.path.toNamespace.asJsonLD,
+              renku / "slug"              -> project.slug.asJsonLD,
+              renku / "projectPath"       -> project.slug.asJsonLD,
+              renku / "projectNamespace"  -> project.slug.toNamespace.asJsonLD,
               renku / "projectNamespaces" -> project.namespaces.asJsonLD,
               schema / "description"      -> project.maybeDescription.asJsonLD,
               schema / "dateCreated"      -> project.dateCreated.asJsonLD,
@@ -1085,8 +1087,9 @@ class ProjectSpec
               EntityId.of(project.resourceId.show),
               entities.Project.entityTypes,
               schema / "name"             -> project.name.asJsonLD,
-              renku / "projectPath"       -> project.path.asJsonLD,
-              renku / "projectNamespace"  -> project.path.toNamespace.asJsonLD,
+              renku / "slug"              -> project.slug.asJsonLD,
+              renku / "projectPath"       -> project.slug.asJsonLD,
+              renku / "projectNamespace"  -> project.slug.toNamespace.asJsonLD,
               renku / "projectNamespaces" -> project.namespaces.asJsonLD,
               schema / "description"      -> project.maybeDescription.asJsonLD,
               schema / "agent"            -> project.agent.asJsonLD,
@@ -1125,8 +1128,9 @@ class ProjectSpec
               EntityId.of(project.resourceId.show),
               entities.Project.entityTypes,
               schema / "name"             -> project.name.asJsonLD,
-              renku / "projectPath"       -> project.path.asJsonLD,
-              renku / "projectNamespace"  -> project.path.toNamespace.asJsonLD,
+              renku / "slug"              -> project.slug.asJsonLD,
+              renku / "projectPath"       -> project.slug.asJsonLD,
+              renku / "projectNamespace"  -> project.slug.toNamespace.asJsonLD,
               renku / "projectNamespaces" -> project.namespaces.asJsonLD,
               schema / "description"      -> project.maybeDescription.asJsonLD,
               schema / "dateCreated"      -> project.dateCreated.asJsonLD,
@@ -1168,8 +1172,9 @@ class ProjectSpec
               EntityId.of(project.resourceId.show),
               entities.Project.entityTypes,
               schema / "name"             -> project.name.asJsonLD,
-              renku / "projectPath"       -> project.path.asJsonLD,
-              renku / "projectNamespace"  -> project.path.toNamespace.asJsonLD,
+              renku / "slug"              -> project.slug.asJsonLD,
+              renku / "projectPath"       -> project.slug.asJsonLD,
+              renku / "projectNamespace"  -> project.slug.toNamespace.asJsonLD,
               renku / "projectNamespaces" -> project.namespaces.asJsonLD,
               schema / "description"      -> project.maybeDescription.asJsonLD,
               schema / "dateCreated"      -> project.dateCreated.asJsonLD,
@@ -1219,14 +1224,14 @@ class ProjectSpec
     val schemaVersion = projectSchemaVersions.generateOne
   }
 
-  private def createRenkuProjectFromPath(
-      parentPath:    projects.Path,
+  private def createRenkuProjectFromSlug(
+      parentSlug:    projects.Slug,
       cliVersion:    CliVersion,
       schemaVersion: SchemaVersion
   ) = {
     val dateCreated = projectCreatedDates().generateOne
     testentities.RenkuProject.WithoutParent(
-      path = parentPath,
+      slug = parentSlug,
       name = projectNames.generateOne,
       maybeDescription = None,
       agent = cliVersion,
@@ -1246,10 +1251,10 @@ class ProjectSpec
   }
 
   private def createRenkuProject(info: GitLabProjectInfo, cliVersion: CliVersion, schemaVersion: SchemaVersion) =
-    info.maybeParentPath match {
-      case Some(parentPath) =>
+    info.maybeParentSlug match {
+      case Some(parentSlug) =>
         testentities.RenkuProject.WithParent(
-          path = info.path,
+          slug = info.slug,
           name = info.name,
           maybeDescription = info.maybeDescription,
           agent = cliVersion,
@@ -1266,11 +1271,11 @@ class ProjectSpec
           unlinkedPlans = Nil,
           images = info.avatarUrl.toList,
           createCompositePlans = Nil,
-          parent = createRenkuProjectFromPath(parentPath, cliVersion, schemaVersion)
+          parent = createRenkuProjectFromSlug(parentSlug, cliVersion, schemaVersion)
         )
       case None =>
         testentities.RenkuProject.WithoutParent(
-          path = info.path,
+          slug = info.slug,
           name = info.name,
           maybeDescription = info.maybeDescription,
           agent = cliVersion,
@@ -1290,10 +1295,10 @@ class ProjectSpec
         )
     }
 
-  private def createNonRenkuProjectFromPath(parentPath: projects.Path) = {
+  private def createNonRenkuProjectFromSlug(parentSlug: projects.Slug) = {
     val createdDate = projectCreatedDates().generateOne
     testentities.NonRenkuProject.WithoutParent(
-      path = parentPath,
+      slug = parentSlug,
       name = projectNames.generateOne,
       maybeDescription = None,
       dateCreated = createdDate,
@@ -1308,10 +1313,10 @@ class ProjectSpec
   }
 
   private def createNonRenkuProject(info: GitLabProjectInfo) =
-    info.maybeParentPath match {
-      case Some(parentPath) =>
+    info.maybeParentSlug match {
+      case Some(parentSlug) =>
         testentities.NonRenkuProject.WithParent(
-          path = info.path,
+          slug = info.slug,
           name = info.name,
           maybeDescription = info.maybeDescription,
           dateCreated = info.dateCreated,
@@ -1322,11 +1327,11 @@ class ProjectSpec
           keywords = info.keywords,
           members = Set.empty,
           images = info.avatarUrl.toList,
-          parent = createNonRenkuProjectFromPath(parentPath)
+          parent = createNonRenkuProjectFromSlug(parentSlug)
         )
       case None =>
         testentities.NonRenkuProject.WithoutParent(
-          path = info.path,
+          slug = info.slug,
           name = info.name,
           maybeDescription = info.maybeDescription,
           dateCreated = info.dateCreated,
@@ -1439,8 +1444,8 @@ class ProjectSpec
   private def merge(person: testentities.Person, member: ProjectMemberWithEmail): testentities.Person =
     person.copy(maybeGitLabId = member.gitLabId.some, name = member.name, maybeEmail = member.email.some)
 
-  private lazy val projectInfoMaybeParent: Lens[GitLabProjectInfo, Option[projects.Path]] =
-    Lens[GitLabProjectInfo, Option[projects.Path]](_.maybeParentPath)(mpp => _.copy(maybeParentPath = mpp))
+  private lazy val projectInfoMaybeParent: Lens[GitLabProjectInfo, Option[projects.Slug]] =
+    Lens[GitLabProjectInfo, Option[projects.Slug]](_.maybeParentSlug)(mpp => _.copy(maybeParentSlug = mpp))
 
   private lazy val modifiedPlanDerivation: Lens[entities.StepPlan.Modified, entities.Plan.Derivation] =
     Lens[entities.StepPlan.Modified, entities.Plan.Derivation](_.derivation)(d => _.copy(derivation = d))

@@ -56,8 +56,8 @@ class ProjectJsonEncoderSpec extends AnyWordSpec with should.Matchers with Scala
         json.as(decoder(project)) shouldBe project.asRight
         json._links shouldBe Right(
           Links.of(
-            Rel.Self        -> Href(renkuApiUrl / "projects" / project.path),
-            Rel("datasets") -> Href(renkuApiUrl / "projects" / project.path / "datasets")
+            Rel.Self        -> Href(renkuApiUrl / "projects" / project.slug),
+            Rel("datasets") -> Href(renkuApiUrl / "projects" / project.slug / "datasets")
           )
         )
 
@@ -71,7 +71,9 @@ class ProjectJsonEncoderSpec extends AnyWordSpec with should.Matchers with Scala
   private def decoder(project: Project): Decoder[Project] = cursor =>
     for {
       id               <- cursor.downField("identifier").as[GitLabId]
-      path             <- cursor.downField("path").as[Path]
+      path             <- cursor.downField("path").as[Slug]
+      slug             <- cursor.downField("slug").as[Slug]
+      _                <- Either.cond(path == slug, (), DecodingFailure("path != slug", Nil))
       name             <- cursor.downField("name").as[Name]
       maybeDescription <- cursor.downField("description").as[Option[Description]]
       visibility       <- cursor.downField("visibility").as[Visibility]
@@ -88,7 +90,7 @@ class ProjectJsonEncoderSpec extends AnyWordSpec with should.Matchers with Scala
     } yield Project(
       project.resourceId,
       id,
-      path,
+      slug,
       name,
       maybeDescription,
       visibility,
@@ -126,11 +128,13 @@ class ProjectJsonEncoderSpec extends AnyWordSpec with should.Matchers with Scala
 
   private def parentDecoder(maybeParent: Option[ParentProject]): Decoder[ParentProject] = cursor =>
     for {
-      path    <- cursor.downField("path").as[Path]
+      path    <- cursor.downField("path").as[Slug]
+      slug    <- cursor.downField("slug").as[Slug]
+      _       <- Either.cond(path == slug, (), DecodingFailure("parent path != slug", Nil))
       name    <- cursor.downField("name").as[Name]
-      parent  <- maybeParent.toRight(DecodingFailure(show"'$path' parent project expected but found None", Nil))
+      parent  <- maybeParent.toRight(DecodingFailure(show"'$slug' parent project expected but found None", Nil))
       created <- cursor.downField("created").as(creationDecoder(parent.created))
-    } yield ParentProject(parent.resourceId, path, name, created)
+    } yield ParentProject(parent.resourceId, slug, name, created)
 
   private implicit lazy val urlsDecoder: Decoder[Urls] = cursor =>
     for {

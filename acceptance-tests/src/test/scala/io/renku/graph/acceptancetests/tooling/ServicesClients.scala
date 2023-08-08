@@ -130,7 +130,7 @@ object EventLogClient {
   object ProjectEvent {
     import io.renku.tinytypes.json.TinyTypeDecoders._
 
-    final case class Project(id: projects.GitLabId, path: projects.Path)
+    final case class Project(id: projects.GitLabId, slug: projects.Slug)
     object Project {
       implicit val jsonDecoder: Decoder[Project] = deriveDecoder
     }
@@ -155,11 +155,11 @@ object EventLogClient {
       } yield ()
     }.unsafeRunSync()
 
-    def getEvents(project: Either[projects.GitLabId, projects.Path]): IO[List[ProjectEvent]] =
+    def getEvents(project: Either[projects.GitLabId, projects.Slug]): IO[List[ProjectEvent]] =
       for {
         uri <- validateUri(s"$baseUrl/events").map(uri =>
                  project.fold(id => uri.withQueryParam("project-id", id.value),
-                              path => uri.withQueryParam("project-path", path.value)
+                              slug => uri.withQueryParam("project-slug", slug.value)
                  )
                )
         req = request(Method.GET, uri)

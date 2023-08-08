@@ -26,17 +26,17 @@ import io.circe.{Decoder, DecodingFailure, Encoder}
 import io.renku.events.CategoryName
 import io.renku.graph.model.projects
 
-final case class SyncRepoMetadata(path: projects.Path)
+final case class SyncRepoMetadata(slug: projects.Slug)
 
 object SyncRepoMetadata {
 
   val categoryName: CategoryName = CategoryName("SYNC_REPO_METADATA")
 
-  implicit val eventEncoder: Encoder[SyncRepoMetadata] = Encoder.instance { case SyncRepoMetadata(path) =>
+  implicit val eventEncoder: Encoder[SyncRepoMetadata] = Encoder.instance { case SyncRepoMetadata(slug) =>
     json"""{
       "categoryName": $categoryName,
       "project": {
-        "path": $path
+        "slug": $slug
       }
     }"""
   }
@@ -49,11 +49,11 @@ object SyncRepoMetadata {
       case other          => DecodingFailure(CustomReason(s"Expected $categoryName but got $other"), cursor).asLeft
     }
 
-    (validateCategory >> cursor.downField("project").downField("path").as[projects.Path])
+    (validateCategory >> cursor.downField("project").downField("slug").as[projects.Slug])
       .map(SyncRepoMetadata(_))
   }
 
-  implicit val show: Show[SyncRepoMetadata] = Show.show { case SyncRepoMetadata(path) =>
-    show"projectPath = $path"
+  implicit val show: Show[SyncRepoMetadata] = Show.show { case SyncRepoMetadata(slug) =>
+    show"projectSlug = $slug"
   }
 }

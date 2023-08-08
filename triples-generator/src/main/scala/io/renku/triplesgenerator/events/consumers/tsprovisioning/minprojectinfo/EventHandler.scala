@@ -50,7 +50,7 @@ private class EventHandler[F[_]: MonadCancelThrow: Logger](
   override def createHandlingDefinition(): EventHandlingDefinition =
     EventHandlingDefinition(
       _.event.getProject.map(MinProjectInfoEvent(_)),
-      tsWriteLock.contramap[Event](_.project.path).surround(eventProcessor.process),
+      tsWriteLock.contramap[Event](_.project.slug).surround(eventProcessor.process),
       precondition = tsReadinessChecker.verifyTSReady,
       onRelease = subscriptionMechanism.renewSubscription().some
     )

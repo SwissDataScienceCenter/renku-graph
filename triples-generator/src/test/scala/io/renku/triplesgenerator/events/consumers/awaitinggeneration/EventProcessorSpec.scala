@@ -28,7 +28,7 @@ import io.renku.generators.Generators._
 import io.renku.generators.jsonld.JsonLDGenerators.jsonLDEntities
 import io.renku.graph.model.events.EventStatus.{FailureStatus, New}
 import io.renku.graph.model.events._
-import io.renku.graph.model.projects.Path
+import io.renku.graph.model.projects.Slug
 import io.renku.graph.tokenrepository.AccessTokenFinder
 import io.renku.http.client.AccessToken
 import io.renku.interpreters.TestLogger
@@ -66,7 +66,7 @@ class EventProcessorSpec
 
       val commitEvent = commitEvents.generateOne
 
-      givenFetchingAccessToken(commitEvent.project.path)
+      givenFetchingAccessToken(commitEvent.project.slug)
         .returning(maybeAccessToken.pure[IO])
 
       successfulTriplesGeneration(commitEvent -> jsonLDEntities.generateOne)
@@ -83,7 +83,7 @@ class EventProcessorSpec
 
       val commitEvent = commitEvents.generateOne
 
-      givenFetchingAccessToken(forProjectPath = commitEvent.project.path)
+      givenFetchingAccessToken(forProjectSlug = commitEvent.project.slug)
         .returning(maybeAccessToken.pure[IO])
 
       val exception = nonRecoverableMalformedRepoErrors.generateOne
@@ -102,7 +102,7 @@ class EventProcessorSpec
 
         val commitEvent = commitEvents.generateOne
 
-        givenFetchingAccessToken(forProjectPath = commitEvent.project.path)
+        givenFetchingAccessToken(forProjectSlug = commitEvent.project.slug)
           .returning(maybeAccessToken.pure[IO])
 
         val exception = exceptions.generateOne
@@ -122,7 +122,7 @@ class EventProcessorSpec
 
       val commitEvent = commitEvents.generateOne
 
-      givenFetchingAccessToken(commitEvent.project.path)
+      givenFetchingAccessToken(commitEvent.project.slug)
         .returning(maybeAccessToken.pure[IO])
 
       val exception = logWorthyRecoverableErrors.generateOne
@@ -143,7 +143,7 @@ class EventProcessorSpec
 
         val commitEvent = commitEvents.generateOne
 
-        givenFetchingAccessToken(commitEvent.project.path)
+        givenFetchingAccessToken(commitEvent.project.slug)
           .returning(maybeAccessToken.pure[IO])
 
         val exception = silentRecoverableErrors.generateOne
@@ -164,7 +164,7 @@ class EventProcessorSpec
       val commitEvent = commitEvents.generateOne
 
       val exception = exceptions.generateOne
-      givenFetchingAccessToken(commitEvent.project.path)
+      givenFetchingAccessToken(commitEvent.project.slug)
         .returning(exception.raiseError[IO, Option[AccessToken]])
 
       expectEventRolledBackToNew(commitEvent)
@@ -192,10 +192,10 @@ class EventProcessorSpec
       singleEventTimeRecorder
     )
 
-    def givenFetchingAccessToken(forProjectPath: Path) =
+    def givenFetchingAccessToken(forProjectSlug: Slug) =
       (accessTokenFinder
-        .findAccessToken(_: Path)(_: Path => String))
-        .expects(forProjectPath, projectPathToPath)
+        .findAccessToken(_: Slug)(_: Slug => String))
+        .expects(forProjectSlug, projectSlugToPath)
 
     def successfulTriplesGeneration(commitAndTriples: (CommitEvent, JsonLD)) = {
       val (commit, payload) = commitAndTriples
@@ -205,7 +205,7 @@ class EventProcessorSpec
         .returning(rightT[IO, ProcessingRecoverableError](payload))
 
       expectEventMarkedAsTriplesGenerated(CompoundEventId(commit.eventId, commit.project.id),
-                                          commit.project.path,
+                                          commit.project.slug,
                                           payload
       )
     }
@@ -216,9 +216,9 @@ class EventProcessorSpec
         case _: LogWorthyRecoverableError => ExecutionDelay(Duration ofMinutes 15)
       }
       (eventStatusUpdater
-        .toFailure(_: CompoundEventId, _: Path, _: FailureStatus, _: Throwable, _: ExecutionDelay))
+        .toFailure(_: CompoundEventId, _: Slug, _: FailureStatus, _: Throwable, _: ExecutionDelay))
         .expects(commit.compoundEventId,
-                 commit.project.path,
+                 commit.project.slug,
                  EventStatus.GenerationRecoverableFailure,
                  exception,
                  executionDelay
@@ -228,15 +228,15 @@ class EventProcessorSpec
 
     def expectEventMarkedAsNonRecoverableFailure(commit: CommitEvent, exception: Throwable) =
       (eventStatusUpdater
-        .toFailure(_: CompoundEventId, _: Path, _: FailureStatus, _: Throwable))
-        .expects(commit.compoundEventId, commit.project.path, EventStatus.GenerationNonRecoverableFailure, exception)
+        .toFailure(_: CompoundEventId, _: Slug, _: FailureStatus, _: Throwable))
+        .expects(commit.compoundEventId, commit.project.slug, EventStatus.GenerationNonRecoverableFailure, exception)
         .returning(().pure[IO])
 
-    def expectEventMarkedAsTriplesGenerated(compoundEventId: CompoundEventId, projectPath: Path, payload: JsonLD) =
+    def expectEventMarkedAsTriplesGenerated(compoundEventId: CompoundEventId, projectSlug: Slug, payload: JsonLD) =
       (eventStatusUpdater
-        .toTriplesGenerated(_: CompoundEventId, _: Path, _: JsonLD, _: EventProcessingTime))
+        .toTriplesGenerated(_: CompoundEventId, _: Slug, _: JsonLD, _: EventProcessingTime))
         .expects(compoundEventId,
-                 projectPath,
+                 projectSlug,
                  payload,
                  EventProcessingTime(Duration.ofMillis(singleEventTimeRecorder.elapsedTime.value))
         )
@@ -244,14 +244,14 @@ class EventProcessorSpec
 
     def expectEventRolledBackToNew(commit: CommitEvent) =
       (eventStatusUpdater
-        .rollback(_: CompoundEventId, _: Path, _: RollbackStatus.New.type))
-        .expects(commit.compoundEventId, commit.project.path, *)
+        .rollback(_: CompoundEventId, _: Slug, _: RollbackStatus.New.type))
+        .expects(commit.compoundEventId, commit.project.slug, *)
         .returning(().pure[IO])
 
     def logError(commit: CommitEvent, exception: Exception, message: String = "failed") =
       logger.logged(Error(s"${commonLogMessage(commit)} $message", exception))
 
     def commonLogMessage(event: CommitEvent): String =
-      show"$categoryName: ${event.compoundEventId}, projectPath = ${event.project.path}"
+      show"$categoryName: ${event.compoundEventId}, projectSlug = ${event.project.slug}"
   }
 }

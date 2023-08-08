@@ -24,7 +24,6 @@ import cats.syntax.all._
 import io.renku.eventlog.EventLogDB.SessionResource
 import org.typelevel.log4cats.Logger
 import skunk._
-import skunk.codec.all._
 import skunk.implicits._
 
 private trait ProjectPathRemover[F[_]] extends DbMigrator[F]
@@ -39,23 +38,11 @@ private class ProjectPathRemoverImpl[F[_]: MonadCancelThrow: Logger: SessionReso
   override def run: F[Unit] = SessionResource[F].useK {
     whenTableExists("event")(
       Kleisli.liftF(Logger[F] info "'project_path' column dropping skipped"),
-      otherwise = checkColumnExists >>= {
-        case false =>
-          Kleisli.liftF[F, Session[F], Unit](
-            Logger[F] info "'project_path' column already removed"
-          )
-        case true => removeColumn()
+      otherwise = checkColumnExists("event_log", "project_path") >>= {
+        case false => Kleisli.liftF[F, Session[F], Unit](Logger[F] info "'project_path' column already removed")
+        case true  => removeColumn()
       }
     )
-  }
-
-  private lazy val checkColumnExists = {
-    val query: Query[Void, String] = sql"select project_path from event_log limit 1".query(varchar)
-    Kleisli[F, Session[F], Boolean] {
-      _.option(query)
-        .map(_ => true)
-        .recover { case _ => false }
-    }
   }
 
   private def removeColumn(): Kleisli[F, Session[F], Unit] = for {

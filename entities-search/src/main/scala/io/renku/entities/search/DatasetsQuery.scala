@@ -35,7 +35,7 @@ object DatasetsQuery extends EntityQuery[Entity.Dataset] {
 
   val matchingScoreVar        = VarName("matchingScore")
   val nameVar                 = VarName("name")
-  val idsPathsVisibilitiesVar = VarName("idsPathsVisibilities")
+  val idsSlugsVisibilitiesVar = VarName("idsSlugsVisibilities")
   val sameAsVar               = VarName("sameAs")
   val maybeDateCreatedVar     = VarName("maybeDateCreated")
   val maybeDatePublishedVar   = VarName("maybeDatePublished")
@@ -50,7 +50,7 @@ object DatasetsQuery extends EntityQuery[Entity.Dataset] {
     entityTypeVar,
     matchingScoreVar,
     nameVar,
-    idsPathsVisibilitiesVar,
+    idsSlugsVisibilitiesVar,
     sameAsVar,
     maybeDateCreatedVar,
     maybeDatePublishedVar,
@@ -68,7 +68,7 @@ object DatasetsQuery extends EntityQuery[Entity.Dataset] {
           |SELECT DISTINCT $entityTypeVar
           |       $matchingScoreVar
           |       $nameVar
-          |       $idsPathsVisibilitiesVar
+          |       $idsSlugsVisibilitiesVar
           |       $sameAsVar
           |       $maybeDateCreatedVar
           |       $maybeDatePublishedVar
@@ -84,7 +84,7 @@ object DatasetsQuery extends EntityQuery[Entity.Dataset] {
           |  { # start sub select
           |    SELECT $sameAsVar $matchingScoreVar
           |      (GROUP_CONCAT(DISTINCT ?creatorName; separator=',') AS $creatorsNamesVar)
-          |      (GROUP_CONCAT(DISTINCT ?idPathVisibility; separator=',') AS $idsPathsVisibilitiesVar)
+          |      (GROUP_CONCAT(DISTINCT ?idSlugVisibility; separator=',') AS $idsSlugsVisibilitiesVar)
           |      (GROUP_CONCAT(DISTINCT ?keyword; separator=',') AS $keywordsVar)
           |      (GROUP_CONCAT(DISTINCT ?encodedImageUrl; separator=',') AS $imagesVar)
           |    WHERE {
@@ -112,8 +112,8 @@ object DatasetsQuery extends EntityQuery[Entity.Dataset] {
           |        # access restriction
           |        ${accessRightsAndVisibility(criteria.maybeUser, criteria.filters.visibilities)}
           |
-          |        # path and visibility
-          |        $pathVisibility
+          |        # slug and visibility
+          |        $slugVisibility
           |      }
           |    }
           |    GROUP BY $sameAsVar $matchingScoreVar
@@ -136,10 +136,10 @@ object DatasetsQuery extends EntityQuery[Entity.Dataset] {
           |""".stripMargin.sparql
     }
 
-  private def pathVisibility: Fragment =
+  private def slugVisibility: Fragment =
     fr"""|  # Return all visibilities and select the broadest in decoding
-         |  BIND (CONCAT(STR(?projectPath), STR(':'),
-         |               STR(?visibility)) AS ?idPathVisibility)
+         |  BIND (CONCAT(STR(?projectSlug), STR(':'),
+         |               STR(?visibility)) AS ?idSlugVisibility)
          |""".stripMargin
 
   private def accessRightsAndVisibility(maybeUser: Option[AuthUser], visibilities: Set[Visibility]): Fragment =
@@ -253,7 +253,7 @@ object DatasetsQuery extends EntityQuery[Entity.Dataset] {
       if (ns.isEmpty) Fragment.empty
       else fr"Values (?namespace) { ${ns.map(_.value)}  }"
 
-    fr"""|  ?projId renku:projectPath ?projectPath;
+    fr"""|  ?projId renku:projectPath ?projectSlug;
          |          renku:projectNamespace ?namespace.
          |  $matchFrag
       """.stripMargin
@@ -305,13 +305,13 @@ object DatasetsQuery extends EntityQuery[Entity.Dataset] {
     import DecodingTools._
     import io.renku.tinytypes.json.TinyTypeDecoders._
 
-    lazy val toListOfIdsPathsAndVisibilities
-        : Option[String] => Decoder.Result[NonEmptyList[(projects.Path, projects.Visibility)]] =
+    lazy val toListOfIdsSlugsAndVisibilities
+        : Option[String] => Decoder.Result[NonEmptyList[(projects.Slug, projects.Visibility)]] =
       _.map(
         _.split(",")
           .map(_.trim)
-          .map { case s"$projectPath:$visibility" =>
-            (projects.Path.from(projectPath), projects.Visibility.from(visibility)).mapN((_, _))
+          .map { case s"$projectSlug:$visibility" =>
+            (projects.Slug.from(projectSlug), projects.Visibility.from(visibility)).mapN((_, _))
           }
           .toList
           .sequence
@@ -320,18 +320,18 @@ object DatasetsQuery extends EntityQuery[Entity.Dataset] {
             case head :: tail => NonEmptyList.of(head, tail: _*).some
             case Nil          => None
           }
-      ).getOrElse(Option.empty[NonEmptyList[(projects.Path, projects.Visibility)]].asRight)
+      ).getOrElse(Option.empty[NonEmptyList[(projects.Slug, projects.Visibility)]].asRight)
         .flatMap {
           case Some(tuples) => tuples.asRight
-          case None         => DecodingFailure("DS's project path and visibility not found", Nil).asLeft
+          case None         => DecodingFailure("DS's project slug and visibility not found", Nil).asLeft
         }
 
     for {
       matchingScore <- read[MatchingScore](matchingScoreVar)
       name          <- read[datasets.Name](nameVar)
       sameAs        <- read[datasets.TopmostSameAs](sameAsVar)
-      pathAndVisibility <- read[Option[String]](idsPathsVisibilitiesVar)
-                             .flatMap(toListOfIdsPathsAndVisibilities)
+      slugAndVisibility <- read[Option[String]](idsSlugsVisibilitiesVar)
+                             .flatMap(toListOfIdsSlugsAndVisibilities)
                              .map(_.toList.maxBy(_._2))
       maybeDateCreated   <- read[Option[datasets.DateCreated]](maybeDateCreatedVar)
       maybeDatePublished <- read[Option[datasets.DatePublished]](maybeDatePublishedVar)
@@ -347,14 +347,14 @@ object DatasetsQuery extends EntityQuery[Entity.Dataset] {
       matchingScore,
       sameAs,
       name,
-      pathAndVisibility._2,
+      slugAndVisibility._2,
       date,
       maybeDateModified.map(d => datasets.DateModified(d.value)),
       creators,
       keywords,
       maybeDesc,
       images,
-      pathAndVisibility._1
+      slugAndVisibility._1
     )
   }
 }

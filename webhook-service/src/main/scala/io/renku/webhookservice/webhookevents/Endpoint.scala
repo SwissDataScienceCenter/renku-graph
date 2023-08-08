@@ -28,7 +28,7 @@ import io.renku.eventlog
 import io.renku.eventlog.api.events.CommitSyncRequest
 import io.renku.events.consumers.Project
 import io.renku.graph.model.events.CommitId
-import io.renku.graph.model.projects.{GitLabId, Path}
+import io.renku.graph.model.projects.{GitLabId, Slug}
 import io.renku.http.client.RestClientError.UnauthorizedException
 import io.renku.metrics.MetricsRegistry
 import io.renku.webhookservice.crypto.HookTokenCrypto
@@ -109,7 +109,7 @@ class EndpointImpl[F[_]: Concurrent: Logger](
   private lazy val logInfo: ((CommitId, CommitSyncRequest)) => F[Unit] = {
     case (commitId, CommitSyncRequest(project)) =>
       Logger[F].info(
-        s"Push event for eventId = $commitId, projectId = ${project.id}, projectPath = ${project.path} -> accepted"
+        s"Push event for eventId = $commitId, projectId = ${project.id}, projectSlug = ${project.slug} -> accepted"
       )
   }
 }
@@ -123,7 +123,7 @@ object Endpoint {
 
   private implicit val projectDecoder: Decoder[Project] = cursor => {
     import io.renku.tinytypes.json.TinyTypeDecoders._
-    (cursor.downField("id").as[GitLabId], cursor.downField("path_with_namespace").as[Path])
+    (cursor.downField("id").as[GitLabId], cursor.downField("path_with_namespace").as[Slug])
       .mapN(Project(_, _))
   }
 

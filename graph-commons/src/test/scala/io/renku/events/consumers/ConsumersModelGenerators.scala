@@ -21,15 +21,15 @@ package io.renku.events.consumers
 import EventSchedulingResult._
 import io.renku.generators.Generators.{exceptions, fixed, nonEmptyStrings}
 import io.renku.generators.Generators.Implicits._
-import io.renku.graph.model.GraphModelGenerators.{projectIds, projectPaths}
+import io.renku.graph.model.GraphModelGenerators.{projectIds, projectSlugs}
 import org.scalacheck.Gen
 
 object ConsumersModelGenerators {
 
   implicit lazy val consumerProjects: Gen[Project] = for {
     projectId <- projectIds
-    path      <- projectPaths
-  } yield Project(projectId, path)
+    slug      <- projectSlugs
+  } yield Project(projectId, slug)
 
   lazy val badRequests: Gen[EventSchedulingResult.BadRequest] = nonEmptyStrings().toGeneratorOf(BadRequest)
   lazy val serviceUnavailables: Gen[EventSchedulingResult.ServiceUnavailable] =

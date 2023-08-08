@@ -107,7 +107,7 @@ object EventsEndpoint {
 
   implicit val show: Show[Criteria] = Show.show {
     implicit def idParamShow[I <: projects.Identifier]: Show[I] = Show.show {
-      case path: projects.Path     => s"project-path: $path"
+      case slug: projects.Slug     => s"project-slug: $slug"
       case id:   projects.GitLabId => s"project-id: $id"
     }
     _.filters match {
@@ -138,7 +138,7 @@ object EventsEndpoint {
     }
 
     implicit val projectIdsEncoder: Encoder[EventInfo.ProjectIds] = ids =>
-      json"""{ "id": ${ids.id}, "path": ${ids.path} }"""
+      json"""{ "id": ${ids.id}, "slug": ${ids.slug} }"""
 
     implicit val eventInfoEncoder: Encoder[EventInfo] = eventInfo =>
       json"""{

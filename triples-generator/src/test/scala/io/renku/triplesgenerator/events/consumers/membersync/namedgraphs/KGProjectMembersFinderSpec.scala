@@ -21,7 +21,7 @@ package namedgraphs
 
 import cats.effect.IO
 import io.renku.generators.Generators.Implicits._
-import io.renku.graph.model.GraphModelGenerators.projectPaths
+import io.renku.graph.model.GraphModelGenerators.projectSlugs
 import io.renku.graph.model.testentities._
 import io.renku.interpreters.TestLogger
 import io.renku.logging.TestSparqlQueryTimeRecorder
@@ -50,11 +50,11 @@ class KGProjectMembersFinderSpec
 
       val expectedMembers = members.flatMap(_.toMaybe[KGProjectMember])
 
-      finder.findProjectMembers(project.path).unsafeRunSync() shouldBe expectedMembers
+      finder.findProjectMembers(project.slug).unsafeRunSync() shouldBe expectedMembers
     }
 
-    "return no members if there's no project with the given path" in new TestCase {
-      finder.findProjectMembers(projectPaths.generateOne).unsafeRunSync() shouldBe Set.empty
+    "return no members if there's no project with the given slug" in new TestCase {
+      finder.findProjectMembers(projectSlugs.generateOne).unsafeRunSync() shouldBe Set.empty
     }
   }
 

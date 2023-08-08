@@ -28,7 +28,7 @@ import io.renku.http.server.security.{Authenticator, EndpointSecurityException}
 import org.http4s.implicits.http4sLiteralsSyntax
 import org.typelevel.log4cats.Logger
 
-class GitLabAuthenticatorImpl[F[_]: Async: GitLabClient: Logger] extends Authenticator[F] {
+class GLAuthenticatorImpl[F[_]: Async: GitLabClient: Logger] extends Authenticator[F] {
 
   import cats.syntax.all._
   import io.circe._
@@ -63,7 +63,6 @@ class GitLabAuthenticatorImpl[F[_]: Async: GitLabClient: Logger] extends Authent
 }
 
 object GitLabAuthenticator {
-
   def apply[F[_]: Async: GitLabClient: Logger]: F[Authenticator[F]] =
-    new GitLabAuthenticatorImpl[F].pure[F].widen[Authenticator[F]]
+    new GLAuthenticatorImpl[F].pure[F].widen[Authenticator[F]]
 }
