@@ -47,12 +47,12 @@ class ProjectFetcherSpec
 
     provisionProject(project).assertNoException >>
       fetcher
-        .fetchProject(project.path)
-        .asserting(_.value shouldBe ProjectInfo(project.resourceId, project.path, project.dateCreated))
+        .fetchProject(project.slug)
+        .asserting(_.value shouldBe ProjectInfo(project.resourceId, project.slug, project.dateCreated))
   }
 
   it should "return no project if one does not exists" in {
-    fetcher.fetchProject(projectPaths.generateOne).asserting(_ shouldBe None)
+    fetcher.fetchProject(projectSlugs.generateOne).asserting(_ shouldBe None)
   }
 
   implicit override lazy val ioLogger: Logger[IO]                  = TestLogger[IO]()

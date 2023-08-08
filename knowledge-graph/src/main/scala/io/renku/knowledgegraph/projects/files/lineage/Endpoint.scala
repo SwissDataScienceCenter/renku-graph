@@ -37,22 +37,22 @@ import org.typelevel.log4cats.Logger
 import scala.util.control.NonFatal
 
 trait Endpoint[F[_]] {
-  def `GET /lineage`(projectPath: projects.Path, location: Location, maybeUser: Option[AuthUser]): F[Response[F]]
+  def `GET /lineage`(projectSlug: projects.Slug, location: Location, maybeUser: Option[AuthUser]): F[Response[F]]
 }
 
 private class EndpointImpl[F[_]: Async: Logger](lineageFinder: LineageFinder[F]) extends Http4sDsl[F] with Endpoint[F] {
 
-  override def `GET /lineage`(projectPath: projects.Path,
+  override def `GET /lineage`(projectSlug: projects.Slug,
                               location:    Location,
                               maybeUser:   Option[AuthUser]
   ): F[Response[F]] =
     lineageFinder
-      .find(projectPath, location, maybeUser)
-      .flatMap(toHttpResult(projectPath, location))
+      .find(projectSlug, location, maybeUser)
+      .flatMap(toHttpResult(projectSlug, location))
       .recoverWith(httpResult)
 
-  private def toHttpResult(projectPath: projects.Path, location: Location): Option[Lineage] => F[Response[F]] = {
-    case None          => NotFound(Message.Info.unsafeApply(show"No lineage for project: $projectPath file: $location"))
+  private def toHttpResult(projectSlug: projects.Slug, location: Location): Option[Lineage] => F[Response[F]] = {
+    case None          => NotFound(Message.Info.unsafeApply(show"No lineage for project: $projectSlug file: $location"))
     case Some(lineage) => Ok(lineage.asJson)
   }
 

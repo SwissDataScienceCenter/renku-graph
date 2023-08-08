@@ -59,9 +59,9 @@ private class ProgressFinderImpl[F[_]: Sync](migrationsDSClient: TSClient[F])(im
       SparqlQuery.ofUnsafe(
         show"${ProvisionProjectsGraph.name} - find left",
         Prefixes of renku -> "renku",
-        sparql"""|SELECT (COUNT(?path) AS ?count)
+        sparql"""|SELECT (COUNT(?slug) AS ?count)
                  |WHERE {
-                 |  ${ProvisionProjectsGraph.name.asEntityId} renku:toBeMigrated ?path
+                 |  ${ProvisionProjectsGraph.name.asEntityId} renku:toBeMigrated ?slug
                  |}
                  |""".stripMargin
       )

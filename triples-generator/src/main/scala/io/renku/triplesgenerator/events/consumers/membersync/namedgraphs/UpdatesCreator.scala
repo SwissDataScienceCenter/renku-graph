@@ -34,17 +34,17 @@ import io.renku.triplesstore.SparqlQuery.Prefixes
 
 private class UpdatesCreator(implicit renkuUrl: RenkuUrl, gitLabApiUrl: GitLabApiUrl) {
 
-  def insertion(projectPath: projects.Path,
+  def insertion(projectSlug: projects.Slug,
                 members:     Set[(GitLabProjectMember, Option[persons.ResourceId])]
   ): List[SparqlQuery] = {
     val (queriesForNewPersons, queriesForExistingPersons) =
       (separateUsersNotYetInKG.pure[List] ap members.toList).separate
-        .bimap(createPersonsAndMemberLinks(projectPath, _), createMemberLinks(projectPath, _))
+        .bimap(createPersonsAndMemberLinks(projectSlug, _), createMemberLinks(projectSlug, _))
     queriesForNewPersons ::: queriesForExistingPersons
   }
 
-  def removal(path: projects.Path, members: Set[KGProjectMember]): List[SparqlQuery] = {
-    val projectId = projects.ResourceId(path)
+  def removal(slug: projects.Slug, members: Set[KGProjectMember]): List[SparqlQuery] = {
+    val projectId = projects.ResourceId(slug)
     members
       .map(member => generateEdge(projectId, member.resourceId))
       .map { edge =>
@@ -61,10 +61,10 @@ private class UpdatesCreator(implicit renkuUrl: RenkuUrl, gitLabApiUrl: GitLabAp
       .toList
   }
 
-  private def createPersonsAndMemberLinks(path:              projects.Path,
+  private def createPersonsAndMemberLinks(slug:              projects.Slug,
                                           membersNotYetInKG: List[GitLabProjectMember]
   ): List[SparqlQuery] = {
-    val projectId             = projects.ResourceId(path)
+    val projectId             = projects.ResourceId(slug)
     val resourceIdsAndMembers = membersNotYetInKG.map(member => (generateResourceId(member.gitLabId), member))
     val membersCreations = resourceIdsAndMembers.map { resourceIdsAndMember =>
       SparqlQuery.of(
@@ -97,10 +97,10 @@ private class UpdatesCreator(implicit renkuUrl: RenkuUrl, gitLabApiUrl: GitLabAp
   private def generateResourceId(gitLabId: GitLabId): persons.ResourceId =
     persons.ResourceId(gitLabId)(renkuUrl)
 
-  private def createMemberLinks(path:               projects.Path,
+  private def createMemberLinks(slug:               projects.Slug,
                                 membersAlreadyInKG: List[(GitLabProjectMember, persons.ResourceId)]
   ): List[SparqlQuery] = {
-    val projectId = projects.ResourceId(path)
+    val projectId = projects.ResourceId(slug)
     membersAlreadyInKG
       .map { case (_, resourceId) => generateEdge(projectId, resourceId) }
       .map { edge =>

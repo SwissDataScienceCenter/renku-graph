@@ -29,7 +29,7 @@ private[collector] final case class PersonViewedProject(userId:     persons.Reso
                                                         dateViewed: projects.DateViewed
 )
 
-private[collector] final case class Project(id: projects.ResourceId, path: projects.Path)
+private[collector] final case class Project(id: projects.ResourceId, slug: projects.Slug)
 
 private[collector] final case class GLUserViewedDataset(userId: UserId, dataset: Dataset, date: datasets.DateViewed)
 

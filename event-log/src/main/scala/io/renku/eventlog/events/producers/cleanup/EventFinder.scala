@@ -72,7 +72,7 @@ private class EventFinderImpl[F[_]: Async: Parallel: SessionResource: Logger: Qu
     SqlStatement
       .named(s"${categoryName.show.toLowerCase} - find event in queue")
       .select[Void, Project](sql"""
-        SELECT queue.project_id, queue.project_path
+        SELECT queue.project_id, queue.project_slug
         FROM clean_up_events_queue queue
         ORDER BY queue.date ASC
         LIMIT 1
@@ -85,7 +85,7 @@ private class EventFinderImpl[F[_]: Async: Parallel: SessionResource: Logger: Qu
     SqlStatement
       .named(s"${categoryName.show.toLowerCase} - find event")
       .select[ExecutionDate, Project](sql"""
-        SELECT evt.project_id, prj.project_path
+        SELECT evt.project_id, prj.project_slug
         FROM event evt
         JOIN  project prj ON prj.project_id = evt.project_id 
         WHERE evt.status = '#${AwaitingDeletion.value}'
@@ -98,15 +98,15 @@ private class EventFinderImpl[F[_]: Async: Parallel: SessionResource: Logger: Qu
   }
 
   private def removeEventFromQueue(): Option[Project] => Kleisli[F, Session[F], Option[Project]] = {
-    case Some(project @ Project(_, projectPath)) =>
+    case Some(project @ Project(_, projectSlug)) =>
       measureExecutionTime {
         SqlStatement
           .named(s"${categoryName.show.toLowerCase} - delete clean-up event")
-          .command[projects.Path](sql"""
+          .command[projects.Slug](sql"""
             DELETE FROM clean_up_events_queue
-            WHERE project_path = $projectPathEncoder
+            WHERE project_slug = $projectSlugEncoder
             """.command)
-          .arguments(projectPath)
+          .arguments(projectSlug)
           .build
           .mapResult {
             case Completion.Delete(_) => project.some
@@ -138,10 +138,10 @@ private class EventFinderImpl[F[_]: Async: Parallel: SessionResource: Logger: Qu
   }
 
   private lazy val updateMetrics: Option[EventAndUpdatedCount] => Kleisli[F, Session[F], Unit] = {
-    case Some(CleanUpEvent(Project(_, projectPath)) -> updatedRows) =>
+    case Some(CleanUpEvent(Project(_, projectSlug)) -> updatedRows) =>
       Kleisli.liftF {
-        EventStatusGauges[F].awaitingDeletion.update((projectPath, updatedRows * -1)) >>
-          EventStatusGauges[F].underDeletion.update((projectPath, updatedRows))
+        EventStatusGauges[F].awaitingDeletion.update((projectSlug, updatedRows * -1)) >>
+          EventStatusGauges[F].underDeletion.update((projectSlug, updatedRows))
       }
     case None => Kleisli.pure[F, Session[F], Unit](())
   }

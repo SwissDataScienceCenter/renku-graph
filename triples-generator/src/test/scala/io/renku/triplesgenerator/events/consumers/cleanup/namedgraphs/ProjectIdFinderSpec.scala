@@ -20,7 +20,7 @@ package io.renku.triplesgenerator.events.consumers.cleanup.namedgraphs
 
 import cats.effect.IO
 import io.renku.generators.Generators.Implicits._
-import io.renku.graph.model.GraphModelGenerators.projectPaths
+import io.renku.graph.model.GraphModelGenerators.projectSlugs
 import io.renku.graph.model.entities
 import io.renku.graph.model.testentities._
 import io.renku.interpreters.TestLogger
@@ -39,22 +39,22 @@ class ProjectIdFinderSpec
 
   "findProjectId" should {
 
-    "return ProjectIdentification object found for the given Project Path" in new TestCase {
+    "return ProjectIdentification object found for the given Project Slug" in new TestCase {
 
       val project = anyProjectEntities.generateOne.to[entities.Project]
 
       upload(to = projectsDataset, project)
 
-      finder.findProjectId(project.path).unsafeRunSync() shouldBe Some(project.identification)
+      finder.findProjectId(project.slug).unsafeRunSync() shouldBe Some(project.identification)
     }
 
-    "return None when there's no Project with the given Path" in new TestCase {
+    "return None when there's no Project with the given Slug" in new TestCase {
 
       val project = anyProjectEntities.generateOne.to[entities.Project]
 
       upload(to = projectsDataset, project)
 
-      finder.findProjectId(projectPaths.generateOne).unsafeRunSync() shouldBe None
+      finder.findProjectId(projectSlugs.generateOne).unsafeRunSync() shouldBe None
     }
   }
 

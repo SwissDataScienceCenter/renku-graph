@@ -27,7 +27,7 @@ import io.renku.generators.CommonGraphGenerators.microserviceBaseUrls
 import io.renku.generators.Generators.Implicits._
 import io.renku.graph.model.EventContentGenerators._
 import io.renku.graph.model.EventsGenerators._
-import io.renku.graph.model.GraphModelGenerators.projectPaths
+import io.renku.graph.model.GraphModelGenerators.projectSlugs
 import io.renku.graph.model.events.{CompoundEventId, EventStatus}
 import io.renku.graph.model.events.EventStatus.ProcessingStatus
 import io.renku.metrics.TestMetricsRegistry
@@ -53,7 +53,7 @@ class LostSubscriberEventFinderSpec extends AnyWordSpec with IOSpec with InMemor
           upsertSubscriber(activeSubscriberId, activeSubscriberUrl, sourceUrl)
           upsertEventDelivery(notLostEvent, activeSubscriberId)
 
-          finder.popEvent().unsafeRunSync() shouldBe ZombieEvent(finder.processName, eventId, projectPath, status).some
+          finder.popEvent().unsafeRunSync() shouldBe ZombieEvent(finder.processName, eventId, projectSlug, status).some
           finder.popEvent().unsafeRunSync() shouldBe None
         }
     }
@@ -72,7 +72,7 @@ class LostSubscriberEventFinderSpec extends AnyWordSpec with IOSpec with InMemor
     val eventId      = compoundEventIds.generateOne
     val subscriberId = subscriberIds.generateOne
     val sourceUrl    = microserviceBaseUrls.generateOne
-    val projectPath  = projectPaths.generateOne
+    val projectSlug  = projectSlugs.generateOne
 
     private implicit val metricsRegistry:  TestMetricsRegistry[IO]   = TestMetricsRegistry[IO]
     private implicit val queriesExecTimes: QueriesExecutionTimes[IO] = QueriesExecutionTimes[IO]().unsafeRunSync()
@@ -84,7 +84,7 @@ class LostSubscriberEventFinderSpec extends AnyWordSpec with IOSpec with InMemor
       executionDates.generateOne,
       eventDates.generateOne,
       eventBodies.generateOne,
-      projectPath = projectPath
+      projectSlug = projectSlug
     )
   }
 }

@@ -51,15 +51,15 @@ private class EventHandler[F[_]: MonadCancelThrow: Logger: EventStatusGauges](
   }
 
   private lazy val updateGauges: ZombieEvent => F[Unit] = {
-    case ZombieEvent(_, projectPath, GeneratingTriples) =>
-      EventStatusGauges[F].awaitingGeneration.increment(projectPath) >>
-        EventStatusGauges[F].underGeneration.decrement(projectPath)
-    case ZombieEvent(_, projectPath, TransformingTriples) =>
-      EventStatusGauges[F].awaitingTransformation.increment(projectPath) >>
-        EventStatusGauges[F].underTransformation.decrement(projectPath)
-    case ZombieEvent(_, projectPath, Deleting) =>
-      EventStatusGauges[F].awaitingDeletion.increment(projectPath) >>
-        EventStatusGauges[F].underDeletion.decrement(projectPath)
+    case ZombieEvent(_, projectSlug, GeneratingTriples) =>
+      EventStatusGauges[F].awaitingGeneration.increment(projectSlug) >>
+        EventStatusGauges[F].underGeneration.decrement(projectSlug)
+    case ZombieEvent(_, projectSlug, TransformingTriples) =>
+      EventStatusGauges[F].awaitingTransformation.increment(projectSlug) >>
+        EventStatusGauges[F].underTransformation.decrement(projectSlug)
+    case ZombieEvent(_, projectSlug, Deleting) =>
+      EventStatusGauges[F].awaitingDeletion.increment(projectSlug) >>
+        EventStatusGauges[F].underDeletion.decrement(projectSlug)
   }
 }
 

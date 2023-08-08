@@ -31,9 +31,9 @@ private object CommitSyncEvent {
 private final case class FullCommitSyncEvent(id: CommitId, override val project: Project, lastSynced: LastSyncedDate)
     extends CommitSyncEvent {
   override lazy val toString: String =
-    s"id = $id, projectId = ${project.id}, projectPath = ${project.path}, lastSynced = $lastSynced"
+    s"id = $id, projectId = ${project.id}, projectSlug = ${project.slug}, lastSynced = $lastSynced"
 }
 private final case class MinimalCommitSyncEvent(override val project: Project) extends CommitSyncEvent {
   override lazy val toString: String =
-    s"projectId = ${project.id}, projectPath = ${project.path}"
+    s"projectId = ${project.id}, projectSlug = ${project.slug}"
 }

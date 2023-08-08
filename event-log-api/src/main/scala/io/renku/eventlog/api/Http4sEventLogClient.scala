@@ -25,7 +25,7 @@ import cats.syntax.all._
 import io.renku.control.Throttler
 import io.renku.graph.model.eventlogapi.ServiceStatus
 import io.renku.graph.model.events.{EventId, EventInfo}
-import io.renku.graph.model.projects.{Path => ProjectPath}
+import io.renku.graph.model.projects.{Slug => ProjectSlug}
 import io.renku.http.client.RestClient
 import io.renku.tinytypes.TinyType
 import org.http4s.Uri.Path.SegmentEncoder
@@ -53,7 +53,7 @@ private[eventlog] final class Http4sEventLogClient[F[_]: Async: Logger](baseUri:
         .withOptionQueryParam("since", criteria.since)
         .withOptionQueryParam("until", criteria.until)
         .withOptionQueryParam("project-id", criteria.projectId)
-        .withOptionQueryParam("project-path", criteria.projectPath)
+        .withOptionQueryParam("project-slug", criteria.projectSlug)
         .withQueryParam("page", criteria.page)
         .withOptionQueryParam("per_page", criteria.perPage)
         .withOptionQueryParam("sort", criteria.sort)
@@ -72,9 +72,9 @@ private[eventlog] final class Http4sEventLogClient[F[_]: Async: Logger](baseUri:
     }
   }
 
-  def getEventPayload(eventId: EventId, projectPath: ProjectPath): F[Result[Option[EventPayload]]] = {
+  def getEventPayload(eventId: EventId, projectSlug: ProjectSlug): F[Result[Option[EventPayload]]] = {
     val request = GET(
-      baseUri / "events" / eventId / projectPath / "payload"
+      baseUri / "events" / eventId / projectSlug / "payload"
     )
 
     send(request) {

@@ -48,8 +48,8 @@ class KGSynchronizerSpec extends AnyWordSpec with MockFactory with should.Matche
       val membersInKG     = Set(kgMemberAlsoInGitLab, kgMemberMissingInGitLab)
 
       (kgProjectMembersFinder
-        .findProjectMembers(_: projects.Path))
-        .expects(projectPath)
+        .findProjectMembers(_: projects.Slug))
+        .expects(projectSlug)
         .returning(membersInKG.pure[Try])
 
       val missingMembersWithIds = Set(gitLabMemberMissingInKG -> personResourceIds.generateOption)
@@ -60,13 +60,13 @@ class KGSynchronizerSpec extends AnyWordSpec with MockFactory with should.Matche
 
       val insertionQueries = sparqlQueries.generateNonEmptyList().toList
       (updatesCreator.insertion _)
-        .expects(projectPath, missingMembersWithIds)
+        .expects(projectSlug, missingMembersWithIds)
         .returning(insertionQueries)
 
       val removalQueries  = sparqlQueries.generateNonEmptyList().toList
       val membersToRemove = Set(kgMemberMissingInGitLab)
       (updatesCreator.removal _)
-        .expects(projectPath, membersToRemove)
+        .expects(projectSlug, membersToRemove)
         .returning(removalQueries)
 
       (removalQueries ::: insertionQueries) foreach { query =>
@@ -75,7 +75,7 @@ class KGSynchronizerSpec extends AnyWordSpec with MockFactory with should.Matche
           .returning(().pure[Try])
       }
 
-      synchronizer.syncMembers(projectPath, membersInGitLab) shouldBe
+      synchronizer.syncMembers(projectSlug, membersInGitLab) shouldBe
         SyncSummary(missingMembersWithIds.size, membersToRemove.size).pure[Try]
     }
 
@@ -83,16 +83,16 @@ class KGSynchronizerSpec extends AnyWordSpec with MockFactory with should.Matche
 
     val exception = exceptions.generateOne
     (kgProjectMembersFinder.findProjectMembers _)
-      .expects(projectPath)
+      .expects(projectSlug)
       .returning(exception.raiseError[Try, Set[KGProjectMember]])
 
-    synchronizer.syncMembers(projectPath, gitLabProjectMembers.generateSet()) shouldBe exception
+    synchronizer.syncMembers(projectSlug, gitLabProjectMembers.generateSet()) shouldBe exception
       .raiseError[Try, Set[KGProjectMember]]
   }
 
   private trait TestCase {
     implicit val renkuUrl: RenkuUrl = renkuUrls.generateOne
-    val projectPath = projectPaths.generateOne
+    val projectSlug = projectSlugs.generateOne
 
     val kgProjectMembersFinder = mock[KGProjectMembersFinder[Try]]
     val kgPersonFinder         = mock[KGPersonFinder[Try]]

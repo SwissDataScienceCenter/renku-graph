@@ -26,7 +26,7 @@ import io.renku.generators.CommonGraphGenerators.accessTokens
 import io.renku.generators.Generators.Implicits._
 import io.renku.generators.Generators.ints
 import io.renku.graph.model.EventsGenerators._
-import io.renku.graph.model.GraphModelGenerators.{personEmails, personGitLabIds, personNames, projectIds, projectPaths}
+import io.renku.graph.model.GraphModelGenerators.{personEmails, personGitLabIds, personNames, projectIds, projectSlugs}
 import io.renku.graph.model.entities.Project.ProjectMember
 import io.renku.graph.model.events.CommitId
 import io.renku.graph.model.testentities.generators.EntitiesGenerators._
@@ -68,9 +68,9 @@ class MemberEmailFinderSpec
 
         val authorEmail = personEmails.generateOne
         (commitAuthorFinder
-          .findCommitAuthor(_: projects.Path, _: CommitId)(_: Option[AccessToken]))
+          .findCommitAuthor(_: projects.Slug, _: CommitId)(_: Option[AccessToken]))
           .expects(
-            project.path,
+            project.slug,
             event.commitId,
             maybeAccessToken
           )
@@ -101,8 +101,8 @@ class MemberEmailFinderSpec
 
       val authorEmail = personEmails.generateOne
       (commitAuthorFinder
-        .findCommitAuthor(_: projects.Path, _: CommitId)(_: Option[AccessToken]))
-        .expects(project.path, commit, maybeAccessToken)
+        .findCommitAuthor(_: projects.Slug, _: CommitId)(_: Option[AccessToken]))
+        .expects(project.slug, commit, maybeAccessToken)
         .returning(EitherT.rightT[IO, ProcessingRecoverableError]((member.name -> authorEmail).some))
 
       finder.findMemberEmail(member, project).value.unsafeRunSync() shouldBe (member add authorEmail).asRight
@@ -132,9 +132,9 @@ class MemberEmailFinderSpec
 
       val authorEmail = personEmails.generateOne
       (commitAuthorFinder
-        .findCommitAuthor(_: projects.Path, _: CommitId)(_: Option[AccessToken]))
+        .findCommitAuthor(_: projects.Slug, _: CommitId)(_: Option[AccessToken]))
         .expects(
-          project.path,
+          project.slug,
           event.commitId,
           maybeAccessToken
         )
@@ -189,9 +189,9 @@ class MemberEmailFinderSpec
 
         def setExpectationForCommitAuthorFinder =
           (commitAuthorFinder
-            .findCommitAuthor(_: projects.Path, _: CommitId)(_: Option[AccessToken]))
+            .findCommitAuthor(_: projects.Slug, _: CommitId)(_: Option[AccessToken]))
             .expects(
-              project.path,
+              project.slug,
               event.commitId,
               maybeAccessToken
             )
@@ -228,9 +228,9 @@ class MemberEmailFinderSpec
           .returning(wrapResult(eventsPage2, PagingInfo(None, Some(2))))
 
         (commitAuthorFinder
-          .findCommitAuthor(_: projects.Path, _: CommitId)(_: Option[AccessToken]))
+          .findCommitAuthor(_: projects.Slug, _: CommitId)(_: Option[AccessToken]))
           .expects(
-            project.path,
+            project.slug,
             eventPage1.commitId,
             maybeAccessToken
           )
@@ -239,9 +239,9 @@ class MemberEmailFinderSpec
           )
         val authorEmail = personEmails.generateOne
         (commitAuthorFinder
-          .findCommitAuthor(_: projects.Path, _: CommitId)(_: Option[AccessToken]))
+          .findCommitAuthor(_: projects.Slug, _: CommitId)(_: Option[AccessToken]))
           .expects(
-            project.path,
+            project.slug,
             eventPage2.commitId,
             maybeAccessToken
           )
@@ -270,9 +270,9 @@ class MemberEmailFinderSpec
         .returning(wrapResult(eventsPage2, PagingInfo(None, Some(2))))
 
       (commitAuthorFinder
-        .findCommitAuthor(_: projects.Path, _: CommitId)(_: Option[AccessToken]))
+        .findCommitAuthor(_: projects.Slug, _: CommitId)(_: Option[AccessToken]))
         .expects(
-          project.path,
+          project.slug,
           eventPage1.commitId,
           maybeAccessToken
         )
@@ -280,9 +280,9 @@ class MemberEmailFinderSpec
           EitherT.rightT[IO, ProcessingRecoverableError]((personNames.generateOne -> personEmails.generateOne).some)
         )
       (commitAuthorFinder
-        .findCommitAuthor(_: projects.Path, _: CommitId)(_: Option[AccessToken]))
+        .findCommitAuthor(_: projects.Slug, _: CommitId)(_: Option[AccessToken]))
         .expects(
-          project.path,
+          project.slug,
           eventPage2.commitId,
           maybeAccessToken
         )
@@ -327,9 +327,9 @@ class MemberEmailFinderSpec
 
       val error = processingRecoverableErrors.generateOne
       (commitAuthorFinder
-        .findCommitAuthor(_: projects.Path, _: CommitId)(_: Option[AccessToken]))
+        .findCommitAuthor(_: projects.Slug, _: CommitId)(_: Option[AccessToken]))
         .expects(
-          project.path,
+          project.slug,
           event.commitId,
           maybeAccessToken
         )
@@ -342,7 +342,7 @@ class MemberEmailFinderSpec
 
   private trait TestCase {
     implicit val maybeAccessToken: Option[AccessToken] = accessTokens.generateOption
-    val project = Project(projectIds.generateOne, projectPaths.generateOne)
+    val project = Project(projectIds.generateOne, projectSlugs.generateOne)
     val member  = projectMembersNoEmail.generateOne
 
     private implicit val logger: TestLogger[IO] = TestLogger[IO]()

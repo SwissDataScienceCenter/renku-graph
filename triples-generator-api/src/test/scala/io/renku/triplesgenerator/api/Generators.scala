@@ -16,30 +16,19 @@
  * limitations under the License.
  */
 
-package io.renku.graph.http.server
+package io.renku.triplesgenerator.api
 
 import io.renku.generators.Generators.Implicits._
-import io.renku.generators.Generators._
-import io.renku.graph.model.GraphModelGenerators.projectPaths
-import org.scalatest.matchers.should
-import org.scalatest.wordspec.AnyWordSpec
+import io.renku.graph.model.RenkuTinyTypeGenerators._
+import org.scalacheck.Gen
 
-class ProjectPathBinderSpec extends AnyWordSpec with should.Matchers {
+object Generators {
 
-  import binders._
-
-  "unapply" should {
-
-    "convert valid project path as string to a ProjectPath" in {
-      val projectPath = projectPaths.generateOne
-
-      val Some(result) = ProjectPath.unapply(projectPath.value)
-
-      result shouldBe projectPath
-    }
-
-    "return None if string value cannot be converted to a ProjectPath" in {
-      ProjectPath.unapply(blankStrings().generateOne) shouldBe None
-    }
-  }
+  val projectUpdatesGen: Gen[ProjectUpdates] =
+    for {
+      maybeNewDesc       <- projectDescriptions.toGeneratorOfOptions.toGeneratorOfOptions
+      maybeNewImages     <- imageUris.toGeneratorOfList().toGeneratorOfOptions
+      maybeNewKeywords   <- projectKeywords.toGeneratorOfSet(min = 0).toGeneratorOfOptions
+      maybeNewVisibility <- projectVisibilities.toGeneratorOfOptions
+    } yield ProjectUpdates(maybeNewDesc, maybeNewImages, maybeNewKeywords, maybeNewVisibility)
 }

@@ -47,7 +47,7 @@ class DispatchRecoverySpec extends AnyWordSpec with IOSpec with should.Matchers 
         "categoryName": "EVENTS_STATUS_CHANGE",
         "project": {
           "id":   ${event.project.id},
-          "path": ${event.project.path}
+          "slug": ${event.project.slug}
         },
         "subCategory": "RollbackToAwaitingDeletion"
       }""")
@@ -58,7 +58,7 @@ class DispatchRecoverySpec extends AnyWordSpec with IOSpec with should.Matchers 
           eventRequestContent,
           EventSender.EventContext(
             CategoryName("EVENTS_STATUS_CHANGE"),
-            show"$categoryName: Marking events for project: ${event.project.path} as $AwaitingDeletion failed"
+            show"$categoryName: Marking events for project: ${event.project.slug} as $AwaitingDeletion failed"
           )
         )
         .returning(().pure[IO])
@@ -78,7 +78,7 @@ class DispatchRecoverySpec extends AnyWordSpec with IOSpec with should.Matchers 
         "categoryName": "EVENTS_STATUS_CHANGE",
         "project": {
           "id":   ${event.project.id},
-          "path": ${event.project.path}
+          "slug": ${event.project.slug}
         },
         "subCategory": "RollbackToAwaitingDeletion"
       }""")
@@ -89,7 +89,7 @@ class DispatchRecoverySpec extends AnyWordSpec with IOSpec with should.Matchers 
           eventRequestContent,
           EventSender.EventContext(
             CategoryName("EVENTS_STATUS_CHANGE"),
-            show"$categoryName: Marking events for project: ${event.project.path} as $AwaitingDeletion failed"
+            show"$categoryName: Marking events for project: ${event.project.slug} as $AwaitingDeletion failed"
           )
         )
         .returning(().pure[IO])

@@ -28,7 +28,7 @@ private object EntityConverters {
   private[search] implicit def projectConverter[P <: testentities.Project]: P => Entity.Project = project =>
     Entity.Project(
       MatchingScore.min,
-      project.path,
+      project.slug,
       project.name,
       project.visibility,
       project.dateCreated,
@@ -57,7 +57,7 @@ private object EntityConverters {
       dataset.additionalInfo.keywords.sorted,
       dataset.additionalInfo.maybeDescription,
       dataset.additionalInfo.images,
-      exemplarProjectPath = project.path
+      exemplarProjectSlug = project.slug
     )
   }
 

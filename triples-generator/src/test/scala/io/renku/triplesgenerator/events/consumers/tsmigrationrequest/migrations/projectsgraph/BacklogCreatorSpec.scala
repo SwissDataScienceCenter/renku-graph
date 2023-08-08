@@ -55,7 +55,7 @@ class BacklogCreatorSpec
   "createBacklog" should {
 
     "find all projects that have relevant Project graphs but no DiscoverableProject entity in the Projects graph " +
-      "and copy their paths into the migrations DS" in new TestCase {
+      "and copy their slugs into the migrations DS" in new TestCase {
 
         val projects = anyProjectEntities
           .generateList(min = pageSize + 1, max = Gen.choose(pageSize + 1, (2 * pageSize) - 1).generateOne)
@@ -69,7 +69,7 @@ class BacklogCreatorSpec
 
         backlogCreator.createBacklog().unsafeRunSync() shouldBe ()
 
-        fetchBacklogProjects.toSet shouldBe projects.map(_.path).toSet
+        fetchBacklogProjects.toSet shouldBe projects.map(_.slug).toSet
       }
 
     "skip projects that are already in the Projects graph" in new TestCase {
@@ -90,7 +90,7 @@ class BacklogCreatorSpec
 
       backlogCreator.createBacklog().unsafeRunSync() shouldBe ()
 
-      fetchBacklogProjects.toSet shouldBe Set(projectNotToSkip.path)
+      fetchBacklogProjects.toSet shouldBe Set(projectNotToSkip.slug)
     }
   }
 
@@ -109,12 +109,12 @@ class BacklogCreatorSpec
         SparqlQuery.ofUnsafe(
           "test Projects Graph provisioning backlog",
           Prefixes of renku -> "renku",
-          sparql"""|SELECT ?path
+          sparql"""|SELECT ?slug
                    |WHERE {
-                   |  ${ProvisionProjectsGraph.name.asEntityId} renku:toBeMigrated ?path
+                   |  ${ProvisionProjectsGraph.name.asEntityId} renku:toBeMigrated ?slug
                    |}
                    |""".stripMargin
         )
-      ).unsafeRunSync().flatMap(_.get("path").map(projects.Path))
+      ).unsafeRunSync().flatMap(_.get("slug").map(projects.Slug))
   }
 }

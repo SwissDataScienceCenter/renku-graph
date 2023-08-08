@@ -63,7 +63,7 @@ private[statuschange] class DbUpdater[F[_]: MonadCancelThrow: QueriesExecutionTi
       .flatMapResult {
         case Some(oldEventStatus) =>
           DBUpdateResults
-            .ForProjects(event.project.path, Map(oldEventStatus -> -1, AwaitingDeletion -> 1))
+            .ForProjects(event.project.slug, Map(oldEventStatus -> -1, AwaitingDeletion -> 1))
             .pure[F]
             .widen[DBUpdateResults]
         case _ => Monoid[DBUpdateResults.ForProjects].empty.pure[F].widen[DBUpdateResults]

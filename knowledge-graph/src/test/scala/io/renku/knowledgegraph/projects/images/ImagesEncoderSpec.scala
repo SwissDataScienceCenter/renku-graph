@@ -31,9 +31,9 @@ import org.scalatestplus.scalacheck.ScalaCheckPropertyChecks
 
 class ImagesEncoderSpec extends AnyFlatSpec with should.Matchers with ScalaCheckPropertyChecks with ImagesEncoder {
 
-  it should "encode the List[ImageUri] -> path tuples to JSON" in {
+  it should "encode the List[ImageUri] -> slug tuples to JSON" in {
     forAll(imageUris.toGeneratorOfList()) { images =>
-      (images -> projectPath).asJson shouldBe imagesEncoder(images)
+      (images -> projectSlug).asJson shouldBe imagesEncoder(images)
     }
   }
 
@@ -44,7 +44,7 @@ class ImagesEncoderSpec extends AnyFlatSpec with should.Matchers with ScalaCheck
         "location": $uri,
         "_links": [{
           "rel":  "view",
-          "href": ${s"$gitLabUrl/$projectPath/raw/master/$uri"}
+          "href": ${s"$gitLabUrl/$projectSlug/raw/master/$uri"}
         }]
       }"""
         case uri: ImageUri.Absolute => json"""{
@@ -58,6 +58,6 @@ class ImagesEncoderSpec extends AnyFlatSpec with should.Matchers with ScalaCheck
     )
   }
 
-  private lazy val projectPath = projectPaths.generateOne
+  private lazy val projectSlug = projectSlugs.generateOne
   private implicit lazy val gitLabUrl: GitLabUrl = gitLabUrls.generateOne
 }

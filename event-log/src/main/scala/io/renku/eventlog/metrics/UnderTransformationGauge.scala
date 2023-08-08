@@ -26,16 +26,16 @@ import io.renku.graph.model.events.EventStatus.TransformingTriples
 import io.renku.graph.model.projects
 import io.renku.metrics.{LabeledGauge, MetricsRegistry, PositiveValuesLabeledGauge}
 
-trait UnderTransformationGauge[F[_]] extends LabeledGauge[F, projects.Path]
+trait UnderTransformationGauge[F[_]] extends LabeledGauge[F, projects.Slug]
 
 object UnderTransformationGauge {
 
   def apply[F[_]: Async: MetricsRegistry](statsFinder: StatsFinder[F]): F[UnderTransformationGauge[F]] =
     MetricsRegistry[F]
       .register {
-        new PositiveValuesLabeledGauge[F, projects.Path](
+        new PositiveValuesLabeledGauge[F, projects.Slug](
           name = "events_under_transformation_count",
-          help = "Number of Events under triples transformation by project path.",
+          help = "Number of Events under triples transformation by project slug.",
           labelName = "project",
           resetDataFetch =
             () => statsFinder.countEvents(Set(TransformingTriples: EventStatus)).map(_.view.mapValues(_.toDouble).toMap)

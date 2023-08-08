@@ -20,7 +20,7 @@ package io.renku.eventlog.events.consumers.statuschange.redoprojecttransformatio
 
 import cats.effect.IO
 import io.renku.eventlog.events.consumers.statuschange.DBUpdateResults
-import io.renku.eventlog.api.events.StatusChangeEvent.{ProjectPath, RedoProjectTransformation}
+import io.renku.eventlog.api.events.StatusChangeEvent.{ProjectSlug, RedoProjectTransformation}
 import io.renku.eventlog.events.producers
 import io.renku.eventlog.events.producers.SubscriptionDataProvisioning
 import io.renku.eventlog.metrics.QueriesExecutionTimes
@@ -63,10 +63,10 @@ class DequeuedEventHandlerSpec
 
         findEventStatuses(project) shouldBe List(TriplesStore, GenerationNonRecoverableFailure, TriplesStore, New)
 
-        val event = RedoProjectTransformation(ProjectPath(project.path))
+        val event = RedoProjectTransformation(ProjectSlug(project.slug))
         sessionResource
           .useK(updater updateDB event)
-          .unsafeRunSync() shouldBe DBUpdateResults.ForProjects(project.path,
+          .unsafeRunSync() shouldBe DBUpdateResults.ForProjects(project.slug,
                                                                 Map(TriplesStore -> -1, TriplesGenerated -> 1)
         )
 
@@ -95,7 +95,7 @@ class DequeuedEventHandlerSpec
         findSyncTime(project.id, producers.minprojectinfo.categoryName).isEmpty shouldBe false
 
         sessionResource
-          .useK(updater updateDB RedoProjectTransformation(ProjectPath(project.path)))
+          .useK(updater updateDB RedoProjectTransformation(ProjectSlug(project.slug)))
           .unsafeRunSync() shouldBe DBUpdateResults.ForProjects.empty
 
         findEventStatuses(project) shouldBe List(Skipped, GenerationNonRecoverableFailure, New)
@@ -133,7 +133,7 @@ class DequeuedEventHandlerSpec
         case AwaitingDeletion                => zippedEventPayloads.generateOption
         case _                               => zippedEventPayloads.generateNone
       },
-      projectPath = project.path
+      projectSlug = project.slug
     )
     (eventId, project, eventDate)
   }

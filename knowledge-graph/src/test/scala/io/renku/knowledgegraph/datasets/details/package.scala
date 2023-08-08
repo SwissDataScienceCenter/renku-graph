@@ -112,7 +112,7 @@ package object details {
                                         dataset: testentities.Dataset[testentities.Dataset.Provenance]
   )(implicit ru: RenkuUrl): DatasetProject =
     DatasetProject(project.resourceId,
-                   project.path,
+                   project.slug,
                    project.name,
                    project.visibility,
                    dataset.identification.identifier

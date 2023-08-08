@@ -32,6 +32,6 @@ private final case class TriplesGeneratedEvent(eventId: EventId, project: Projec
 
 private object TriplesGeneratedEvent {
   implicit val show: Show[TriplesGeneratedEvent] = Show.show { event =>
-    s"${event.compoundEventId}, projectPath = ${event.project.path}"
+    s"${event.compoundEventId}, projectSlug = ${event.project.slug}"
   }
 }

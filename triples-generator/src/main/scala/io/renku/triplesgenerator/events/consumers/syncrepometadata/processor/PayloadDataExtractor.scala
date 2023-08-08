@@ -30,7 +30,7 @@ import io.renku.jsonld.{Cursor, Property}
 import org.typelevel.log4cats.Logger
 
 private trait PayloadDataExtractor[F[_]] {
-  def extractPayloadData(path: projects.Path, payload: EventPayload): F[Option[DataExtract.Payload]]
+  def extractPayloadData(slug: projects.Slug, payload: EventPayload): F[Option[DataExtract.Payload]]
 }
 
 private object PayloadDataExtractor {
@@ -46,22 +46,22 @@ private class PayloadDataExtractorImpl[F[_]: MonadThrow: Logger] extends Payload
   import io.renku.jsonld.parser._
   import io.renku.jsonld.{JsonLD, JsonLDDecoder}
 
-  override def extractPayloadData(path: projects.Path, payload: EventPayload): F[Option[DataExtract.Payload]] =
+  override def extractPayloadData(slug: projects.Slug, payload: EventPayload): F[Option[DataExtract.Payload]] =
     (unzip(payload.data.toArray) >>= parse)
-      .fold(logError(path), _.some.pure[F])
-      .flatMap(decode(path))
+      .fold(logError(slug), _.some.pure[F])
+      .flatMap(decode(slug))
 
-  private def decode(path: projects.Path): Option[JsonLD] => F[Option[DataExtract.Payload]] = {
+  private def decode(slug: projects.Slug): Option[JsonLD] => F[Option[DataExtract.Payload]] = {
     case None =>
       Option.empty[DataExtract.Payload].pure[F]
     case Some(jsonLD) =>
       jsonLD.cursor
-        .as(decodeList(dataExtract(path)))
+        .as(decodeList(dataExtract(slug)))
         .map(_.headOption)
-        .fold(logWarn(path), _.pure[F])
+        .fold(logWarn(slug), _.pure[F])
   }
 
-  private def dataExtract(path: projects.Path): JsonLDDecoder[DataExtract.Payload] =
+  private def dataExtract(slug: projects.Slug): JsonLDDecoder[DataExtract.Payload] =
     JsonLDDecoder.entity(CliProject.entityTypes) { cur =>
       for {
         name <- cur.downField(CliSchema.name).as[Option[projects.Name]] >>= {
@@ -71,7 +71,7 @@ private class PayloadDataExtractorImpl[F[_]: MonadThrow: Logger] extends Payload
         maybeDesc <- cur.downField(CliSchema.description).as[Option[projects.Description]]
         keywords  <- cur.downField(CliSchema.keywords).as[Set[Option[projects.Keyword]]].map(_.flatten)
         images    <- cur.downField(CliSchema.image).as[List[Image]].map(_.sortBy(_.position).map(_.uri))
-      } yield DataExtract.Payload(path, name, maybeDesc, keywords, images)
+      } yield DataExtract.Payload(slug, name, maybeDesc, keywords, images)
     }
 
   private def decodingFailure(propName: Property, cur: Cursor) =
@@ -80,13 +80,13 @@ private class PayloadDataExtractorImpl[F[_]: MonadThrow: Logger] extends Payload
       cur.jsonLD.toJson.hcursor
     )
 
-  private def logError(path: projects.Path): Throwable => F[Option[JsonLD]] =
+  private def logError(slug: projects.Slug): Throwable => F[Option[JsonLD]] =
     Logger[F]
-      .error(_)(show"$categoryName: cannot process data from the payload for $path")
+      .error(_)(show"$categoryName: cannot process data from the payload for $slug")
       .as(Option.empty[JsonLD])
 
-  private def logWarn(path: projects.Path): DecodingFailure => F[Option[DataExtract.Payload]] =
+  private def logWarn(slug: projects.Slug): DecodingFailure => F[Option[DataExtract.Payload]] =
     Logger[F]
-      .warn(_)(show"$categoryName: cannot decode the payload for $path")
+      .warn(_)(show"$categoryName: cannot decode the payload for $slug")
       .as(Option.empty[DataExtract.Payload])
 }

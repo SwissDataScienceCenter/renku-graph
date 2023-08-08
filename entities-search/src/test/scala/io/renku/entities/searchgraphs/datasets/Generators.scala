@@ -74,11 +74,11 @@ private object Generators {
 
   def originalDatasetLinkObjectsGen(topmostSameAs: TopmostSameAs,
                                     projectIdGen:  Gen[projects.ResourceId] = projectResourceIds
-  ): Gen[Link] = (projectIdGen, projectPaths)
+  ): Gen[Link] = (projectIdGen, projectSlugs)
     .mapN(Link(topmostSameAs, datasets.ResourceId(topmostSameAs.value), _, _))
 
   def importedDatasetLinkObjectsGen(topmostSameAs: TopmostSameAs,
                                     projectIdGen:  Gen[projects.ResourceId] = projectResourceIds
-  ): Gen[Link] = (datasetResourceIds, projectIdGen, projectPaths)
+  ): Gen[Link] = (datasetResourceIds, projectIdGen, projectSlugs)
     .mapN(Link(topmostSameAs, _, _, _))
 }

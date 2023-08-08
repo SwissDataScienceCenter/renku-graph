@@ -103,7 +103,7 @@ class LastSyncedDateUpdaterSpec
     private implicit val queriesExecTimes: QueriesExecutionTimes[IO] = QueriesExecutionTimes[IO]().unsafeRunSync()
     val updater = new LastSyncedDateUpdateImpl[IO]
 
-    upsertProject(project.id, project.path, eventDates.generateOne)
+    upsertProject(project.id, project.slug, eventDates.generateOne)
   }
 
   private def getLastSyncedDate(project: Project): Option[LastSyncedDate] = execute {

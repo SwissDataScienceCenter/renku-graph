@@ -111,15 +111,15 @@ class EventHandlerSpec extends AnyWordSpec with IOSpec with MockFactory with sho
         "id": $id,
         "project": {
           "id":   ${project.id},
-          "path": ${project.path}
+          "slug": ${project.slug}
         },
         "lastSynced": $lastSynced
       }"""
     case MinimalCommitSyncEvent(project) => json"""{
         "categoryName": "COMMIT_SYNC",
         "project": {
-          "id":         ${project.id},
-          "path":       ${project.path}
+          "id":   ${project.id},
+          "slug": ${project.slug}
         }
       }"""
   }

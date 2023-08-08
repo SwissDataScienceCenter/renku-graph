@@ -55,7 +55,7 @@ class AllProjectsSpec
       upload(to = projectsDataset, projects.map(a => a: Project): _*)
       val result = allProjects.findAll(10).compile.toList.unsafeRunSync()
 
-      result shouldBe projects.map(p => ProjectMetadata(p.path)).sortBy(_.path.value)
+      result shouldBe projects.map(p => ProjectMetadata(p.slug)).sortBy(_.slug.value)
     }
   }
 }

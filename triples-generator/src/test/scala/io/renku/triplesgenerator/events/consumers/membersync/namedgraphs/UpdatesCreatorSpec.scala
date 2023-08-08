@@ -24,7 +24,7 @@ import cats.syntax.all._
 import eu.timepit.refined.auto._
 import io.renku.generators.Generators.Implicits._
 import io.renku.generators.Generators._
-import io.renku.graph.model.GraphModelGenerators.projectPaths
+import io.renku.graph.model.GraphModelGenerators.projectSlugs
 import io.renku.graph.model.entities.Person
 import io.renku.graph.model.persons.{Email, GitLabId}
 import io.renku.graph.model.testentities._
@@ -55,16 +55,16 @@ class UpdatesCreatorSpec
 
       upload(to = projectsDataset, project)
 
-      findMembers(project.path) shouldBe allMembers.flatMap(_.maybeGitLabId)
+      findMembers(project.slug) shouldBe allMembers.flatMap(_.maybeGitLabId)
 
       val queries = updatesCreator.removal(
-        project.path,
+        project.slug,
         Set(memberToRemove0, memberToRemove1).flatMap(_.toMaybe[KGProjectMember]) + kgProjectMembers.generateOne
       )
 
       queries.runAll(on = projectsDataset).unsafeRunSync()
 
-      findMembers(project.path) shouldBe Set(memberToStay.maybeGitLabId).flatten
+      findMembers(project.slug) shouldBe Set(memberToStay.maybeGitLabId).flatten
     }
   }
 
@@ -78,16 +78,16 @@ class UpdatesCreatorSpec
       upload(to = projectsDataset, project)
       upload(to = projectsDataset, personInKG)
 
-      findMembers(project.path) shouldBe Set.empty
+      findMembers(project.slug) shouldBe Set.empty
 
       val queries = updatesCreator.insertion(
-        project.path,
+        project.slug,
         Set(member -> personInKG.resourceId.some)
       )
 
       queries.runAll(on = projectsDataset).unsafeRunSync()
 
-      findMembersEmails(project.path) shouldBe Set(member.gitLabId -> personInKG.maybeEmail)
+      findMembersEmails(project.slug) shouldBe Set(member.gitLabId -> personInKG.maybeEmail)
     }
 
     "prepare queries to insert links and new person for members non-existing in KG" in {
@@ -96,34 +96,34 @@ class UpdatesCreatorSpec
 
       upload(to = projectsDataset, project)
 
-      findMembers(project.path) shouldBe Set.empty
+      findMembers(project.slug) shouldBe Set.empty
 
       val member = gitLabProjectMembers.generateOne
       val queries = updatesCreator.insertion(
-        project.path,
+        project.slug,
         Set(member -> Option.empty[persons.ResourceId])
       )
 
       queries.runAll(on = projectsDataset).unsafeRunSync()
 
-      findMembersEmails(project.path) shouldBe Set(member.gitLabId -> Option.empty[persons.Email])
+      findMembersEmails(project.slug) shouldBe Set(member.gitLabId -> Option.empty[persons.Email])
     }
 
     "prepare queries to insert the project and then the members when neither exists in KG" in {
 
-      val projectPath = projectPaths.generateOne
+      val projectSlug = projectSlugs.generateOne
 
-      findMembers(projectPath) shouldBe Set.empty
+      findMembers(projectSlug) shouldBe Set.empty
 
       val member = gitLabProjectMembers.generateOne
       val queries = updatesCreator.insertion(
-        projectPath,
+        projectSlug,
         Set(member -> Option.empty[persons.ResourceId])
       )
 
       queries.runAll(on = projectsDataset).unsafeRunSync()
 
-      findMembersEmails(projectPath) shouldBe Set(
+      findMembersEmails(projectSlug) shouldBe Set(
         member.gitLabId -> Option.empty[persons.Email]
       )
     }
@@ -135,18 +135,18 @@ class UpdatesCreatorSpec
 
       upload(to = projectsDataset, personInKG)
 
-      val projectPath = projectPaths.generateOne
+      val projectSlug = projectSlugs.generateOne
 
-      findMembers(projectPath) shouldBe Set.empty
+      findMembers(projectSlug) shouldBe Set.empty
 
       val queries = updatesCreator.insertion(
-        projectPath,
+        projectSlug,
         Set(member -> personInKG.resourceId.some)
       )
 
       queries.runAll(on = projectsDataset).unsafeRunSync()
 
-      findMembersEmails(projectPath) shouldBe Set(
+      findMembersEmails(projectSlug) shouldBe Set(
         member.gitLabId -> personInKG.maybeEmail
       )
     }
@@ -169,8 +169,8 @@ class UpdatesCreatorSpec
    */
   private lazy val updatesCreator = new UpdatesCreator
 
-  private def findMembers(path: projects.Path): Set[GitLabId] = {
-    val projectId = projects.ResourceId(path)
+  private def findMembers(slug: projects.Slug): Set[GitLabId] = {
+    val projectId = projects.ResourceId(slug)
     runSelect(
       on = projectsDataset,
       SparqlQuery.of(
@@ -190,8 +190,8 @@ class UpdatesCreatorSpec
       .toSet
   }
 
-  private def findMembersEmails(path: projects.Path): Set[(GitLabId, Option[Email])] = {
-    val projectId = projects.ResourceId(path)
+  private def findMembersEmails(slug: projects.Slug): Set[(GitLabId, Option[Email])] = {
+    val projectId = projects.ResourceId(slug)
     runSelect(
       on = projectsDataset,
       SparqlQuery.of(

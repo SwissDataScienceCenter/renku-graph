@@ -89,7 +89,7 @@ class ProjectsResourcesSpec
       waitForAllEventsInFinalState(project.id)
 
       When("the user fetches project's details with GET knowledge-graph/projects/<namespace>/<name>")
-      val projectDetailsResponse = knowledgeGraphClient.GET(s"knowledge-graph/projects/${project.path}", accessToken)
+      val projectDetailsResponse = knowledgeGraphClient.GET(s"knowledge-graph/projects/${project.slug}", accessToken)
 
       Then("he should get OK response with project's details")
       projectDetailsResponse.status shouldBe Ok
@@ -110,7 +110,7 @@ class ProjectsResourcesSpec
       Then("he should get OK response with the projects datasets")
       datasetsResponseStatus shouldBe Ok
       val foundDatasets = datasetsResponseBody.as[List[Json]].value
-      foundDatasets should contain theSameElementsAs project.entitiesProject.datasets.map(briefJson(_, project.path))
+      foundDatasets should contain theSameElementsAs project.entitiesProject.datasets.map(briefJson(_, project.slug))
 
       When("there's an authenticated user who is not project member")
       val nonMemberUser = authUsers.generateOne
@@ -118,17 +118,17 @@ class ProjectsResourcesSpec
 
       And("he fetches project's details")
       val projectDetailsResponseForNonMember =
-        knowledgeGraphClient.GET(s"knowledge-graph/projects/${project.path}", nonMemberUser.accessToken)
+        knowledgeGraphClient.GET(s"knowledge-graph/projects/${project.slug}", nonMemberUser.accessToken)
 
       Then("he should get NOT_FOUND response")
       projectDetailsResponseForNonMember.status shouldBe NotFound
 
       When("the user calls the Delete Project API")
-      knowledgeGraphClient.DELETE(s"knowledge-graph/projects/${project.path}", accessToken).status shouldBe Accepted
+      knowledgeGraphClient.DELETE(s"knowledge-graph/projects/${project.slug}", accessToken).status shouldBe Accepted
 
       Then("the project should be deleted")
       eventually {
-        knowledgeGraphClient.GET(s"knowledge-graph/projects/${project.path}", accessToken).status shouldBe NotFound
+        knowledgeGraphClient.GET(s"knowledge-graph/projects/${project.slug}", accessToken).status shouldBe NotFound
       }
     }
   }

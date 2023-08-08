@@ -53,7 +53,7 @@ private[entities] object CliProjectConverter {
     }
     val dateCreated  = (gitLabInfo.dateCreated :: cliProject.dateCreated :: Nil).min
     val dateModified = (gitLabInfo.dateModified :: cliProject.dateModified :: Nil).max
-    val gitlabImage  = gitLabInfo.avatarUrl.map(Image.projectImage(ResourceId(gitLabInfo.path), _))
+    val gitlabImage  = gitLabInfo.avatarUrl.map(Image.projectImage(ResourceId(gitLabInfo.slug), _))
     val all          = (creatorV, allPersonV, datasetV, activityV, planV).mapN(Tuple5.apply)
     all.andThen { case (creator, persons, datasets, activities, plans) =>
       newProject(
@@ -94,12 +94,12 @@ private[entities] object CliProjectConverter {
                          plans:            List[Plan],
                          images:           List[Image]
   )(implicit renkuUrl: RenkuUrl): ValidatedNel[String, Project] =
-    (maybeAgent, maybeVersion, gitLabInfo.maybeParentPath) match {
-      case (Some(agent), Some(version), Some(parentPath)) =>
+    (maybeAgent, maybeVersion, gitLabInfo.maybeParentSlug) match {
+      case (Some(agent), Some(version), Some(parentSlug)) =>
         RenkuProject.WithParent
           .from(
-            ResourceId(gitLabInfo.path),
-            gitLabInfo.path,
+            ResourceId(gitLabInfo.slug),
+            gitLabInfo.slug,
             gitLabInfo.name,
             maybeDescription,
             agent,
@@ -113,15 +113,15 @@ private[entities] object CliProjectConverter {
             activities,
             datasets,
             plans,
-            parentResourceId = ResourceId(parentPath),
+            parentResourceId = ResourceId(parentSlug),
             images
           )
           .widen[Project]
       case (Some(agent), Some(version), None) =>
         RenkuProject.WithoutParent
           .from(
-            ResourceId(gitLabInfo.path),
-            gitLabInfo.path,
+            ResourceId(gitLabInfo.slug),
+            gitLabInfo.slug,
             gitLabInfo.name,
             maybeDescription,
             agent,
@@ -138,11 +138,11 @@ private[entities] object CliProjectConverter {
             images
           )
           .widen[Project]
-      case (None, None, Some(parentPath)) =>
+      case (None, None, Some(parentSlug)) =>
         NonRenkuProject.WithParent
           .from(
-            ResourceId(gitLabInfo.path),
-            gitLabInfo.path,
+            ResourceId(gitLabInfo.slug),
+            gitLabInfo.slug,
             gitLabInfo.name,
             maybeDescription,
             dateCreated,
@@ -151,15 +151,15 @@ private[entities] object CliProjectConverter {
             gitLabInfo.visibility,
             keywords,
             members(allJsonLdPersons)(gitLabInfo),
-            parentResourceId = ResourceId(parentPath),
+            parentResourceId = ResourceId(parentSlug),
             images
           )
           .widen[Project]
       case (None, None, None) =>
         NonRenkuProject.WithoutParent
           .from(
-            ResourceId(gitLabInfo.path),
-            gitLabInfo.path,
+            ResourceId(gitLabInfo.slug),
+            gitLabInfo.slug,
             gitLabInfo.name,
             maybeDescription,
             dateCreated,

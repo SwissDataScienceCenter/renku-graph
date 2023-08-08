@@ -34,33 +34,33 @@ class EventProcessorSpec extends AnyWordSpec with IOSpec with should.Matchers wi
 
   "process" should {
 
-    "offer project id and path to the queue if a Full event is given" in new TestCase {
+    "offer project id and slug to the queue if a Full event is given" in new TestCase {
       val projectId   = projectIds.generateOne
-      val projectPath = projectPaths.generateOne
+      val projectSlug = projectSlugs.generateOne
 
-      (eventsQueue.offer _).expects(projectId, projectPath).returning(().pure[IO])
+      (eventsQueue.offer _).expects(projectId, projectSlug).returning(().pure[IO])
 
-      processor.process(CleanUpRequestEvent(projectId, projectPath)).unsafeRunSync() shouldBe ()
+      processor.process(CleanUpRequestEvent(projectId, projectSlug)).unsafeRunSync() shouldBe ()
     }
 
-    "offer project id and path to the queue if a Partial event is given " +
+    "offer project id and slug to the queue if a Partial event is given " +
       "but projectId was found in the project table" in new TestCase {
         val projectId   = projectIds.generateOne
-        val projectPath = projectPaths.generateOne
+        val projectSlug = projectSlugs.generateOne
 
-        (projectIdFinder.findProjectId _).expects(projectPath).returning(projectId.some.pure[IO])
+        (projectIdFinder.findProjectId _).expects(projectSlug).returning(projectId.some.pure[IO])
 
-        (eventsQueue.offer _).expects(projectId, projectPath).returning(().pure[IO])
+        (eventsQueue.offer _).expects(projectId, projectSlug).returning(().pure[IO])
 
-        processor.process(CleanUpRequestEvent(projectPath)).unsafeRunSync() shouldBe ()
+        processor.process(CleanUpRequestEvent(projectSlug)).unsafeRunSync() shouldBe ()
       }
 
     "log a warning for a Partial event when projectId cannot be found in the project table" in new TestCase {
-      val projectPath = projectPaths.generateOne
+      val projectSlug = projectSlugs.generateOne
 
-      (projectIdFinder.findProjectId _).expects(projectPath).returning(Option.empty[projects.GitLabId].pure[IO])
+      (projectIdFinder.findProjectId _).expects(projectSlug).returning(Option.empty[projects.GitLabId].pure[IO])
 
-      processor.process(CleanUpRequestEvent(projectPath)).unsafeRunSync() shouldBe ()
+      processor.process(CleanUpRequestEvent(projectSlug)).unsafeRunSync() shouldBe ()
     }
   }
 

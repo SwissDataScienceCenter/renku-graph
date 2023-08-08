@@ -132,16 +132,16 @@ trait RenkuTinyTypeGenerators {
     } yield projects.Namespace(s"$firstChar${otherChars.toList.mkString("")}")
   }
 
-  implicit val projectPaths: Gen[projects.Path] = Generators.relativePaths(
+  implicit val projectSlugs: Gen[projects.Slug] = Generators.relativePaths(
     minSegments = 2,
     maxSegments = 5,
     partsGenerator = projectNamespaces.map(_.show)
-  ) map projects.Path.apply
+  ) map projects.Slug.apply
 
   implicit val projectResourceIds: Gen[projects.ResourceId] = projectResourceIds()(renkuUrls.generateOne)
 
   def projectResourceIds()(implicit renkuUrl: RenkuUrl): Gen[projects.ResourceId] =
-    projectPaths map (path => projects.ResourceId.from(s"$renkuUrl/projects/$path").fold(throw _, identity))
+    projectSlugs.map(slug => projects.ResourceId.from(s"$renkuUrl/projects/$slug").fold(throw _, identity))
 
   def projectImageResourceIds(projectId: projects.ResourceId, max: Int = 5): Gen[List[ImageResourceId]] =
     Gen

@@ -34,13 +34,13 @@ private object CommitSyncEvent {
 }
 
 private final case class FullCommitSyncEvent(id:             CompoundEventId,
-                                             projectPath:    projects.Path,
+                                             projectSlug:    projects.Slug,
                                              lastSyncedDate: LastSyncedDate
 ) extends CommitSyncEvent
 
 private object FullCommitSyncEvent {
   implicit lazy val show: Show[FullCommitSyncEvent] =
-    Show.show(event => show"${event.id}, projectPath = ${event.projectPath}, lastSynced = ${event.lastSyncedDate}")
+    Show.show(event => show"${event.id}, projectSlug = ${event.projectSlug}, lastSynced = ${event.lastSyncedDate}")
 }
 
 private final case class MinimalCommitSyncEvent(project: Project) extends CommitSyncEvent
@@ -55,20 +55,20 @@ private object CommitSyncEventEncoder {
   import io.circe.literal._
 
   def encodeEvent(event: CommitSyncEvent): Json = event match {
-    case FullCommitSyncEvent(eventId, projectPath, lastSyncedDate) => json"""{
-        "categoryName": ${categoryName.value},
-        "id":           ${eventId.id.value},
+    case FullCommitSyncEvent(eventId, projectSlug, lastSyncedDate) => json"""{
+        "categoryName": $categoryName,
+        "id":           ${eventId.id},
         "project": {
-          "id":         ${eventId.projectId.value},
-          "path":       ${projectPath.value}
+          "id":   ${eventId.projectId},
+          "slug": $projectSlug
         },
-        "lastSynced":   ${lastSyncedDate.value}
+        "lastSynced": ${lastSyncedDate.value}
       }"""
-    case MinimalCommitSyncEvent(Project(projectId, projectPath)) => json"""{
-        "categoryName": ${categoryName.value},
+    case MinimalCommitSyncEvent(Project(projectId, projectSlug)) => json"""{
+        "categoryName": $categoryName,
         "project": {
-          "id":         ${projectId.value},
-          "path":       ${projectPath.value}
+          "id":   $projectId,
+          "slug": $projectSlug
         }
       }"""
   }

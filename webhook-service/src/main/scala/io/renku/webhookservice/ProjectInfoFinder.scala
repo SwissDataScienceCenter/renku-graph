@@ -52,7 +52,7 @@ private class ProjectInfoFinderImpl[F[_]: Async: GitLabClient: Logger] extends P
 
   private implicit lazy val projectEntityDecoder: EntityDecoder[F, Project] = {
     implicit val projectDecoder: Decoder[Project] = cursor =>
-      (cursor.downField("id").as[projects.GitLabId], cursor.downField("path_with_namespace").as[projects.Path])
+      (cursor.downField("id").as[projects.GitLabId], cursor.downField("path_with_namespace").as[projects.Slug])
         .mapN(Project(_, _))
 
     jsonOf[F, Project]

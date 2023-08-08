@@ -50,14 +50,14 @@ private object GlobalCommitSyncEventEncoder {
   import io.circe.literal._
 
   def encodeEvent(event: GlobalCommitSyncEvent): Json = json"""{
-    "categoryName": ${categoryName.value},
+    "categoryName": $categoryName,
     "project": {
-      "id":         ${event.project.id.value},
-      "path":       ${event.project.path.value}
+      "id":   ${event.project.id},
+      "slug": ${event.project.slug}
     },
     "commits": {
-      "count":  ${event.commits.count.value},
-      "latest": ${event.commits.latest.value}
+      "count":  ${event.commits.count},
+      "latest": ${event.commits.latest}
     }
   }"""
 }

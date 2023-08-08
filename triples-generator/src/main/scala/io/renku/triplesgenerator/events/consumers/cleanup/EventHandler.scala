@@ -47,7 +47,7 @@ private class EventHandler[F[_]: MonadCancelThrow: Logger](
   override def createHandlingDefinition(): EventHandlingDefinition =
     EventHandlingDefinition(
       decode = _.event.as[CleanUpEvent],
-      process = tsWriteLock.contramap[Event](_.project.path).surround(e => eventProcessor.process(e.project)),
+      process = tsWriteLock.contramap[Event](_.project.slug).surround(e => eventProcessor.process(e.project)),
       precondition = tsReadinessChecker.verifyTSReady,
       onRelease = subscriptionMechanism.renewSubscription().some
     )

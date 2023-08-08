@@ -54,7 +54,7 @@ class BacklogCreatorSpec
   private val pageSize = 50
 
   it should "find all projects that have no dateModified, either DiscoverableProject or Project entities " +
-    "and copy their paths into the migrations DS" in {
+    "and copy their slugs into the migrations DS" in {
 
       val projects = anyProjectEntities
         .generateList(min = pageSize + 1, max = Gen.choose(pageSize + 1, (2 * pageSize) - 1).generateOne)
@@ -63,7 +63,7 @@ class BacklogCreatorSpec
         provision(projects).assertNoException >>
         deleteModifiedDates(projects).assertNoException >>
         backlogCreator.createBacklog().assertNoException >>
-        fetchBacklogProjects.asserting(_.toSet shouldBe projects.map(_.path).toSet)
+        fetchBacklogProjects.asserting(_.toSet shouldBe projects.map(_.slug).toSet)
     }
 
   it should "skip projects that already have dateModified" in {
@@ -76,7 +76,7 @@ class BacklogCreatorSpec
       fetchBacklogProjects.asserting(_ shouldBe Nil) >>
       deleteModifiedDates(projectNotToSkip.resourceId).assertNoException >>
       backlogCreator.createBacklog().assertNoException >>
-      fetchBacklogProjects.asserting(_.toSet shouldBe Set(projectNotToSkip.path))
+      fetchBacklogProjects.asserting(_.toSet shouldBe Set(projectNotToSkip.slug))
   }
 
   it should "find project that does not have dateModified only in the Project graph" in {
@@ -87,7 +87,7 @@ class BacklogCreatorSpec
       fetchBacklogProjects.asserting(_ shouldBe Nil) >>
       deleteProjectDateModified(project.resourceId).assertNoException >>
       backlogCreator.createBacklog().assertNoException >>
-      fetchBacklogProjects.asserting(_.toSet shouldBe Set(project.path))
+      fetchBacklogProjects.asserting(_.toSet shouldBe Set(project.slug))
   }
 
   it should "find project that does not have dateModified only in the Projects graph" in {
@@ -98,7 +98,7 @@ class BacklogCreatorSpec
       fetchBacklogProjects.asserting(_ shouldBe Nil) >>
       deleteProjectsDateModified(project.resourceId).assertNoException >>
       backlogCreator.createBacklog().assertNoException >>
-      fetchBacklogProjects.asserting(_.toSet shouldBe Set(project.path))
+      fetchBacklogProjects.asserting(_.toSet shouldBe Set(project.slug))
   }
 
   private implicit lazy val logger:    TestLogger[IO] = TestLogger[IO]()
@@ -108,19 +108,19 @@ class BacklogCreatorSpec
   private lazy val backlogCreator =
     new BacklogCreatorImpl[IO](RecordsFinder[IO](projectsDSConnectionInfo), TSClient[IO](migrationsDSConnectionInfo))
 
-  private def fetchBacklogProjects: IO[List[projects.Path]] =
+  private def fetchBacklogProjects: IO[List[projects.Slug]] =
     runSelect(
       on = migrationsDataset,
       SparqlQuery.ofUnsafe(
         "test Projects dateModified",
         Prefixes of renku -> "renku",
-        sparql"""|SELECT ?path
+        sparql"""|SELECT ?slug
                  |WHERE {
-                 |  ${AddProjectDateModified.name.asEntityId} renku:toBeMigrated ?path
+                 |  ${AddProjectDateModified.name.asEntityId} renku:toBeMigrated ?slug
                  |}
                  |""".stripMargin
       )
-    ).map(_.flatMap(_.get("path").map(projects.Path)))
+    ).map(_.flatMap(_.get("slug").map(projects.Slug)))
 
   private def provision(project: Project): IO[Unit] =
     provision(List(project))

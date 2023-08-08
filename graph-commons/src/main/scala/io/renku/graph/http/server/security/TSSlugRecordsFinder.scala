@@ -35,29 +35,29 @@ import io.renku.triplesstore.ResultsDecoder._
 import io.renku.triplesstore.SparqlQuery.Prefixes
 import org.typelevel.log4cats.Logger
 
-trait TSPathRecordsFinder[F[_]] extends SecurityRecordFinder[F, projects.Path]
+trait TSSlugRecordsFinder[F[_]] extends SecurityRecordFinder[F, projects.Slug]
 
-object TSPathRecordsFinder {
-  def apply[F[_]: Async: Logger: SparqlQueryTimeRecorder]: F[TSPathRecordsFinder[F]] = for {
+object TSSlugRecordsFinder {
+  def apply[F[_]: Async: Logger: SparqlQueryTimeRecorder]: F[TSSlugRecordsFinder[F]] = for {
     implicit0(renkuUrl: RenkuUrl) <- RenkuUrlLoader[F]()
     storeConfig                   <- ProjectsConnectionConfig[F]()
-  } yield new TSPathRecordsFinderImpl[F](storeConfig)
+  } yield new TSSlugRecordsFinderImpl[F](storeConfig)
 }
 
-private class TSPathRecordsFinderImpl[F[_]: Async: Logger: SparqlQueryTimeRecorder](
+private class TSSlugRecordsFinderImpl[F[_]: Async: Logger: SparqlQueryTimeRecorder](
     storeConfig: ProjectsConnectionConfig
 )(implicit renkuUrl: RenkuUrl)
     extends TSClientImpl(storeConfig)
-    with TSPathRecordsFinder[F] {
+    with TSSlugRecordsFinder[F] {
 
-  override def apply(path: projects.Path, maybeAuthUser: Option[AuthUser]): F[List[SecurityRecord]] =
-    queryExpecting[List[SecurityRecord]](query(ResourceId(path)))(recordsDecoder(path))
+  override def apply(slug: projects.Slug, maybeAuthUser: Option[AuthUser]): F[List[SecurityRecord]] =
+    queryExpecting[List[SecurityRecord]](query(ResourceId(slug)))(recordsDecoder(slug))
 
   import eu.timepit.refined.auto._
   import io.renku.graph.model.Schemas._
 
   private def query(resourceId: projects.ResourceId) = SparqlQuery.of(
-    name = "authorise - project path",
+    name = "authorise - project slug",
     Prefixes of (renku -> "renku", schema -> "schema"),
     s"""|SELECT DISTINCT ?projectId ?visibility (GROUP_CONCAT(?maybeMemberGitLabId; separator=',') AS ?memberGitLabIds)
         |FROM <${GraphClass.Persons.id}>
@@ -75,7 +75,7 @@ private class TSPathRecordsFinderImpl[F[_]: Async: Logger: SparqlQueryTimeRecord
         |""".stripMargin
   )
 
-  private def recordsDecoder(path: projects.Path): Decoder[List[SecurityRecord]] =
+  private def recordsDecoder(slug: projects.Slug): Decoder[List[SecurityRecord]] =
     ResultsDecoder[List, SecurityRecord] { implicit cur =>
       for {
         visibility <- extract[Visibility]("visibility")
@@ -83,6 +83,6 @@ private class TSPathRecordsFinderImpl[F[_]: Async: Logger: SparqlQueryTimeRecord
                          .map(_.map(_.split(",").toList).getOrElse(List.empty))
                          .flatMap(_.map(GitLabId.parse).sequence.leftMap(ex => DecodingFailure(ex.getMessage, Nil)))
                          .map(_.toSet)
-      } yield SecurityRecord(visibility, path, maybeUserId)
+      } yield SecurityRecord(visibility, slug, maybeUserId)
     }
 }

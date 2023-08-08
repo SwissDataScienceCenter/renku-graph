@@ -38,7 +38,7 @@ import org.typelevel.log4cats.Logger
 import java.time.Instant
 
 private trait ProjectFinder[F[_]] {
-  def findProject(path: projects.Path)(implicit
+  def findProject(slug: projects.Slug)(implicit
       maybeAccessToken: Option[AccessToken]
   ): EitherT[F, ProcessingRecoverableError, Option[GitLabProjectInfo]]
 }
@@ -59,18 +59,18 @@ private class ProjectFinderImpl[F[_]: Async: GitLabClient: Logger](
   private type ProjectAndCreator = (GitLabProjectInfo, Option[persons.GitLabId])
 
   override def findProject(
-      path: projects.Path
+      slug: projects.Slug
   )(implicit mat: Option[AccessToken]): EitherT[F, ProcessingRecoverableError, Option[GitLabProjectInfo]] = EitherT {
     {
       for {
-        (project, maybeCreatorId) <- fetchProject(path)
+        (project, maybeCreatorId) <- fetchProject(slug)
         maybeCreator              <- fetchCreator(maybeCreatorId)
       } yield project.copy(maybeCreator = maybeCreator)
     }.value.map(_.asRight[ProcessingRecoverableError]).recoverWith(recoveryStrategy.maybeRecoverableError)
   }
 
-  private def fetchProject(path: projects.Path)(implicit maybeAccessToken: Option[AccessToken]) = OptionT {
-    GitLabClient[F].get(uri"projects" / path, "single-project")(mapTo[ProjectAndCreator])
+  private def fetchProject(slug: projects.Slug)(implicit maybeAccessToken: Option[AccessToken]) = OptionT {
+    GitLabClient[F].get(uri"projects" / slug, "single-project")(mapTo[ProjectAndCreator])
   }
 
   private def mapTo[OUT](implicit
@@ -82,12 +82,12 @@ private class ProjectFinderImpl[F[_]: Async: GitLabClient: Logger](
 
   private implicit lazy val projectDecoder: EntityDecoder[F, ProjectAndCreator] = {
 
-    lazy val parentPathDecoder: Decoder[projects.Path] = _.downField("path_with_namespace").as[projects.Path]
+    lazy val parentSlugDecoder: Decoder[projects.Slug] = _.downField("path_with_namespace").as[projects.Slug]
 
     implicit val decoder: Decoder[ProjectAndCreator] = cursor =>
       for {
         id               <- cursor.downField("id").as[projects.GitLabId]
-        path             <- cursor.downField("path_with_namespace").as[projects.Path]
+        slug             <- cursor.downField("path_with_namespace").as[projects.Slug]
         name             <- cursor.downField("name").as[projects.Name]
         maybeVisibility  <- cursor.downField("visibility").as[Option[projects.Visibility]]
         dateCreated      <- cursor.downField("created_at").as[projects.DateCreated]
@@ -96,14 +96,14 @@ private class ProjectFinderImpl[F[_]: Async: GitLabClient: Logger](
         maybeDescription <- cursor.downField("description").as[Option[projects.Description]]
         keywords         <- cursor.downField("topics").as[Set[Option[projects.Keyword]]].map(_.flatten)
         maybeCreatorId   <- cursor.downField("creator_id").as[Option[persons.GitLabId]]
-        maybeParentPath <- cursor
+        maybeParentSlug <- cursor
                              .downField("forked_from_project")
-                             .as[Option[projects.Path]](decodeOption(parentPathDecoder))
+                             .as[Option[projects.Slug]](decodeOption(parentSlugDecoder))
         avatarUrl <- cursor.downField("avatar_url").as[Option[ImageUri]]
       } yield GitLabProjectInfo(
         id,
         name,
-        path,
+        slug,
         dateCreated,
         projects.DateModified(List(updatedAt, lastActivityAt, dateCreated.value.some).max.head),
         maybeDescription,
@@ -111,7 +111,7 @@ private class ProjectFinderImpl[F[_]: Async: GitLabClient: Logger](
         keywords,
         members = Set.empty,
         maybeVisibility getOrElse projects.Visibility.Public,
-        maybeParentPath,
+        maybeParentSlug,
         avatarUrl
       ) -> maybeCreatorId
 

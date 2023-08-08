@@ -47,11 +47,11 @@ private object BacklogCreator {
     migrationsDSClient      <- MigrationsConnectionConfig[F]().map(TSClient[F](_))
   } yield new BacklogCreatorImpl[F](startTimeFinder, recordsFinder, migrationsDSClient)
 
-  def asToBeMigratedInserts(implicit ru: RenkuUrl): List[projects.Path] => Option[SparqlQuery] =
+  def asToBeMigratedInserts(implicit ru: RenkuUrl): List[projects.Slug] => Option[SparqlQuery] =
     toTriples andThen toInsertQuery
 
-  private def toTriples(implicit ru: RenkuUrl): List[projects.Path] => List[Triple] =
-    _.map(path => Triple(MigrationToV10.name.asEntityId, renku / "toBeMigrated", path.asObject))
+  private def toTriples(implicit ru: RenkuUrl): List[projects.Slug] => List[Triple] =
+    _.map(slug => Triple(MigrationToV10.name.asEntityId, renku / "toBeMigrated", slug.asObject))
 
   private lazy val toInsertQuery: List[Triple] => Option[SparqlQuery] = {
     case Nil => None
@@ -86,39 +86,39 @@ private class BacklogCreatorImpl[F[_]: Async](startTimeFinder: MigrationStartTim
   private def addPageToBacklog(currentPage: Ref[F, Int]): F[Unit] =
     (findMigrationStartDate -> currentPage.getAndUpdate(_ + 1))
       .mapN(query)
-      .flatMap(findRecords[projects.Path])
+      .flatMap(findRecords[projects.Slug])
       .map(asToBeMigratedInserts)
       .flatMap(storeInBacklog(currentPage))
 
   private def query(startDate: Instant, page: Int) = SparqlQuery.ofUnsafe(
     show"${MigrationToV10.name} - projects to migrate",
     Prefixes of (schema -> "schema", renku -> "renku", xsd -> "xsd"),
-    s"""|SELECT DISTINCT ?path
+    s"""|SELECT DISTINCT ?slug
         |WHERE {
         |  {
         |    GRAPH ?id {
         |      ?id a schema:Project;
         |          schema:schemaVersion '9';
-        |          renku:projectPath ?path.
+        |          renku:projectPath ?slug.
         |    }
         |  } UNION {
         |    GRAPH ?id {
         |      ?id a schema:Project;
-        |          renku:projectPath ?path;
+        |          renku:projectPath ?slug;
         |          schema:dateCreated ?created.
         |      OPTIONAL { ?id schema:schemaVersion ?version }
         |      FILTER (!BOUND(?version) && ?created <= ${startDate.asTripleObject.asSparql.sparql})
         |    }
         |  }
         |}
-        |ORDER BY ?path
+        |ORDER BY ?slug
         |LIMIT $pageSize
         |OFFSET ${(page - 1) * pageSize}
         |""".stripMargin
   )
 
-  private implicit lazy val decoder: Decoder[List[projects.Path]] = ResultsDecoder[List, projects.Path] {
-    implicit cur => extract[projects.Path]("path")
+  private implicit lazy val decoder: Decoder[List[projects.Slug]] = ResultsDecoder[List, projects.Slug] {
+    implicit cur => extract[projects.Slug]("slug")
   }
 
   private def storeInBacklog(currentPage: Ref[F, Int]): Option[SparqlQuery] => F[Unit] = {

@@ -76,10 +76,10 @@ class MicroserviceRoutesSpec
     forAll {
       Table(
         "uri" -> "criteria",
-        projectPaths
-          .map(path =>
-            uri"/events" +? ("project-path" -> path.value) -> Criteria(
-              Filters.ProjectEvents(path, maybeStatus = None, maybeDates = None)
+        projectSlugs
+          .map(slug =>
+            uri"/events" +? ("project-slug" -> slug.value) -> Criteria(
+              Filters.ProjectEvents(slug, maybeStatus = None, maybeDates = None)
             )
           )
           .generateOne,
@@ -90,25 +90,25 @@ class MicroserviceRoutesSpec
             )
           )
           .generateOne,
-        (projectPaths -> eventStatuses).mapN { case (path, status) =>
-          uri"/events" +? ("project-path" -> path.value) +? ("status" -> status.value) -> Criteria(
-            Filters.ProjectEvents(path, Some(status), maybeDates = None)
+        (projectSlugs -> eventStatuses).mapN { case (slug, status) =>
+          uri"/events" +? ("project-slug" -> slug.value) +? ("status" -> status.value) -> Criteria(
+            Filters.ProjectEvents(slug, Some(status), maybeDates = None)
           )
         }.generateOne,
-        (projectPaths -> eventDates).mapN { case (path, since) =>
-          uri"/events" +? ("project-path" -> path.value) +? ("since" -> since) -> Criteria(
-            Filters.ProjectEvents(path, None, Filters.EventsSince(since).some)
+        (projectSlugs -> eventDates).mapN { case (slug, since) =>
+          uri"/events" +? ("project-slug" -> slug.value) +? ("since" -> since) -> Criteria(
+            Filters.ProjectEvents(slug, None, Filters.EventsSince(since).some)
           )
         }.generateOne,
-        (projectPaths -> eventDates).mapN { case (path, until) =>
-          uri"/events" +? ("project-path" -> path.value) +? ("until" -> until) -> Criteria(
-            Filters.ProjectEvents(path, None, Filters.EventsUntil(until).some)
+        (projectSlugs -> eventDates).mapN { case (slug, until) =>
+          uri"/events" +? ("project-slug" -> slug.value) +? ("until" -> until) -> Criteria(
+            Filters.ProjectEvents(slug, None, Filters.EventsUntil(until).some)
           )
         }.generateOne,
-        (projectPaths, eventDates, eventDates).mapN { case (path, since, until) =>
-          uri"/events" +? ("project-path" -> path.value) +? ("since" -> since) +? ("until" -> until) -> Criteria(
+        (projectSlugs, eventDates, eventDates).mapN { case (slug, since, until) =>
+          uri"/events" +? ("project-slug" -> slug.value) +? ("since" -> since) +? ("until" -> until) -> Criteria(
             Filters.ProjectEvents(
-              path,
+              slug,
               maybeStatus = None,
               Filters.EventsSinceAndUntil(Filters.EventsSince(since), Filters.EventsUntil(until)).some
             )
@@ -188,7 +188,7 @@ class MicroserviceRoutesSpec
     }
 
     Set(
-      uri"/events".withQueryParam("project-path", nonEmptyStrings().generateOne),
+      uri"/events".withQueryParam("project-slug", nonEmptyStrings().generateOne),
       uri"/events".withQueryParam("project-id", nonEmptyStrings().generateOne),
       uri"/events".withQueryParam("status", nonEmptyStrings().generateOne),
       uri"/events"
@@ -208,7 +208,7 @@ class MicroserviceRoutesSpec
       }
     }
 
-    s"return $NotFound if no project-path or status parameter is present" in new TestCase with IsNotMigrating {
+    s"return $NotFound if no project-slug or status parameter is present" in new TestCase with IsNotMigrating {
       routes.call(Request[IO](method = GET, uri"/events")).status shouldBe NotFound
     }
   }
@@ -314,7 +314,7 @@ class MicroserviceRoutesSpec
 
       givenMigrationIsRunning
 
-      val request = Request[IO](GET, uri"/events".withQueryParam("project-path", projectPaths.generateOne.value))
+      val request = Request[IO](GET, uri"/events".withQueryParam("project-slug", projectSlugs.generateOne.value))
       routes.call(request).status shouldBe ServiceUnavailable
 
       routes.call(Request(GET, uri"/ping")).status    shouldBe Ok
@@ -322,20 +322,20 @@ class MicroserviceRoutesSpec
     }
   }
 
-  "GET /events/:event-id/:project-path/payload" should {
+  "GET /events/:event-id/:project-slug/payload" should {
 
     s"find event payload and return $Ok" in new TestCase with IsNotMigrating {
       val eventId     = eventIds.generateOne
-      val projectPath = projectPaths.generateOne
+      val projectSlug = projectSlugs.generateOne
 
       val request = Request[IO](
         method = GET,
-        uri"/events" / eventId.toString / projectPath.toString / "payload"
+        uri"/events" / eventId.toString / projectSlug.toString / "payload"
       )
 
       val someData = ByteVector(0, 10, -10, 5)
       (eventPayloadEndpoint.getEventPayload _)
-        .expects(eventId, projectPath)
+        .expects(eventId, projectSlug)
         .returning(Response[IO](Ok).withEntity(someData).pure[IO])
 
       val response = routes.call(request)

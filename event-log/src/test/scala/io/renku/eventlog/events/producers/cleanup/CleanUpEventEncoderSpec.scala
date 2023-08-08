@@ -34,11 +34,10 @@ class CleanUpEventEncoderSpec extends AnyWordSpec with should.Matchers {
       CleanUpEventEncoder.encodeEvent(event) shouldBe json"""{
         "categoryName": "CLEAN_UP",
         "project": {
-        "id":           ${event.project.id.value},
-          "path":         ${event.project.path.value}
+          "id":   ${event.project.id},
+          "slug": ${event.project.slug}
         }
       }"""
     }
   }
-
 }

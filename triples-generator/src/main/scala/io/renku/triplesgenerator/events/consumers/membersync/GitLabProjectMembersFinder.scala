@@ -25,7 +25,7 @@ import eu.timepit.refined.auto._
 import eu.timepit.refined.collection.NonEmpty
 import io.circe.Decoder
 import io.renku.graph.model.persons.{GitLabId, Name}
-import io.renku.graph.model.projects.Path
+import io.renku.graph.model.projects.Slug
 import io.renku.http.client.{AccessToken, GitLabClient}
 import io.renku.tinytypes.json.TinyTypeDecoders._
 import org.http4s.Status.{Forbidden, NotFound, Ok, Unauthorized}
@@ -36,13 +36,13 @@ import org.typelevel.ci._
 import org.typelevel.log4cats.Logger
 
 private trait GitLabProjectMembersFinder[F[_]] {
-  def findProjectMembers(path: Path)(implicit maybeAccessToken: Option[AccessToken]): F[Set[GitLabProjectMember]]
+  def findProjectMembers(slug: Slug)(implicit maybeAccessToken: Option[AccessToken]): F[Set[GitLabProjectMember]]
 }
 
 private class GitLabProjectMembersFinderImpl[F[_]: Async: GitLabClient: Logger] extends GitLabProjectMembersFinder[F] {
 
-  override def findProjectMembers(path: Path)(implicit mat: Option[AccessToken]): F[Set[GitLabProjectMember]] =
-    fetch(uri"projects" / path.show / "members" / "all")
+  override def findProjectMembers(slug: Slug)(implicit mat: Option[AccessToken]): F[Set[GitLabProjectMember]] =
+    fetch(uri"projects" / slug.show / "members" / "all")
 
   private val glApiName: String Refined NonEmpty = "project-members"
 

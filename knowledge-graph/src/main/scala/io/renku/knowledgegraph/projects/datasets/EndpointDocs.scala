@@ -113,7 +113,7 @@ private class EndpointDocsImpl()(implicit gitLabUrl: GitLabUrl, renkuApiUrl: ren
   )
 
   private val example = {
-    implicit val dsEncoder: Encoder[ProjectDataset] = ProjectDataset.encoder(projects.Path("namespace/name"))
+    implicit val dsEncoder: Encoder[ProjectDataset] = ProjectDataset.encoder(projects.Slug("namespace/name"))
     Json.arr(
       ProjectDataset(
         datasets.Identifier("123"),

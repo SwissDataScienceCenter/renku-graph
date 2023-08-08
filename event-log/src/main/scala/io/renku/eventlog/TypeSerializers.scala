@@ -45,14 +45,14 @@ trait TypeSerializers {
   val projectIdDecoder: Decoder[projects.GitLabId] = int4.map(projects.GitLabId.apply)
   val projectIdEncoder: Encoder[projects.GitLabId] = int4.values.contramap(_.value)
 
-  val projectPathDecoder: Decoder[projects.Path] = varchar.map(projects.Path.apply)
-  val projectPathEncoder: Encoder[projects.Path] =
-    varchar.values.contramap((b: projects.Path) => b.value)
+  val projectSlugDecoder: Decoder[projects.Slug] = varchar.map(projects.Slug.apply)
+  val projectSlugEncoder: Encoder[projects.Slug] =
+    varchar.values.contramap((b: projects.Slug) => b.value)
 
   val projectIdsDecoder: Decoder[EventInfo.ProjectIds] =
-    (projectIdDecoder, projectPathDecoder).mapN(EventInfo.ProjectIds.apply)
+    (projectIdDecoder, projectSlugDecoder).mapN(EventInfo.ProjectIds.apply)
   val projectIdsEncoder: Encoder[EventInfo.ProjectIds] =
-    (projectIdEncoder, projectPathEncoder).contramapN(a => (a.id, a.path))
+    (projectIdEncoder, projectSlugEncoder).contramapN(a => (a.id, a.slug))
 
   val eventBodyDecoder: Decoder[EventBody] = text.map(EventBody.apply)
   val eventBodyEncoder: Encoder[EventBody] = text.values.contramap(_.value)
@@ -107,7 +107,7 @@ trait TypeSerializers {
 
   val compoundEventIdDecoder: Decoder[CompoundEventId] = (eventIdDecoder *: projectIdDecoder).to[CompoundEventId]
 
-  val projectDecoder: Decoder[Project] = (projectIdDecoder *: projectPathDecoder).to[Project]
+  val projectDecoder: Decoder[Project] = (projectIdDecoder *: projectSlugDecoder).to[Project]
 
   val subscriberUrlDecoder: Decoder[SubscriberUrl] = varchar.map(SubscriberUrl.apply)
   val subscriberUrlEncoder: Encoder[SubscriberUrl] = varchar.values.contramap(_.value)

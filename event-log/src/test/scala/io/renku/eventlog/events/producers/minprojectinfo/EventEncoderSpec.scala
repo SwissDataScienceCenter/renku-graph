@@ -20,7 +20,7 @@ package io.renku.eventlog.events.producers.minprojectinfo
 
 import io.circe.literal._
 import io.renku.generators.Generators.Implicits._
-import io.renku.graph.model.GraphModelGenerators.{projectIds, projectPaths}
+import io.renku.graph.model.GraphModelGenerators.{projectIds, projectSlugs}
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
 
@@ -29,13 +29,13 @@ class EventEncoderSpec extends AnyWordSpec with should.Matchers {
   "encodeEvent" should {
 
     "serialize MemberSyncEvent to Json" in {
-      val event = MinProjectInfoEvent(projectIds.generateOne, projectPaths.generateOne)
+      val event = MinProjectInfoEvent(projectIds.generateOne, projectSlugs.generateOne)
 
       EventEncoder.encodeEvent(event) shouldBe json"""{
         "categoryName": "ADD_MIN_PROJECT_INFO",
         "project": {
-          "id":   ${event.projectId.value},
-          "path": ${event.projectPath.value}
+          "id":   ${event.projectId},
+          "slug": ${event.projectSlug}
         }
       }"""
     }

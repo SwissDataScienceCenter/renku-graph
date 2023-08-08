@@ -37,7 +37,8 @@ private object ProjectJsonLDEncoder extends ProjectJsonLDEncoder {
       project.resourceId.asEntityId,
       entities.Project.entityTypes,
       schema / "identifier"       -> project.id.asJsonLD,
-      renku / "projectPath"       -> project.path.asJsonLD,
+      renku / "projectPath"       -> project.slug.asJsonLD,
+      renku / "slug"              -> project.slug.asJsonLD,
       schema / "name"             -> project.name.asJsonLD,
       schema / "description"      -> project.maybeDescription.asJsonLD,
       renku / "projectVisibility" -> project.visibility.asJsonLD,
@@ -65,7 +66,7 @@ private object ProjectJsonLDEncoder extends ProjectJsonLDEncoder {
     JsonLD.entity(
       parent.resourceId.asEntityId,
       entities.Project.entityTypes,
-      renku / "projectPath"  -> parent.path.asJsonLD,
+      renku / "projectPath"  -> parent.slug.asJsonLD,
       schema / "name"        -> parent.name.asJsonLD,
       schema / "dateCreated" -> parent.created.date.asJsonLD,
       schema / "creator"     -> parent.created.maybeCreator.asJsonLD

@@ -30,7 +30,7 @@ import io.renku.triplesgenerator.events.consumers.ProcessingRecoverableError
 import org.typelevel.log4cats.Logger
 
 private[tsprovisioning] trait ProjectInfoFinder[F[_]] {
-  def findProjectInfo(path: projects.Path)(implicit
+  def findProjectInfo(slug: projects.Slug)(implicit
       maybeAccessToken: Option[AccessToken]
   ): EitherT[F, ProcessingRecoverableError, Option[GitLabProjectInfo]]
 }
@@ -54,19 +54,19 @@ private class ProjectInfoFinderImpl[F[_]: MonadThrow: Parallel: Logger](
   import projectFinder._
 
   override def findProjectInfo(
-      path: projects.Path
+      slug: projects.Slug
   )(implicit maybeAccessToken: Option[AccessToken]): EitherT[F, ProcessingRecoverableError, Option[GitLabProjectInfo]] =
-    findProject(path) >>= {
+    findProject(slug) >>= {
       case None          => EitherT.rightT[F, ProcessingRecoverableError](Option.empty[GitLabProjectInfo])
       case Some(project) => (addMembers(project) >>= addEmails).map(_.some)
     }
 
   private def addMembers(project: GitLabProjectInfo)(implicit maybeAccessToken: Option[AccessToken]) =
-    findProjectMembers(project.path).map(members => project.copy(members = members))
+    findProjectMembers(project.slug).map(members => project.copy(members = members))
 
   private def addEmails(project: GitLabProjectInfo)(implicit maybeAccessToken: Option[AccessToken]) = EitherT {
     (project.members ++ project.maybeCreator).toList
-      .map(findMemberEmail(_, Project(project.id, project.path)).value)
+      .map(findMemberEmail(_, Project(project.id, project.slug)).value)
       .parSequence
       .map(_.sequence)
   }.map(deduplicateSameIdMembers)

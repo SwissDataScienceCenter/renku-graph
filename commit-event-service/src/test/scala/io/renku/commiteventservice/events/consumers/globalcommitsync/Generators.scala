@@ -28,7 +28,7 @@ import io.renku.generators.CommonGraphGenerators.pages
 import io.renku.generators.Generators.Implicits._
 import io.renku.generators.Generators._
 import io.renku.graph.model.EventsGenerators.commitIds
-import io.renku.graph.model.GraphModelGenerators.{projectIds, projectPaths}
+import io.renku.graph.model.GraphModelGenerators.{projectIds, projectSlugs}
 import io.renku.graph.model.events.CommitId
 import io.renku.graph.model.projects
 import org.scalacheck.Gen
@@ -39,9 +39,9 @@ private object Generators {
 
   def globalCommitSyncEvents(projectIdGen: Gen[projects.GitLabId] = projectIds): Gen[GlobalCommitSyncEvent] = for {
     projectId   <- projectIdGen
-    projectPath <- projectPaths
+    projectSlug <- projectSlugs
     commitsInfo <- commitsInfos
-  } yield GlobalCommitSyncEvent(Project(projectId, projectPath), commitsInfo)
+  } yield GlobalCommitSyncEvent(Project(projectId, projectSlug), commitsInfo)
 
   lazy val commitsInfos: Gen[CommitsInfo] = for {
     commitsCount   <- commitsCounts

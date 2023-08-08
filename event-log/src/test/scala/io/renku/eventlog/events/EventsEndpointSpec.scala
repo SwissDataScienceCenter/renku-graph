@@ -115,12 +115,12 @@ class EventsEndpointSpec extends AnyWordSpec with IOSpec with MockFactory with s
 
     val criterias: Gen[EventsEndpoint.Criteria] = Gen.oneOf(
       for {
-        projectPath <- projectPaths
+        projectSlug <- projectSlugs
         maybeStatus <- eventStatuses.toGeneratorOfOptions
         maybeDates  <- filtersOnDates.toGeneratorOfOptions
         sorting     <- sortBys(Criteria.Sort)
         paging      <- pagingRequests
-      } yield Criteria(Filters.ProjectEvents(projectPath, maybeStatus, maybeDates), sorting, paging),
+      } yield Criteria(Filters.ProjectEvents(projectSlug, maybeStatus, maybeDates), sorting, paging),
       for {
         status     <- eventStatuses
         maybeDates <- filtersOnDates.toGeneratorOfOptions

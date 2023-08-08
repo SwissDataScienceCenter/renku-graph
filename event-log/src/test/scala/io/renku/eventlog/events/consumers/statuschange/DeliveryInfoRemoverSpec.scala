@@ -26,7 +26,7 @@ import io.renku.generators.CommonGraphGenerators.microserviceBaseUrls
 import io.renku.generators.Generators.Implicits._
 import io.renku.graph.model.EventContentGenerators._
 import io.renku.graph.model.EventsGenerators._
-import io.renku.graph.model.GraphModelGenerators.{projectIds, projectPaths}
+import io.renku.graph.model.GraphModelGenerators.{projectIds, projectSlugs}
 import io.renku.graph.model.events.CompoundEventId
 import io.renku.metrics.TestMetricsRegistry
 import io.renku.testtools.IOSpec
@@ -39,13 +39,13 @@ class DeliveryInfoRemoverSpec extends AnyWordSpec with IOSpec with should.Matche
 
     "remove delivery info for the given eventId from the DB" in new TestCase {
       val event =
-        storeGeneratedEvent(eventStatuses.generateOne, eventDates.generateOne, projectId, projectPaths.generateOne)
+        storeGeneratedEvent(eventStatuses.generateOne, eventDates.generateOne, projectId, projectSlugs.generateOne)
       val eventId = CompoundEventId(event._1, projectId)
       upsertSubscriber(subscriberId, subscriberUrl, sourceUrl)
       upsertEventDelivery(eventId, subscriberId)
 
       val otherEvent =
-        storeGeneratedEvent(eventStatuses.generateOne, eventDates.generateOne, projectId, projectPaths.generateOne)
+        storeGeneratedEvent(eventStatuses.generateOne, eventDates.generateOne, projectId, projectSlugs.generateOne)
       val otherEventId = CompoundEventId(otherEvent._1, projectId)
       upsertEventDelivery(otherEventId, subscriberId)
 

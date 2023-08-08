@@ -46,7 +46,7 @@ class PersistedTokenRemoverSpec
     "succeed if token exists" in new TestCase {
 
       val encryptedToken = encryptedAccessTokens.generateOne
-      insert(projectId, projectPath, encryptedToken)
+      insert(projectId, projectSlug, encryptedToken)
       findToken(projectId) shouldBe Some(encryptedToken.value)
 
       remover.delete(projectId).unsafeRunSync() shouldBe ()
@@ -57,7 +57,7 @@ class PersistedTokenRemoverSpec
 
   private trait TestCase {
     val projectId   = projectIds.generateOne
-    val projectPath = projectPaths.generateOne
+    val projectSlug = projectSlugs.generateOne
 
     private implicit val metricsRegistry:  TestMetricsRegistry[IO]   = TestMetricsRegistry[IO]
     private implicit val queriesExecTimes: QueriesExecutionTimes[IO] = QueriesExecutionTimes[IO]().unsafeRunSync()

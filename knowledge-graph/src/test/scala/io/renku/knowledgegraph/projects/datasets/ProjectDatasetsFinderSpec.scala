@@ -58,7 +58,7 @@ class ProjectDatasetsFinderSpec
       renkuProjectEntities(anyVisibility).withDatasets(datasetEntities(provenanceNonModified)).generateOne
 
     provisionTestProjects(otherProject, projectComplete) >>
-      datasetsFinder.findProjectDatasets(Criteria(projectComplete.path)).asserting {
+      datasetsFinder.findProjectDatasets(Criteria(projectComplete.slug)).asserting {
         _.results shouldBe List(
           ProjectDataset(
             modification2.identification.identifier,
@@ -82,7 +82,7 @@ class ProjectDatasetsFinderSpec
       .generateOne
 
     provisionTestProject(project) >>
-      datasetsFinder.findProjectDatasets(Criteria(project.path)).asserting {
+      datasetsFinder.findProjectDatasets(Criteria(project.slug)).asserting {
         _.results should contain theSameElementsAs List(
           ProjectDataset(
             dataset1.identification.identifier,
@@ -119,7 +119,7 @@ class ProjectDatasetsFinderSpec
     assume(dataset1.provenance.topmostSameAs == original.provenance.topmostSameAs)
 
     provisionTestProjects(originalProject, project) >>
-      datasetsFinder.findProjectDatasets(Criteria(project.path)).asserting {
+      datasetsFinder.findProjectDatasets(Criteria(project.slug)).asserting {
         _.results should contain theSameElementsAs List(
           ProjectDataset(
             dataset1.identification.identifier,
@@ -146,7 +146,7 @@ class ProjectDatasetsFinderSpec
   }
 
   it should "return None if there are no datasets in the project" in {
-    datasetsFinder.findProjectDatasets(Criteria(projectPaths.generateOne)).asserting(_.results shouldBe List.empty)
+    datasetsFinder.findProjectDatasets(Criteria(projectSlugs.generateOne)).asserting(_.results shouldBe List.empty)
   }
 
   it should "not returned deleted dataset" in {
@@ -157,7 +157,7 @@ class ProjectDatasetsFinderSpec
       .generateOne
 
     provisionTestProject(project) >>
-      datasetsFinder.findProjectDatasets(Criteria(project.path)).asserting {
+      datasetsFinder.findProjectDatasets(Criteria(project.slug)).asserting {
         _.results shouldBe List(
           ProjectDataset(
             dataset2.identification.identifier,
@@ -179,7 +179,7 @@ class ProjectDatasetsFinderSpec
       renkuProjectEntities(anyVisibility).addDatasetAndModification(datasetEntities(provenanceInternal)).generateOne
 
     provisionTestProject(project.addDatasets(modification.invalidateNow(personEntities))) >>
-      datasetsFinder.findProjectDatasets(Criteria(project.path)).asserting(_.results shouldBe Nil)
+      datasetsFinder.findProjectDatasets(Criteria(project.slug)).asserting(_.results shouldBe Nil)
   }
 
   it should "return the results sorted by dateModified if requested" in {
@@ -191,7 +191,7 @@ class ProjectDatasetsFinderSpec
 
     provisionTestProject(project) >>
       datasetsFinder
-        .findProjectDatasets(Criteria(project.path, Sorting(Criteria.Sort.By(ByDateModified, Direction.Desc))))
+        .findProjectDatasets(Criteria(project.slug, Sorting(Criteria.Sort.By(ByDateModified, Direction.Desc))))
         .asserting {
           _.results shouldBe List(
             ProjectDataset(
@@ -228,7 +228,7 @@ class ProjectDatasetsFinderSpec
 
     provisionTestProject(project) >>
       datasetsFinder
-        .findProjectDatasets(Criteria(project.path, Sorting(Criteria.Sort.By(ByDateModified, Direction.Desc))))
+        .findProjectDatasets(Criteria(project.slug, Sorting(Criteria.Sort.By(ByDateModified, Direction.Desc))))
         .asserting {
           _.results shouldBe List(
             ProjectDataset(
@@ -297,10 +297,10 @@ class ProjectDatasetsFinderSpec
 
     provisionTestProject(project) >>
       datasetsFinder
-        .findProjectDatasets(Criteria(project.path, Sorting(Criteria.Sort.By(ByName, Direction.Asc))))
+        .findProjectDatasets(Criteria(project.slug, Sorting(Criteria.Sort.By(ByName, Direction.Asc))))
         .asserting(_.results shouldBe expectedResults) >>
       datasetsFinder
-        .findProjectDatasets(Criteria(project.path))
+        .findProjectDatasets(Criteria(project.slug))
         .asserting(_.results shouldBe expectedResults)
   }
 
@@ -313,7 +313,7 @@ class ProjectDatasetsFinderSpec
 
     provisionTestProject(project) >>
       datasetsFinder
-        .findProjectDatasets(Criteria(project.path, paging = PagingRequest(Page(2), PerPage(1))))
+        .findProjectDatasets(Criteria(project.slug, paging = PagingRequest(Page(2), PerPage(1))))
         .asserting {
           _.results shouldBe List(
             ProjectDataset(

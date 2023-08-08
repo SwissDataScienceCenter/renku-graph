@@ -43,13 +43,13 @@ private trait TokensCreator[F[_]] {
 }
 
 private class TokensCreatorImpl[F[_]: MonadThrow: Logger](
-    projectPathFinder:   ProjectPathFinder[F],
+    projectSlugFinder:   ProjectSlugFinder[F],
     accessTokenCrypto:   AccessTokenCrypto[F],
     tokenValidator:      TokenValidator[F],
     tokenDueChecker:     TokenDueChecker[F],
     newTokensCreator:    NewTokensCreator[F],
     tokensPersister:     TokensPersister[F],
-    persistedPathFinder: PersistedPathFinder[F],
+    persistedSlugFinder: PersistedSlugFinder[F],
     tokenRemover:        TokenRemover[F],
     tokenFinder:         PersistedTokensFinder[F],
     tokensRevoker:       TokensRevoker[F],
@@ -57,7 +57,7 @@ private class TokensCreatorImpl[F[_]: MonadThrow: Logger](
 ) extends TokensCreator[F] {
 
   import newTokensCreator._
-  import persistedPathFinder._
+  import persistedSlugFinder._
   import tokenDueChecker._
   import tokenFinder._
   import tokenValidator._
@@ -68,7 +68,7 @@ private class TokensCreatorImpl[F[_]: MonadThrow: Logger](
       .flatMapF(
         decrypt >=>
           removeWhenInvalid(projectId, userToken) >=>
-          replacePathIfChangedOrRemove(projectId, userToken) >=>
+          replaceSlugIfChangedOrRemove(projectId, userToken) >=>
           checkIfDue(projectId)
       )
       .void
@@ -88,18 +88,18 @@ private class TokensCreatorImpl[F[_]: MonadThrow: Logger](
       }
   }
 
-  private def replacePathIfChangedOrRemove(
+  private def replaceSlugIfChangedOrRemove(
       projectId: projects.GitLabId,
       userToken: AccessToken
   ): Option[AccessToken] => F[Option[AccessToken]] = {
     case None => Option.empty[AccessToken].pure[F]
     case Some(token) =>
-      projectPathFinder
-        .findProjectPath(projectId, token)
-        .semiflatMap(actualPath =>
-          findPersistedProjectPath(projectId).flatMap {
-            case `actualPath` => ().pure[F]
-            case _            => updatePath(Project(projectId, actualPath))
+      projectSlugFinder
+        .findProjectSlug(projectId, token)
+        .semiflatMap(actualSlug =>
+          findPersistedProjectSlug(projectId).flatMap {
+            case `actualSlug` => ().pure[F]
+            case _            => updateSlug(Project(projectId, actualSlug))
           }
         )
         .cataF(
@@ -117,13 +117,13 @@ private class TokensCreatorImpl[F[_]: MonadThrow: Logger](
     tokenValidator.checkValid(projectId, userToken) >>= {
       case false => ().pure[F]
       case true =>
-        (findProjectPath(projectId, userToken) >>= createNewToken(userToken))
+        (findProjectSlug(projectId, userToken) >>= createNewToken(userToken))
           .semiflatMap(encrypt >=> persist >=> logSuccess >=> tryRevokingOldTokens(userToken))
           .getOrElse(())
     }
 
-  private def findProjectPath(projectId: projects.GitLabId, userToken: AccessToken): OptionT[F, Project] =
-    projectPathFinder.findProjectPath(projectId, userToken).map(Project(projectId, _))
+  private def findProjectSlug(projectId: projects.GitLabId, userToken: AccessToken): OptionT[F, Project] =
+    projectSlugFinder.findProjectSlug(projectId, userToken).map(Project(projectId, _))
 
   private def createNewToken(userToken: AccessToken)(project: Project): OptionT[F, (Project, TokenCreationInfo)] =
     createProjectAccessToken(project.id, userToken).map(project -> _)
@@ -184,7 +184,7 @@ private object TokensCreator {
   private val maxRetries: Int Refined NonNegative = 3
 
   def apply[F[_]: Async: GitLabClient: Logger: SessionResource: QueriesExecutionTimes]: F[TokensCreator[F]] = for {
-    pathFinder                <- ProjectPathFinder[F]
+    slugFinder                <- ProjectSlugFinder[F]
     accessTokenCrypto         <- AccessTokenCrypto[F]()
     tokenValidator            <- TokenValidator[F]
     tokenDueChecker           <- TokenDueChecker[F]
@@ -192,13 +192,13 @@ private object TokensCreator {
     tokenRemover              <- TokenRemover[F]
     tokensRevoker             <- TokensRevoker[F]
   } yield new TokensCreatorImpl[F](
-    pathFinder,
+    slugFinder,
     accessTokenCrypto,
     tokenValidator,
     tokenDueChecker,
     projectAccessTokenCreator,
     TokensPersister[F],
-    PersistedPathFinder[F],
+    PersistedSlugFinder[F],
     tokenRemover,
     PersistedTokensFinder[F],
     tokensRevoker,

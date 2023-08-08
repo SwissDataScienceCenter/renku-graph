@@ -89,7 +89,7 @@ private class EndpointDocsImpl(projectJsonEncoder: ProjectJsonEncoder, projectJs
   private val example = Project(
     projects.ResourceId("http://renkulab.io/projects/namespace/name"),
     projects.GitLabId(123),
-    projects.Path("namespace/name"),
+    projects.Slug("namespace/name"),
     projects.Name("name"),
     projects.Description("description").some,
     projects.Visibility.Public,
@@ -112,7 +112,7 @@ private class EndpointDocsImpl(projectJsonEncoder: ProjectJsonEncoder, projectJs
       ForksCount(1),
       ParentProject(
         projects.ResourceId("http://renkulab.io/projects/namespace/fork"),
-        projects.Path("namespace/fork"),
+        projects.Slug("namespace/fork"),
         projects.Name("fork"),
         Creation(
           projects.DateCreated(Instant.parse("2012-11-17T10:00:00.000Z")),

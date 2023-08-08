@@ -42,7 +42,7 @@ import org.scalamock.scalatest.MockFactory
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
 
-class GitLabAuthenticatorSpec
+class GLAuthenticatorSpec
     extends AnyWordSpec
     with IOSpec
     with should.Matchers
@@ -111,7 +111,7 @@ class GitLabAuthenticatorSpec
 
     private implicit val logger: TestLogger[IO]   = TestLogger()
     implicit val gitLabClient:   GitLabClient[IO] = mock[GitLabClient[IO]]
-    val authenticator = new GitLabAuthenticatorImpl[IO]
+    val authenticator = new GLAuthenticatorImpl[IO]
 
     lazy val mapResponse =
       captureMapping(gitLabClient)(

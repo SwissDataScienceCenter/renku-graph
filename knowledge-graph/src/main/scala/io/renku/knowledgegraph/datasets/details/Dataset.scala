@@ -97,7 +97,7 @@ private object Dataset {
   final case class Tag(name: model.publicationEvents.Name, maybeDesc: Option[model.publicationEvents.Description])
 
   final case class DatasetProject(id:                model.projects.ResourceId,
-                                  path:              model.projects.Path,
+                                  slug:              model.projects.Slug,
                                   name:              model.projects.Name,
                                   visibility:        Visibility,
                                   datasetIdentifier: model.datasets.Identifier
@@ -138,7 +138,7 @@ private object Dataset {
       ) deepMerge _links(
         Rel.Self -> Endpoint.href(renkuApiUrl, requestedDataset),
         Rel("initial-version") -> Endpoint.href(renkuApiUrl, RequestedDataset(dataset.versions.initial.asIdentifier)),
-        Rel("tags") -> projects.datasets.tags.Endpoint.href(renkuApiUrl, dataset.project.path, dataset.name),
+        Rel("tags") -> projects.datasets.tags.Endpoint.href(renkuApiUrl, dataset.project.slug, dataset.name),
       )
   }
   // format: on
@@ -172,13 +172,14 @@ private object Dataset {
   private implicit def projectEncoder(implicit renkuApiUrl: renku.ApiUrl): Encoder[DatasetProject] =
     Encoder.instance[DatasetProject] { project =>
       json"""{
-        "path":       ${project.path},
+        "path":       ${project.slug},
+        "slug":       ${project.slug},
         "name":       ${project.name},
         "visibility": ${project.visibility},
         "dataset": {
           "identifier": ${project.datasetIdentifier}
         }
-      }""" deepMerge _links(Link(Rel("project-details") -> projects.details.Endpoint.href(renkuApiUrl, project.path)))
+      }""" deepMerge _links(Link(Rel("project-details") -> projects.details.Endpoint.href(renkuApiUrl, project.slug)))
     }
 
   private implicit lazy val versionsEncoder: Encoder[DatasetVersions] = Encoder.instance[DatasetVersions] { versions =>
@@ -199,7 +200,7 @@ private object Dataset {
         case uri: ImageUri.Relative =>
           json"""{
             "location": $uri
-          }""" deepMerge _links(Link(Rel("view") -> Href(gitLabUrl / project.path / "raw" / "master" / uri)))
+          }""" deepMerge _links(Link(Rel("view") -> Href(gitLabUrl / project.slug / "raw" / "master" / uri)))
         case uri: ImageUri.Absolute =>
           json"""{
             "location": $uri

@@ -32,7 +32,7 @@ import io.renku.graph.model.testentities.generators.EntitiesGenerators.{Composit
 import io.renku.graph.model.versions.{CliVersion, SchemaVersion}
 
 sealed trait RenkuProject extends Project with RenkuProject.RenkuProjectAlg with Product with Serializable {
-  val path:                 Path
+  val slug:                 Slug
   val name:                 Name
   val maybeDescription:     Option[Description]
   val agent:                CliVersion
@@ -82,7 +82,7 @@ object RenkuProject {
       (plans, created) => Option.when(plans.nonEmpty)(f(ProjectBasedGenFactory.pure(plans)).run(created).generateOne)
   }
 
-  final case class WithoutParent(path:                 Path,
+  final case class WithoutParent(slug:                 Slug,
                                  name:                 Name,
                                  maybeDescription:     Option[Description],
                                  agent:                CliVersion,
@@ -160,7 +160,7 @@ object RenkuProject {
       .void
   }
 
-  final case class WithParent(path:                 Path,
+  final case class WithParent(slug:                 Slug,
                               name:                 Name,
                               maybeDescription:     Option[Description],
                               agent:                CliVersion,
@@ -251,7 +251,7 @@ object RenkuProject {
       entities.RenkuProject.WithoutParent
         .from(
           projects.ResourceId(project.asEntityId),
-          project.path,
+          project.slug,
           project.name,
           project.maybeDescription,
           project.agent,
@@ -276,7 +276,7 @@ object RenkuProject {
       entities.RenkuProject.WithParent
         .from(
           projects.ResourceId(project.asEntityId),
-          project.path,
+          project.slug,
           project.name,
           project.maybeDescription,
           project.agent,

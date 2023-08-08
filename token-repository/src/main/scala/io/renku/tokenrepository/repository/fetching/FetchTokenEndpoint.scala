@@ -41,7 +41,7 @@ trait FetchTokenEndpoint[F[_]] {
   )(implicit findToken: ID => OptionT[F, AccessToken]): F[Response[F]]
 
   implicit val findById:   projects.GitLabId => OptionT[F, AccessToken]
-  implicit val findByPath: projects.Path => OptionT[F, AccessToken]
+  implicit val findBySlug: projects.Slug => OptionT[F, AccessToken]
 }
 
 class FetchTokenEndpointImpl[F[_]: MonadThrow: Logger](tokenFinder: TokenFinder[F])
@@ -70,7 +70,7 @@ class FetchTokenEndpointImpl[F[_]: MonadThrow: Logger](tokenFinder: TokenFinder[
   }
 
   implicit val findById:   projects.GitLabId => OptionT[F, AccessToken] = tokenFinder.findToken
-  implicit val findByPath: projects.Path => OptionT[F, AccessToken]     = tokenFinder.findToken
+  implicit val findBySlug: projects.Slug => OptionT[F, AccessToken]     = tokenFinder.findToken
 }
 
 object FetchTokenEndpoint {

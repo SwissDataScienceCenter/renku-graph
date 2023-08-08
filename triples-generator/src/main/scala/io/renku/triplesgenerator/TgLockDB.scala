@@ -33,7 +33,7 @@ import scala.concurrent.duration.FiniteDuration
 sealed trait TgLockDB
 
 object TgLockDB {
-  type TsWriteLock[F[_]] = Lock[F, projects.Path]
+  type TsWriteLock[F[_]] = Lock[F, projects.Slug]
 
   type SessionResource[F[_]] = io.renku.db.SessionResource[F, TgLockDB]
 

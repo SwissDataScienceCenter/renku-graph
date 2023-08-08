@@ -54,8 +54,8 @@ class LineageFinderSpec
       forAll { lineage: Lineage =>
         val initialEdgesMap = lineages.generateOne.toEdgesMap
         (edgesFinder
-          .findEdges(_: projects.Path, _: Option[AuthUser]))
-          .expects(projectPath, maybeAuthUser)
+          .findEdges(_: projects.Slug, _: Option[AuthUser]))
+          .expects(projectSlug, maybeAuthUser)
           .returning(initialEdgesMap.pure[IO])
 
         val trimmedEdgesMap = lineage.toEdgesMap
@@ -64,61 +64,61 @@ class LineageFinderSpec
           .returning(trimmedEdgesMap.pure[IO])
 
         (nodeDetailsFinder
-          .findDetails(_: Set[ExecutionInfo], _: projects.Path)(_: (ExecutionInfo, ResourceId) => SparqlQuery))
-          .expects(trimmedEdgesMap.keySet, projectPath, activityIdQuery)
+          .findDetails(_: Set[ExecutionInfo], _: projects.Slug)(_: (ExecutionInfo, ResourceId) => SparqlQuery))
+          .expects(trimmedEdgesMap.keySet, projectSlug, activityIdQuery)
           .returning(lineage.processRunNodes.pure[IO])
 
         val nodesSet = trimmedEdgesMap.view.mapValues { case (s, t) => s ++ t }.values.toSet.flatten
         (nodeDetailsFinder
-          .findDetails(_: Set[Node.Location], _: projects.Path)(_: (Node.Location, ResourceId) => SparqlQuery))
-          .expects(nodesSet, projectPath, locationQuery)
+          .findDetails(_: Set[Node.Location], _: projects.Slug)(_: (Node.Location, ResourceId) => SparqlQuery))
+          .expects(nodesSet, projectSlug, locationQuery)
           .returning(lineage.locationNodes.pure[IO])
 
-        lineageFinder.find(projectPath, location, maybeAuthUser).unsafeRunSync() shouldBe lineage.some
+        lineageFinder.find(projectSlug, location, maybeAuthUser).unsafeRunSync() shouldBe lineage.some
       }
     }
 
     "return None if not edges are found" in new TestCase {
       (edgesFinder
-        .findEdges(_: projects.Path, _: Option[AuthUser]))
-        .expects(projectPath, maybeAuthUser)
+        .findEdges(_: projects.Slug, _: Option[AuthUser]))
+        .expects(projectSlug, maybeAuthUser)
         .returning((Map.empty: EdgeMap).pure[IO])
 
-      lineageFinder.find(projectPath, location, maybeAuthUser).unsafeRunSync() shouldBe None
+      lineageFinder.find(projectSlug, location, maybeAuthUser).unsafeRunSync() shouldBe None
     }
 
     "return None if the trimming returns None" in new TestCase {
 
       val initialEdgesMap = lineages.generateOne.toEdgesMap
       (edgesFinder
-        .findEdges(_: projects.Path, _: Option[AuthUser]))
-        .expects(projectPath, maybeAuthUser)
+        .findEdges(_: projects.Slug, _: Option[AuthUser]))
+        .expects(projectSlug, maybeAuthUser)
         .returning(initialEdgesMap.pure[IO])
 
       (edgesTrimmer.trim _)
         .expects(initialEdgesMap, location)
         .returning((Map.empty: EdgeMap).pure[IO])
 
-      lineageFinder.find(projectPath, location, maybeAuthUser).unsafeRunSync() shouldBe None
+      lineageFinder.find(projectSlug, location, maybeAuthUser).unsafeRunSync() shouldBe None
     }
 
     "return a Failure if finding edges fails" in new TestCase {
 
       val exception = exceptions.generateOne
       (edgesFinder
-        .findEdges(_: projects.Path, _: Option[AuthUser]))
-        .expects(projectPath, maybeAuthUser)
+        .findEdges(_: projects.Slug, _: Option[AuthUser]))
+        .expects(projectSlug, maybeAuthUser)
         .returning(exception.raiseError[IO, EdgeMap])
 
-      lineageFinder.find(projectPath, location, maybeAuthUser) shouldBeFailure exception
+      lineageFinder.find(projectSlug, location, maybeAuthUser) shouldBeFailure exception
     }
 
     "return a Failure if the trimming fails" in new TestCase {
 
       val initialEdgesMap = lineages.generateOne.toEdgesMap
       (edgesFinder
-        .findEdges(_: projects.Path, _: Option[AuthUser]))
-        .expects(projectPath, maybeAuthUser)
+        .findEdges(_: projects.Slug, _: Option[AuthUser]))
+        .expects(projectSlug, maybeAuthUser)
         .returning(initialEdgesMap.pure[IO])
 
       val exception = exceptions.generateOne
@@ -126,15 +126,15 @@ class LineageFinderSpec
         .expects(initialEdgesMap, location)
         .returning(exception.raiseError[IO, EdgeMap])
 
-      lineageFinder.find(projectPath, location, maybeAuthUser) shouldBeFailure exception
+      lineageFinder.find(projectSlug, location, maybeAuthUser) shouldBeFailure exception
     }
 
     "return a Failure if finding plan nodes details fails" in new TestCase {
 
       val initialEdgesMap = lineages.generateOne.toEdgesMap
       (edgesFinder
-        .findEdges(_: projects.Path, _: Option[AuthUser]))
-        .expects(projectPath, maybeAuthUser)
+        .findEdges(_: projects.Slug, _: Option[AuthUser]))
+        .expects(projectSlug, maybeAuthUser)
         .returning(initialEdgesMap.pure[IO])
 
       val lineage         = lineages.generateOne
@@ -145,19 +145,19 @@ class LineageFinderSpec
 
       val exception = exceptions.generateOne
       (nodeDetailsFinder
-        .findDetails(_: Set[ExecutionInfo], _: projects.Path)(_: (ExecutionInfo, ResourceId) => SparqlQuery))
-        .expects(trimmedEdgesMap.keySet, projectPath, activityIdQuery)
+        .findDetails(_: Set[ExecutionInfo], _: projects.Slug)(_: (ExecutionInfo, ResourceId) => SparqlQuery))
+        .expects(trimmedEdgesMap.keySet, projectSlug, activityIdQuery)
         .returning(exception.raiseError[IO, Set[Node]])
 
-      lineageFinder.find(projectPath, location, maybeAuthUser) shouldBeFailure exception
+      lineageFinder.find(projectSlug, location, maybeAuthUser) shouldBeFailure exception
     }
 
     "return a Failure if finding entities nodes details fails" in new TestCase {
 
       val initialEdgesMap = lineages.generateOne.toEdgesMap
       (edgesFinder
-        .findEdges(_: projects.Path, _: Option[AuthUser]))
-        .expects(projectPath, maybeAuthUser)
+        .findEdges(_: projects.Slug, _: Option[AuthUser]))
+        .expects(projectSlug, maybeAuthUser)
         .returning(initialEdgesMap.pure[IO])
 
       val lineage         = lineages.generateOne
@@ -167,8 +167,8 @@ class LineageFinderSpec
         .returning(trimmedEdgesMap.pure[IO])
 
       (nodeDetailsFinder
-        .findDetails(_: Set[ExecutionInfo], _: projects.Path)(_: (ExecutionInfo, ResourceId) => SparqlQuery))
-        .expects(trimmedEdgesMap.keySet, projectPath, activityIdQuery)
+        .findDetails(_: Set[ExecutionInfo], _: projects.Slug)(_: (ExecutionInfo, ResourceId) => SparqlQuery))
+        .expects(trimmedEdgesMap.keySet, projectSlug, activityIdQuery)
         .returning(lineage.processRunNodes.pure[IO])
 
       val nodesSet = trimmedEdgesMap.view
@@ -178,19 +178,19 @@ class LineageFinderSpec
         .flatten
       val exception = exceptions.generateOne
       (nodeDetailsFinder
-        .findDetails(_: Set[Node.Location], _: projects.Path)(_: (Node.Location, ResourceId) => SparqlQuery))
-        .expects(nodesSet, projectPath, locationQuery)
+        .findDetails(_: Set[Node.Location], _: projects.Slug)(_: (Node.Location, ResourceId) => SparqlQuery))
+        .expects(nodesSet, projectSlug, locationQuery)
         .returning(exception.raiseError[IO, Set[Node]])
 
-      lineageFinder.find(projectPath, location, maybeAuthUser) shouldBeFailure exception
+      lineageFinder.find(projectSlug, location, maybeAuthUser) shouldBeFailure exception
     }
 
     "return a Failure when Lineage object instantiation fails" in new TestCase {
 
       val initialEdgesMap = lineages.generateOne.toEdgesMap
       (edgesFinder
-        .findEdges(_: projects.Path, _: Option[AuthUser]))
-        .expects(projectPath, maybeAuthUser)
+        .findEdges(_: projects.Slug, _: Option[AuthUser]))
+        .expects(projectSlug, maybeAuthUser)
         .returning(initialEdgesMap.pure[IO])
 
       val lineage         = lineages.generateOne
@@ -200,8 +200,8 @@ class LineageFinderSpec
         .returning(trimmedEdgesMap.pure[IO])
 
       (nodeDetailsFinder
-        .findDetails(_: Set[ExecutionInfo], _: projects.Path)(_: (ExecutionInfo, ResourceId) => SparqlQuery))
-        .expects(trimmedEdgesMap.keySet, projectPath, activityIdQuery)
+        .findDetails(_: Set[ExecutionInfo], _: projects.Slug)(_: (ExecutionInfo, ResourceId) => SparqlQuery))
+        .expects(trimmedEdgesMap.keySet, projectSlug, activityIdQuery)
         .returning(Set.empty[Node].pure[IO])
 
       val nodesSet = trimmedEdgesMap.view
@@ -210,11 +210,11 @@ class LineageFinderSpec
         .toSet
         .flatten
       (nodeDetailsFinder
-        .findDetails(_: Set[Node.Location], _: projects.Path)(_: (Node.Location, ResourceId) => SparqlQuery))
-        .expects(nodesSet, projectPath, locationQuery)
+        .findDetails(_: Set[Node.Location], _: projects.Slug)(_: (Node.Location, ResourceId) => SparqlQuery))
+        .expects(nodesSet, projectSlug, locationQuery)
         .returning(Set.empty[Node].pure[IO])
 
-      intercept[Exception](lineageFinder.find(projectPath, location, maybeAuthUser).unsafeRunSync())
+      intercept[Exception](lineageFinder.find(projectSlug, location, maybeAuthUser).unsafeRunSync())
     }
   }
 
@@ -225,7 +225,7 @@ class LineageFinderSpec
     implicit val logger: TestLogger[IO] = TestLogger[IO]()
     val lineageFinder = new LineageFinderImpl[IO](edgesFinder, edgesTrimmer, nodeDetailsFinder)
     val maybeAuthUser = authUsers.generateOption
-    val projectPath   = projectPaths.generateOne
+    val projectSlug   = projectSlugs.generateOne
     val location      = nodeLocations.generateOne
 
     implicit class FailureOps(failure: IO[Option[Lineage]]) {
@@ -234,9 +234,9 @@ class LineageFinderSpec
         val actual = intercept[Exception](failure.unsafeRunSync())
 
         actual.getCause   shouldBe expected
-        actual.getMessage shouldBe s"Finding lineage for '$projectPath' and '$location' failed"
+        actual.getMessage shouldBe s"Finding lineage for '$projectSlug' and '$location' failed"
 
-        logger.loggedOnly(Error(s"Finding lineage for '$projectPath' and '$location' failed", expected))
+        logger.loggedOnly(Error(s"Finding lineage for '$projectSlug' and '$location' failed", expected))
       }
     }
   }

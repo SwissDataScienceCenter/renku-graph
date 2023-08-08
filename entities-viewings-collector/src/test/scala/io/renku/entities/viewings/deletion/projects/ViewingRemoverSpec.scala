@@ -64,7 +64,7 @@ class ViewingRemoverSpec
       findProjectsWithViewings shouldBe Set(project.resourceId, otherProject.resourceId)
       findPersonViewings       shouldBe Set(personId -> project.resourceId, personId -> otherProject.resourceId)
 
-      val event = ProjectViewingDeletion(project.path)
+      val event = ProjectViewingDeletion(project.slug)
 
       remover.removeViewing(event).unsafeRunSync() shouldBe ()
 
@@ -88,7 +88,7 @@ class ViewingRemoverSpec
         findProjectsWithViewings shouldBe Set(project.resourceId, otherProject.resourceId)
         findPersonViewings       shouldBe Set(personId -> project.resourceId, otherPersonId -> otherProject.resourceId)
 
-        val event = ProjectViewingDeletion(project.path)
+        val event = ProjectViewingDeletion(project.slug)
 
         remover.removeViewing(event).unsafeRunSync() shouldBe ()
 
@@ -97,32 +97,32 @@ class ViewingRemoverSpec
         countPersonViewingsTriples(personId) shouldBe 0
       }
 
-    "do nothing if there's no project with the given path" in new TestCase {
+    "do nothing if there's no project with the given slug" in new TestCase {
 
       findProjectsWithViewings shouldBe Set.empty
 
-      val event = ProjectViewingDeletion(projectPaths.generateOne)
+      val event = ProjectViewingDeletion(projectSlugs.generateOne)
 
       remover.removeViewing(event).unsafeRunSync() shouldBe ()
 
       findProjectsWithViewings shouldBe Set.empty
     }
 
-    "do nothing if there are no triples in the PersonViewing graph for the given path" in new TestCase {
+    "do nothing if there are no triples in the PersonViewing graph for the given slug" in new TestCase {
 
       val userId  = userIds.generateOne
       val project = generateProjectWithCreator(userId)
 
       upload(to = projectsDataset, project)
 
-      val projectViewedEvent = projectViewedEvents.generateOne.copy(path = project.path, maybeUserId = None)
+      val projectViewedEvent = projectViewedEvents.generateOne.copy(slug = project.slug, maybeUserId = None)
 
       eventPersister.persist(projectViewedEvent).unsafeRunSync()
 
       findProjectsWithViewings shouldBe Set(project.resourceId)
       findPersonViewings       shouldBe Set.empty
 
-      val viewingDeletionEvent = ProjectViewingDeletion(project.path)
+      val viewingDeletionEvent = ProjectViewingDeletion(project.slug)
 
       remover.removeViewing(viewingDeletionEvent).unsafeRunSync() shouldBe ()
 
@@ -144,7 +144,7 @@ class ViewingRemoverSpec
 
       upload(to = projectsDataset, project)
 
-      val event = projectViewedEvents.generateOne.copy(path = project.path, maybeUserId = userId.some)
+      val event = projectViewedEvents.generateOne.copy(slug = project.slug, maybeUserId = userId.some)
 
       eventPersister.persist(event).unsafeRunSync()
     }

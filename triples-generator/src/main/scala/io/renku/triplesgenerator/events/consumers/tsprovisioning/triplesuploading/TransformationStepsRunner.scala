@@ -92,7 +92,7 @@ private class TransformationStepsRunnerImpl[F[_]: MonadThrow](
 
   private def transformationFailure(project: Project): PartialFunction[Throwable, F[TriplesUploadResult]] = {
     case NonFatal(exception) =>
-      NonRecoverableFailure(s"Transformation of ${project.path} failed: $exception", exception)
+      NonRecoverableFailure(s"Transformation of ${project.slug} failed: $exception", exception)
         .pure[F]
         .widen[TriplesUploadResult]
   }

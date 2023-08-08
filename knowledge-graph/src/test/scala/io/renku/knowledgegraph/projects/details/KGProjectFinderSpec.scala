@@ -46,27 +46,27 @@ class KGProjectFinderSpec
 
   "findProject" should {
 
-    "return details of the project with the given path when there's no parent" in new TestCase {
+    "return details of the project with the given slug when there's no parent" in new TestCase {
       forAll(Gen.oneOf(renkuProjectEntities(anyVisibility), nonRenkuProjectEntities(anyVisibility))) { project =>
         upload(to = projectsDataset, anyProjectEntities.generateOne, project)
 
-        kgProjectFinder.findProject(project.path, authUsers.generateOption).unsafeRunSync() shouldBe
+        kgProjectFinder.findProject(project.slug, authUsers.generateOption).unsafeRunSync() shouldBe
           project.to(kgProjectConverter).some
       }
     }
 
-    "return details of the project with the given path if it has a parent project - public projects" in new TestCase {
+    "return details of the project with the given slug if it has a parent project - public projects" in new TestCase {
       forAll(
         Gen.oneOf(renkuProjectWithParentEntities(visibilityPublic), nonRenkuProjectWithParentEntities(visibilityPublic))
       ) { project =>
         upload(to = projectsDataset, project, project.parent)
 
-        kgProjectFinder.findProject(project.path, authUsers.generateOption).unsafeRunSync() shouldBe
+        kgProjectFinder.findProject(project.slug, authUsers.generateOption).unsafeRunSync() shouldBe
           project.to(kgProjectConverter).some
       }
     }
 
-    "return details of the project with the given path if it has a parent project - non-public projects" in new TestCase {
+    "return details of the project with the given slug if it has a parent project - non-public projects" in new TestCase {
       val user         = authUsers.generateOne
       val userAsMember = personEntities.generateOne.copy(maybeGitLabId = user.id.some)
       val project = Gen
@@ -80,11 +80,11 @@ class KGProjectFinderSpec
 
       upload(to = projectsDataset, project, parent)
 
-      kgProjectFinder.findProject(project.path, user.some).unsafeRunSync() shouldBe
+      kgProjectFinder.findProject(project.slug, user.some).unsafeRunSync() shouldBe
         project.to(kgProjectConverter).some
     }
 
-    "return details of the project with the given path without info about the parent " +
+    "return details of the project with the given slug without info about the parent " +
       "if the user has no rights to access the parent project" in new TestCase {
         val user = authUsers.generateOne
         val project = Gen
@@ -100,13 +100,13 @@ class KGProjectFinderSpec
 
         upload(to = projectsDataset, project, parent)
 
-        kgProjectFinder.findProject(project.path, Some(user)).unsafeRunSync() shouldBe Some {
+        kgProjectFinder.findProject(project.slug, Some(user)).unsafeRunSync() shouldBe Some {
           project.to(kgProjectConverter).copy(maybeParent = None)
         }
       }
 
-    "return None if there's no project with the given path" in new TestCase {
-      kgProjectFinder.findProject(projectPaths.generateOne, authUsers.generateOption).unsafeRunSync() shouldBe None
+    "return None if there's no project with the given slug" in new TestCase {
+      kgProjectFinder.findProject(projectSlugs.generateOne, authUsers.generateOption).unsafeRunSync() shouldBe None
     }
   }
 

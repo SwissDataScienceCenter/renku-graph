@@ -122,52 +122,52 @@ class AccessTokenFinderSpec
     }
   }
 
-  "findAccessToken(ProjectPath)" should {
+  "findAccessToken(ProjectSlug)" should {
 
     "return Some Personal Access Token if remote responds with OK and valid body" in new TestCase {
 
-      val projectPath = projectPaths.generateOne
+      val projectSlug = projectSlugs.generateOne
       val accessToken: AccessToken = personalAccessTokens.generateOne
 
       stubFor {
-        get(s"/projects/${urlEncode(projectPath.toString)}/tokens")
+        get(s"/projects/${urlEncode(projectSlug.toString)}/tokens")
           .willReturn(okJson(accessToken.asJson.noSpaces))
       }
 
-      accessTokenFinder.findAccessToken(projectPath).unsafeRunSync() shouldBe Some(accessToken)
+      accessTokenFinder.findAccessToken(projectSlug).unsafeRunSync() shouldBe Some(accessToken)
     }
 
     "return Some OAuth Access Token if remote responds with OK and valid body" in new TestCase {
 
-      val projectPath = projectPaths.generateOne
+      val projectSlug = projectSlugs.generateOne
       val accessToken: AccessToken = userOAuthAccessTokens.generateOne
 
       stubFor {
-        get(s"/projects/${urlEncode(projectPath.toString)}/tokens")
+        get(s"/projects/${urlEncode(projectSlug.toString)}/tokens")
           .willReturn(okJson(accessToken.asJson.noSpaces))
       }
 
-      accessTokenFinder.findAccessToken(projectPath).unsafeRunSync() shouldBe Some(accessToken)
+      accessTokenFinder.findAccessToken(projectSlug).unsafeRunSync() shouldBe Some(accessToken)
     }
 
     "return None if remote responds with NOT_FOUND" in new TestCase {
 
-      val projectPath = projectPaths.generateOne
+      val projectSlug = projectSlugs.generateOne
 
       stubFor {
-        get(s"/projects/${urlEncode(projectPath.toString)}/tokens")
+        get(s"/projects/${urlEncode(projectSlug.toString)}/tokens")
           .willReturn(notFound())
       }
 
-      accessTokenFinder.findAccessToken(projectPath).unsafeRunSync() shouldBe None
+      accessTokenFinder.findAccessToken(projectSlug).unsafeRunSync() shouldBe None
     }
 
     "return a RuntimeException if remote responds with status neither OK nor NOT_FOUND" in new TestCase {
 
-      val projectPath = projectPaths.generateOne
+      val projectSlug = projectSlugs.generateOne
 
       stubFor {
-        get(s"/projects/${urlEncode(projectPath.toString)}/tokens")
+        get(s"/projects/${urlEncode(projectSlug.toString)}/tokens")
           .willReturn(
             aResponse
               .withStatus(Status.BadGateway.code)
@@ -177,25 +177,25 @@ class AccessTokenFinderSpec
       }
 
       intercept[Exception] {
-        accessTokenFinder.findAccessToken(projectPath).unsafeRunSync()
-      }.getMessage shouldBe s"GET $tokenRepositoryUrl/projects/${urlEncode(projectPath.toString)}/tokens returned ${Status.BadGateway}; body: some body"
+        accessTokenFinder.findAccessToken(projectSlug).unsafeRunSync()
+      }.getMessage shouldBe s"GET $tokenRepositoryUrl/projects/${urlEncode(projectSlug.toString)}/tokens returned ${Status.BadGateway}; body: some body"
     }
 
     "return a RuntimeException if remote responds with unexpected body" in new TestCase {
 
-      val projectPath = projectPaths.generateOne
+      val projectSlug = projectSlugs.generateOne
 
       stubFor {
-        get(s"/projects/${urlEncode(projectPath.toString)}/tokens")
+        get(s"/projects/${urlEncode(projectSlug.toString)}/tokens")
           .willReturn(okJson("{}"))
       }
 
       val exception = intercept[Exception] {
-        accessTokenFinder.findAccessToken(projectPath).unsafeRunSync()
+        accessTokenFinder.findAccessToken(projectSlug).unsafeRunSync()
       }
 
       exception.getMessage should include(
-        s"GET $tokenRepositoryUrl/projects/${urlEncode(projectPath.toString)}/tokens returned ${Status.Ok}; error: Invalid message body: Could not decode JSON: {}"
+        s"GET $tokenRepositoryUrl/projects/${urlEncode(projectSlug.toString)}/tokens returned ${Status.Ok}; error: Invalid message body: Could not decode JSON: {}"
       )
       exception.getMessage should include("Access token cannot be deserialized")
     }

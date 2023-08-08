@@ -42,7 +42,7 @@ package object projects {
 
   private[projects] val notActivatedProjects: Gen[model.Project.NotActivated] = for {
     id             <- projectIds
-    path           <- projectPaths
+    slug           <- projectSlugs
     name           <- projectNames
     visibility     <- projectVisibilities
     dateCreated    <- projectCreatedDates()
@@ -52,7 +52,7 @@ package object projects {
     maybeDesc      <- projectDescriptions.toGeneratorOfOptions
   } yield model.Project.NotActivated(id,
                                      name,
-                                     path,
+                                     slug,
                                      visibility,
                                      dateCreated,
                                      maybeCreatorId,
@@ -67,7 +67,7 @@ package object projects {
     project =>
       model.Project.Activated(
         project.name,
-        project.path,
+        project.slug,
         project.visibility,
         project.dateCreated,
         project.maybeCreator.map(_.name),

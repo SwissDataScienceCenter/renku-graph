@@ -25,7 +25,7 @@ import io.renku.entities.viewings.collector.persons.{GLUserViewedDataset, Person
 import io.renku.generators.Generators.Implicits._
 import projects.viewed.EventPersister
 import io.renku.graph.model.{datasets, projects}
-import io.renku.graph.model.RenkuTinyTypeGenerators.{datasetIdentifiers, datasetResourceIds, personGitLabIds, projectPaths}
+import io.renku.graph.model.RenkuTinyTypeGenerators.{datasetIdentifiers, datasetResourceIds, personGitLabIds, projectSlugs}
 import io.renku.triplesgenerator.api.events.{DatasetViewedEvent, ProjectViewedEvent, UserId}
 import io.renku.triplesgenerator.api.events.Generators.datasetViewedEvents
 import org.scalacheck.Gen
@@ -50,7 +50,7 @@ class EventUploaderSpec extends AnyWordSpec with should.Matchers with MockFactor
         givenProjectFinding(event.identifier, returning = dsInfo.some.pure[Try])
 
         givenEventPersisting(
-          ProjectViewedEvent(dsInfo.projectPath,
+          ProjectViewedEvent(dsInfo.projectSlug,
                              projects.DateViewed(event.dateViewed.value),
                              event.maybeUserId.map(UserId(_))
           ),
@@ -72,7 +72,7 @@ class EventUploaderSpec extends AnyWordSpec with should.Matchers with MockFactor
         givenProjectFinding(event.identifier, returning = dsInfo.some.pure[Try])
 
         givenEventPersisting(
-          ProjectViewedEvent(dsInfo.projectPath,
+          ProjectViewedEvent(dsInfo.projectSlug,
                              projects.DateViewed(event.dateViewed.value),
                              event.maybeUserId.map(UserId(_))
           ),
@@ -113,7 +113,7 @@ class EventUploaderSpec extends AnyWordSpec with should.Matchers with MockFactor
   }
 
   private lazy val dsInfos: Gen[DSInfo] =
-    (projectPaths         ->
+    (projectSlugs         ->
       (datasetResourceIds -> datasetIdentifiers).mapN(collector.persons.Dataset))
       .mapN(DSInfo)
 }

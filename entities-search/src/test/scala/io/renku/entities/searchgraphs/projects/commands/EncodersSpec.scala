@@ -82,7 +82,8 @@ class EncodersSpec extends AnyWordSpec with should.Matchers {
       searchInfo.asQuads shouldBe Set(
         ProjectsQuad(searchInfo.id, rdf / "type", renku / "DiscoverableProject"),
         ProjectsQuad(searchInfo.id, ProjectSearchInfoOntology.nameProperty.id, searchInfo.name.asObject),
-        ProjectsQuad(searchInfo.id, ProjectSearchInfoOntology.pathProperty.id, searchInfo.path.asObject),
+        ProjectsQuad(searchInfo.id, ProjectSearchInfoOntology.slugProperty.id, searchInfo.slug.asObject),
+        ProjectsQuad(searchInfo.id, ProjectSearchInfoOntology.pathProperty.id, searchInfo.slug.asObject),
         ProjectsQuad(searchInfo.id, ProjectSearchInfoOntology.visibilityProperty.id, searchInfo.visibility.asObject),
         ProjectsQuad(searchInfo.id, ProjectSearchInfoOntology.dateCreatedProperty.id, searchInfo.dateCreated.asObject),
         ProjectsQuad(searchInfo.id, ProjectSearchInfoOntology.dateModifiedProperty.id, searchInfo.dateModified.asObject)
@@ -95,10 +96,9 @@ class EncodersSpec extends AnyWordSpec with should.Matchers {
   }
 
   private def creatorToQuads(searchInfo: ProjectSearchInfo): Set[Quad] =
-    searchInfo.maybeCreator.toSet
-      .flatMap((pi: PersonInfo) =>
-        pi.asQuads + ProjectsQuad(searchInfo.id, ProjectSearchInfoOntology.creatorProperty, pi.resourceId.asEntityId)
-      )
+    searchInfo.maybeCreator.toSet.flatMap((pi: PersonInfo) =>
+      pi.asQuads + ProjectsQuad(searchInfo.id, ProjectSearchInfoOntology.creatorProperty, pi.resourceId.asEntityId)
+    )
 
   private def keywordsToQuads(searchInfo: ProjectSearchInfo): Set[Quad] =
     searchInfo.keywords

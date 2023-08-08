@@ -23,7 +23,6 @@ import cats.effect.MonadCancelThrow
 import io.renku.eventlog.EventLogDB.SessionResource
 import org.typelevel.log4cats.Logger
 import skunk._
-import skunk.codec.all.bool
 import skunk.implicits._
 
 private trait EventDeliveryTableCreator[F[_]] extends DbMigrator[F]
@@ -35,17 +34,10 @@ private class EventDeliveryTableCreatorImpl[F[_]: MonadCancelThrow: Logger: Sess
   import cats.syntax.all._
 
   override def run: F[Unit] = SessionResource[F].useK {
-    checkTableExists >>= {
+    checkTableExists("event_delivery") >>= {
       case true  => Kleisli.liftF(Logger[F] info "'event_delivery' table exists")
       case false => createTable()
     }
-  }
-
-  private lazy val checkTableExists: Kleisli[F, Session[F], Boolean] = {
-    val query: Query[skunk.Void, Boolean] =
-      sql"SELECT EXISTS (SELECT 1 FROM pg_tables WHERE tablename = 'event_delivery')"
-        .query(bool)
-    Kleisli(_.unique(query).recover { case _ => false })
   }
 
   private def createTable(): Kleisli[F, Session[F], Unit] = for {

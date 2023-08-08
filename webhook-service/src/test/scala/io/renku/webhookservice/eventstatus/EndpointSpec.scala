@@ -260,8 +260,8 @@ class EndpointSpec
     }
 
     def verifyProjectViewedEventSent(project: Project, authUser: Option[AuthUser]) = eventually {
-      sentEvents.get.unsafeRunSync().collect { case e: ProjectViewedEvent => e.path -> e.maybeUserId } shouldBe
-        List(project.path -> authUser.map(_.id).map(UserId(_)))
+      sentEvents.get.unsafeRunSync().collect { case e: ProjectViewedEvent => e.slug -> e.maybeUserId } shouldBe
+        List(project.slug -> authUser.map(_.id).map(UserId(_)))
     }
   }
 }

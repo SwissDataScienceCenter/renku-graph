@@ -21,7 +21,7 @@ package io.renku.knowledgegraph.projects.files.lineage
 import cats.effect.Async
 import cats.syntax.all._
 import cats.{MonadThrow, Parallel}
-import io.renku.graph.model.projects.Path
+import io.renku.graph.model.projects.Slug
 import io.renku.http.server.security.model.AuthUser
 import io.renku.triplesstore.SparqlQueryTimeRecorder
 import model.Node.Location
@@ -29,7 +29,7 @@ import model._
 import org.typelevel.log4cats.Logger
 
 trait LineageFinder[F[_]] {
-  def find(projectPath: Path, location: Location, maybeUser: Option[AuthUser]): F[Option[Lineage]]
+  def find(projectSlug: Slug, location: Location, maybeUser: Option[AuthUser]): F[Option[Lineage]]
 }
 
 class LineageFinderImpl[F[_]: MonadThrow: Logger](
@@ -45,20 +45,20 @@ class LineageFinderImpl[F[_]: MonadThrow: Logger](
 
   import scala.util.control.NonFatal
 
-  def find(projectPath: Path, location: Location, maybeUser: Option[AuthUser]): F[Option[Lineage]] =
-    findEdges(projectPath, maybeUser) flatMap {
+  def find(projectSlug: Slug, location: Location, maybeUser: Option[AuthUser]): F[Option[Lineage]] =
+    findEdges(projectSlug, maybeUser) flatMap {
       case edges if edges.isEmpty => Option.empty[Lineage].pure[F]
       case edges =>
         trim(edges, location) >>= {
           case trimmedEdges if trimmedEdges.isEmpty => Option.empty[Lineage].pure[F]
-          case trimmedEdges                         => findDetailsAndLineage(trimmedEdges, projectPath)
+          case trimmedEdges                         => findDetailsAndLineage(trimmedEdges, projectSlug)
         }
-    } recoverWith loggingError(projectPath, location)
+    } recoverWith loggingError(projectSlug, location)
 
-  private def findDetailsAndLineage(edges: EdgeMap, projectPath: Path) = for {
+  private def findDetailsAndLineage(edges: EdgeMap, projectSlug: Slug) = for {
     edgesSet         <- edges.toEdgesSet
-    plansDetails     <- findDetails(edges.keySet, projectPath)
-    locationsDetails <- findDetails(edges.toLocationsSet, projectPath)
+    plansDetails     <- findDetails(edges.keySet, projectSlug)
+    locationsDetails <- findDetails(edges.toLocationsSet, projectSlug)
     lineage          <- Lineage.from[F](edgesSet, plansDetails ++ locationsDetails)
   } yield lineage.some
 
@@ -78,9 +78,9 @@ class LineageFinderImpl[F[_]: MonadThrow: Logger](
     lazy val toLocation: Node.Location = Node.Location(runInfo.entityId.value.toString)
   }
 
-  private def loggingError(projectPath: Path, location: Location): PartialFunction[Throwable, F[Option[Lineage]]] = {
+  private def loggingError(projectSlug: Slug, location: Location): PartialFunction[Throwable, F[Option[Lineage]]] = {
     case NonFatal(ex) =>
-      val message = s"Finding lineage for '$projectPath' and '$location' failed"
+      val message = s"Finding lineage for '$projectSlug' and '$location' failed"
       Logger[F].error(ex)(message) *> new Exception(message, ex).raiseError[F, Option[Lineage]]
   }
 }

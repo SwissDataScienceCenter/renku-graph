@@ -51,7 +51,7 @@ private class DispatchRecoveryImpl[F[_]: MonadThrow: Logger](eventSender: EventS
       event.toAwaitingDeletionEvent,
       EventSender.EventContext(
         CategoryName("EVENTS_STATUS_CHANGE"),
-        show"$categoryName: Marking events for project: ${event.project.path} as $AwaitingDeletion failed"
+        show"$categoryName: Marking events for project: ${event.project.slug} as $AwaitingDeletion failed"
       )
     )
 
@@ -62,7 +62,7 @@ private class DispatchRecoveryImpl[F[_]: MonadThrow: Logger](eventSender: EventS
         "categoryName": "EVENTS_STATUS_CHANGE",
         "project": {
           "id":   ${event.project.id},
-          "path": ${event.project.path}
+          "slug": ${event.project.slug}
         },
         "subCategory": "RollbackToAwaitingDeletion"
      }"""

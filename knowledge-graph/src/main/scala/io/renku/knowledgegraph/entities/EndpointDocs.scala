@@ -96,7 +96,7 @@ private class EndpointDocsImpl()(implicit gitLabUrl: GitLabUrl, renkuApiUrl: ren
   private lazy val namespace = Parameter.Query(
     "namespace",
     Schema.String,
-    "to filter by namespace(s); there might be multiple values given; for nested namespaces the whole path has be used, e.g. 'group/subgroup'".some,
+    "to filter by namespace(s); there might be multiple values given; for nested namespaces the whole path has to be used, e.g. 'group/subgroup'".some,
     required = false
   )
   private lazy val since = Parameter.Query(
@@ -143,7 +143,7 @@ private class EndpointDocsImpl()(implicit gitLabUrl: GitLabUrl, renkuApiUrl: ren
   private lazy val example = Json.arr(
     Project(
       MatchingScore(1),
-      projects.Path("group/subgroup/name"),
+      projects.Slug("group/subgroup/name"),
       projects.Name("name"),
       projects.Visibility.Public,
       projects.DateCreated(Instant.parse("2012-11-15T10:00:00.000Z")),
@@ -164,7 +164,7 @@ private class EndpointDocsImpl()(implicit gitLabUrl: GitLabUrl, renkuApiUrl: ren
       List(datasets.Keyword("key")),
       datasets.Description("Some project").some,
       List(ImageUri("image.png")),
-      projects.Path("group/subgroup/name")
+      projects.Slug("group/subgroup/name")
     ).asJson,
     Workflow(
       MatchingScore(1),

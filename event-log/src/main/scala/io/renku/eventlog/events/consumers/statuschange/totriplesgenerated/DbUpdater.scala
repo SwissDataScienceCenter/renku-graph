@@ -83,7 +83,7 @@ private[statuschange] class DbUpdater[F[_]: Async: QueriesExecutionTimes](
       .flatMapResult {
         case Completion.Update(1) =>
           DBUpdateResults
-            .ForProjects(event.project.path, Map(GeneratingTriples -> -1, TriplesGenerated -> 1))
+            .ForProjects(event.project.slug, Map(GeneratingTriples -> -1, TriplesGenerated -> 1))
             .pure[F]
         case Completion.Update(0) =>
           Monoid[DBUpdateResults.ForProjects].empty.pure[F]
@@ -161,7 +161,7 @@ private[statuschange] class DbUpdater[F[_]: Async: QueriesExecutionTimes](
         val incrementedStatuses =
           TriplesGenerated -> (idsAndStatuses.size - idsAndStatuses.count(_._2 == EventStatus.AwaitingDeletion))
         idsAndStatuses -> DBUpdateResults.ForProjects(
-          event.project.path,
+          event.project.slug,
           decrementedStatuses + incrementedStatuses
         )
       }
@@ -224,7 +224,7 @@ private[statuschange] class DbUpdater[F[_]: Async: QueriesExecutionTimes](
 
   private def removeAwaitingDeletionEvents(eventsWindow: List[(EventId, EventStatus)], event: ToTriplesGenerated) =
     eventsWindow.collect { case (id, AwaitingDeletion) => id } match {
-      case Nil => Kleisli.pure(DBUpdateResults.ForProjects(event.project.path, Map()))
+      case Nil => Kleisli.pure(DBUpdateResults.ForProjects(event.project.slug, Map()))
       case eventIdsToRemove =>
         measureExecutionTime {
           SqlStatement(name = "to_triples_generated - awaiting_deletions removal")

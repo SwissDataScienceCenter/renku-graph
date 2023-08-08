@@ -25,7 +25,7 @@ import io.renku.graph.model.EventContentGenerators._
 import io.renku.graph.model.EventsGenerators._
 import io.renku.graph.model.GraphModelGenerators._
 import io.renku.graph.model.events._
-import io.renku.graph.model.projects.{GitLabId, Path}
+import io.renku.graph.model.projects.{GitLabId, Slug}
 import io.renku.interpreters.TestLogger
 import io.renku.interpreters.TestLogger.Level.Info
 import io.renku.testtools.IOSpec
@@ -59,16 +59,16 @@ class ProjectTableCreatorSpec extends AnyWordSpec with IOSpec with DbInitSpec wi
       "fill it in with data fetched from the 'event_log' about project and the most recent event_date of all project's events" in new TestCase {
 
         val project1Id    = projectIds.generateOne
-        val project1Path  = projectPaths.generateOne
+        val project1Slug  = projectSlugs.generateOne
         val project2Id    = projectIds.generateOne
-        val project2Path1 = projectPaths.generateOne
-        val project2Path2 = projectPaths.generateOne
+        val project2Slug1 = projectSlugs.generateOne
+        val project2Slug2 = projectSlugs.generateOne
 
-        val (_, _, project1EventDate1)                    = createEvent(project1Id, project1Path)
-        val (_, _, project1EventDate2)                    = createEvent(project1Id, project1Path)
-        val (_, _, project2EventDate1)                    = createEvent(project2Id, project2Path1)
-        val (_, _, project2EventDate2)                    = createEvent(project2Id, project2Path2)
-        val (project3Id, project3Path, project3EventDate) = createEvent()
+        val (_, _, project1EventDate1)                    = createEvent(project1Id, project1Slug)
+        val (_, _, project1EventDate2)                    = createEvent(project1Id, project1Slug)
+        val (_, _, project2EventDate1)                    = createEvent(project2Id, project2Slug1)
+        val (_, _, project2EventDate2)                    = createEvent(project2Id, project2Slug2)
+        val (project3Id, project3Slug, project3EventDate) = createEvent()
 
         tableExists("project") shouldBe false
 
@@ -78,13 +78,13 @@ class ProjectTableCreatorSpec extends AnyWordSpec with IOSpec with DbInitSpec wi
 
         logger.loggedOnly(Info("'project' table created"), Info("'project' table filled in"))
 
-        val project2Path =
-          if ((project2EventDate1 compareTo project2EventDate2) < 0) project2Path2
-          else project2Path1
+        val project2Slug =
+          if ((project2EventDate1 compareTo project2EventDate2) < 0) project2Slug2
+          else project2Slug1
         fetchProjectData should contain theSameElementsAs List(
-          (project1Id, project1Path, Set(project1EventDate1, project1EventDate2).max),
-          (project2Id, project2Path, Set(project2EventDate1, project2EventDate2).max),
-          (project3Id, project3Path, project3EventDate)
+          (project1Id, project1Slug, Set(project1EventDate1, project1EventDate2).max),
+          (project2Id, project2Slug, Set(project2EventDate1, project2EventDate2).max),
+          (project3Id, project3Slug, project3EventDate)
         )
       }
 
@@ -126,13 +126,13 @@ class ProjectTableCreatorSpec extends AnyWordSpec with IOSpec with DbInitSpec wi
     val tableCreator = new ProjectTableCreatorImpl[IO]
   }
 
-  private def fetchProjectData: List[(GitLabId, Path, EventDate)] = execute {
+  private def fetchProjectData: List[(GitLabId, Slug, EventDate)] = execute {
     Kleisli { session =>
-      val query: Query[Void, (GitLabId, Path, EventDate)] =
+      val query: Query[Void, (GitLabId, Slug, EventDate)] =
         sql"""select project_id, project_path, latest_event_date from project"""
-          .query(projectIdDecoder ~ projectPathDecoder ~ eventDateTimestampDecoder)
-          .map { case projectId ~ projectPath ~ eventDate =>
-            (projectId, projectPath, eventDate)
+          .query(projectIdDecoder ~ projectSlugDecoder ~ eventDateTimestampDecoder)
+          .map { case projectId ~ projectSlug ~ eventDate =>
+            (projectId, projectSlug, eventDate)
           }
       session.execute(query)
     }
@@ -142,29 +142,29 @@ class ProjectTableCreatorSpec extends AnyWordSpec with IOSpec with DbInitSpec wi
     timestamp.map(timestamp => EventDate(timestamp.toInstant(ZoneOffset.UTC)))
 
   private def createEvent(projectId:   GitLabId = projectIds.generateOne,
-                          projectPath: Path = projectPaths.generateOne,
+                          projectSlug: Slug = projectSlugs.generateOne,
                           eventDate:   EventDate = eventDates.generateOne
-  ): (GitLabId, Path, EventDate) = {
+  ): (GitLabId, Slug, EventDate) = {
     execute[Unit] {
       Kleisli { session =>
         val query: Command[
-          EventId *: GitLabId *: Path *: EventStatus *: CreatedDate *: ExecutionDate *: EventDate *: BatchDate *: EventBody *: EmptyTuple
+          EventId *: GitLabId *: Slug *: EventStatus *: CreatedDate *: ExecutionDate *: EventDate *: BatchDate *: EventBody *: EmptyTuple
         ] = sql"""
             insert into
             event_log (event_id, project_id, project_path, status, created_date, execution_date, event_date, batch_date, event_body)
-            values ($eventIdEncoder, $projectIdEncoder, $projectPathEncoder, $eventStatusEncoder, $createdDateEncoder, $executionDateEncoder, $eventDateEncoder, $batchDateEncoder, $eventBodyEncoder)
+            values ($eventIdEncoder, $projectIdEncoder, $projectSlugEncoder, $eventStatusEncoder, $createdDateEncoder, $executionDateEncoder, $eventDateEncoder, $batchDateEncoder, $eventBodyEncoder)
       """.command
         session
           .prepare(query)
           .flatMap(
             _.execute(
-              eventIds.generateOne *: projectId *: projectPath *: eventStatuses.generateOne *: createdDates.generateOne *: executionDates.generateOne *: eventDate *: batchDates.generateOne *: eventBodies.generateOne *: EmptyTuple
+              eventIds.generateOne *: projectId *: projectSlug *: eventStatuses.generateOne *: createdDates.generateOne *: executionDates.generateOne *: eventDate *: batchDates.generateOne *: eventBodies.generateOne *: EmptyTuple
             )
           )
           .map(_ => ())
       }
     }
 
-    (projectId, projectPath, eventDate)
+    (projectId, projectSlug, eventDate)
   }
 }

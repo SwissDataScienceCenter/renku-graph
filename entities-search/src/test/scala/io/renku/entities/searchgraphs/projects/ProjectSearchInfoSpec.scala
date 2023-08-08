@@ -32,7 +32,7 @@ class ProjectSearchInfoSpec extends AnyWordSpec with should.Matchers with ScalaC
       forAll(projectSearchInfoObjects) {
         case info @ ProjectSearchInfo(id,
                                       name,
-                                      path,
+                                      slug,
                                       visibility,
                                       dateCreated,
                                       dateModified,
@@ -44,7 +44,7 @@ class ProjectSearchInfoSpec extends AnyWordSpec with should.Matchers with ScalaC
           info.show shouldBe List(
             show"id = $id".some,
             show"name = $name".some,
-            show"path = $path".some,
+            show"slug = $slug".some,
             show"visibility = $visibility".some,
             show"dateCreated = $dateCreated".some,
             show"dateModified = $dateModified".some,

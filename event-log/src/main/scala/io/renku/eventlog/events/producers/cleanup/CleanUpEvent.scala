@@ -36,8 +36,8 @@ private object CleanUpEventEncoder {
   def encodeEvent(event: CleanUpEvent): Json = json"""{
     "categoryName": ${categoryName.value},
     "project": {
-      "id":   ${event.project.id.value},
-      "path": ${event.project.path.value}
+      "id":   ${event.project.id},
+      "slug": ${event.project.slug}
     }
   }"""
 }

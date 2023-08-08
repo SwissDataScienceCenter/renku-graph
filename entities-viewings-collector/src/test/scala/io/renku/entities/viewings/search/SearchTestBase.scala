@@ -64,8 +64,8 @@ abstract class SearchTestBase
 
   val token: UserAccessToken = AccessToken.PersonalAccessToken("nonblank")
 
-  def storeProjectViewed(userId: GitLabId, dateViewed: Instant, path: projects.Path): Unit =
-    provision(ProjectViewedEvent(path, dateViewed, UserId.GLId(userId).some)).unsafeRunSync()
+  def storeProjectViewed(userId: GitLabId, dateViewed: Instant, slug: projects.Slug): Unit =
+    provision(ProjectViewedEvent(slug, dateViewed, UserId.GLId(userId).some)).unsafeRunSync()
 
   def storeDatasetViewed(userId: GitLabId, dateViewed: Instant, ident: datasets.Identifier): Unit =
     provision(DatasetViewedEvent(ident, dateViewed, userId.some)).unsafeRunSync()

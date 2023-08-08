@@ -90,7 +90,7 @@ private class EndpointImpl[F[_]: Async: NonEmptyParallel: Logger: ExecutionTimeR
 
   private def sendProjectViewed(projectId: GitLabId, authUser: Option[AuthUser]): F[Unit] = Spawn[F].start {
     findProjectInfo(projectId)(authUser.map(_.accessToken)) >>= { project =>
-      (tgClient send ProjectViewedEvent.forProjectAndUserId(project.path, authUser.map(_.id)))
+      (tgClient send ProjectViewedEvent.forProjectAndUserId(project.slug, authUser.map(_.id)))
         .handleErrorWith(Logger[F].warn(_)("Sending ProjectViewedEvent failed"))
     }
   }.void

@@ -48,6 +48,7 @@ import org.scalamock.scalatest.MockFactory
 import org.scalatest.OptionValues
 import org.scalatest.concurrent.Eventually
 import org.scalatest.matchers.should
+import org.scalatest.time.{Millis, Seconds, Span}
 import org.scalatest.wordspec.AnyWordSpec
 
 class HookCreatorSpec
@@ -255,4 +256,10 @@ class HookCreatorSpec
       commitSyncRequestSenderResponse.size.unsafeRunSync() shouldBe 0
     )
   }
+
+  implicit override lazy val patienceConfig: PatienceConfig =
+    PatienceConfig(
+      timeout = scaled(Span(1, Seconds)),
+      interval = scaled(Span(50, Millis))
+    )
 }

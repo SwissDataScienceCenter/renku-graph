@@ -72,9 +72,9 @@ class FastTractEventRouteSpec
 
       Then("the project data should exist in the KG")
       eventually {
-        val response = knowledgeGraphClient.GET(s"knowledge-graph/projects/${project.path}")
+        val response = knowledgeGraphClient.GET(s"knowledge-graph/projects/${project.slug}")
         response.status                                              shouldBe Ok
-        response.jsonBody.hcursor.downField("path").as[String].value shouldBe project.path.show
+        response.jsonBody.hcursor.downField("path").as[String].value shouldBe project.slug.show
       }
     }
   }

@@ -38,7 +38,7 @@ import skunk.implicits._
 import java.time.Instant
 
 private trait CommitSyncForcer[F[_]] {
-  def forceCommitSync(projectId: projects.GitLabId, projectPath: projects.Path): F[Unit]
+  def forceCommitSync(projectId: projects.GitLabId, projectSlug: projects.Slug): F[Unit]
 }
 
 private class CommitSyncForcerImpl[F[_]: MonadCancelThrow: SessionResource: QueriesExecutionTimes]
@@ -47,10 +47,10 @@ private class CommitSyncForcerImpl[F[_]: MonadCancelThrow: SessionResource: Quer
     with TypeSerializers
     with SubscriptionTypeSerializers {
 
-  override def forceCommitSync(projectId: projects.GitLabId, projectPath: projects.Path): F[Unit] =
+  override def forceCommitSync(projectId: projects.GitLabId, projectSlug: projects.Slug): F[Unit] =
     SessionResource[F].useK {
       deleteLastSyncedDate(projectId) >>= {
-        case true  => upsertProject(projectId, projectPath).void
+        case true  => upsertProject(projectId, projectSlug).void
         case false => Kleisli.pure(())
       }
     }
@@ -69,16 +69,15 @@ private class CommitSyncForcerImpl[F[_]: MonadCancelThrow: SessionResource: Quer
       }
   }
 
-  private def upsertProject(projectId: projects.GitLabId, projectPath: projects.Path) = measureExecutionTime {
+  private def upsertProject(projectId: projects.GitLabId, projectSlug: projects.Slug) = measureExecutionTime {
     SqlStatement
       .named(s"${categoryName.value.toLowerCase} - insert project")
-      .command[projects.GitLabId *: projects.Path *: EventDate *: EmptyTuple](sql"""
-        INSERT INTO project (project_id, project_path, latest_event_date)
-        VALUES ($projectIdEncoder, $projectPathEncoder, $eventDateEncoder)
-        ON CONFLICT (project_id)
-        DO NOTHING
+      .command[projects.GitLabId *: projects.Slug *: EventDate *: EmptyTuple](sql"""
+        INSERT INTO project (project_id, project_slug, latest_event_date)
+        VALUES ($projectIdEncoder, $projectSlugEncoder, $eventDateEncoder)
+        ON CONFLICT (project_id) DO NOTHING
         """.command)
-      .arguments(projectId *: projectPath *: EventDate(Instant.EPOCH) *: EmptyTuple)
+      .arguments(projectId *: projectSlug *: EventDate(Instant.EPOCH) *: EmptyTuple)
       .build
   }
 }

@@ -61,7 +61,7 @@ class LostZombieEventFinderSpec extends AnyWordSpec with IOSpec with InMemoryEve
 
       finder.popEvent().unsafeRunSync() shouldBe ZombieEvent(finder.processName,
                                                              zombieEventId,
-                                                             projectPath,
+                                                             projectSlug,
                                                              zombieEventStatus
       ).some
 
@@ -87,7 +87,7 @@ class LostZombieEventFinderSpec extends AnyWordSpec with IOSpec with InMemoryEve
     val lostZombieEventExecutionDate =
       relativeTimestamps(moreThanAgo = Duration.ofSeconds(executionDateThreshold + 2)).toGeneratorOf(ExecutionDate)
 
-    val projectPath = projectPaths.generateOne
+    val projectSlug = projectSlugs.generateOne
 
     private implicit val metricsRegistry:  TestMetricsRegistry[IO]   = TestMetricsRegistry[IO]
     private implicit val queriesExecTimes: QueriesExecutionTimes[IO] = QueriesExecutionTimes[IO]().unsafeRunSync()
@@ -112,7 +112,7 @@ class LostZombieEventFinderSpec extends AnyWordSpec with IOSpec with InMemoryEve
       executionDate,
       eventDates.generateOne,
       eventBodies.generateOne,
-      projectPath = projectPath,
+      projectSlug = projectSlug,
       maybeMessage = Some(EventMessage(zombieMessage))
     )
   }

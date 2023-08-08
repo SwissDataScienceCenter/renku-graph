@@ -42,17 +42,17 @@ class ELProjectFinderSpec extends AnyWordSpec with should.Matchers with MockFact
     "return a project if found in EL" in new TestCase {
 
       givenELProjectFinding(returning =
-        Success(eventInfos(project.path, project.id).generateFixedSizeList(ofSize = 1)).pure[Try]
+        Success(eventInfos(project.slug, project.id).generateFixedSizeList(ofSize = 1)).pure[Try]
       )
 
-      finder.findProject(project.path).success.value shouldBe Some(project)
+      finder.findProject(project.slug).success.value shouldBe Some(project)
     }
 
     "return no project if not found in EL" in new TestCase {
 
       givenELProjectFinding(returning = Success(List.empty[EventInfo]).pure[Try])
 
-      finder.findProject(project.path).success.value shouldBe None
+      finder.findProject(project.slug).success.value shouldBe None
     }
 
     "fail if finding project return an error" in new TestCase {
@@ -60,7 +60,7 @@ class ELProjectFinderSpec extends AnyWordSpec with should.Matchers with MockFact
       val failure = Failure(nonEmptyStrings().generateOne)
       givenELProjectFinding(returning = failure.pure[Try])
 
-      finder.findProject(project.path).failure.exception shouldBe failure
+      finder.findProject(project.slug).failure.exception shouldBe failure
     }
 
     "fail if finding project fails" in new TestCase {
@@ -68,7 +68,7 @@ class ELProjectFinderSpec extends AnyWordSpec with should.Matchers with MockFact
       val failure = exceptions.generateOne
       givenELProjectFinding(returning = failure.raiseError[Try, Result[List[EventInfo]]])
 
-      finder.findProject(project.path).failure.exception shouldBe failure
+      finder.findProject(project.slug).failure.exception shouldBe failure
     }
   }
 
@@ -81,7 +81,7 @@ class ELProjectFinderSpec extends AnyWordSpec with should.Matchers with MockFact
 
     def givenELProjectFinding(returning: Try[EventLogClient.Result[List[EventInfo]]]) =
       (elClient.getEvents _)
-        .expects(SearchCriteria.forProject(project.path).withPerPage(PerPage(1)))
+        .expects(SearchCriteria.forProject(project.slug).withPerPage(PerPage(1)))
         .returning(returning)
   }
 }

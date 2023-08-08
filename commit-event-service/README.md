@@ -31,8 +31,8 @@ Accepts an event as multipart requests.
   "categoryName": "COMMIT_SYNC",
   "id": "df654c3b1bd105a29d658f78f6380a842feac879",
   "project": {
-    "id": 12,
-    "path": "project/path"
+    "id":   12,
+    "slug": "project/path"
   },
   "lastSynced": "2001-09-04T11:00:00.000Z"
 }
@@ -44,8 +44,8 @@ or
 {
   "categoryName": "COMMIT_SYNC",
   "project": {
-    "id": 12,
-    "path": "project/path"
+    "id":    12,
+    "slug": "project/path"
   }
 }
 ```
@@ -72,8 +72,8 @@ or
 {
   "categoryName": "GLOBAL_COMMIT_SYNC",
   "project": {
-    "id": 12,
-    "path": "project/path"
+    "id":   12,
+    "slug": "project/path"
   },
   "commits": {
     "count":  100,

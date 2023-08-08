@@ -54,12 +54,12 @@ private class DatasetIdRecordsFinderImpl[F[_]: Async: Logger: SparqlQueryTimeRec
   private def query(id: datasets.Identifier) = SparqlQuery.of(
     name = "authorise - dataset id",
     Prefixes of (renku -> "renku", schema -> "schema"),
-    s"""|SELECT DISTINCT ?projectId ?path ?visibility (GROUP_CONCAT(?maybeMemberGitLabId; separator='$rowsSeparator') AS ?memberGitLabIds)
+    s"""|SELECT DISTINCT ?projectId ?slug ?visibility (GROUP_CONCAT(?maybeMemberGitLabId; separator='$rowsSeparator') AS ?memberGitLabIds)
         |WHERE {
         |  GRAPH ?projectGraph {
         |    ?projectId a schema:Project;
         |               renku:hasDataset/schema:identifier ${id.asObject.asSparql.sparql};
-        |               renku:projectPath ?path;
+        |               renku:projectPath ?slug;
         |               renku:projectVisibility ?visibility
         |    OPTIONAL {
         |      ?projectId schema:member ?memberId.
@@ -71,7 +71,7 @@ private class DatasetIdRecordsFinderImpl[F[_]: Async: Logger: SparqlQueryTimeRec
         |    }
         |  }
         |}
-        |GROUP BY ?projectId ?path ?visibility
+        |GROUP BY ?projectId ?slug ?visibility
         |""".stripMargin
   )
 
@@ -82,11 +82,11 @@ private class DatasetIdRecordsFinderImpl[F[_]: Async: Logger: SparqlQueryTimeRec
 
       for {
         visibility <- extract[Visibility]("visibility")
-        path       <- extract[projects.Path]("path")
+        slug       <- extract[projects.Slug]("slug")
         userIds <- extract[Option[String]]("memberGitLabIds")
                      .map(_.map(_.split(rowsSeparator).toList).getOrElse(List.empty))
                      .flatMap(_.map(GitLabId.parse).sequence.leftMap(ex => DecodingFailure(ex.getMessage, Nil)))
                      .map(_.toSet)
-      } yield SecurityRecord(visibility, path, userIds)
+      } yield SecurityRecord(visibility, slug, userIds)
   }
 }

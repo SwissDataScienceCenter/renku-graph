@@ -32,7 +32,7 @@ object EndpointDocs extends docs.EndpointDocs {
   override lazy val path: Path = Path(
     PUT(
       "Project Update",
-      "Update selected properties of the Project with the given path",
+      "Update selected properties of the Project with the given slug",
       Uri / "projects" / namespace / projectName,
       RequestBody(
         "Properties with new values",

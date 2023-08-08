@@ -38,14 +38,14 @@ class EventPayloadEndpointSpec extends AnyWordSpec with IOSpec with MockFactory 
   "getEventPayload" should {
     "return OK with bytes if event and payload is found" in new TestCase {
       val eventId     = EventsGenerators.eventIds.generateOne
-      val projectPath = GraphModelGenerators.projectPaths.generateOne
+      val projectSlug = GraphModelGenerators.projectSlugs.generateOne
       val someData    = PayloadData(ByteVector(0, 10, -10, 5))
 
       (finder.findEventPayload _)
-        .expects(eventId, projectPath)
+        .expects(eventId, projectSlug)
         .returning(someData.some.pure[IO])
 
-      val resp = endpoint.getEventPayload(eventId, projectPath).unsafeRunSync()
+      val resp = endpoint.getEventPayload(eventId, projectSlug).unsafeRunSync()
       resp.status                                   shouldBe Status.Ok
       resp.contentType                              shouldBe Some(`Content-Type`(MediaType.application.gzip))
       resp.headers.get[`Content-Length`].get.length shouldBe someData.length
@@ -54,13 +54,13 @@ class EventPayloadEndpointSpec extends AnyWordSpec with IOSpec with MockFactory 
 
     "return NotFound if no payload is available" in new TestCase {
       val eventId     = EventsGenerators.eventIds.generateOne
-      val projectPath = GraphModelGenerators.projectPaths.generateOne
+      val projectSlug = GraphModelGenerators.projectSlugs.generateOne
 
       (finder.findEventPayload _)
-        .expects(eventId, projectPath)
+        .expects(eventId, projectSlug)
         .returning(None.pure[IO])
 
-      val resp = endpoint.getEventPayload(eventId, projectPath).unsafeRunSync()
+      val resp = endpoint.getEventPayload(eventId, projectSlug).unsafeRunSync()
       resp.status      shouldBe Status.NotFound
       resp.contentType shouldBe Some(`Content-Type`(MediaType.application.json))
     }

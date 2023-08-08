@@ -70,7 +70,7 @@ private class ProjectsFinderImpl[F[_]: MonadThrow: NonEmptyParallel](
       : (List[model.Project.Activated], List[model.Project.NotActivated]) => List[model.Project] = {
     (tsFound, glFound) =>
       glFound.foldLeft(tsFound.asInstanceOf[List[model.Project]]) {
-        case (all, glProj) if all.exists(_.path == glProj.path) => all
+        case (all, glProj) if all.exists(_.slug == glProj.slug) => all
         case (all, glProj)                                      => glProj :: all
       }
   }

@@ -40,7 +40,7 @@ trait ModelTinyTypesDiffInstances extends TinyTypeDiffInstances {
 
   implicit val imageDiff: Diff[Image] = Diff.derived[Image]
 
-  implicit val projectPathDiff: Diff[projects.Path] = Diff.diffForString.contramap(_.value)
+  implicit val projectSlugDiff: Diff[projects.Slug] = Diff.diffForString.contramap(_.value)
 
   implicit lazy val outputDefaultValueDiff: Diff[commandParameters.OutputDefaultValue] =
     Diff.diffForString.contramap(_.value.value)

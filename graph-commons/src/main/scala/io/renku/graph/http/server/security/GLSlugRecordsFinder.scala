@@ -36,36 +36,36 @@ import org.http4s.implicits._
 import org.typelevel.ci._
 import org.typelevel.log4cats.Logger
 
-trait GitLabPathRecordsFinder[F[_]] extends SecurityRecordFinder[F, projects.Path]
+trait GLSlugRecordsFinder[F[_]] extends SecurityRecordFinder[F, projects.Slug]
 
-object GitLabPathRecordsFinder {
-  def apply[F[_]: Async: Parallel: Logger: GitLabClient]: F[GitLabPathRecordsFinder[F]] =
-    new GitLabPathRecordsFinderImpl[F](new VisibilityFinderImpl[F], new MembersFinderImpl[F]).pure[F].widen
+object GLSlugRecordsFinder {
+  def apply[F[_]: Async: Parallel: Logger: GitLabClient]: F[GLSlugRecordsFinder[F]] =
+    new GLSlugRecordsFinderImpl[F](new VisibilityFinderImpl[F], new MembersFinderImpl[F]).pure[F].widen
 }
 
-private class GitLabPathRecordsFinderImpl[F[_]: Async: Parallel](visibilityFinder: VisibilityFinder[F],
-                                                                 membersFinder: MembersFinder[F]
-) extends GitLabPathRecordsFinder[F] {
+private class GLSlugRecordsFinderImpl[F[_]: Async: Parallel](visibilityFinder: VisibilityFinder[F],
+                                                             membersFinder: MembersFinder[F]
+) extends GLSlugRecordsFinder[F] {
 
   import membersFinder.findMembers
   import visibilityFinder.findVisibility
 
-  override def apply(path: projects.Path, maybeAuthUser: Option[AuthUser]): F[List[SecurityRecord]] = {
+  override def apply(slug: projects.Slug, maybeAuthUser: Option[AuthUser]): F[List[SecurityRecord]] = {
     implicit val maybeAccessToken: Option[UserAccessToken] = maybeAuthUser.map(_.accessToken)
 
-    (findVisibility(path) -> findMembers(path))
-      .parMapN((maybeVisibility, members) => maybeVisibility.map(vis => SecurityRecord(vis, path, members)).toList)
+    (findVisibility(slug) -> findMembers(slug))
+      .parMapN((maybeVisibility, members) => maybeVisibility.map(vis => SecurityRecord(vis, slug, members)).toList)
   }
 }
 
 private trait VisibilityFinder[F[_]] {
-  def findVisibility(path: projects.Path)(implicit mat: Option[AccessToken]): F[Option[projects.Visibility]]
+  def findVisibility(slug: projects.Slug)(implicit mat: Option[AccessToken]): F[Option[projects.Visibility]]
 }
 
 private class VisibilityFinderImpl[F[_]: Async: GitLabClient: Logger] extends VisibilityFinder[F] {
 
-  override def findVisibility(path: projects.Path)(implicit mat: Option[AccessToken]): F[Option[projects.Visibility]] =
-    GitLabClient[F].get(uri"projects" / path, "single-project")(mapResponse)
+  override def findVisibility(slug: projects.Slug)(implicit mat: Option[AccessToken]): F[Option[projects.Visibility]] =
+    GitLabClient[F].get(uri"projects" / slug, "single-project")(mapResponse)
 
   private lazy val mapResponse: PartialFunction[(Status, Request[F], Response[F]), F[Option[projects.Visibility]]] = {
     case (Ok, _, response)                           => response.as[Option[projects.Visibility]]
@@ -83,13 +83,13 @@ private class VisibilityFinderImpl[F[_]: Async: GitLabClient: Logger] extends Vi
 }
 
 private trait MembersFinder[F[_]] {
-  def findMembers(path: projects.Path)(implicit mat: Option[AccessToken]): F[Set[persons.GitLabId]]
+  def findMembers(slug: projects.Slug)(implicit mat: Option[AccessToken]): F[Set[persons.GitLabId]]
 }
 
 private class MembersFinderImpl[F[_]: Async: GitLabClient: Logger] extends MembersFinder[F] {
 
-  override def findMembers(path: projects.Path)(implicit mat: Option[AccessToken]): F[Set[persons.GitLabId]] =
-    fetch(uri"projects" / path / "members" / "all")
+  override def findMembers(slug: projects.Slug)(implicit mat: Option[AccessToken]): F[Set[persons.GitLabId]] =
+    fetch(uri"projects" / slug / "members" / "all")
 
   private def fetch(
       uri:        Uri,

@@ -26,7 +26,7 @@ import io.renku.generators.CommonGraphGenerators._
 import io.renku.generators.Generators.Implicits._
 import io.renku.generators.Generators._
 import io.renku.graph.model.GraphModelGenerators._
-import io.renku.graph.model.projects.{GitLabId, Path}
+import io.renku.graph.model.projects.{GitLabId, Slug}
 import io.renku.http.client.AccessToken
 import io.renku.testtools.IOSpec
 import io.renku.tokenrepository.repository.AccessTokenCrypto
@@ -146,16 +146,16 @@ class TokenFinderSpec extends AnyWordSpec with IOSpec with MockFactory with shou
     }
   }
 
-  "findStoredToken(ProjectPath)" should {
+  "findStoredToken(ProjectSlug)" should {
 
-    "return Access Token if the token found for the projectPath in the db was successfully decrypted" in new TestCase {
+    "return Access Token if the token found for the projectSlug in the db was successfully decrypted" in new TestCase {
 
-      val projectPath = projectPaths.generateOne
+      val projectSlug = projectSlugs.generateOne
 
       val encryptedToken = encryptedAccessTokens.generateOne
       (tokenInRepoFinder
-        .findStoredToken(_: Path))
-        .expects(projectPath)
+        .findStoredToken(_: Slug))
+        .expects(projectSlug)
         .returning(OptionT.some(encryptedToken))
 
       val accessToken = accessTokens.generateOne
@@ -164,38 +164,38 @@ class TokenFinderSpec extends AnyWordSpec with IOSpec with MockFactory with shou
         .expects(encryptedToken)
         .returning(accessToken.pure[IO])
 
-      tokenFinder.findToken(projectPath).value.unsafeRunSync() shouldBe Some(accessToken)
+      tokenFinder.findToken(projectSlug).value.unsafeRunSync() shouldBe Some(accessToken)
     }
 
     "return None if no token was found in the db" in new TestCase {
 
-      val projectPath = projectPaths.generateOne
+      val projectSlug = projectSlugs.generateOne
 
       (tokenInRepoFinder
-        .findStoredToken(_: Path))
-        .expects(projectPath)
+        .findStoredToken(_: Slug))
+        .expects(projectSlug)
         .returning(OptionT.none[IO, EncryptedAccessToken])
 
-      tokenFinder.findToken(projectPath).value.unsafeRunSync() shouldBe None
+      tokenFinder.findToken(projectSlug).value.unsafeRunSync() shouldBe None
     }
 
     "fail if finding token in the db fails" in new TestCase {
 
-      val projectPath = projectPaths.generateOne
+      val projectSlug = projectSlugs.generateOne
 
       val exception = exceptions.generateOne
       (tokenInRepoFinder
-        .findStoredToken(_: Path))
-        .expects(projectPath)
+        .findStoredToken(_: Slug))
+        .expects(projectSlug)
         .returning(OptionT.liftF[IO, EncryptedAccessToken](exception.raiseError[IO, EncryptedAccessToken]))
       intercept[Exception] {
-        tokenFinder.findToken(projectPath).value.unsafeRunSync()
+        tokenFinder.findToken(projectSlug).value.unsafeRunSync()
       }.getMessage shouldBe exception.getMessage
     }
 
     "retry if decrypting found token fails" in new TestCase {
 
-      val projectPath = projectPaths.generateOne
+      val projectSlug = projectSlugs.generateOne
 
       val accessToken = accessTokens.generateOne
       override val tokenFinder =
@@ -205,8 +205,8 @@ class TokenFinderSpec extends AnyWordSpec with IOSpec with MockFactory with shou
 
         val encryptedToken = encryptedAccessTokens.generateOne
         (tokenInRepoFinder
-          .findStoredToken(_: Path))
-          .expects(projectPath)
+          .findStoredToken(_: Slug))
+          .expects(projectSlug)
           .returning(OptionT.some(encryptedToken))
         val exception = exceptions.generateOne
         (accessTokenCrypto
@@ -215,8 +215,8 @@ class TokenFinderSpec extends AnyWordSpec with IOSpec with MockFactory with shou
           .returning(exception.raiseError[IO, AccessToken])
 
         (tokenInRepoFinder
-          .findStoredToken(_: Path))
-          .expects(projectPath)
+          .findStoredToken(_: Slug))
+          .expects(projectSlug)
           .returning(OptionT.some(encryptedToken))
 
         (accessTokenCrypto
@@ -226,19 +226,19 @@ class TokenFinderSpec extends AnyWordSpec with IOSpec with MockFactory with shou
 
       }
 
-      tokenFinder.findToken(projectPath).value.unsafeRunSync() shouldBe Some(accessToken)
+      tokenFinder.findToken(projectSlug).value.unsafeRunSync() shouldBe Some(accessToken)
     }
 
     "fail if decrypting found token still fails when there a no retries left" in new TestCase {
 
-      val projectPath = projectPaths.generateOne
+      val projectSlug = projectSlugs.generateOne
 
       val exception = exceptions.generateOne
 
       val encryptedToken = encryptedAccessTokens.generateOne
       (tokenInRepoFinder
-        .findStoredToken(_: Path))
-        .expects(projectPath)
+        .findStoredToken(_: Slug))
+        .expects(projectSlug)
         .returning(OptionT.some(encryptedToken))
 
       (accessTokenCrypto
@@ -247,7 +247,7 @@ class TokenFinderSpec extends AnyWordSpec with IOSpec with MockFactory with shou
         .returning(exception.raiseError[IO, AccessToken])
 
       intercept[Exception] {
-        tokenFinder.findToken(projectPath).value.unsafeRunSync()
+        tokenFinder.findToken(projectSlug).value.unsafeRunSync()
       }.getMessage shouldBe exception.getMessage
     }
   }

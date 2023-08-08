@@ -41,7 +41,7 @@ import org.typelevel.log4cats.Logger
 import scala.util.control.NonFatal
 
 trait Endpoint[F[_]] {
-  def `GET /projects/:path/datasets`(request: Request[F], criteria: Criteria): F[Response[F]]
+  def `GET /projects/:slug/datasets`(request: Request[F], criteria: Criteria): F[Response[F]]
 }
 
 class EndpointImpl[F[_]: MonadCancelThrow: Logger](
@@ -54,18 +54,18 @@ class EndpointImpl[F[_]: MonadCancelThrow: Logger](
   import executionTimeRecorder._
   import org.http4s.circe._
 
-  def `GET /projects/:path/datasets`(request: Request[F], criteria: Criteria): F[Response[F]] =
-    measureAndLogTime(finishedSuccessfully(criteria.projectPath)) {
+  def `GET /projects/:slug/datasets`(request: Request[F], criteria: Criteria): F[Response[F]] =
+    measureAndLogTime(finishedSuccessfully(criteria.projectSlug)) {
       projectDatasetsFinder
         .findProjectDatasets(criteria)
         .map(toHttpResponse(request, criteria))
-        .recoverWith(errorHttpResponse(criteria.projectPath))
+        .recoverWith(errorHttpResponse(criteria.projectSlug))
     }
 
   private def toHttpResponse(request: Request[F], criteria: Criteria)(
       response: PagingResponse[ProjectDataset]
   ): Response[F] = {
-    implicit val encoder: Encoder[ProjectDataset] = ProjectDataset.encoder(criteria.projectPath)
+    implicit val encoder: Encoder[ProjectDataset] = ProjectDataset.encoder(criteria.projectSlug)
     val resourceUrl = renku.ResourceUrl(show"$renkuUrl${request.uri}")
     Response[F](Ok)
       .withEntity(response.results.asJson)
@@ -73,20 +73,20 @@ class EndpointImpl[F[_]: MonadCancelThrow: Logger](
   }
 
   private def errorHttpResponse(
-      projectPath: projects.Path
+      projectSlug: projects.Slug
   ): PartialFunction[Throwable, F[Response[F]]] = { case NonFatal(exception) =>
-    val errorMessage = Message.Error.unsafeApply(s"Finding $projectPath's datasets failed")
+    val errorMessage = Message.Error.unsafeApply(s"Finding $projectSlug's datasets failed")
     Logger[F].error(exception)(errorMessage.show) >> InternalServerError(errorMessage)
   }
 
-  private def finishedSuccessfully(projectPath: projects.Path): PartialFunction[Response[F], String] = {
-    case response if response.status == Ok => s"Finding '$projectPath' datasets finished"
+  private def finishedSuccessfully(projectSlug: projects.Slug): PartialFunction[Response[F], String] = {
+    case response if response.status == Ok => s"Finding '$projectSlug' datasets finished"
   }
 }
 
 object Endpoint {
 
-  final case class Criteria(projectPath: projects.Path,
+  final case class Criteria(projectSlug: projects.Slug,
                             sorting:     Sorting[Criteria.Sort.type] = Criteria.Sort.default,
                             paging:      PagingRequest = PagingRequest.default
   )
@@ -117,6 +117,6 @@ object Endpoint {
     executionTimeRecorder                <- ExecutionTimeRecorder[F]()
   } yield new EndpointImpl[F](ProjectDatasetsFinder(renkuConnectionConfig), executionTimeRecorder)
 
-  def href(renkuApiUrl: renku.ApiUrl, projectPath: projects.Path): Href =
-    Href(renkuApiUrl / "projects" / projectPath / "datasets")
+  def href(renkuApiUrl: renku.ApiUrl, projectSlug: projects.Slug): Href =
+    Href(renkuApiUrl / "projects" / projectSlug / "datasets")
 }

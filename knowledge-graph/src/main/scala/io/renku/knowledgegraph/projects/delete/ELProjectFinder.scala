@@ -30,7 +30,7 @@ import io.renku.http.rest.paging.model.PerPage
 import org.typelevel.log4cats.Logger
 
 private trait ELProjectFinder[F[_]] {
-  def findProject(path: projects.Path): F[Option[Project]]
+  def findProject(slug: projects.Slug): F[Option[Project]]
 }
 
 private object ELProjectFinder {
@@ -40,14 +40,14 @@ private object ELProjectFinder {
 
 private class ELProjectFinderImpl[F[_]: MonadThrow](elClient: EventLogClient[F]) extends ELProjectFinder[F] {
 
-  override def findProject(path: projects.Path): F[Option[Project]] =
+  override def findProject(slug: projects.Slug): F[Option[Project]] =
     elClient
-      .getEvents(SearchCriteria.forProject(path).withPerPage(PerPage(1)))
+      .getEvents(SearchCriteria.forProject(slug).withPerPage(PerPage(1)))
       .flatMap(toResult)
 
   private def toResult: Result[List[EventInfo]] => F[Option[Project]] =
     _.toEither.fold(
       _.raiseError[F, Option[Project]],
-      _.headOption.map(ei => Project(ei.project.id, ei.project.path)).pure[F]
+      _.headOption.map(ei => Project(ei.project.id, ei.project.slug)).pure[F]
     )
 }

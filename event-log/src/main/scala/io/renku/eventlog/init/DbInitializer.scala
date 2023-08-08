@@ -82,6 +82,7 @@ object DbInitializer {
     TSMigrationTableCreator[F],
     CleanUpEventsTableCreator[F],
     ProjectIdOnCleanUpTable[F],
+    ProjectPathToSlug[F],
     FailedEventsRestorer[F](
       "%Error: The repository is dirty. Please use the \"git\" command to clean it.%",
       currentStatus = GenerationNonRecoverableFailure,

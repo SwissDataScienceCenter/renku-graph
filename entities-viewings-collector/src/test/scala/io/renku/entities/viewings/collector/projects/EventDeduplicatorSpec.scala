@@ -52,7 +52,7 @@ class EventDeduplicatorSpec
       val project = anyProjectEntities.generateOne.to[entities.Project]
       upload(to = projectsDataset, project)
 
-      val event = projectViewedEvents.generateOne.copy(path = project.path)
+      val event = projectViewedEvents.generateOne.copy(slug = project.slug)
 
       persister.persist(event).unsafeRunSync() shouldBe ()
 
@@ -66,7 +66,7 @@ class EventDeduplicatorSpec
       val project = anyProjectEntities.generateOne.to[entities.Project]
       upload(to = projectsDataset, project)
 
-      val event = projectViewedEvents.generateOne.copy(path = project.path)
+      val event = projectViewedEvents.generateOne.copy(slug = project.slug)
       persister.persist(event).unsafeRunSync() shouldBe ()
 
       val olderDateViewed1 = timestamps(max = event.dateViewed.value).generateAs(projects.DateViewed)
@@ -92,9 +92,9 @@ class EventDeduplicatorSpec
       val project2 = anyProjectEntities.generateOne.to[entities.Project]
       upload(to = projectsDataset, project2)
 
-      val event1 = projectViewedEvents.generateOne.copy(path = project1.path)
+      val event1 = projectViewedEvents.generateOne.copy(slug = project1.slug)
       persister.persist(event1).unsafeRunSync() shouldBe ()
-      val event2 = projectViewedEvents.generateOne.copy(path = project2.path)
+      val event2 = projectViewedEvents.generateOne.copy(slug = project2.slug)
       persister.persist(event2).unsafeRunSync() shouldBe ()
 
       findAllViewings shouldBe Set(

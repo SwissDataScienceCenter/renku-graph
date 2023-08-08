@@ -87,12 +87,12 @@ private object Link {
   def apply(topmostSameAs: datasets.TopmostSameAs,
             datasetId:     datasets.ResourceId,
             projectId:     projects.ResourceId,
-            projectPath:   projects.Path
+            projectSlug:   projects.Slug
   ): Link =
     if (topmostSameAs.value == datasetId.value)
-      OriginalDataset(links.ResourceId.from(topmostSameAs, projectPath), datasetId, projectId)
+      OriginalDataset(links.ResourceId.from(topmostSameAs, projectSlug), datasetId, projectId)
     else
-      ImportedDataset(links.ResourceId.from(topmostSameAs, projectPath), datasetId, projectId)
+      ImportedDataset(links.ResourceId.from(topmostSameAs, projectSlug), datasetId, projectId)
 
   def apply(linkId: links.ResourceId, datasetId: datasets.ResourceId, projectId: projects.ResourceId): Link =
     if (linkId.value startsWith datasetId.value)
@@ -125,8 +125,8 @@ private object links {
       with UrlConstraint[ResourceId]
       with EntityIdJsonLDOps[ResourceId] {
 
-    def from(topmostSameAs: datasets.TopmostSameAs, projectPath: projects.Path): ResourceId = ResourceId(
-      (topmostSameAs / projectPath).value
+    def from(topmostSameAs: datasets.TopmostSameAs, projectSlug: projects.Slug): ResourceId = ResourceId(
+      (topmostSameAs / projectSlug).value
     )
   }
 }

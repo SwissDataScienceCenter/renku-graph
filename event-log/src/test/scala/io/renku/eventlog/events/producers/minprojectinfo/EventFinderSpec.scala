@@ -24,7 +24,7 @@ import io.renku.eventlog.InMemoryEventLogDbSpec
 import io.renku.eventlog.metrics.QueriesExecutionTimes
 import io.renku.generators.Generators.Implicits._
 import io.renku.graph.model.EventContentGenerators._
-import io.renku.graph.model.GraphModelGenerators.{projectIds, projectPaths}
+import io.renku.graph.model.GraphModelGenerators.{projectIds, projectSlugs}
 import io.renku.graph.model.events.EventStatus.TriplesStore
 import io.renku.graph.model.events.{EventStatus, LastSyncedDate}
 import io.renku.metrics.TestMetricsRegistry
@@ -52,10 +52,10 @@ class EventFinderSpec
         finder.popEvent().unsafeRunSync() shouldBe None
 
         val projectId   = projectIds.generateOne
-        val projectPath = projectPaths.generateOne
-        upsertProject(projectId, projectPath, eventDates.generateOne)
+        val projectSlug = projectSlugs.generateOne
+        upsertProject(projectId, projectSlug, eventDates.generateOne)
 
-        finder.popEvent().unsafeRunSync() shouldBe Some(MinProjectInfoEvent(projectId, projectPath))
+        finder.popEvent().unsafeRunSync() shouldBe Some(MinProjectInfoEvent(projectId, projectSlug))
 
         findProjectCategorySyncTimes(projectId) shouldBe List(
           categoryName -> LastSyncedDate(currentTime.truncatedTo(MICROS))
@@ -68,14 +68,14 @@ class EventFinderSpec
       s"and no rows in the subscription_category_sync_times table for the $categoryName" in new TestCase {
 
         val projectId   = projectIds.generateOne
-        val projectPath = projectPaths.generateOne
-        upsertProject(projectId, projectPath, eventDates.generateOne)
+        val projectSlug = projectSlugs.generateOne
+        upsertProject(projectId, projectSlug, eventDates.generateOne)
 
         EventStatus.all - TriplesStore foreach {
-          storeGeneratedEvent(_, eventDates.generateOne, projectId, projectPath)
+          storeGeneratedEvent(_, eventDates.generateOne, projectId, projectSlug)
         }
 
-        finder.popEvent().unsafeRunSync() shouldBe Some(MinProjectInfoEvent(projectId, projectPath))
+        finder.popEvent().unsafeRunSync() shouldBe Some(MinProjectInfoEvent(projectId, projectSlug))
 
         findProjectCategorySyncTimes(projectId) shouldBe List(
           categoryName -> LastSyncedDate(currentTime.truncatedTo(MICROS))
@@ -88,11 +88,11 @@ class EventFinderSpec
       s"even there's no rows in the subscription_category_sync_times table for the $categoryName" in new TestCase {
 
         val projectId   = projectIds.generateOne
-        val projectPath = projectPaths.generateOne
-        upsertProject(projectId, projectPath, eventDates.generateOne)
+        val projectSlug = projectSlugs.generateOne
+        upsertProject(projectId, projectSlug, eventDates.generateOne)
 
         EventStatus.all foreach {
-          storeGeneratedEvent(_, eventDates.generateOne, projectId, projectPath)
+          storeGeneratedEvent(_, eventDates.generateOne, projectId, projectSlug)
         }
 
         finder.popEvent().unsafeRunSync() shouldBe None

@@ -45,9 +45,9 @@ private class EventHandler[F[_]: MonadCancelThrow: Logger](
     import io.renku.tinytypes.json.TinyTypeDecoders._
 
     _.downField("project").as[Json].map(_.hcursor) >>= { cursor =>
-      (cursor.downField("id").as[Option[projects.GitLabId]], cursor.downField("path").as[projects.Path]).mapN {
-        case (Some(id), path) => CleanUpRequestEvent(id, path)
-        case (None, path)     => CleanUpRequestEvent(path)
+      (cursor.downField("id").as[Option[projects.GitLabId]], cursor.downField("slug").as[projects.Slug]).mapN {
+        case (Some(id), slug) => CleanUpRequestEvent(id, slug)
+        case (None, slug)     => CleanUpRequestEvent(slug)
       }
     }
   }

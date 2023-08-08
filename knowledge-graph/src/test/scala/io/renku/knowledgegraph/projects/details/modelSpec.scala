@@ -33,14 +33,14 @@ class modelSpec extends AnyWordSpec with ScalaCheckPropertyChecks with should.Ma
   "HttpUrl" should {
 
     "instantiate for valid absolute git urls" in {
-      forAll(httpUrls(), projectPaths) { (httpUrl, projectPath) =>
-        val url = s"$httpUrl/$projectPath.git"
+      forAll(httpUrls(), projectSlugs) { (httpUrl, projectSlug) =>
+        val url = s"$httpUrl/$projectSlug.git"
         HttpUrl.from(url).map(_.value) shouldBe Right(url)
       }
     }
 
     "fail instantiation for non-absolute urls" in {
-      val url = s"${relativePaths().generateOne}/${projectPaths.generateOne}.git"
+      val url = s"${relativePaths().generateOne}/${projectSlugs.generateOne}.git"
 
       val Left(exception) = HttpUrl.from(url)
 
@@ -52,14 +52,14 @@ class modelSpec extends AnyWordSpec with ScalaCheckPropertyChecks with should.Ma
   "SshUrl" should {
 
     "instantiate for valid absolute ssh urls" in {
-      forAll(nonEmptyList(nonBlankStrings()), projectPaths) { (hostParts, projectPath) =>
-        val url = s"git@${hostParts.toList.mkString(".")}:$projectPath.git"
+      forAll(nonEmptyList(nonBlankStrings()), projectSlugs) { (hostParts, projectSlug) =>
+        val url = s"git@${hostParts.toList.mkString(".")}:$projectSlug.git"
         SshUrl.from(url).map(_.value) shouldBe Right(url)
       }
     }
 
     "fail instantiation for non-ssh urls" in {
-      val url = s"${gitLabUrls.generateOne}/${projectPaths.generateOne}.git"
+      val url = s"${gitLabUrls.generateOne}/${projectSlugs.generateOne}.git"
 
       val Left(exception) = SshUrl.from(url)
 

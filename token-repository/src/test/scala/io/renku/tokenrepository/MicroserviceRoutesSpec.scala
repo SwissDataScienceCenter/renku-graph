@@ -94,23 +94,23 @@ class MicroserviceRoutesSpec
         .status shouldBe ServiceUnavailable
     }
 
-    s"return $Ok when a valid projectPath is given" in new TestCase {
+    s"return $Ok when a valid projectSlug is given" in new TestCase {
 
       givenDBReady()
 
-      val projectPath = projectPaths.generateOne
+      val projectSlug = projectSlugs.generateOne
 
       (fetchEndpoint
-        .fetchToken(_: projects.Path)(_: projects.Path => OptionT[IO, AccessToken]))
-        .expects(projectPath, *)
+        .fetchToken(_: projects.Slug)(_: projects.Slug => OptionT[IO, AccessToken]))
+        .expects(projectSlug, *)
         .returning(IO.pure(Response[IO](Ok)))
 
-      routes.call(Request(GET, uri"/projects" / projectPath.toString / "tokens")).status shouldBe Ok
+      routes.call(Request(GET, uri"/projects" / projectSlug.toString / "tokens")).status shouldBe Ok
     }
 
-    s"return $ServiceUnavailable for a valid Project Path when DB migration is ongoing" in new TestCase {
+    s"return $ServiceUnavailable for a valid Project Slug when DB migration is ongoing" in new TestCase {
       routes
-        .call(Request(GET, uri"/projects" / projectPaths.generateOne.toString / "tokens"))
+        .call(Request(GET, uri"/projects" / projectSlugs.generateOne.toString / "tokens"))
         .status shouldBe ServiceUnavailable
     }
   }

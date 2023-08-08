@@ -22,7 +22,7 @@ import io.renku.graph.model.{events, projects}
 import io.renku.graph.model.events.CompoundEventId
 import io.renku.graph.model.events.EventStatus.ProcessingStatus
 
-private final case class ZombieEvent(eventId: CompoundEventId, projectPath: projects.Path, status: ProcessingStatus)
+private final case class ZombieEvent(eventId: CompoundEventId, projectSlug: projects.Slug, status: ProcessingStatus)
 
 private object ZombieEvent {
 
@@ -41,12 +41,12 @@ private object ZombieEvent {
     for {
       id          <- cursor.downField("id").as[events.EventId]
       projectId   <- cursor.downField("project").downField("id").as[projects.GitLabId]
-      projectPath <- cursor.downField("project").downField("path").as[projects.Path]
+      projectSlug <- cursor.downField("project").downField("slug").as[projects.Slug]
       status      <- cursor.downField("status").as[events.EventStatus.ProcessingStatus]
-    } yield ZombieEvent(CompoundEventId(id, projectId), projectPath, status)
+    } yield ZombieEvent(CompoundEventId(id, projectId), projectSlug, status)
   }
 
   implicit lazy val show: Show[ZombieEvent] = Show.show { event =>
-    show"${event.eventId}, projectPath = ${event.projectPath}, status = ${event.status}"
+    show"${event.eventId}, projectSlug = ${event.projectSlug}, status = ${event.status}"
   }
 }
