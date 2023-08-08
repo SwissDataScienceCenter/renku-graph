@@ -51,28 +51,33 @@ private class ClientImpl[F[_]](eventSender: EventSender[F]) extends Client[F] {
   import io.circe.syntax._
 
   override def send(event: CleanUpEvent): F[Unit] =
-    send(event, CleanUpEvent.categoryName)
+    send(event, CleanUpEvent.categoryName, maxRetriesNumber = None)
 
   override def send(event: DatasetViewedEvent): F[Unit] =
-    send(event, DatasetViewedEvent.categoryName)
+    send(event, DatasetViewedEvent.categoryName, maxRetriesNumber = 5.some)
 
   override def send(event: ProjectActivated): F[Unit] =
-    send(event, ProjectActivated.categoryName)
+    send(event, ProjectActivated.categoryName, maxRetriesNumber = None)
 
   override def send(event: ProjectViewedEvent): F[Unit] =
-    send(event, ProjectViewedEvent.categoryName)
+    send(event, ProjectViewedEvent.categoryName, maxRetriesNumber = 5.some)
 
   override def send(event: ProjectViewingDeletion): F[Unit] =
-    send(event, ProjectViewingDeletion.categoryName)
+    send(event, ProjectViewingDeletion.categoryName, maxRetriesNumber = None)
 
   override def send(event: SyncRepoMetadata): F[Unit] =
-    send(event, SyncRepoMetadata.categoryName)
+    send(event, SyncRepoMetadata.categoryName, maxRetriesNumber = None)
 
-  private def send[E](event: E, category: CategoryName)(implicit enc: Encoder[E], show: Show[E]): F[Unit] =
+  private def send[E](event: E, category: CategoryName, maxRetriesNumber: Option[Int])(implicit
+      enc:  Encoder[E],
+      show: Show[E]
+  ): F[Unit] = {
+    val message = show"$category: sending event $event failed"
     eventSender.sendEvent(
       EventRequestContent.NoPayload(event.asJson),
-      EventContext(category, show"$category: sending event $event failed")
+      maxRetriesNumber.map(mr => EventContext(category, message, mr)).getOrElse(EventContext(category, message))
     )
+  }
 
   private def send[E, P](event: E, payload: P, category: CategoryName)(implicit
       eventEnc:   Encoder[E],
