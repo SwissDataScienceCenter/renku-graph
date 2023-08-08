@@ -43,7 +43,7 @@ class ClientSpec extends AnyWordSpec with should.Matchers with MockFactory with 
 
       val event = projectActivatedEvents.generateOne
 
-      givenSending(event, ProjectActivated.categoryName, returning = ().pure[Try])
+      givenSending(event, ProjectActivated.categoryName, maxRetriesNumber = None, returning = ().pure[Try])
 
       client.send(event).success.value shouldBe ()
     }
@@ -55,7 +55,7 @@ class ClientSpec extends AnyWordSpec with should.Matchers with MockFactory with 
 
       val event = datasetViewedEvents.generateOne
 
-      givenSending(event, DatasetViewedEvent.categoryName, returning = ().pure[Try])
+      givenSending(event, DatasetViewedEvent.categoryName, maxRetriesNumber = 5.some, returning = ().pure[Try])
 
       client.send(event).success.value shouldBe ()
     }
@@ -67,7 +67,7 @@ class ClientSpec extends AnyWordSpec with should.Matchers with MockFactory with 
 
       val event = projectViewedEvents.generateOne
 
-      givenSending(event, ProjectViewedEvent.categoryName, returning = ().pure[Try])
+      givenSending(event, ProjectViewedEvent.categoryName, maxRetriesNumber = 5.some, returning = ().pure[Try])
 
       client.send(event).success.value shouldBe ()
     }
@@ -79,7 +79,7 @@ class ClientSpec extends AnyWordSpec with should.Matchers with MockFactory with 
 
       val event = projectViewingDeletions.generateOne
 
-      givenSending(event, ProjectViewingDeletion.categoryName, returning = ().pure[Try])
+      givenSending(event, ProjectViewingDeletion.categoryName, maxRetriesNumber = None, returning = ().pure[Try])
 
       client.send(event).success.value shouldBe ()
     }
@@ -91,7 +91,7 @@ class ClientSpec extends AnyWordSpec with should.Matchers with MockFactory with 
 
       val event = syncRepoMetadataEvents.generateOne
 
-      givenSending(event, SyncRepoMetadata.categoryName, returning = ().pure[Try])
+      givenSending(event, SyncRepoMetadata.categoryName, maxRetriesNumber = None, returning = ().pure[Try])
 
       client.send(event).success.value shouldBe ()
     }
@@ -102,16 +102,22 @@ class ClientSpec extends AnyWordSpec with should.Matchers with MockFactory with 
     private val eventSender = mock[EventSender[Try]]
     val client              = new ClientImpl[Try](eventSender)
 
-    def givenSending[E](event: E, categoryName: CategoryName, returning: Try[Unit])(implicit
-        encoder: Encoder[E],
-        show:    Show[E]
-    ) = (eventSender
-      .sendEvent(_: EventRequestContent.NoPayload, _: EventSender.EventContext))
-      .expects(
-        EventRequestContent.NoPayload(event.asJson),
-        EventSender.EventContext(categoryName, show"$categoryName: sending event $event failed")
-      )
-      .returning(returning)
+    def givenSending[E](event:            E,
+                        categoryName:     CategoryName,
+                        maxRetriesNumber: Option[Int],
+                        returning:        Try[Unit]
+    )(implicit encoder: Encoder[E], show: Show[E]) = {
+
+      val ctxMessage = show"$categoryName: sending event $event failed"
+      val ctx = maxRetriesNumber
+        .map(EventSender.EventContext(categoryName, ctxMessage, _))
+        .getOrElse(EventSender.EventContext(categoryName, ctxMessage))
+
+      (eventSender
+        .sendEvent(_: EventRequestContent.NoPayload, _: EventSender.EventContext))
+        .expects(EventRequestContent.NoPayload(event.asJson), ctx)
+        .returning(returning)
+    }
 
     def givenSending[E, P](event: E, payload: P, categoryName: CategoryName, returning: Try[Unit])(implicit
         eventEncoder: Encoder[E],
