@@ -27,6 +27,7 @@ import io.circe.Decoder
 import io.renku.graph.model.persons.{GitLabId, Name}
 import io.renku.graph.model.projects.Slug
 import io.renku.http.client.{AccessToken, GitLabClient}
+import io.renku.projectauth.{ProjectMember, Role}
 import io.renku.tinytypes.json.TinyTypeDecoders._
 import org.http4s.Status.{Forbidden, NotFound, Ok, Unauthorized}
 import org.http4s._
@@ -99,4 +100,7 @@ private object GitLabProjectMembersFinder {
     new GitLabProjectMembersFinderImpl[F].pure[F].widen[GitLabProjectMembersFinder[F]]
 }
 
-private final case class GitLabProjectMember(gitLabId: GitLabId, name: Name, accessLevel: Int)
+private final case class GitLabProjectMember(gitLabId: GitLabId, name: Name, accessLevel: Int) {
+  def toProjectAuthMember: ProjectMember =
+    ProjectMember(gitLabId, Role.fromGitLabAccessLevel(accessLevel))
+}

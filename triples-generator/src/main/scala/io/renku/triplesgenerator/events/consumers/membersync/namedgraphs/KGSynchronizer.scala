@@ -23,6 +23,7 @@ import cats.MonadThrow
 import cats.effect.Async
 import cats.syntax.all._
 import io.renku.graph.model.projects
+import io.renku.projectauth.ProjectAuthData
 import io.renku.triplesstore._
 import org.typelevel.log4cats.Logger
 
@@ -52,5 +53,8 @@ private class KGSynchronizerImpl[F[_]: MonadThrow](kgMembersFinder: KGProjectMem
     membersToRemove  = findMembersToRemove(membersInGL, membersInKG)
     removalUpdates   = updatesCreator.removal(slug, membersToRemove)
     _ <- (insertionUpdates ::: removalUpdates).map(tsClient.updateWithNoResult).sequence
+
+    // TODO add project-auth graph updates here; needs visibility
+    x = ProjectAuthData(slug, membersInGL.map(_.toProjectAuthMember), null)
   } yield SyncSummary(membersAdded = membersToAdd.size, membersRemoved = membersToRemove.size)
 }
