@@ -18,11 +18,13 @@
 
 package io.renku.projectauth
 
-import io.renku.graph.model.projects.{Slug, ResourceId, Visibility}
+import io.renku.graph.model.projects.{ResourceId, Slug, Visibility}
 import io.renku.graph.model.{RenkuUrl, Schemas}
 import io.renku.jsonld.JsonLD.JsonLDArray
 import io.renku.jsonld.syntax._
 import io.renku.jsonld.{EntityTypes, JsonLD, JsonLDEncoder}
+import io.renku.triplesstore.client.http.RowDecoder
+import io.renku.tinytypes.json.TinyTypeDecoders._
 
 final case class ProjectAuthData(
     path:       Slug,
@@ -44,4 +46,7 @@ object ProjectAuthData {
         )
       )
     }
+
+  implicit def rowDecoder: RowDecoder[ProjectAuthData] =
+    RowDecoder.forProduct3("slug", "visibility", "members")(ProjectAuthData.apply)
 }

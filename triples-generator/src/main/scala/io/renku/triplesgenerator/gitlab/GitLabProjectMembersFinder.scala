@@ -16,7 +16,7 @@
  * limitations under the License.
  */
 
-package io.renku.triplesgenerator.events.consumers.membersync
+package io.renku.triplesgenerator.gitlab
 
 import cats.effect.Async
 import cats.syntax.all._
@@ -27,7 +27,7 @@ import io.circe.Decoder
 import io.renku.graph.model.persons.{GitLabId, Name}
 import io.renku.graph.model.projects.Slug
 import io.renku.http.client.{AccessToken, GitLabClient}
-import io.renku.projectauth.{ProjectMember, Role}
+import io.renku.projectauth.ProjectMember
 import io.renku.tinytypes.json.TinyTypeDecoders._
 import org.http4s.Status.{Forbidden, NotFound, Ok, Unauthorized}
 import org.http4s._
@@ -36,7 +36,7 @@ import org.http4s.implicits.http4sLiteralsSyntax
 import org.typelevel.ci._
 import org.typelevel.log4cats.Logger
 
-private trait GitLabProjectMembersFinder[F[_]] {
+trait GitLabProjectMembersFinder[F[_]] {
   def findProjectMembers(slug: Slug)(implicit maybeAccessToken: Option[AccessToken]): F[Set[GitLabProjectMember]]
 }
 
@@ -95,12 +95,12 @@ private class GitLabProjectMembersFinderImpl[F[_]: Async: GitLabClient: Logger] 
     Decoder.forProduct3("id", "name", "accessLevel")(GitLabProjectMember.apply)
 }
 
-private object GitLabProjectMembersFinder {
+object GitLabProjectMembersFinder {
   def apply[F[_]: Async: GitLabClient: Logger]: F[GitLabProjectMembersFinder[F]] =
     new GitLabProjectMembersFinderImpl[F].pure[F].widen[GitLabProjectMembersFinder[F]]
 }
 
-private final case class GitLabProjectMember(gitLabId: GitLabId, name: Name, accessLevel: Int) {
+final case class GitLabProjectMember(gitLabId: GitLabId, name: Name, accessLevel: Int) {
   def toProjectAuthMember: ProjectMember =
-    ProjectMember(gitLabId, Role.fromGitLabAccessLevel(accessLevel))
+    ProjectMember.fromGitLabData(gitLabId, accessLevel)
 }

@@ -35,7 +35,7 @@ object RowDecoder {
       cursor.downField(name).downField("value").as[A]
     }
 
-  def forProduct1[T, A0](name: String)(f: A0 => T)(implicit d: RowDecoder[A0]): RowDecoder[T] =
+  def forProduct1[T, A0](name: String)(f: A0 => T)(implicit d: Decoder[A0]): RowDecoder[T] =
     fromDecoder(prop(name).map(f))
 
   def forProduct2[T, A0: Decoder, A1: Decoder](name0: String, name1: String)(f: (A0, A1) => T): RowDecoder[T] =
@@ -45,4 +45,15 @@ object RowDecoder {
       f: (A0, A1, A2) => T
   ): RowDecoder[T] =
     fromDecoder((prop[A0](name0), prop[A1](name1), prop[A2](name2)).mapN(f))
+
+  def forProduct4[T, A0: Decoder, A1: Decoder, A2: Decoder, A3: Decoder](
+      name0: String,
+      name1: String,
+      name2: String,
+      name3: String
+  )(
+      f: (A0, A1, A2, A3) => T
+  ): RowDecoder[T] =
+    fromDecoder((prop[A0](name0), prop[A1](name1), prop[A2](name2), prop[A3](name3)).mapN(f))
+
 }

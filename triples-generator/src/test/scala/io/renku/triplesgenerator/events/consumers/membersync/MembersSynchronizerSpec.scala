@@ -33,6 +33,8 @@ import io.renku.interpreters.TestLogger.Level.{Error, Info}
 import io.renku.logging.TestExecutionTimeRecorder
 import io.renku.testtools.IOSpec
 import io.renku.triplesgenerator.events.consumers.membersync.Generators._
+import io.renku.triplesgenerator.gitlab.Generators._
+import io.renku.triplesgenerator.gitlab.{GitLabProjectMember, GitLabProjectMembersFinder}
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec

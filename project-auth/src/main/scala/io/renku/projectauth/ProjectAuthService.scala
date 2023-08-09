@@ -18,14 +18,19 @@
 
 package io.renku.projectauth
 
+import cats.MonadThrow
 import cats.effect._
-import fs2.Pipe
+import fs2.{Pipe, Stream}
 import fs2.io.net.Network
+import io.renku.graph.model.persons.GitLabId
+import io.renku.graph.model.projects.{Slug, Visibility}
 import io.renku.graph.model.{RenkuUrl, Schemas}
 import io.renku.jsonld.NamedGraph
 import io.renku.jsonld.syntax._
-import io.renku.triplesstore.client.http.{ConnectionConfig, SparqlClient}
+import io.renku.triplesstore.client.http.{ConnectionConfig, RowDecoder, SparqlClient}
+import io.renku.triplesstore.client.syntax._
 import org.typelevel.log4cats.Logger
+import io.renku.tinytypes.json.TinyTypeDecoders._
 
 import scala.concurrent.duration._
 
@@ -36,22 +41,24 @@ trait ProjectAuthService[F[_]] {
 
   def updateAll: Pipe[F, ProjectAuthData, Nothing]
 
+  def getAll(chunkSize: Int = 100): Stream[F, ProjectAuthData]
 }
 
 object ProjectAuthService {
 
-  def apply[F[_]: Async: Network: Logger](
+  def resource[F[_]: Async: Network: Logger](
       connectionConfig: ConnectionConfig,
       timeout:          Duration = 20.minutes
   )(implicit renkuUrl: RenkuUrl): Resource[F, ProjectAuthService[F]] =
     SparqlClient(connectionConfig, timeout).map(c => apply[F](c, renkuUrl))
 
-  def apply[F[_]](client: SparqlClient[F], renkuUrl: RenkuUrl): ProjectAuthService[F] =
-    new Impl[F](client)(renkuUrl)
+  def apply[F[_]: MonadThrow](client: SparqlClient[F], renkuUrl: RenkuUrl): ProjectAuthService[F] =
+    new Impl[F](client, renkuUrl)
 
-  private final class Impl[F[_]](sparqlClient: SparqlClient[F])(implicit renkuUrl: RenkuUrl)
+  private final class Impl[F[_]: MonadThrow](sparqlClient: SparqlClient[F], renkuUrl: RenkuUrl)
       extends ProjectAuthService[F] {
     private[this] val graph = Schemas.renku / "ProjectAuth"
+    private implicit val rUrl: RenkuUrl = renkuUrl
 
     override def update(data: ProjectAuthData): F[Unit] = {
       val jsonld = NamedGraph.fromJsonLDsUnsafe(graph, data.asJsonLD)
@@ -68,5 +75,51 @@ object ProjectAuthService {
         )
         .evalMap(sparqlClient.upload)
         .drain
+
+    override def getAll(chunkSize: Int): Stream[F, ProjectAuthData] =
+      streamAll(chunkSize)
+
+    private def streamAll(chunkSize: Int) =
+      Stream
+        .iterate(0)(_ + chunkSize)
+        .evalMap(offset => getChunk(chunkSize, offset))
+        .takeWhile(_.nonEmpty)
+        .flatMap(Stream.emits)
+        .groupAdjacentBy(_._1)
+        .map { case (slug, rest) =>
+          val members = rest.toList.flatMap(t => t._3.flatMap(id => t._4.map(role => ProjectMember(id, role))))
+          val vis     = rest.head.map(_._2)
+          vis.map(v => ProjectAuthData(slug, members.toSet, v))
+        }
+        .unNone
+
+    private def getChunk(limit: Int, offset: Int) =
+      sparqlClient.queryDecode[(Slug, Visibility, Option[GitLabId], Option[Role])](
+        sparql"""PREFIX schema: <http://schema.org/>
+                |PREFIX renku: <https://swissdatasciencecenter.github.io/renku-ontology#>
+                |
+                |SELECT ?slug ?visibility ?gitLabId ?role
+                |WHERE {
+                |  Graph ${graph.asSparql} {
+                |    ?project a schema:Project;
+                |             renku:slug ?slug;
+                |             renku:visibility ?visibility.
+                |    OPTIONAL {
+                |      ?project renku:members ?memberId.
+                |      ?memberId schema:role ?role;
+                |                schema:identifier ?gitLabId.
+                |    }
+                |  }
+                |}
+                |ORDER BY ?slug
+                |OFFSET $offset
+                |LIMIT $limit
+                |""".stripMargin
+      )
+
+    private implicit val tupleRowDecoder: RowDecoder[(Slug, Visibility, Option[GitLabId], Option[Role])] =
+      RowDecoder.forProduct4("slug", "visibility", "gitLabId", "role")(
+        Tuple4.apply[Slug, Visibility, Option[GitLabId], Option[Role]]
+      )
   }
 }

@@ -25,6 +25,8 @@ import io.renku.config.ConfigLoader.urlTinyTypeReader
 import io.renku.http.client.{BasicAuthCredentials, BasicAuthPassword, BasicAuthUsername}
 import io.renku.tinytypes.constraints.{Url, UrlOps}
 import io.renku.tinytypes.{TinyTypeFactory, UrlTinyType}
+import io.renku.triplesstore.client.http.ConnectionConfig
+import org.http4s.{BasicCredentials, Uri}
 import pureconfig.ConfigReader
 
 trait FusekiConnectionConfig {
@@ -50,6 +52,13 @@ trait DatasetConnectionConfig extends FusekiConnectionConfig {
   val fusekiUrl:       FusekiUrl
   val datasetName:     DatasetName
   val authCredentials: BasicAuthCredentials
+
+  def toCC(retryCfg: Option[ConnectionConfig.RetryConfig] = None): ConnectionConfig =
+    ConnectionConfig(
+      Uri.unsafeFromString(fusekiUrl.value) / datasetName.value,
+      Some(BasicCredentials(authCredentials.username.value, authCredentials.password.value)),
+      retryCfg
+    )
 }
 
 final case class ProjectsConnectionConfig(fusekiUrl: FusekiUrl, authCredentials: BasicAuthCredentials)

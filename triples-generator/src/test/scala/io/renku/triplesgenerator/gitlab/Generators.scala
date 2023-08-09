@@ -16,26 +16,17 @@
  * limitations under the License.
  */
 
-package io.renku.triplesstore.client.http
+package io.renku.triplesgenerator.gitlab
 
-import org.http4s.{BasicCredentials, Uri}
+import io.renku.graph.model.GraphModelGenerators.{personGitLabIds, personNames}
+import io.renku.projectauth.Role
+import org.scalacheck.Gen
 
-import scala.concurrent.duration._
+object Generators {
 
-final case class ConnectionConfig(
-    baseUrl:   Uri,
-    basicAuth: Option[BasicCredentials],
-    retry:     Option[ConnectionConfig.RetryConfig]
-)
+  implicit val gitLabProjectMembers: Gen[GitLabProjectMember] = for {
+    id   <- personGitLabIds
+    name <- personNames
+  } yield GitLabProjectMember(id, name, Role.toGitLabAccessLevel(Role.Owner))
 
-object ConnectionConfig {
-
-  final case class RetryConfig(
-      interval:   FiniteDuration,
-      maxRetries: Int
-  )
-
-  object RetryConfig {
-    val default: RetryConfig = RetryConfig(10.seconds, 10)
-  }
 }

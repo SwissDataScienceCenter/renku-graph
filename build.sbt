@@ -198,7 +198,7 @@ lazy val triplesGenerator = project
     triplesGeneratorApi % "compile->compile; test->test",
     entitiesSearch,
     entitiesViewingsCollector % "compile->compile; test->test",
-    projectAuth               % "test->test"
+    projectAuth               % "compile->compile; test->test"
   )
   .enablePlugins(
     JavaAppPackaging,

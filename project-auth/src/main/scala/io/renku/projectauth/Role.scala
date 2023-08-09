@@ -20,6 +20,7 @@ package io.renku.projectauth
 
 import cats.Order
 import cats.data.NonEmptyList
+import io.circe.{Decoder, Encoder}
 
 sealed trait Role extends Ordered[Role] {
   def asString: String
@@ -77,4 +78,10 @@ object Role {
 
   implicit val order: Order[Role] =
     Order.fromOrdering
+
+  implicit val jsonDecoder: Decoder[Role] =
+    Decoder.decodeString.emap(fromString)
+
+  implicit val jsonEncoder: Encoder[Role] =
+    Encoder.encodeString.contramap(_.asString)
 }

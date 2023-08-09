@@ -22,6 +22,8 @@ import io.renku.graph.model.Schemas
 import io.renku.graph.model.persons.GitLabId
 import io.renku.jsonld.syntax._
 import io.renku.jsonld.{EntityId, EntityTypes, JsonLD, JsonLDEncoder}
+import io.renku.triplesstore.client.http.RowDecoder
+import io.renku.tinytypes.json.TinyTypeDecoders._
 
 final case class ProjectMember(
     gitLabId: GitLabId,
@@ -42,4 +44,7 @@ object ProjectMember {
         Schemas.schema / "role"       -> member.role.asString.asJsonLD
       )
     }
+
+  implicit def rowDecoder: RowDecoder[ProjectMember] =
+    RowDecoder.forProduct2("gitLabId", "role")(ProjectMember.apply)
 }
