@@ -51,6 +51,7 @@ lazy val root = project
     entitiesSearch,
     entitiesViewingsCollector,
     triplesGenerator,
+    renkuCoreClient,
     knowledgeGraph
   )
 
@@ -204,6 +205,13 @@ lazy val tokenRepository = project
     AutomateHeaderPlugin
   )
 
+lazy val renkuCoreClient = project
+  .in(file("renku-core-client"))
+  .withId("renku-core-client")
+  .settings(commonSettings)
+  .dependsOn(graphCommons % "compile->compile; test->test")
+  .enablePlugins(AutomateHeaderPlugin)
+
 lazy val knowledgeGraph = project
   .in(file("knowledge-graph"))
   .withId("knowledge-graph")
@@ -220,6 +228,7 @@ lazy val knowledgeGraph = project
     graphCommons        % "compile->compile; test->test",
     entitiesSearch      % "compile->compile; test->test",
     triplesGeneratorApi % "compile->compile; test->test",
+    renkuCoreClient     % "compile->compile; test->test",
     entitiesViewingsCollector
   )
   .enablePlugins(
