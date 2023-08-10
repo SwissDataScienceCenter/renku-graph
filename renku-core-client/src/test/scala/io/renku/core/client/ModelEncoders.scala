@@ -20,6 +20,7 @@ package io.renku.core.client
 
 import io.circe.Encoder
 import io.circe.literal._
+import io.circe.syntax._
 import io.renku.graph.model.versions.{CliVersion, SchemaVersion}
 
 private object ModelEncoders {
@@ -48,4 +49,18 @@ private object ModelEncoders {
       "latest_version":      $cliVersion
     }"""
   }
+
+  implicit def resultEncoder[T](implicit enc: Encoder[T]): Encoder[Result[T]] =
+    Encoder.instance {
+      case Result.Success(obj) => json"""{
+          "result": ${obj.asJson}
+        }"""
+      case Result.Failure.Detailed(code, userMessage) => json"""{
+          "error": {
+            "code":        $code,
+            "userMessage": $userMessage
+          }
+        }"""
+      case result => throw new Exception(s"$result shouldn't be in the core API response payload")
+    }
 }

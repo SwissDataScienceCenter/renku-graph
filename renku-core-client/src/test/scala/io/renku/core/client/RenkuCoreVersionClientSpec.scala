@@ -25,8 +25,6 @@ import cats.effect.IO
 import cats.syntax.all._
 import com.github.tomakehurst.wiremock.client.WireMock._
 import com.typesafe.config.Config
-import io.circe.Encoder
-import io.circe.literal._
 import io.circe.syntax._
 import io.renku.generators.Generators.Implicits._
 import io.renku.generators.Generators.exceptions
@@ -153,19 +151,5 @@ class RenkuCoreVersionClientSpec
       val uriForSchema = RenkuCoreUri.ForSchema(server.baseUri, schemaVersion)
 
       client.getApiVersion(uriForSchema).map(uriForSchema -> _)
-    }
-
-  private implicit def resultEncoder[T](implicit enc: Encoder[T]): Encoder[Result[T]] =
-    Encoder.instance {
-      case Result.Success(obj) => json"""{
-          "result": ${obj.asJson}
-        }"""
-      case Result.Failure.Detailed(code, userMessage) => json"""{
-          "error": {
-            "code":        $code,
-            "userMessage": $userMessage
-          }
-        }"""
-      case result => fail(s"$result shouldn't be in the core API response payload")
     }
 }
