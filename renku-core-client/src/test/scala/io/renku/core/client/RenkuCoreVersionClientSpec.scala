@@ -65,7 +65,7 @@ class RenkuCoreVersionClientSpec
 
             client
               .findCoreUri(schemaVersion)
-              .asserting(_ shouldBe RenkuCoreUri.Versioned(coreUriForSchema, apiVersions.max))
+              .asserting(_ shouldBe Result.success(RenkuCoreUri.Versioned(coreUriForSchema, apiVersions.max)))
         }
       }
 
@@ -81,7 +81,7 @@ class RenkuCoreVersionClientSpec
         .assertThrowsError[Exception](_ shouldBe exception)
     }
 
-    "fail if fetching the api version fails" in {
+    "return a failure if fetching the api version fails" in {
 
       val schemaVersion = projectSchemaVersions.generateOne
       val failure       = resultDetailedFailures.generateOne
@@ -89,9 +89,7 @@ class RenkuCoreVersionClientSpec
       givenApiVersionFetching(schemaVersion, returning = failure).use { case (coreUriForSchema, _) =>
         givenCoreUriForSchemaInConfig(returning = coreUriForSchema)
 
-        client
-          .findCoreUri(schemaVersion)
-          .assertThrowsError[Exception](_ shouldBe failure)
+        client.findCoreUri(schemaVersion).asserting(_ shouldBe failure)
       }
     }
   }

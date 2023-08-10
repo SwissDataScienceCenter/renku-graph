@@ -18,7 +18,6 @@
 
 package io.renku.core.client
 
-import cats.MonadThrow
 import cats.effect.Async
 import cats.syntax.all._
 import com.typesafe.config.{Config, ConfigFactory}
@@ -32,7 +31,7 @@ import org.http4s.dsl.Http4sDsl
 import org.typelevel.log4cats.Logger
 
 private trait RenkuCoreVersionClient[F[_]] {
-  def findCoreUri(schemaVersion: SchemaVersion): F[RenkuCoreUri.Versioned]
+  def findCoreUri(schemaVersion: SchemaVersion): F[Result[RenkuCoreUri.Versioned]]
   def getVersions: F[Result[List[SchemaVersion]]]
   def getApiVersion(uri: RenkuCoreUri.ForSchema): F[Result[SchemaApiVersions]]
 }
@@ -55,13 +54,11 @@ private class RenkuCoreVersionClientImpl[F[_]: Async: Logger](coreUri: RenkuCore
 
   import clientTools._
 
-  override def findCoreUri(schemaVersion: SchemaVersion): F[RenkuCoreUri.Versioned] =
+  override def findCoreUri(schemaVersion: SchemaVersion): F[Result[RenkuCoreUri.Versioned]] =
     for {
       uriForSchema   <- coreUriForSchemaLoader.loadFromConfig[F](schemaVersion, config)
       apiVersionsRes <- getApiVersion(uriForSchema)
-      versionedUriRes = apiVersionsRes.map(_.max).map(RenkuCoreUri.Versioned(uriForSchema, _))
-      versionedUri <- MonadThrow[F].fromEither(versionedUriRes.toEither)
-    } yield versionedUri
+    } yield apiVersionsRes.map(_.max).map(RenkuCoreUri.Versioned(uriForSchema, _))
 
   override def getVersions: F[Result[List[SchemaVersion]]] = {
     val decoder = Decoder.instance[List[SchemaVersion]] { res =>
