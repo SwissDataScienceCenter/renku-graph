@@ -20,4 +20,4 @@ name := "token-repository"
 
 Test / fork := true
 
-libraryDependencies += "ch.qos.logback" % "logback-classic" % "1.4.9"
+libraryDependencies += "ch.qos.logback" % "logback-classic" % "1.4.11"
