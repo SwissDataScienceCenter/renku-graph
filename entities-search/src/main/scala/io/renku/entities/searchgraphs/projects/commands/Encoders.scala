@@ -20,25 +20,15 @@ package io.renku.entities.searchgraphs.projects
 package commands
 
 import cats.syntax.all._
-import io.renku.entities.searchgraphs.PersonInfo
 import io.renku.graph.model.Schemas.rdf
-import io.renku.graph.model.entities.Person
 import io.renku.graph.model.images.Image
-import io.renku.graph.model.projects
+import io.renku.graph.model.{persons, projects}
 import io.renku.jsonld.Property
 import io.renku.jsonld.syntax._
 import io.renku.triplesstore.client.model.{Quad, QuadsEncoder, TripleObject}
 import io.renku.triplesstore.client.syntax._
 
 private object Encoders {
-
-  implicit val personInfoEncoder: QuadsEncoder[PersonInfo] = QuadsEncoder.instance {
-    case PersonInfo(resourceId, name) =>
-      Set(
-        ProjectsQuad(resourceId, rdf / "type", Person.Ontology.typeClass.id),
-        ProjectsQuad(resourceId, Person.Ontology.nameProperty.id, name.asObject)
-      )
-  }
 
   implicit val imageEncoder: QuadsEncoder[Image] = QuadsEncoder.instance { case Image(resourceId, uri, position) =>
     Set(
@@ -56,8 +46,8 @@ private object Encoders {
       searchInfoQuad(ProjectSearchInfoOntology.descriptionProperty.id, d.asObject)
     }
 
-    val creatorQuads = info.maybeCreator.toSet.flatMap { (c: PersonInfo) =>
-      c.asQuads + searchInfoQuad(ProjectSearchInfoOntology.creatorProperty, c.resourceId.asEntityId)
+    val creatorQuads = info.maybeCreator.toSet.map { (resourceId: persons.ResourceId) =>
+      searchInfoQuad(ProjectSearchInfoOntology.creatorProperty, resourceId.asEntityId)
     }
 
     val keywordsQuads = info.keywords.toSet.map { (k: projects.Keyword) =>

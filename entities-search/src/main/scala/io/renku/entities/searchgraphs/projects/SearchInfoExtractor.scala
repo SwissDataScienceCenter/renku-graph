@@ -18,7 +18,6 @@
 
 package io.renku.entities.searchgraphs.projects
 
-import io.renku.entities.searchgraphs.PersonInfo.toPersonInfo
 import io.renku.graph.model.entities.Project
 
 private object SearchInfoExtractor {
@@ -31,7 +30,7 @@ private object SearchInfoExtractor {
       project.visibility,
       project.dateCreated,
       project.dateModified,
-      project.maybeCreator.map(toPersonInfo),
+      project.maybeCreator.map(_.resourceId),
       project.keywords.toList,
       project.maybeDescription,
       project.images

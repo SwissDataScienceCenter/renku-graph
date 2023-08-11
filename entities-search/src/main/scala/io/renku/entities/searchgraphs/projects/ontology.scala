@@ -40,7 +40,7 @@ object ProjectSearchInfoOntology {
   lazy val typeDef: Type = Type.Def(
     Class(renku / "DiscoverableProject"),
     ObjectProperties(
-      ObjectProperty(creatorProperty, PersonInfoOntology.typeDef),
+      ObjectProperty(creatorProperty, Person.Ontology.typeDef),
       ObjectProperty(imageProperty, Image.Ontology.typeDef)
     ),
     DataProperties(
@@ -53,17 +53,6 @@ object ProjectSearchInfoOntology {
       keywordsProperty,
       descriptionProperty
     )
-  )
-}
-
-object PersonInfoOntology {
-
-  val nameProperty: DataProperty.Def = Person.Ontology.nameProperty
-
-  lazy val typeDef: Type = Type.Def(
-    Class(renku / "DiscoverableDatasetPerson"),
-    ObjectProperties(),
-    DataProperties(nameProperty)
   )
 }
 

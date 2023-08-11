@@ -20,7 +20,6 @@ package io.renku.entities.searchgraphs.datasets
 
 import cats.data.NonEmptyList
 import cats.syntax.all._
-import io.renku.entities.searchgraphs
 import io.renku.entities.searchgraphs.datasets.SearchInfoLens._
 import io.renku.generators.Generators.Implicits._
 import io.renku.graph.model.datasets.TopmostSameAs
@@ -37,7 +36,7 @@ private object Generators {
     createdOrPublished <- datasetCreatedOrPublished
     visibility         <- projectVisibilities
     maybeDateModified  <- datasetModifiedDates(notYoungerThan = createdOrPublished).toGeneratorOfOptions
-    creators           <- searchgraphs.Generators.personInfos.toGeneratorOfNonEmptyList(max = 2)
+    creators           <- personResourceIds.toGeneratorOfNonEmptyList(max = 2)
     keywords           <- datasetKeywords.toGeneratorOfList(max = 2)
     maybeDesc          <- datasetDescriptions.toGeneratorOfOptions
     images             <- imageUris.toGeneratorOfList(max = 2).map(_.toEntitiesImages(datasetResourceIds.generateOne))
