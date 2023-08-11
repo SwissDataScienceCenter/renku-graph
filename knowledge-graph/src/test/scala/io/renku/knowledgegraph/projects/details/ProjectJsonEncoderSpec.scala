@@ -139,7 +139,7 @@ class ProjectJsonEncoderSpec extends AnyWordSpec with should.Matchers with Scala
   private implicit lazy val urlsDecoder: Decoder[Urls] = cursor =>
     for {
       ssh         <- cursor.downField("ssh").as[SshUrl]
-      http        <- cursor.downField("http").as[HttpUrl]
+      http        <- cursor.downField("http").as[GitHttpUrl]
       web         <- cursor.downField("web").as[WebUrl]
       maybeReadme <- cursor.downField("readme").as[Option[ReadmeUrl]]
     } yield Urls(ssh, http, web, maybeReadme)

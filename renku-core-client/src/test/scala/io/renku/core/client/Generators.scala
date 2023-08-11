@@ -37,6 +37,9 @@ object Generators {
   implicit lazy val apiVersions: Gen[ApiVersion] =
     (positiveInts(), positiveInts()).mapN((major, minor) => ApiVersion(s"$major.$minor"))
 
+  implicit lazy val migrationRequiredGen: Gen[MigrationRequired] =
+    Gen.oneOf(MigrationRequired.yes, MigrationRequired.no)
+
   implicit lazy val coreUrisForSchema: Gen[RenkuCoreUri.ForSchema] =
     for {
       baseUri <- httpUrls()
@@ -51,4 +54,7 @@ object Generators {
 
   implicit lazy val schemaApiVersions: Gen[SchemaApiVersions] =
     (apiVersions, apiVersions, cliVersions).mapN(SchemaApiVersions.apply)
+
+  implicit lazy val projectMigrationChecks: Gen[ProjectMigrationCheck] =
+    (projectSchemaVersions, migrationRequiredGen).mapN(ProjectMigrationCheck.apply)
 }

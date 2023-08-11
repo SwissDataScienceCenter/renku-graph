@@ -18,14 +18,18 @@
 
 package io.renku.core.client
 
+import Generators.projectMigrationChecks
+import ModelEncoders._
 import cats.effect.IO
+import com.github.tomakehurst.wiremock.client.WireMock._
+import io.circe.syntax._
+import io.renku.generators.CommonGraphGenerators.accessTokens
 import io.renku.generators.Generators.Implicits._
-import io.renku.graph.model.GraphModelGenerators.{projectSchemaVersions, projectSlugs}
+import io.renku.graph.model.GraphModelGenerators.projectGitHttpUrls
 import io.renku.interpreters.TestLogger
 import io.renku.stubbing.ExternalServiceStubbing
 import io.renku.testtools.CustomAsyncIOSpec
 import org.scalamock.scalatest.AsyncMockFactory
-import com.github.tomakehurst.wiremock.client.WireMock._
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AsyncWordSpec
 import org.scalatest.{EitherValues, OptionValues}
@@ -44,19 +48,25 @@ class RenkuCoreClientSpec
 
     "return info about current project schema version" in {
 
-      val schemaVersion = projectSchemaVersions.generateOne
-      val projectSlug = projectSlugs.generateOne
+      val accessToken       = accessTokens.generateOne
+      val projectGitHttpUrl = projectGitHttpUrls.generateOne
+      val migrationCheck    = projectMigrationChecks.generateOne
 
       stubFor {
-        get(s"/renku/cache.migrations_check").withQueryParam("git_url", )
-          .willReturn(ok(Result.success(versionTuples).asJson.spaces2))
+        get(urlPathEqualTo("/renku/cache.migrations_check"))
+          .withQueryParam("git_url", equalTo(projectGitHttpUrl.value))
+          .withHeader("gitlab-token", equalTo(accessToken.value))
+          .willReturn(ok(Result.success(migrationCheck).asJson.spaces2))
       }
+
+      client.getMigrationCheck(projectGitHttpUrl, accessToken).asserting(_ shouldBe Result.success(migrationCheck))
     }
   }
 
   private implicit val logger: Logger[IO] = TestLogger()
   private val coreVersionClient = mock[RenkuCoreVersionClient[IO]]
-  private lazy val client = new RenkuCoreClientImpl[IO](RenkuCoreUri.Current(externalServiceBaseUri), coreVersionClient)
+  private lazy val client =
+    new RenkuCoreClientImpl[IO](RenkuCoreUri.Current(externalServiceBaseUri), coreVersionClient, ClientTools[IO])
 
 //  private def givenCoreUriForSchemaInConfig(returning: RenkuCoreUri.ForSchema) =
 //    (coreUriForSchemaLoader

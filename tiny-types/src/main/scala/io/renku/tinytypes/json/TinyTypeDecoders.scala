@@ -32,6 +32,11 @@ object TinyTypeDecoders {
 
   private type NonBlank = String Refined NonEmpty
 
+  implicit def booleanDecoder[TT <: BooleanTinyType](implicit tinyTypeFactory: From[TT]): Decoder[TT] =
+    decodeBoolean.emap { value =>
+      tinyTypeFactory.from(value).leftMap(_.getMessage)
+    }
+
   implicit def stringDecoder[TT <: StringTinyType](implicit tinyTypeFactory: From[TT]): Decoder[TT] =
     decodeString.emap { value =>
       tinyTypeFactory.from(value).leftMap(_.getMessage)

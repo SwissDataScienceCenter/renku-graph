@@ -50,6 +50,15 @@ private object ModelEncoders {
     }"""
   }
 
+  implicit val projectMigrationCheckEnc: Encoder[ProjectMigrationCheck] = Encoder.instance {
+    case ProjectMigrationCheck(schemaVersion, migrationRequired) => json"""{
+      "core_compatibility_status": {
+        "project_metadata_version": $schemaVersion,
+        "migration_required":       $migrationRequired
+      }
+    }"""
+  }
+
   implicit def resultEncoder[T](implicit enc: Encoder[T]): Encoder[Result[T]] =
     Encoder.instance {
       case Result.Success(obj) => json"""{

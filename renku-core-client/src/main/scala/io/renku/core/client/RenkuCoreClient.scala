@@ -22,28 +22,50 @@ import cats.effect.Async
 import cats.syntax.all._
 import com.typesafe.config.{Config, ConfigFactory}
 import io.renku.control.Throttler
-import io.renku.http.client.RestClient
+import io.renku.graph.model.projects
+import io.renku.http.client.{AccessToken, RestClient}
+import org.http4s.Header
 import org.http4s.client.dsl.Http4sClientDsl
 import org.http4s.dsl.Http4sDsl
 import org.typelevel.log4cats.Logger
+import org.typelevel.ci._
 
-trait RenkuCoreClient[F[_]] {}
+trait RenkuCoreClient[F[_]] {
+  def getMigrationCheck(projectGitHttpUrl: projects.GitHttpUrl, accessToken: AccessToken): F[Result[ProjectMigrationCheck]]
+}
 
 object RenkuCoreClient {
   def apply[F[_]: Async: Logger](config: Config = ConfigFactory.load): F[RenkuCoreClient[F]] =
     for {
       coreCurrentUri <- RenkuCoreUri.Current.loadFromConfig[F](config)
       versionClient = RenkuCoreVersionClient[F](coreCurrentUri, config)
-    } yield new RenkuCoreClientImpl[F](coreCurrentUri, versionClient)
+    } yield new RenkuCoreClientImpl[F](coreCurrentUri, versionClient, ClientTools[F])
 }
 
-private class RenkuCoreClientImpl[F[_]: Async: Logger](coreCurrentUri: RenkuCoreUri.Current,
-                                                       versionClient: RenkuCoreVersionClient[F]
+private class RenkuCoreClientImpl[F[_]: Async: Logger](currentUri: RenkuCoreUri.Current,
+                                                       versionClient: RenkuCoreVersionClient[F],
+                                                       clientTools:   ClientTools[F]
 ) extends RestClient[F, Nothing](Throttler.noThrottling)
     with RenkuCoreClient[F]
     with Http4sDsl[F]
     with Http4sClientDsl[F] {
 
-  println(coreCurrentUri)
+  import clientTools._
+
   println(versionClient)
+
+  override def getMigrationCheck(projectGitHttpUrl: projects.GitHttpUrl,
+                                 accessToken:       AccessToken
+  ): F[Result[ProjectMigrationCheck]] = {
+
+    val uri = (currentUri.uri / "renku" / "cache.migrations_check")
+      .withQueryParam("git_url", projectGitHttpUrl.value)
+
+    send(GET(uri).withHeaders(Header.Raw(ci"gitlab-token", accessToken.value))) {
+      case (Ok, _, resp) =>
+        toResult[ProjectMigrationCheck](resp)
+      case reqInfo =>
+        toFailure[ProjectMigrationCheck](s"Migration check for $projectGitHttpUrl failed")(reqInfo)
+    }
+  }
 }

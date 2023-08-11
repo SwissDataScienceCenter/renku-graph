@@ -28,7 +28,7 @@ import model.Forking.ForksCount
 import model.Permissions._
 import model.Project.StarsCount
 import model.Statistics.{CommitsCount, JobArtifactsSize, LsfObjectsSize, RepositorySize, StorageSize}
-import model.Urls.{HttpUrl, ReadmeUrl, SshUrl, WebUrl}
+import model.Urls.{ReadmeUrl, SshUrl, WebUrl}
 import model._
 import org.scalacheck.Gen
 
@@ -84,7 +84,7 @@ private object ProjectsGenerators {
 
   implicit lazy val urlsObjects: Gen[Urls] = for {
     sshUrl         <- sshUrls
-    httpUrl        <- httpUrls
+    httpUrl        <- projectGitHttpUrls
     webUrl         <- webUrls
     maybeReadmeUrl <- readmeUrls.toGeneratorOfOptions
   } yield Urls(sshUrl, httpUrl, webUrl, maybeReadmeUrl)
@@ -96,11 +96,6 @@ private object ProjectsGenerators {
     hostParts   <- nonEmptyList(nonBlankStrings())
     projectSlug <- projectSlugs
   } yield SshUrl(s"git@${hostParts.toList.mkString(".")}:$projectSlug.git")
-
-  private implicit lazy val httpUrls: Gen[HttpUrl] = for {
-    url         <- urls()
-    projectSlug <- projectSlugs
-  } yield HttpUrl(s"$url/$projectSlug.git")
 
   private implicit lazy val readmeUrls: Gen[ReadmeUrl] = for {
     url         <- urls()

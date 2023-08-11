@@ -18,14 +18,16 @@
 
 package io.renku.graph.model
 
+import cats.data.Validated
 import cats.syntax.all._
 import eu.timepit.refined.api.Refined
 import eu.timepit.refined.numeric.Positive
 import io.renku.graph.model.views.{EntityIdJsonLDOps, NonBlankTTJsonLDOps, TinyTypeJsonLDOps, UrlResourceRenderer}
 import io.renku.jsonld.{EntityId, JsonLDDecoder, JsonLDEncoder}
-import io.renku.tinytypes.constraints._
 import io.renku.tinytypes._
+import io.renku.tinytypes.constraints._
 
+import java.net.{MalformedURLException, URL}
 import java.time.Instant
 import java.time.temporal.ChronoUnit
 
@@ -206,4 +208,15 @@ object projects {
       extends TinyTypeFactory[Keyword](new Keyword(_))
       with NonBlank[Keyword]
       with NonBlankTTJsonLDOps[Keyword]
+
+  final class GitHttpUrl private(val value: String) extends AnyVal with StringTinyType
+  implicit object GitHttpUrl extends TinyTypeFactory[GitHttpUrl](new GitHttpUrl(_)) with NonBlank[GitHttpUrl] {
+    addConstraint(
+      check = url =>
+        (url endsWith ".git") && Validated
+          .catchOnly[MalformedURLException](new URL(url))
+          .isValid,
+      message = url => s"$url is not a valid repository http url"
+    )
+  }
 }

@@ -151,6 +151,11 @@ trait RenkuTinyTypeGenerators {
   implicit val projectKeywords: Gen[projects.Keyword] =
     Generators.nonBlankStrings(minLength = 5).map(v => projects.Keyword(v.value))
 
+  implicit lazy val projectGitHttpUrls: Gen[projects.GitHttpUrl] = for {
+    url         <- httpUrls()
+    projectSlug <- projectSlugs
+  } yield projects.GitHttpUrl(s"$url/$projectSlug.git")
+
   implicit val filePaths: Gen[projects.FilePath] = Generators.relativePaths() map projects.FilePath.apply
 
   implicit val datasetIdentifiers: Gen[datasets.Identifier] = Generators.noDashUuid.toGeneratorOf(datasets.Identifier)
