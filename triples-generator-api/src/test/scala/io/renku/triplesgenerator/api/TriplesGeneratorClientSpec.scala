@@ -34,7 +34,11 @@ import org.scalatest.matchers.should
 import org.scalatest.wordspec.AsyncWordSpec
 import org.typelevel.log4cats.Logger
 
-class TriplesGeneratorClientSpec extends AsyncWordSpec with CustomAsyncIOSpec with should.Matchers with ExternalServiceStubbing {
+class TriplesGeneratorClientSpec
+    extends AsyncWordSpec
+    with CustomAsyncIOSpec
+    with should.Matchers
+    with ExternalServiceStubbing {
 
   private implicit val logger: Logger[IO] = TestLogger()
   private lazy val client = new TriplesGeneratorClientImpl[IO](Uri.unsafeFromString(externalServiceBaseUrl))

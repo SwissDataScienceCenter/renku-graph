@@ -31,7 +31,9 @@ import org.typelevel.log4cats.Logger
 import org.typelevel.ci._
 
 trait RenkuCoreClient[F[_]] {
-  def getMigrationCheck(projectGitHttpUrl: projects.GitHttpUrl, accessToken: AccessToken): F[Result[ProjectMigrationCheck]]
+  def getMigrationCheck(projectGitHttpUrl: projects.GitHttpUrl,
+                        accessToken:       AccessToken
+  ): F[Result[ProjectMigrationCheck]]
 }
 
 object RenkuCoreClient {

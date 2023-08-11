@@ -209,7 +209,7 @@ object projects {
       with NonBlank[Keyword]
       with NonBlankTTJsonLDOps[Keyword]
 
-  final class GitHttpUrl private(val value: String) extends AnyVal with StringTinyType
+  final class GitHttpUrl private (val value: String) extends AnyVal with StringTinyType
   implicit object GitHttpUrl extends TinyTypeFactory[GitHttpUrl](new GitHttpUrl(_)) with NonBlank[GitHttpUrl] {
     addConstraint(
       check = url =>

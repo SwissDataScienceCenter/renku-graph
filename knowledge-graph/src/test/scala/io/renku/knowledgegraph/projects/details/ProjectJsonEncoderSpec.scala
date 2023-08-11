@@ -38,7 +38,7 @@ import model.Forking.ForksCount
 import model.Permissions.{AccessLevel, GroupAccessLevel, ProjectAccessLevel}
 import model.Project.{ImageLinks, StarsCount}
 import model.Statistics.{CommitsCount, JobArtifactsSize, LsfObjectsSize, RepositorySize, StorageSize}
-import model.Urls.{HttpUrl, ReadmeUrl, SshUrl, WebUrl}
+import model.Urls.{ReadmeUrl, SshUrl, WebUrl}
 import model._
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
