@@ -19,10 +19,13 @@
 package io.renku.core.client
 
 import cats.effect.IO
+import io.renku.generators.Generators.Implicits._
+import io.renku.graph.model.GraphModelGenerators.{projectSchemaVersions, projectSlugs}
 import io.renku.interpreters.TestLogger
 import io.renku.stubbing.ExternalServiceStubbing
 import io.renku.testtools.CustomAsyncIOSpec
 import org.scalamock.scalatest.AsyncMockFactory
+import com.github.tomakehurst.wiremock.client.WireMock._
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AsyncWordSpec
 import org.scalatest.{EitherValues, OptionValues}
@@ -36,6 +39,20 @@ class RenkuCoreClientSpec
     with EitherValues
     with ExternalServiceStubbing
     with AsyncMockFactory {
+
+  "getMigrationCheck" should {
+
+    "return info about current project schema version" in {
+
+      val schemaVersion = projectSchemaVersions.generateOne
+      val projectSlug = projectSlugs.generateOne
+
+      stubFor {
+        get(s"/renku/cache.migrations_check").withQueryParam("git_url", )
+          .willReturn(ok(Result.success(versionTuples).asJson.spaces2))
+      }
+    }
+  }
 
   private implicit val logger: Logger[IO] = TestLogger()
   private val coreVersionClient = mock[RenkuCoreVersionClient[IO]]
