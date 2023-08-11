@@ -21,7 +21,6 @@ package io.renku.entities.searchgraphs.datasets
 import cats.MonadThrow
 import cats.data.NonEmptyList
 import cats.syntax.all._
-import io.renku.entities.searchgraphs.PersonInfo.toPersonInfo
 import io.renku.graph.model.datasets
 import io.renku.graph.model.entities.{Dataset, Project}
 
@@ -65,7 +64,7 @@ private object SearchInfoExtractor {
     project.visibility,
     createdOrPublished,
     maybeDateModified,
-    ds.provenance.creators.map(toPersonInfo),
+    ds.provenance.creators.map(_.resourceId),
     ds.additionalInfo.keywords,
     ds.additionalInfo.maybeDescription,
     ds.additionalInfo.images,

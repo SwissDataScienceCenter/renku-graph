@@ -21,16 +21,15 @@ package io.renku.entities.searchgraphs.datasets
 import cats.Show
 import cats.data.NonEmptyList
 import cats.syntax.all._
-import io.renku.entities.searchgraphs.PersonInfo
 import io.renku.graph.model.images.Image
-import io.renku.graph.model.{datasets, projects}
+import io.renku.graph.model.{datasets, persons, projects}
 
 private final case class DatasetSearchInfo(topmostSameAs:      datasets.TopmostSameAs,
                                            name:               datasets.Name,
                                            visibility:         projects.Visibility,
                                            createdOrPublished: datasets.CreatedOrPublished,
                                            maybeDateModified:  Option[datasets.DateModified],
-                                           creators:           NonEmptyList[PersonInfo],
+                                           creators:           NonEmptyList[persons.ResourceId],
                                            keywords:           List[datasets.Keyword],
                                            maybeDescription:   Option[datasets.Description],
                                            images:             List[Image],

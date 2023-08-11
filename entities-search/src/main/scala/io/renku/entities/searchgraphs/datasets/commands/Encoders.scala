@@ -19,27 +19,17 @@
 package io.renku.entities.searchgraphs.datasets.commands
 
 import cats.syntax.all._
-import io.renku.entities.searchgraphs.PersonInfo
 import io.renku.entities.searchgraphs.datasets.Link.{ImportedDataset, OriginalDataset}
 import io.renku.entities.searchgraphs.datasets.{DatasetSearchInfo, DatasetSearchInfoOntology, Link, LinkOntology}
 import io.renku.graph.model.Schemas.{rdf, renku}
-import io.renku.graph.model.datasets
-import io.renku.graph.model.entities.Person
 import io.renku.graph.model.images.Image
+import io.renku.graph.model.{datasets, persons}
 import io.renku.jsonld.Property
 import io.renku.jsonld.syntax._
 import io.renku.triplesstore.client.model.{Quad, QuadsEncoder, TripleObject}
 import io.renku.triplesstore.client.syntax._
 
 private object Encoders {
-
-  implicit val personInfoEncoder: QuadsEncoder[PersonInfo] = QuadsEncoder.instance {
-    case PersonInfo(resourceId, name) =>
-      Set(
-        DatasetsQuad(resourceId, rdf / "type", Person.Ontology.typeClass.id),
-        DatasetsQuad(resourceId, Person.Ontology.nameProperty.id, name.asObject)
-      )
-  }
 
   implicit val imageEncoder: QuadsEncoder[Image] = QuadsEncoder.instance { case Image(resourceId, uri, position) =>
     Set(
@@ -84,9 +74,8 @@ private object Encoders {
       searchInfoQuad(DatasetSearchInfoOntology.descriptionProperty.id, d.asObject)
     }
 
-    val creatorsQuads = info.creators.toList.toSet.flatMap { (pi: PersonInfo) =>
-      pi.asQuads +
-        searchInfoQuad(DatasetSearchInfoOntology.creatorProperty, pi.resourceId.asEntityId)
+    val creatorsQuads = info.creators.toList.toSet.map { (resourceId: persons.ResourceId) =>
+      searchInfoQuad(DatasetSearchInfoOntology.creatorProperty, resourceId.asEntityId)
     }
 
     val keywordsQuads = info.keywords.toSet.map { (k: datasets.Keyword) =>
@@ -106,6 +95,7 @@ private object Encoders {
     Set(
       searchInfoQuad(rdf / "type", DatasetSearchInfoOntology.typeDef.clazz.id).some,
       searchInfoQuad(DatasetSearchInfoOntology.slugProperty.id, info.name.asObject).some,
+      searchInfoQuad(DatasetSearchInfoOntology.visibilityProperty.id, info.visibility.asObject).some,
       searchInfoQuad(DatasetSearchInfoOntology.visibilityProperty.id, info.visibility.asObject).some,
       createdOrPublishedQuad.some,
       maybeDateModifiedQuad,
