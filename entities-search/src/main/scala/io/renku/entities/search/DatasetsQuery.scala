@@ -91,9 +91,12 @@ object DatasetsQuery extends EntityQuery[Entity.Dataset] {
           |      # textQuery
           |      ${textQueryPart(criteria.filters.maybeQuery)}
           |
-          |      Graph schema:Dataset {
+          |      GRAPH schema:Dataset {
           |        #creator
-          |        $sameAsVar schema:creator / schema:name ?creatorName.
+          |        $sameAsVar schema:creator ?creatorId.
+          |        GRAPH ${GraphClass.Persons.id} {
+          |          ?creatorId schema:name ?creatorName
+          |        }
           |
           |        #keywords
           |        $keywords
@@ -105,7 +108,7 @@ object DatasetsQuery extends EntityQuery[Entity.Dataset] {
           |        $images
           |      }
           |
-          |      Graph ?projId {
+          |      GRAPH ?projId {
           |        # project namespaces
           |        ${namespacesPart(criteria.filters.namespaces)}
           |
@@ -121,7 +124,7 @@ object DatasetsQuery extends EntityQuery[Entity.Dataset] {
           |
           |  ${creatorsPart(criteria.filters.creators)}
           |
-          |  Graph schema:Dataset {
+          |  GRAPH schema:Dataset {
           |    # name
           |    $sameAsVar renku:slug $nameVar
           |

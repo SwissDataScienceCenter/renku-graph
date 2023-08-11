@@ -83,7 +83,10 @@ object DatasetQuery extends (Criteria => Option[SparqlQuery]) {
                |          }
                |
                |          Optional {
-               |            ${v.datasetSameAs} schema:creator / schema:name ?creatorName.
+               |            ${v.datasetSameAs} schema:creator ?creatorId.
+               |            GRAPH ${GraphClass.Persons.id} {
+               |              ?creatorId schema:name ?creatorName
+               |            }
                |          }
                |          Optional {
                |            ${v.datasetSameAs} schema:keywords ?keyword
