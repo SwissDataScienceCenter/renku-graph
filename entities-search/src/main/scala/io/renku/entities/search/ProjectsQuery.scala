@@ -97,7 +97,12 @@ private case object ProjectsQuery extends EntityQuery[model.Entity.Project] {
              |        ${namespacesPart(criteria.filters.namespaces)}
              |      }
              |
-             |      OPTIONAL { $projectIdVar schema:creator/schema:name $someCreatorNameVar }
+             |      OPTIONAL {
+             |        $projectIdVar schema:creator ?creatorId.
+             |        GRAPH ${GraphClass.Persons.id} {
+             |          ?creatorId schema:name $someCreatorNameVar
+             |        }
+             |      }
              |      ${filters.maybeOnCreatorName(someCreatorNameVar)}
              |
              |      OPTIONAL { $projectIdVar schema:description $maybeDescriptionVar }
