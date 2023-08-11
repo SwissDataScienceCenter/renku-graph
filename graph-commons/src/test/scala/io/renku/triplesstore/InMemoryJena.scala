@@ -238,6 +238,9 @@ sealed trait NamedGraphDataset {
       })
       .unsafeRunSync()
 
+  def insertIO(to: DatasetName, quads: List[Quad]): IO[Unit] =
+    quads.map(insertIO(to, _)).sequence.void
+
   def insertIO(to: DatasetName, quad: Quad): IO[Unit] =
     queryRunnerFor(to) >>= (_.runUpdate {
       SparqlQuery.of("insert quad", show"INSERT DATA { ${quad.asSparql.sparql} }")
