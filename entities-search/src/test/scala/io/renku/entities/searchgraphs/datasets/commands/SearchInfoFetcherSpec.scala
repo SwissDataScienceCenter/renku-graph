@@ -20,7 +20,6 @@ package io.renku.entities.searchgraphs.datasets
 package commands
 
 import cats.effect.IO
-import io.renku.entities.searchgraphs.Generators.personInfos
 import io.renku.entities.searchgraphs.datasets.DatasetSearchInfo
 import io.renku.entities.searchgraphs.datasets.Generators._
 import io.renku.entities.searchgraphs.datasets.commands.Encoders._
@@ -55,17 +54,6 @@ class SearchInfoFetcherSpec
       fetcher.fetchTSSearchInfos(projectId).unsafeRunSync() shouldBe infos.sortBy(_.name).map(orderValues)
     }
 
-    "work if there are ',' in names" in new TestCase {
-
-      val infos = datasetSearchInfoObjects(withLinkTo = projectId)
-        .map(_.copy(creators = personInfos.map(_.copy(name = "name, surname")).generateNonEmptyList(max = 1)))
-        .generateFixedSizeList(ofSize = 1)
-
-      insert(projectsDataset, infos.map(_.asQuads).toSet.flatten)
-
-      fetcher.fetchTSSearchInfos(projectId).unsafeRunSync() shouldBe infos.sortBy(_.name).map(orderValues)
-    }
-
     "return nothing if no Datasets for the Project" in new TestCase {
 
       insert(projectsDataset, datasetSearchInfoObjects.generateOne.asQuads)
@@ -83,7 +71,7 @@ class SearchInfoFetcherSpec
     val fetcher = new SearchInfoFetcherImpl[IO](projectsDSConnectionInfo)
   }
 
-  private def orderValues(info: DatasetSearchInfo) = info.copy(creators = info.creators.sortBy(_.name),
+  private def orderValues(info: DatasetSearchInfo) = info.copy(creators = info.creators.sorted,
                                                                keywords = info.keywords.sorted,
                                                                images = info.images.sortBy(_.position),
                                                                links = info.links.sortBy(_.projectId)

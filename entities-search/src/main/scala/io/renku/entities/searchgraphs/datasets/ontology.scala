@@ -40,7 +40,7 @@ object DatasetSearchInfoOntology {
   lazy val typeDef: Type = Type.Def(
     Class(renku / "DiscoverableDataset"),
     ObjectProperties(
-      ObjectProperty(creatorProperty, PersonInfoOntology.typeDef),
+      ObjectProperty(creatorProperty, Person.Ontology.typeDef),
       ObjectProperty(imageProperty, Image.Ontology.typeDef),
       ObjectProperty(linkProperty, LinkOntology.typeDef)
     ),

@@ -48,6 +48,8 @@ private[tsmigrationrequest] object Migrations {
     addProjectDateModified         <- datemodified.AddProjectDateModified[F]
     fixMultipleProjectVersions     <- FixMultipleProjectVersions[F]
     addProjectSlug                 <- projectslug.AddProjectSlug[F]
+    datasetsGraphPersonRemover     <- DatasetsGraphPersonRemover[F]
+    projectsGraphPersonRemover     <- ProjectsGraphPersonRemover[F]
     migrations <- validateNames(
                     datasetsCreator,
                     datasetsRemover,
@@ -63,7 +65,9 @@ private[tsmigrationrequest] object Migrations {
                     provisionProjectsGraph,
                     addProjectDateModified,
                     fixMultipleProjectVersions,
-                    addProjectSlug
+                    addProjectSlug,
+                    datasetsGraphPersonRemover,
+                    projectsGraphPersonRemover
                   )
   } yield migrations
 

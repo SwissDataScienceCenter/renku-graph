@@ -21,7 +21,6 @@ package io.renku.entities.searchgraphs.datasets.commands
 import cats.data.NonEmptyList
 import cats.effect.Async
 import io.renku.entities.searchgraphs
-import io.renku.entities.searchgraphs.PersonInfo
 import io.renku.entities.searchgraphs.datasets.{DatasetSearchInfo, Link, links}
 import io.renku.graph.model.datasets.TopmostSameAs
 import io.renku.graph.model.{GraphClass, projects}
@@ -78,16 +77,12 @@ private class SearchInfoFetcherImpl[F[_]: Async: Logger: SparqlQueryTimeRecorder
              |  } {
              |    GRAPH ${GraphClass.Datasets.id} {
              |      ?topSameAs renku:slug ?name;
-             |                 renku:projectVisibility ?visibility.
+             |                 renku:projectVisibility ?visibility;
+             |                 schema:creator ?creator.
              |      OPTIONAL { ?topSameAs schema:description ?maybeDescription }
              |      OPTIONAL { ?topSameAs schema:dateCreated ?maybeDateCreated }
              |      OPTIONAL { ?topSameAs schema:datePublished ?maybeDatePublished }
              |      OPTIONAL { ?topSameAs schema:dateModified ?maybeDateModified }
-             |      {
-             |        ?topSameAs schema:creator ?creatorId.
-             |        ?creatorId schema:name ?creatorName.
-             |        BIND (CONCAT(STR(?creatorId), STR(';;'), STR(?creatorName)) AS ?creator)
-             |      }
              |      OPTIONAL { ?topSameAs schema:keywords ?keyword }
              |      OPTIONAL {
              |        ?topSameAs schema:image ?imageId.
@@ -138,18 +133,15 @@ private class SearchInfoFetcherImpl[F[_]: Async: Logger: SparqlQueryTimeRecorder
         _.map(decode[datasets.Keyword](map = toKeyword, sort = _.sorted))
           .getOrElse(List.empty.asRight[DecodingFailure])
 
-      val toCreator: String => Decoder.Result[PersonInfo] = {
-        case s"$id;;$name" =>
-          (persons.ResourceId.from(id) -> persons.Name.from(name))
-            .mapN(PersonInfo(_, _))
-            .leftMap(ex => DecodingFailure(DecodingFailure.Reason.CustomReason(ex.getMessage), cur))
-        case other =>
-          DecodingFailure(DecodingFailure.Reason.CustomReason(s"'$other' not a valid creator record"), cur)
-            .asLeft[PersonInfo]
-      }
+      val toCreatorId: String => Decoder.Result[persons.ResourceId] =
+        persons.ResourceId
+          .from(_)
+          .leftMap(ex => DecodingFailure(DecodingFailure.Reason.CustomReason(ex.getMessage), cur))
 
-      def toListOfCreators(implicit topmostSameAs: TopmostSameAs): String => Decoder.Result[NonEmptyList[PersonInfo]] =
-        decode[PersonInfo](map = toCreator, sort = _.sortBy(_.name))(_)
+      def toListOfCreators(implicit
+          topmostSameAs: TopmostSameAs
+      ): String => Decoder.Result[NonEmptyList[persons.ResourceId]] =
+        decode[persons.ResourceId](map = toCreatorId, sort = _.sorted)(_)
           .flatMap(toNonEmptyList(s"No creators found for $topmostSameAs"))
 
       val toImage: String => Decoder.Result[images.Image] = {

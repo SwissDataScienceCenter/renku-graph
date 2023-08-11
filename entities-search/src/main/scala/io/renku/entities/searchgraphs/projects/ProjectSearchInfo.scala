@@ -20,9 +20,8 @@ package io.renku.entities.searchgraphs.projects
 
 import cats.Show
 import cats.syntax.all._
-import io.renku.entities.searchgraphs.PersonInfo
 import io.renku.graph.model.images.Image
-import io.renku.graph.model.projects
+import io.renku.graph.model.{persons, projects}
 
 private final case class ProjectSearchInfo(id:               projects.ResourceId,
                                            name:             projects.Name,
@@ -30,7 +29,7 @@ private final case class ProjectSearchInfo(id:               projects.ResourceId
                                            visibility:       projects.Visibility,
                                            dateCreated:      projects.DateCreated,
                                            dateModified:     projects.DateModified,
-                                           maybeCreator:     Option[PersonInfo],
+                                           maybeCreator:     Option[persons.ResourceId],
                                            keywords:         List[projects.Keyword],
                                            maybeDescription: Option[projects.Description],
                                            images:           List[Image]

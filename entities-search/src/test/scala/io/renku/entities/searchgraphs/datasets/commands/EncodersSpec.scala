@@ -19,7 +19,6 @@
 package io.renku.entities.searchgraphs.datasets
 package commands
 
-import io.renku.entities.searchgraphs.Generators.personInfos
 import io.renku.entities.searchgraphs.datasets.Generators._
 import io.renku.entities.searchgraphs.datasets.{DatasetSearchInfo, DatasetSearchInfoOntology, LinkOntology}
 import io.renku.generators.Generators.Implicits._
@@ -28,7 +27,6 @@ import io.renku.generators.jsonld.JsonLDGenerators.entityIds
 import io.renku.graph.model.GraphModelGenerators.{datasetTopmostSameAs, imageUris}
 import io.renku.graph.model.Schemas.{rdf, renku, schema}
 import io.renku.graph.model.datasets
-import io.renku.graph.model.entities.Person
 import io.renku.graph.model.images.{Image, ImagePosition, ImageResourceId}
 import io.renku.jsonld.syntax._
 import io.renku.triplesstore.client.model.Quad
@@ -39,19 +37,6 @@ import org.scalatest.wordspec.AnyWordSpec
 class EncodersSpec extends AnyWordSpec with should.Matchers {
 
   import io.renku.entities.searchgraphs.datasets.commands.Encoders._
-
-  "personInfoEncoder" should {
-
-    "turn a PersonInfo object into a Set of relevant Quads" in {
-
-      val personInfo = personInfos.generateOne
-
-      personInfo.asQuads shouldBe Set(
-        DatasetsQuad(personInfo.resourceId, rdf / "type", Person.Ontology.typeClass.id),
-        DatasetsQuad(personInfo.resourceId, Person.Ontology.nameProperty.id, personInfo.name.asObject)
-      )
-    }
-  }
 
   "imageEncoder" should {
 
@@ -139,15 +124,11 @@ class EncodersSpec extends AnyWordSpec with should.Matchers {
 
   private def creatorsToQuads(searchInfo: DatasetSearchInfo): Set[Quad] =
     searchInfo.creators
-      .map(pi =>
-        pi.asQuads + DatasetsQuad(searchInfo.topmostSameAs,
-                                  DatasetSearchInfoOntology.creatorProperty,
-                                  pi.resourceId.asEntityId
-        )
+      .map(creatorId =>
+        DatasetsQuad(searchInfo.topmostSameAs, DatasetSearchInfoOntology.creatorProperty, creatorId.asEntityId)
       )
       .toList
       .toSet
-      .flatten
 
   private def keywordsToQuads(searchInfo: DatasetSearchInfo): Set[Quad] =
     searchInfo.keywords
