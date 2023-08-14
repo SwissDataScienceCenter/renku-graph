@@ -18,14 +18,15 @@
 
 package io.renku.core.client
 
-import Generators.projectMigrationChecks
-import ModelEncoders._
+import Generators._
+import cats.MonadThrow
 import cats.effect.IO
-import com.github.tomakehurst.wiremock.client.WireMock._
-import io.circe.syntax._
-import io.renku.generators.CommonGraphGenerators.accessTokens
+import cats.syntax.all._
+import com.typesafe.config.Config
 import io.renku.generators.Generators.Implicits._
-import io.renku.graph.model.GraphModelGenerators.projectGitHttpUrls
+import io.renku.generators.Generators.exceptions
+import io.renku.graph.model.GraphModelGenerators.projectSchemaVersions
+import io.renku.graph.model.versions.SchemaVersion
 import io.renku.interpreters.TestLogger
 import io.renku.stubbing.ExternalServiceStubbing
 import io.renku.testtools.CustomAsyncIOSpec
@@ -44,33 +45,71 @@ class RenkuCoreClientSpec
     with ExternalServiceStubbing
     with AsyncMockFactory {
 
-  "getMigrationCheck" should {
+  "findCoreUri" should {
 
-    "return info about current project schema version" in {
+    "find the uri of the core for the given schema in the config, " +
+      "fetch the api version using the uri and " +
+      "return the CoreUri relevant for the given schema" in {
 
-      val accessToken       = accessTokens.generateOne
-      val projectGitHttpUrl = projectGitHttpUrls.generateOne
-      val migrationCheck    = projectMigrationChecks.generateOne
+        val coreUriForSchema = coreUrisForSchema.generateOne
+        val apiVersions      = schemaApiVersions.generateOne
 
-      stubFor {
-        get(urlPathEqualTo("/renku/cache.migrations_check"))
-          .withQueryParam("git_url", equalTo(projectGitHttpUrl.value))
-          .withHeader("gitlab-token", equalTo(accessToken.value))
-          .willReturn(ok(Result.success(migrationCheck).asJson.spaces2))
+        givenCoreUriForSchemaInConfig(returning = coreUriForSchema)
+        givenApiVersionFetching(coreUriForSchema, returning = Result.success(apiVersions))
+
+        client
+          .findCoreUri(coreUriForSchema.schemaVersion)
+          .asserting(_ shouldBe Result.success(RenkuCoreUri.Versioned(coreUriForSchema, apiVersions.max)))
       }
 
-      client.getMigrationCheck(projectGitHttpUrl, accessToken).asserting(_ shouldBe Result.success(migrationCheck))
+    "fail if finding the uri of the core for the given schema in the config fails " in {
+
+      val exception = exceptions.generateOne
+      givenCoreUriForSchemaInConfig(failsWith = exception)
+
+      val schemaVersion = projectSchemaVersions.generateOne
+
+      client
+        .findCoreUri(schemaVersion)
+        .assertThrowsError[Exception](_ shouldBe exception)
+    }
+
+    "return a failure if fetching the api version fails" in {
+
+      val coreUriForSchema = coreUrisForSchema.generateOne
+      val failure          = resultDetailedFailures.generateOne
+
+      givenCoreUriForSchemaInConfig(returning = coreUriForSchema)
+      givenApiVersionFetching(coreUriForSchema, returning = failure)
+
+      client.findCoreUri(coreUriForSchema.schemaVersion).asserting(_ shouldBe failure)
     }
   }
 
   private implicit val logger: Logger[IO] = TestLogger()
-  private val coreVersionClient = mock[RenkuCoreVersionClient[IO]]
-  private lazy val client =
-    new RenkuCoreClientImpl[IO](RenkuCoreUri.Current(externalServiceBaseUri), coreVersionClient, ClientTools[IO])
+  private val coreUriForSchemaLoader = mock[RenkuCoreUri.ForSchemaLoader]
+  private val lowLevelApis           = mock[LowLevelApis[IO]]
+  private lazy val config            = mock[Config]
+  private lazy val client = new RenkuCoreClientImpl[IO](RenkuCoreUri.Current(externalServiceBaseUri),
+                                                        coreUriForSchemaLoader,
+                                                        lowLevelApis,
+                                                        config
+  )
 
-//  private def givenCoreUriForSchemaInConfig(returning: RenkuCoreUri.ForSchema) =
-//    (coreUriForSchemaLoader
-//      .loadFromConfig[IO](_: SchemaVersion, _: Config)(_: MonadThrow[IO]))
-//      .expects(returning.schemaVersion, config, *)
-//      .returning(returning.pure[IO])
+  private def givenApiVersionFetching(coreUri: RenkuCoreUri.ForSchema, returning: Result[SchemaApiVersions]) =
+    (lowLevelApis.getApiVersion _)
+      .expects(coreUri)
+      .returning(returning.pure[IO])
+
+  private def givenCoreUriForSchemaInConfig(returning: RenkuCoreUri.ForSchema) =
+    (coreUriForSchemaLoader
+      .loadFromConfig[IO](_: SchemaVersion, _: Config)(_: MonadThrow[IO]))
+      .expects(returning.schemaVersion, config, *)
+      .returning(returning.pure[IO])
+
+  private def givenCoreUriForSchemaInConfig(failsWith: Throwable) =
+    (coreUriForSchemaLoader
+      .loadFromConfig[IO](_: SchemaVersion, _: Config)(_: MonadThrow[IO]))
+      .expects(*, config, *)
+      .returning(failsWith.raiseError[IO, Nothing])
 }
