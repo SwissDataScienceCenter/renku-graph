@@ -18,42 +18,68 @@
 
 package io.renku.core.client
 
+import cats.data.Nested
 import cats.effect.Async
 import cats.syntax.all._
 import com.typesafe.config.{Config, ConfigFactory}
 import io.renku.control.Throttler
+import io.renku.graph.model.projects
 import io.renku.graph.model.versions.SchemaVersion
-import io.renku.http.client.RestClient
+import io.renku.http.client.{AccessToken, RestClient}
 import org.http4s.client.dsl.Http4sClientDsl
 import org.http4s.dsl.Http4sDsl
 import org.typelevel.log4cats.Logger
 
 trait RenkuCoreClient[F[_]] {
+  def findCoreUri(projectUrl:    projects.GitHttpUrl, accessToken: AccessToken): F[Result[RenkuCoreUri.Versioned]]
   def findCoreUri(schemaVersion: SchemaVersion): F[Result[RenkuCoreUri.Versioned]]
 }
 
 object RenkuCoreClient {
   def apply[F[_]: Async: Logger](config: Config = ConfigFactory.load): F[RenkuCoreClient[F]] =
     RenkuCoreUri.Current.loadFromConfig[F](config).map { coreCurrentUri =>
-      new RenkuCoreClientImpl[F](coreCurrentUri, RenkuCoreUri.ForSchema, LowLevelApis[F](coreCurrentUri), config)
+      new RenkuCoreClientImpl[F](RenkuCoreUri.ForSchema, LowLevelApis[F](coreCurrentUri), config)
     }
 }
 
-private class RenkuCoreClientImpl[F[_]: Async: Logger](currentUri: RenkuCoreUri.Current,
-                                                       coreUriForSchemaLoader: RenkuCoreUri.ForSchemaLoader,
-                                                       lowLevelApis:           LowLevelApis[F],
-                                                       config:                 Config
+private class RenkuCoreClientImpl[F[_]: Async: Logger](coreUriForSchemaLoader: RenkuCoreUri.ForSchemaLoader,
+                                                       lowLevelApis: LowLevelApis[F],
+                                                       config:       Config
 ) extends RestClient[F, Nothing](Throttler.noThrottling)
     with RenkuCoreClient[F]
     with Http4sDsl[F]
     with Http4sClientDsl[F] {
 
-  println(currentUri)
+  private val nestedF = NestedF[F]
+  import nestedF._
+
+  override def findCoreUri(projectUrl:  projects.GitHttpUrl,
+                           accessToken: AccessToken
+  ): F[Result[RenkuCoreUri.Versioned]] =
+    Nested(lowLevelApis.getVersions)
+      .flatMap(_.findM(migratedAndMatchingSchema(projectUrl, accessToken)))
+      .flatMapF[RenkuCoreUri.Versioned] {
+        case Some(sv) => findCoreUri(sv)
+        case None     => Result.failure(show"No API for $projectUrl. Quite likely migration required").pure[F].widen
+      }
+      .value
+
+  private def migratedAndMatchingSchema(projectUrl:  projects.GitHttpUrl,
+                                        accessToken: AccessToken
+  ): SchemaVersion => Nested[F, Result, Boolean] =
+    schemaVersion =>
+      Nested {
+        coreUriForSchemaLoader
+          .loadFromConfig[F](schemaVersion, config)
+          .flatMap(lowLevelApis.getMigrationCheck(_, projectUrl, accessToken))
+      }.subflatMap {
+        case ProjectMigrationCheck(`schemaVersion`, MigrationRequired.no) => Result.success(true)
+        case _                                                            => Result.success(false)
+      }
 
   override def findCoreUri(schemaVersion: SchemaVersion): F[Result[RenkuCoreUri.Versioned]] =
     for {
       uriForSchema   <- coreUriForSchemaLoader.loadFromConfig[F](schemaVersion, config)
       apiVersionsRes <- lowLevelApis.getApiVersion(uriForSchema)
     } yield apiVersionsRes.map(_.max).map(RenkuCoreUri.Versioned(uriForSchema, _))
-
 }
