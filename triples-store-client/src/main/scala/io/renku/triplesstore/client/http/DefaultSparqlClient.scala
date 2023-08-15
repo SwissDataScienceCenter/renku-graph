@@ -73,7 +73,7 @@ final class DefaultSparqlClient[F[_]: Async: Logger](client: Client[F], config: 
   }
 
   override def query(request: SparqlQuery): F[Json] =
-    retry.fold(query0(request))(_.retryConnectionError(query(request)))
+    retry.fold(query0(request))(_.retryConnectionError(query0(request)))
 
   private def query0(request: SparqlQuery): F[Json] = {
     val req =
