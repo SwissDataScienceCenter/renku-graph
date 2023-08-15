@@ -89,6 +89,6 @@ object ProjectAuthSync {
         .map(_.headOption)
 
     implicit def decoder: RowDecoder[Visibility] =
-      RowDecoder.forProduct1[Visibility, Visibility]("visibility")(identity)
+      RowDecoder.forProduct1[Visibility, Visibility]("visibility")(identity)(Visibility.jsonDecoder)
   }
 }
