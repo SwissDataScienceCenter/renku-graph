@@ -36,7 +36,7 @@ final class DefaultSparqlClient[F[_]: Async: Logger](client: Client[F], config: 
     with Http4sClientDsl[F]
     with MoreClientDsl[F] {
 
-  private[this] val retry = config.retry.map(c => Retry[F](c.interval, c.maxRetries))
+  private[this] val retry = config.retry.map(Retry.apply[F])
   private[this] val sparqlResultsJson: MediaType = mediaType"application/sparql-results+json"
 
   override def update(request: SparqlUpdate): F[Unit] =

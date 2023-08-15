@@ -20,22 +20,8 @@ package io.renku.triplesstore.client.http
 
 import org.http4s.{BasicCredentials, Uri}
 
-import scala.concurrent.duration._
-
 final case class ConnectionConfig(
     baseUrl:   Uri,
     basicAuth: Option[BasicCredentials],
-    retry:     Option[ConnectionConfig.RetryConfig]
+    retry:     Option[Retry.RetryConfig]
 )
-
-object ConnectionConfig {
-
-  final case class RetryConfig(
-      interval:   FiniteDuration,
-      maxRetries: Int
-  )
-
-  object RetryConfig {
-    val default: RetryConfig = RetryConfig(10.seconds, 10)
-  }
-}

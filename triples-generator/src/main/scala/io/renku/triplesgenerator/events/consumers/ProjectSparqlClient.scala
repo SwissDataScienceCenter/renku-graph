@@ -22,7 +22,7 @@ import cats.effect._
 import fs2.io.net.Network
 import io.renku.jsonld.JsonLD
 import io.renku.triplesstore.ProjectsConnectionConfig
-import io.renku.triplesstore.client.http.{ConnectionConfig, SparqlClient, SparqlQuery, SparqlUpdate}
+import io.renku.triplesstore.client.http.{Retry, SparqlClient, SparqlQuery, SparqlUpdate}
 import org.typelevel.log4cats.Logger
 
 /** SparQL client fixed to the `projects` dataset. */
@@ -31,7 +31,7 @@ trait ProjectSparqlClient[F[_]] extends SparqlClient[F]
 object ProjectSparqlClient {
   def apply[F[_]: Network: Async: Logger](
       cc:       ProjectsConnectionConfig,
-      retryCfg: ConnectionConfig.RetryConfig = ConnectionConfig.RetryConfig.default
+      retryCfg: Retry.RetryConfig = Retry.RetryConfig.default
   ): Resource[F, ProjectSparqlClient[F]] = {
     val cfg = cc.toCC(Some(retryCfg))
     SparqlClient[F](cfg).map(c =>

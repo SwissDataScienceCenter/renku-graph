@@ -34,7 +34,7 @@ final class DefaultFusekiClient[F[_]: Async: Logger](
     with Http4sClientDsl[F]
     with MoreClientDsl[F] {
 
-  private[this] val retry       = cc.retry.map(c => Retry[F](c.interval, c.maxRetries))
+  private[this] val retry       = cc.retry.map(Retry.apply[F])
   private[this] val datasetsUri = cc.baseUrl / "$" / "datasets"
 
   override def sparql(datasetName: String): SparqlClient[F] = {

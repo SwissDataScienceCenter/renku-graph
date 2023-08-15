@@ -70,7 +70,7 @@ class RetrySpec extends AsyncFlatSpec with AsyncIOSpec with should.Matchers {
 
   it should "not retry and not wait on first success" in {
     val e     = new TestEffect(_ => None)
-    val retry = new Retry[IO](5.hours, 10)
+    val retry = new Retry[IO](Retry.RetryConfig(5.hours, 10))
     for {
       r <- retry.retryWhen(RetryError.unapply(_).isDefined)(e.exec)
       _ = r shouldBe ()
@@ -81,7 +81,7 @@ class RetrySpec extends AsyncFlatSpec with AsyncIOSpec with should.Matchers {
 
   it should "not retry for unfiltered errors" in {
     val e     = new TestEffect(_ => FinalError.some)
-    val retry = Retry[IO](5.hours, 10)
+    val retry = Retry[IO](Retry.RetryConfig(5.hours, 10))
     for {
       r <- retry.retryWhen(RetryError.unapply(_).isDefined)(e.exec).attempt
       _ = r shouldBe Left(FinalError)
@@ -97,7 +97,7 @@ class RetrySpec extends AsyncFlatSpec with AsyncIOSpec with should.Matchers {
         1 -> RetryError.some
       ).withDefaultValue(None)
     )
-    val retry = Retry[IO](500.millis, 10)
+    val retry = Retry[IO](Retry.RetryConfig(500.millis, 10))
     for {
       r <- retry.retryWhen(RetryError.unapply(_).isDefined)(e.exec)
       _ = r shouldBe ()
@@ -115,7 +115,7 @@ class RetrySpec extends AsyncFlatSpec with AsyncIOSpec with should.Matchers {
         2 -> FinalError.some
       ).withDefaultValue(None)
     )
-    val retry = Retry[IO](500.millis, 10)
+    val retry = Retry[IO](Retry.RetryConfig(500.millis, 10))
     for {
       r <- retry.retryWhen(RetryError.unapply(_).isDefined)(e.exec).attempt
       _ = r shouldBe Left(FinalError)
@@ -134,7 +134,7 @@ class RetrySpec extends AsyncFlatSpec with AsyncIOSpec with should.Matchers {
         3 -> RetryError.some
       ).withDefaultValue(None)
     )
-    val retry = Retry[IO](1.millis, 3)
+    val retry = Retry[IO](Retry.RetryConfig(1.millis, 3))
     for {
       r <- retry.retryWhen(RetryError.unapply(_).isDefined)(e.exec).attempt
       Left(ex: Retry.RetryExceeded) = r

@@ -26,6 +26,7 @@ import io.renku.generators.Generators.Implicits._
 import io.renku.generators.Generators._
 import io.renku.graph.model.GraphModelGenerators._
 import io.renku.graph.model.{RenkuUrl, projects}
+import io.renku.projectauth.ProjectMember
 import io.renku.triplesgenerator.events.consumers.ProjectAuthSync
 import io.renku.triplesgenerator.gitlab.GitLabProjectMember
 import io.renku.triplesgenerator.gitlab.Generators._
@@ -77,6 +78,11 @@ class KGSynchronizerSpec extends AnyWordSpec with MockFactory with should.Matche
           .expects(query)
           .returning(().pure[Try])
       }
+
+      (projectAuthSync
+        .syncProject(_: projects.Slug, _: Set[ProjectMember]))
+        .expects(projectSlug, membersInGitLab.map(_.toProjectAuthMember))
+        .returning(().pure[Try])
 
       synchronizer.syncMembers(projectSlug, membersInGitLab) shouldBe
         SyncSummary(missingMembersWithIds.size, membersToRemove.size).pure[Try]

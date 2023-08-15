@@ -26,20 +26,20 @@ import fs2.Stream
 import io.renku.triplesstore.client.http.Retry.Context
 import org.typelevel.log4cats.Logger
 
-import scala.concurrent.duration.FiniteDuration
+import scala.concurrent.duration._
 
-final class Retry[F[_]: Logger: Temporal: MonadThrow](interval: FiniteDuration, maxTries: Int) {
+final class Retry[F[_]: Logger: Temporal: MonadThrow](cfg: Retry.RetryConfig) {
   private[this] val logger: Logger[F] = Logger[F]
   private[this] val F = MonadThrow[F]
 
   def retryWhen[A](filter: Throwable => Boolean)(fa: F[A]): F[A] = {
-    val waits = Stream.awakeDelay(interval).void
+    val waits = Stream.awakeDelay(cfg.interval).void
 
     val tries =
       (Stream.eval(fa.attempt) ++
         waits
           .zip(Stream.repeatEval(fa.attempt))
-          .map(_._2)).zipWithIndex.take(maxTries)
+          .map(_._2)).zipWithIndex.take(cfg.maxRetries)
 
     val result =
       tries
@@ -47,7 +47,7 @@ final class Retry[F[_]: Logger: Temporal: MonadThrow](interval: FiniteDuration, 
           case (Right(v), _) => Stream.emit(Context.success(v))
           case (Left(ex), currentTry) if filter(ex) =>
             Stream
-              .eval(logger.info(s"Failing with ${ex.getMessage}, trying again $currentTry/$maxTries"))
+              .eval(logger.info(s"Failing with ${ex.getMessage}, trying again $currentTry/${cfg.maxRetries}"))
               .as(Context.failed[A](ex))
 
           case (Left(ex), _) =>
@@ -59,7 +59,7 @@ final class Retry[F[_]: Logger: Temporal: MonadThrow](interval: FiniteDuration, 
 
     result.map(_.toEither).flatMap {
       case Right(v)   => v.pure[F]
-      case Left(errs) => F.raiseError(Retry.RetryExceeded(interval, maxTries, errs))
+      case Left(errs) => F.raiseError(Retry.RetryExceeded(cfg, errs))
     }
   }
 
@@ -68,13 +68,25 @@ final class Retry[F[_]: Logger: Temporal: MonadThrow](interval: FiniteDuration, 
 }
 
 object Retry {
-  final case class RetryExceeded(interval: FiniteDuration, maxTries: Int, errors: List[Throwable])
-      extends RuntimeException(s"Fail after trying $maxTries times at $interval interval", errors.headOption.orNull) {
+  final case class RetryConfig(
+      interval:   FiniteDuration,
+      maxRetries: Int
+  )
+
+  object RetryConfig {
+    val default: RetryConfig = RetryConfig(10.seconds, 10)
+  }
+
+  final case class RetryExceeded(cfg: RetryConfig, errors: List[Throwable])
+      extends RuntimeException(
+        s"Fail after trying ${cfg.maxRetries} times at ${cfg.interval} interval",
+        errors.headOption.orNull
+      ) {
     override def fillInStackTrace() = this
   }
 
-  def apply[F[_]: Logger: Temporal: MonadThrow](interval: FiniteDuration, maxTries: Int): Retry[F] =
-    new Retry[F](interval, maxTries)
+  def apply[F[_]: Logger: Temporal: MonadThrow](cfg: RetryConfig): Retry[F] =
+    new Retry[F](cfg)
 
   private final case class Context[A](value: Option[A], errors: List[Throwable]) {
     def valueAbsent: Boolean                    = value.isEmpty

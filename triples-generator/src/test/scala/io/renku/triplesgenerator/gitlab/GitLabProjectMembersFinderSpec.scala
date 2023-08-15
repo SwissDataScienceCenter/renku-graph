@@ -195,7 +195,8 @@ class GitLabProjectMembersFinderSpec
       json"""{
         "id":       ${member.gitLabId.value},
         "username": ${member.name.value},
-        "name":     ${member.name.value}
+        "name":     ${member.name.value},
+        "accessLevel": ${member.accessLevel}
       }"""
   }
 }
