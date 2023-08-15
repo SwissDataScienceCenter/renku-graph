@@ -92,7 +92,7 @@ private class GitLabProjectMembersFinderImpl[F[_]: Async: GitLabClient: Logger] 
     response.headers.get(ci"X-Next-Page").flatMap(_.head.value.toIntOption)
 
   private implicit val memberDecoder: Decoder[GitLabProjectMember] =
-    Decoder.forProduct3("id", "name", "accessLevel")(GitLabProjectMember.apply)
+    Decoder.forProduct3("id", "name", "access_level")(GitLabProjectMember.apply)
 }
 
 object GitLabProjectMembersFinder {
