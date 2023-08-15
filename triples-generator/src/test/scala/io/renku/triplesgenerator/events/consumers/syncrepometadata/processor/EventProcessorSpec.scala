@@ -102,7 +102,7 @@ class EventProcessorSpec extends AsyncFlatSpec with AsyncIOSpec with should.Matc
       eventPayloads[IO].map(_.generateOne) >>= { payload =>
         givenPayloadFinding(event.slug, returning = payload.some.pure[IO])
 
-        val maybePayloadData = payloadDataExtracts(having = event.slug).generateOption
+        val maybePayloadData = payloadDataExtracts.generateOption
         givenPayloadDataExtraction(event.slug, payload, returning = maybePayloadData.pure[IO])
 
         val updates = updateCommands.generateList()
