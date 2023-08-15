@@ -19,12 +19,13 @@
 package io.renku.core.client
 
 import Generators._
-import ModelEncoders._
+import TestModelCodecs._
 import cats.effect.IO
 import cats.syntax.all._
 import com.github.tomakehurst.wiremock.client.WireMock._
+import io.circe.literal._
 import io.circe.syntax._
-import io.renku.generators.CommonGraphGenerators.accessTokens
+import io.renku.generators.CommonGraphGenerators.userAccessTokens
 import io.renku.generators.Generators.Implicits._
 import io.renku.graph.model.GraphModelGenerators.{cliVersions, projectSchemaVersions}
 import io.renku.graph.model.RenkuTinyTypeGenerators.projectGitHttpUrls
@@ -69,7 +70,7 @@ class LowLevelApisSpec
 
     "return info about migration status of the given project on the given Core API" in {
 
-      val accessToken       = accessTokens.generateOne
+      val accessToken       = userAccessTokens.generateOne
       val projectGitHttpUrl = projectGitHttpUrls.generateOne
       val migrationCheck    = projectMigrationChecks.generateOne
 
@@ -102,6 +103,32 @@ class LowLevelApisSpec
       }
 
       client.getVersions.asserting(_ shouldBe Result.success(versionTuples.map(_._1)))
+    }
+  }
+
+  "postProjectUpdate" should {
+
+    "do POST /renku/project.edit with a relevant payload" in {
+
+      val accessToken = userAccessTokens.generateOne
+      val updates     = projectUpdatesGen.generateOne
+
+      otherWireMockResource.evalMap { server =>
+        val versionedUri = coreUrisVersioned(server.baseUri).generateOne
+
+        server.stubFor {
+          post(s"/${versionedUri.apiVersion}/renku/project.edit")
+            .withRequestBody(equalToJson(updates.asJson.spaces2))
+            .withAccessToken(accessToken.some)
+            .withHeader("renku-user-email", equalTo(updates.userInfo.email.value))
+            .withHeader("renku-user-fullname", equalTo(updates.userInfo.name.value))
+            .willReturn(ok(Result.success(json"""{"edited": {}}""").asJson.spaces2))
+        }
+
+        client
+          .postProjectUpdate(versionedUri, updates, accessToken)
+          .asserting(_ shouldBe Result.success(()))
+      }.use_
     }
   }
 

@@ -21,7 +21,7 @@ package io.renku.core.client
 import cats.syntax.all._
 import io.renku.generators.Generators.Implicits._
 import io.renku.generators.Generators._
-import io.renku.graph.model.RenkuTinyTypeGenerators.{cliVersions, projectSchemaVersions}
+import io.renku.graph.model.RenkuTinyTypeGenerators.{cliVersions, personEmails, personNames, projectDescriptions, projectGitHttpUrls, projectKeywords, projectSchemaVersions}
 import org.http4s.Uri
 import org.scalacheck.Gen
 
@@ -49,15 +49,31 @@ object Generators {
       schema  <- projectSchemaVersions
     } yield RenkuCoreUri.ForSchema(Uri.unsafeFromString(baseUri), schema)
 
+  def coreUrisForSchema(baseUri: Uri): Gen[RenkuCoreUri.ForSchema] =
+    projectSchemaVersions.map(RenkuCoreUri.ForSchema(baseUri, _))
+
   implicit lazy val coreUrisVersioned: Gen[RenkuCoreUri.Versioned] =
     for {
       baseUri    <- coreUrisForSchema
       apiVersion <- apiVersions
     } yield RenkuCoreUri.Versioned(baseUri, apiVersion)
 
+  def coreUrisVersioned(baseUri: Uri): Gen[RenkuCoreUri.Versioned] =
+    (coreUrisForSchema(baseUri), apiVersions).mapN(RenkuCoreUri.Versioned)
+
   implicit lazy val schemaApiVersions: Gen[SchemaApiVersions] =
     (apiVersions, apiVersions, cliVersions).mapN(SchemaApiVersions.apply)
 
   implicit lazy val projectMigrationChecks: Gen[ProjectMigrationCheck] =
     (projectSchemaVersions, migrationRequiredGen).mapN(ProjectMigrationCheck.apply)
+
+  implicit lazy val userInfos: Gen[UserInfo] =
+    (personNames, personEmails).mapN(UserInfo.apply)
+
+  implicit lazy val projectUpdatesGen: Gen[ProjectUpdates] =
+    (projectGitHttpUrls,
+     userInfos,
+     projectDescriptions.toGeneratorOfOptions.toGeneratorOfOptions,
+     projectKeywords.toGeneratorOfSet().toGeneratorOfOptions
+    ).mapN(ProjectUpdates.apply)
 }

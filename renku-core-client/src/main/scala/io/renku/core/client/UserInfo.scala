@@ -18,24 +18,6 @@
 
 package io.renku.core.client
 
-import Generators._
-import TestModelCodecs.projectMigrationCheckEnc
-import io.circe.syntax._
-import io.renku.generators.Generators.Implicits._
-import org.scalatest.EitherValues
-import org.scalatest.flatspec.AnyFlatSpec
-import org.scalatest.matchers.should
-import org.scalatestplus.scalacheck.ScalaCheckPropertyChecks
+import io.renku.graph.model.persons
 
-class ProjectMigrationCheckSpec
-    extends AnyFlatSpec
-    with should.Matchers
-    with EitherValues
-    with ScalaCheckPropertyChecks {
-
-  it should "decode from JSON" in {
-    forAll { migrationCheck: ProjectMigrationCheck =>
-      migrationCheck.asJson.hcursor.as[ProjectMigrationCheck].value shouldBe migrationCheck
-    }
-  }
-}
+final case class UserInfo(name: persons.Name, email: persons.Email)

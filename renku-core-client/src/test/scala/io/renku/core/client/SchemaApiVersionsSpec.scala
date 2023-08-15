@@ -19,7 +19,7 @@
 package io.renku.core.client
 
 import Generators._
-import ModelEncoders.schemaApiVersionsEnc
+import TestModelCodecs.schemaApiVersionsEnc
 import io.circe.syntax._
 import io.renku.generators.Generators.Implicits._
 import org.scalatest.EitherValues

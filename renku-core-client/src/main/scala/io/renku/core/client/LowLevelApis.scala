@@ -19,17 +19,21 @@
 package io.renku.core.client
 
 import cats.effect.Async
-import io.circe.Decoder
+import cats.syntax.all._
 import io.circe.Decoder.decodeList
+import io.circe.DecodingFailure.Reason.CustomReason
+import io.circe.syntax._
+import io.circe.{Decoder, DecodingFailure}
 import io.renku.control.Throttler
 import io.renku.graph.model.projects
 import io.renku.graph.model.versions.SchemaVersion
-import io.renku.http.client.{AccessToken, RestClient}
+import io.renku.http.client.{AccessToken, RestClient, UserAccessToken}
 import org.http4s.Header
+import org.http4s.circe._
 import org.http4s.client.dsl.Http4sClientDsl
 import org.http4s.dsl.Http4sDsl
-import org.typelevel.log4cats.Logger
 import org.typelevel.ci._
+import org.typelevel.log4cats.Logger
 
 private trait LowLevelApis[F[_]] {
   def getApiVersion(uri: RenkuCoreUri.ForSchema): F[Result[SchemaApiVersions]]
@@ -38,6 +42,10 @@ private trait LowLevelApis[F[_]] {
                         accessToken:       AccessToken
   ):               F[Result[ProjectMigrationCheck]]
   def getVersions: F[Result[List[SchemaVersion]]]
+  def postProjectUpdate(coreUri:     RenkuCoreUri.Versioned,
+                        updates:     ProjectUpdates,
+                        accessToken: UserAccessToken
+  ): F[Result[Unit]]
 }
 
 private object LowLevelApis {
@@ -89,7 +97,29 @@ private class LowLevelApisImpl[F[_]: Async: Logger](coreCurrentUri: RenkuCoreUri
 
     send(GET(coreCurrentUri.uri / "renku" / "versions")) {
       case (Ok, _, resp) => toResult[List[SchemaVersion]](resp)(decoder)
-      case reqInfo       => toFailure[List[SchemaVersion]](s"Version info cannot be found")(reqInfo)
+      case reqInfo       => toFailure[List[SchemaVersion]]("Version info cannot be found")(reqInfo)
     }
+  }
+
+  override def postProjectUpdate(uri:         RenkuCoreUri.Versioned,
+                                 updates:     ProjectUpdates,
+                                 accessToken: UserAccessToken
+  ): F[Result[Unit]] =
+    send(
+      request(POST, uri.uri / "renku" / "project.edit", accessToken)
+        .withEntity(updates.asJson)
+        .putHeaders(Header.Raw(ci"renku-user-email", updates.userInfo.email.value))
+        .putHeaders(Header.Raw(ci"renku-user-fullname", updates.userInfo.name.value))
+    ) {
+      case (Ok, _, resp) => toResult[Unit](resp)(toSuccessfulEdit)
+      case reqInfo       => toFailure[Unit]("Submitting Project Edit payload failed")(reqInfo)
+    }
+
+  private lazy val toSuccessfulEdit = Decoder.instance { cur =>
+    cur
+      .downField("edited")
+      .success
+      .as(().asRight)
+      .getOrElse(DecodingFailure(CustomReason("Submitting Project Edit payload did not succeed"), cur).asLeft[Unit])
   }
 }

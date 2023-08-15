@@ -23,7 +23,7 @@ import io.circe.literal._
 import io.circe.syntax._
 import io.renku.graph.model.versions.{CliVersion, SchemaVersion}
 
-private object ModelEncoders {
+private object TestModelCodecs {
 
   implicit val versionsEnc: Encoder[List[(SchemaVersion, CliVersion)]] = Encoder.instance { versions =>
     val versionJsons = versions.map { case (schema, cli) =>
