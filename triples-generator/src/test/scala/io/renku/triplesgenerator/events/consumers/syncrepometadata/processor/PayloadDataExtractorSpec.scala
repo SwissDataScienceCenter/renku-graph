@@ -53,12 +53,7 @@ class PayloadDataExtractorSpec
       (ioPayload >>=
         (extractor.extractPayloadData(testProject.slug, _)))
         .asserting(
-          _.value shouldBe DataExtract.Payload(testProject.slug,
-                                               testProject.name,
-                                               testProject.maybeDescription,
-                                               testProject.keywords,
-                                               testProject.images
-          )
+          _.value shouldBe DataExtract.Payload(testProject.maybeDescription, testProject.keywords, testProject.images)
         )
     }
   }

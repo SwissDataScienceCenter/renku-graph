@@ -26,8 +26,6 @@ import io.renku.triplesstore.SparqlQuery
 import java.time.Instant
 
 private sealed trait DataExtract {
-  val slug:              projects.Slug
-  val name:              projects.Name
   val maybeDateModified: Option[projects.DateModified]
   val maybeDesc:         Option[projects.Description]
   val keywords:          Set[projects.Keyword]
@@ -55,9 +53,7 @@ private object DataExtract {
     override val maybeDateModified: Option[projects.DateModified] =
       List(updatedAt, lastActivityAt).max.map(projects.DateModified.apply)
   }
-  final case class Payload(slug:      projects.Slug,
-                           name:      projects.Name,
-                           maybeDesc: Option[projects.Description],
+  final case class Payload(maybeDesc: Option[projects.Description],
                            keywords:  Set[projects.Keyword],
                            images:    List[ImageUri]
   ) extends DataExtract {

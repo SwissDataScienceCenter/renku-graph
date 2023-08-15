@@ -34,7 +34,7 @@ class NewValuesCalculatorSpec extends AnyWordSpec with should.Matchers with Opti
 
   "new name" should {
 
-    "be None if ts and gl names are the same - no payload case" in {
+    "be None if ts and gl names are the same" in {
 
       val tsData = tsDataExtracts().generateOne
       val glData = glDataFrom(tsData)
@@ -42,32 +42,13 @@ class NewValuesCalculatorSpec extends AnyWordSpec with should.Matchers with Opti
       NewValuesCalculator.findNewValues(tsData, glData, maybePayloadData = None) shouldBe NewValues.empty
     }
 
-    "be None if ts and payload names are the same" in {
-
-      val tsData      = tsDataExtracts().generateOne
-      val glData      = glDataFrom(tsData).copy(name = projectNames.generateOne)
-      val payloadData = payloadDataFrom(tsData)
-
-      NewValuesCalculator.findNewValues(tsData, glData, payloadData.some) shouldBe NewValues.empty
-    }
-
-    "be gl name if ts and gl contains different names - no payload case" in {
+    "be gl name if ts and gl contains different names" in {
 
       val tsData = tsDataExtracts().generateOne
       val glData = glDataFrom(tsData).copy(name = projectNames.generateOne)
 
       NewValuesCalculator.findNewValues(tsData, glData, maybePayloadData = None) shouldBe
         NewValues.empty.copy(maybeName = glData.name.some)
-    }
-
-    "be payload name if all ts, gl and payload contains different names" in {
-
-      val tsData      = tsDataExtracts().generateOne
-      val glData      = glDataFrom(tsData).copy(name = projectNames.generateOne)
-      val payloadData = payloadDataFrom(tsData).copy(name = projectNames.generateOne)
-
-      NewValuesCalculator.findNewValues(tsData, glData, payloadData.some) shouldBe
-        NewValues.empty.copy(maybeName = payloadData.name.some)
     }
   }
 
