@@ -34,7 +34,7 @@ private object NewValuesCalculator extends NewValuesCalculator {
                              glData:           DataExtract.GL,
                              maybePayloadData: Option[DataExtract.Payload]
   ): NewValues = NewValues(
-    maybeNewName(tsData, glData, maybePayloadData),
+    maybeNewName(tsData, glData),
     Option.when(tsData.visibility != glData.visibility)(glData.visibility),
     maybeNewDateModified(tsData, glData),
     maybeNewDesc(tsData, glData, maybePayloadData),
@@ -42,13 +42,8 @@ private object NewValuesCalculator extends NewValuesCalculator {
     maybeNewImages(tsData, glData, maybePayloadData)
   )
 
-  private def maybeNewName(tsData:           DataExtract.TS,
-                           glData:           DataExtract.GL,
-                           maybePayloadData: Option[DataExtract.Payload]
-  ) = {
-    val potentiallyNewName = maybePayloadData.getOrElse(glData).name
-    Option.when(tsData.name != potentiallyNewName)(potentiallyNewName)
-  }
+  private def maybeNewName(tsData: DataExtract.TS, glData: DataExtract.GL) =
+    Option.when(tsData.name != glData.name)(glData.name)
 
   private def maybeNewDateModified(tsData: DataExtract.TS, glData: DataExtract.GL) =
     tsData.maybeDateModified -> glData.maybeDateModified match {
