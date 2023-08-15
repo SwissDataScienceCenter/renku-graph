@@ -22,7 +22,7 @@ import cats.syntax.all._
 import io.renku.eventlog.api.events.Generators.redoProjectTransformationEvents
 import io.renku.generators.CommonGraphGenerators.sparqlQueries
 import io.renku.generators.Generators.Implicits._
-import io.renku.graph.model.RenkuTinyTypeGenerators.{imageUris, projectDescriptions, projectKeywords, projectModifiedDates, projectNames, projectSlugs, projectResourceIds, projectVisibilities}
+import io.renku.graph.model.RenkuTinyTypeGenerators.{imageUris, projectDescriptions, projectKeywords, projectModifiedDates, projectNames, projectResourceIds, projectSlugs, projectVisibilities}
 import io.renku.graph.model.{entities, projects}
 import org.scalacheck.Gen
 
@@ -48,12 +48,11 @@ private object Generators {
     maybeImage     <- imageUris.toGeneratorOfOptions
   } yield DataExtract.GL(having, name, visibility, updatedAt, lastActivityAt, maybeDesc, keywords, maybeImage)
 
-  def payloadDataExtracts(having: projects.Slug = projectSlugs.generateOne): Gen[DataExtract.Payload] = for {
-    name      <- projectNames
+  lazy val payloadDataExtracts: Gen[DataExtract.Payload] = for {
     maybeDesc <- projectDescriptions.toGeneratorOfOptions
     keywords  <- projectKeywords.toGeneratorOfSet(min = 0)
     imageUris <- imageUris.toGeneratorOfList()
-  } yield DataExtract.Payload(having, name, maybeDesc, keywords, imageUris)
+  } yield DataExtract.Payload(maybeDesc, keywords, imageUris)
 
   def tsDataFrom(project: entities.Project): DataExtract.TS =
     DataExtract.TS(
@@ -84,7 +83,7 @@ private object Generators {
   }
 
   def payloadDataFrom(data: DataExtract.TS): DataExtract.Payload =
-    DataExtract.Payload(data.slug, data.name, data.maybeDesc, data.keywords, data.images)
+    DataExtract.Payload(data.maybeDesc, data.keywords, data.images)
 
   val sparqlUpdateCommands: Gen[UpdateCommand.Sparql] = sparqlQueries.map(UpdateCommand.Sparql)
   val eventUpdateCommands:  Gen[UpdateCommand.Event]  = redoProjectTransformationEvents.map(UpdateCommand.Event)

@@ -59,7 +59,7 @@ class UpdateCommandsCalculatorSpec
 
     val tsData           = tsDataFrom(project)
     val glData           = glDataExtracts(project.slug).generateOne
-    val maybePayloadData = payloadDataExtracts(project.slug).generateOption
+    val maybePayloadData = payloadDataExtracts.generateOption
 
     val newValue = projectNames.generateOne
     givenNewValuesFinding(tsData, glData, maybePayloadData, returning = NewValues.empty.copy(maybeName = newValue.some))
@@ -84,7 +84,7 @@ class UpdateCommandsCalculatorSpec
 
     val tsData           = tsDataFrom(project)
     val glData           = glDataExtracts(project.slug).generateOne
-    val maybePayloadData = payloadDataExtracts(project.slug).generateOption
+    val maybePayloadData = payloadDataExtracts.generateOption
 
     val newValue = projectVisibilities.generateOne
     givenNewValuesFinding(tsData,
@@ -114,7 +114,7 @@ class UpdateCommandsCalculatorSpec
 
     val tsData           = tsDataFrom(project)
     val glData           = glDataExtracts(project.slug).generateOne
-    val maybePayloadData = payloadDataExtracts(project.slug).generateOption
+    val maybePayloadData = payloadDataExtracts.generateOption
 
     val newValue = projectModifiedDates(project.dateModified.value).generateSome
     givenNewValuesFinding(tsData,
@@ -143,7 +143,7 @@ class UpdateCommandsCalculatorSpec
 
     val tsData           = tsDataFrom(project)
     val glData           = glDataExtracts(project.slug).generateOne
-    val maybePayloadData = payloadDataExtracts(project.slug).generateOption
+    val maybePayloadData = payloadDataExtracts.generateOption
 
     val newValue = projectDescriptions.generateSome
     givenNewValuesFinding(tsData, glData, maybePayloadData, returning = NewValues.empty.copy(maybeDesc = newValue.some))
@@ -171,7 +171,7 @@ class UpdateCommandsCalculatorSpec
 
     val tsData           = tsDataFrom(project)
     val glData           = glDataExtracts(project.slug).generateOne
-    val maybePayloadData = payloadDataExtracts(project.slug).generateOption
+    val maybePayloadData = payloadDataExtracts.generateOption
 
     givenNewValuesFinding(tsData, glData, maybePayloadData, returning = NewValues.empty.copy(maybeDesc = Some(None)))
     val updatedTsData = tsData.copy(maybeDesc = None)
@@ -198,7 +198,7 @@ class UpdateCommandsCalculatorSpec
 
     val tsData           = tsDataFrom(project)
     val glData           = glDataExtracts(project.slug).generateOne
-    val maybePayloadData = payloadDataExtracts(project.slug).generateOption
+    val maybePayloadData = payloadDataExtracts.generateOption
 
     val newValue = projectKeywords.generateSet(min = 1)
     givenNewValuesFinding(tsData,
@@ -230,7 +230,7 @@ class UpdateCommandsCalculatorSpec
 
     val tsData           = tsDataFrom(project)
     val glData           = glDataExtracts(project.slug).generateOne
-    val maybePayloadData = payloadDataExtracts(project.slug).generateOption
+    val maybePayloadData = payloadDataExtracts.generateOption
 
     val newValue = Set.empty[projects.Keyword]
     givenNewValuesFinding(tsData,
@@ -259,7 +259,7 @@ class UpdateCommandsCalculatorSpec
 
     val tsData           = tsDataFrom(project)
     val glData           = glDataExtracts(project.slug).generateOne
-    val maybePayloadData = payloadDataExtracts(project.slug).generateOption
+    val maybePayloadData = payloadDataExtracts.generateOption
 
     val newValue = imageUris.generateList(min = 1)
     givenNewValuesFinding(tsData,
@@ -291,7 +291,7 @@ class UpdateCommandsCalculatorSpec
 
     val tsData           = tsDataFrom(project)
     val glData           = glDataExtracts(project.slug).generateOne
-    val maybePayloadData = payloadDataExtracts(project.slug).generateOption
+    val maybePayloadData = payloadDataExtracts.generateOption
 
     val newValue = List.empty[Image]
     givenNewValuesFinding(tsData,
@@ -320,7 +320,7 @@ class UpdateCommandsCalculatorSpec
 
     val tsData           = tsDataFrom(project)
     val glData           = glDataExtracts(project.slug).generateOne
-    val maybePayloadData = payloadDataExtracts(project.slug).generateOption
+    val maybePayloadData = payloadDataExtracts.generateOption
 
     val newValue = projectKeywords.generateSet(min = 1)
     givenNewValuesFinding(tsData,
@@ -349,7 +349,7 @@ class UpdateCommandsCalculatorSpec
 
     val tsData           = tsDataFrom(project)
     val glData           = glDataExtracts(project.slug).generateOne
-    val maybePayloadData = payloadDataExtracts(project.slug).generateOption
+    val maybePayloadData = payloadDataExtracts.generateOption
 
     givenNewValuesFinding(tsData, glData, maybePayloadData, returning = NewValues.empty)
 
