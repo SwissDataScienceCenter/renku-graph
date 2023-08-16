@@ -28,7 +28,7 @@ import io.renku.graph.model.projects
 import io.renku.http.client.GitLabClient
 import io.renku.http.server.security.model.AuthUser
 import io.renku.metrics.MetricsRegistry
-import io.renku.triplesgenerator.api.{ProjectUpdates, TriplesGeneratorClient}
+import io.renku.triplesgenerator.api.{TriplesGeneratorClient, ProjectUpdates => TGProjectUpdates}
 import org.http4s.circe.CirceEntityDecoder._
 import org.http4s.dsl.Http4sDsl
 import org.http4s.{Request, Response}
@@ -55,12 +55,12 @@ private class EndpointImpl[F[_]: Async: Logger](glProjectUpdater: GLProjectUpdat
       .merge
       .handleErrorWith(serverError(slug)(_))
 
-  private lazy val decodePayload: Request[F] => EitherT[F, Response[F], NewValues] = req =>
+  private lazy val decodePayload: Request[F] => EitherT[F, Response[F], ProjectUpdates] = req =>
     EitherT {
       req
-        .as[NewValues]
+        .as[ProjectUpdates]
         .map(_.asRight[Response[F]])
-        .handleError(badRequest(_).asLeft[NewValues])
+        .handleError(badRequest(_).asLeft[ProjectUpdates])
     }
 
   private def badRequest: Throwable => Response[F] = { _ =>
@@ -70,13 +70,15 @@ private class EndpointImpl[F[_]: Async: Logger](glProjectUpdater: GLProjectUpdat
   private def badRequest(message: Json): Response[F] =
     Response[F](BadRequest).withEntity(Message.Error.fromJsonUnsafe(message))
 
-  private def updateGL(slug: projects.Slug, authUser: AuthUser)(newValues: NewValues): EitherT[F, Response[F], Unit] =
-    glProjectUpdater.updateProject(slug, newValues, authUser.accessToken).leftMap(badRequest)
+  private def updateGL(slug: projects.Slug, authUser: AuthUser)(
+      updates: ProjectUpdates
+  ): EitherT[F, Response[F], Unit] =
+    glProjectUpdater.updateProject(slug, updates, authUser.accessToken).leftMap(badRequest)
 
-  private def updateTG(slug: projects.Slug)(newValues: NewValues): EitherT[F, Response[F], Response[F]] =
+  private def updateTG(slug: projects.Slug)(updates: ProjectUpdates): EitherT[F, Response[F], Response[F]] =
     EitherT {
       tgClient
-        .updateProject(slug, ProjectUpdates.empty.copy(newVisibility = newValues.visibility.some))
+        .updateProject(slug, TGProjectUpdates.empty.copy(newVisibility = updates.visibility.some))
         .map(_.toEither)
     }.biSemiflatMap(
       serverError(slug),

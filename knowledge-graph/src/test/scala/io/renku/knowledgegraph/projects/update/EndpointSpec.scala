@@ -36,7 +36,7 @@ import io.renku.http.client.AccessToken
 import io.renku.http.server.EndpointTester._
 import io.renku.interpreters.TestLogger
 import io.renku.testtools.CustomAsyncIOSpec
-import io.renku.triplesgenerator.api.{ProjectUpdates, TriplesGeneratorClient}
+import io.renku.triplesgenerator.api.{ProjectUpdates => TGProjectUpdates, TriplesGeneratorClient}
 import org.http4s.{Request, Status}
 import org.scalamock.scalatest.AsyncMockFactory
 import org.scalatest.flatspec.AsyncFlatSpec
@@ -50,7 +50,7 @@ class EndpointSpec extends AsyncFlatSpec with CustomAsyncIOSpec with should.Matc
 
       val authUser  = authUsers.generateOne
       val slug      = projectSlugs.generateOne
-      val newValues = newValuesGen.generateOne
+      val newValues = projectUpdatesGen.generateOne
 
       givenUpdatingProjectInGL(slug, newValues, authUser.accessToken, returning = EitherT.pure[IO, Json](()))
       givenSyncRepoMetadataSending(slug, newValues, returning = TriplesGeneratorClient.Result.success(()).pure[IO])
@@ -76,7 +76,7 @@ class EndpointSpec extends AsyncFlatSpec with CustomAsyncIOSpec with should.Matc
 
     val authUser  = authUsers.generateOne
     val slug      = projectSlugs.generateOne
-    val newValues = newValuesGen.generateOne
+    val newValues = projectUpdatesGen.generateOne
 
     val error = jsons.generateOne
     givenUpdatingProjectInGL(slug, newValues, authUser.accessToken, returning = EitherT.left(error.pure[IO]))
@@ -91,7 +91,7 @@ class EndpointSpec extends AsyncFlatSpec with CustomAsyncIOSpec with should.Matc
 
     val authUser  = authUsers.generateOne
     val slug      = projectSlugs.generateOne
-    val newValues = newValuesGen.generateOne
+    val newValues = projectUpdatesGen.generateOne
 
     val exception = exceptions.generateOne
     givenUpdatingProjectInGL(slug,
@@ -110,7 +110,7 @@ class EndpointSpec extends AsyncFlatSpec with CustomAsyncIOSpec with should.Matc
 
     val authUser  = authUsers.generateOne
     val slug      = projectSlugs.generateOne
-    val newValues = newValuesGen.generateOne
+    val newValues = projectUpdatesGen.generateOne
 
     givenUpdatingProjectInGL(slug, newValues, authUser.accessToken, returning = EitherT.pure[IO, Json](()))
     val exception = exceptions.generateOne
@@ -131,7 +131,7 @@ class EndpointSpec extends AsyncFlatSpec with CustomAsyncIOSpec with should.Matc
   private lazy val endpoint    = new EndpointImpl[IO](glProjectUpdater, tgClient)
 
   private def givenUpdatingProjectInGL(slug:      projects.Slug,
-                                       newValues: NewValues,
+                                       newValues: ProjectUpdates,
                                        at:        AccessToken,
                                        returning: EitherT[IO, Json, Unit]
   ) = (glProjectUpdater.updateProject _)
@@ -139,13 +139,14 @@ class EndpointSpec extends AsyncFlatSpec with CustomAsyncIOSpec with should.Matc
     .returning(returning)
 
   private def givenSyncRepoMetadataSending(slug:      projects.Slug,
-                                           newValues: NewValues,
+                                           newValues: ProjectUpdates,
                                            returning: IO[TriplesGeneratorClient.Result[Unit]]
   ) = (tgClient.updateProject _)
-    .expects(slug, ProjectUpdates.empty.copy(newVisibility = newValues.visibility.some))
+    .expects(slug, TGProjectUpdates.empty.copy(newVisibility = newValues.visibility.some))
     .returning(returning)
 
-  private implicit lazy val payloadEncoder: Encoder[NewValues] = Encoder.instance { case NewValues(visibility) =>
-    json"""{"visibility":  $visibility}"""
+  private implicit lazy val payloadEncoder: Encoder[ProjectUpdates] = Encoder.instance {
+    case ProjectUpdates(visibility) =>
+      json"""{"visibility":  $visibility}"""
   }
 }

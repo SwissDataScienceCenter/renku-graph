@@ -33,7 +33,7 @@ import org.http4s.implicits._
 import org.http4s.{Request, Response, Status, UrlForm}
 
 private trait GLProjectUpdater[F[_]] {
-  def updateProject(slug: projects.Slug, newValues: NewValues, at: AccessToken): EitherT[F, Json, Unit]
+  def updateProject(slug: projects.Slug, updates: ProjectUpdates, at: AccessToken): EitherT[F, Json, Unit]
 }
 
 private object GLProjectUpdater {
@@ -42,9 +42,9 @@ private object GLProjectUpdater {
 
 private class GLProjectUpdaterImpl[F[_]: Async: GitLabClient] extends GLProjectUpdater[F] {
 
-  override def updateProject(slug: projects.Slug, newValues: NewValues, at: AccessToken): EitherT[F, Json, Unit] =
+  override def updateProject(slug: projects.Slug, updates: ProjectUpdates, at: AccessToken): EitherT[F, Json, Unit] =
     EitherT {
-      GitLabClient[F].put(uri"projects" / slug, "edit-project", UrlForm("visibility" -> newValues.visibility.value))(
+      GitLabClient[F].put(uri"projects" / slug, "edit-project", UrlForm("visibility" -> updates.visibility.value))(
         mapResponse
       )(at.some)
     }

@@ -21,9 +21,9 @@ package io.renku.knowledgegraph.projects.update
 import io.circe.Decoder
 import io.renku.graph.model.projects
 
-private final case class NewValues(visibility: projects.Visibility)
+private final case class ProjectUpdates(visibility: projects.Visibility)
 
-private object NewValues {
-  implicit val decoder: Decoder[NewValues] =
-    Decoder.instance(cur => cur.downField("visibility").as[projects.Visibility].map(NewValues(_)))
+private object ProjectUpdates {
+  implicit val decoder: Decoder[ProjectUpdates] =
+    Decoder.instance(cur => cur.downField("visibility").as[projects.Visibility].map(ProjectUpdates(_)))
 }

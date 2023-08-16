@@ -57,7 +57,7 @@ class GLProjectUpdaterSpec
   it should s"call GL's PUT gl/projects/:slug and return unit on success" in {
 
     val slug        = projectSlugs.generateOne
-    val newValues   = newValuesGen.generateOne
+    val newValues   = projectUpdatesGen.generateOne
     val accessToken = accessTokens.generateOne
 
     givenEditProjectAPICall(slug, newValues, accessToken, returning = ().asRight.pure[IO])
@@ -68,7 +68,7 @@ class GLProjectUpdaterSpec
   it should s"call GL's PUT gl/projects/:slug and return GL message if returned" in {
 
     val slug        = projectSlugs.generateOne
-    val newValues   = newValuesGen.generateOne
+    val newValues   = projectUpdatesGen.generateOne
     val accessToken = accessTokens.generateOne
 
     val error = jsons.generateOne
@@ -101,7 +101,7 @@ class GLProjectUpdaterSpec
   private lazy val finder = new GLProjectUpdaterImpl[IO]
 
   private def givenEditProjectAPICall(slug:        projects.Slug,
-                                      newValues:   NewValues,
+                                      newValues:   ProjectUpdates,
                                       accessToken: AccessToken,
                                       returning:   IO[Either[Json, Unit]]
   ) = {
@@ -122,7 +122,7 @@ class GLProjectUpdaterSpec
   private lazy val mapResponse: ResponseMappingF[IO, Either[Json, Unit]] =
     captureMapping(glClient)(
       finder
-        .updateProject(projectSlugs.generateOne, newValuesGen.generateOne, accessTokens.generateOne)
+        .updateProject(projectSlugs.generateOne, projectUpdatesGen.generateOne, accessTokens.generateOne)
         .value
         .unsafeRunSync(),
       ().asRight[Json],

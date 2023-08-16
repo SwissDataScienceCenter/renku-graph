@@ -18,9 +18,6 @@
 
 package io.renku.knowledgegraph.projects.update
 
-import io.renku.graph.model.RenkuTinyTypeGenerators.projectVisibilities
-import org.scalacheck.Gen
+private trait ProjectUpdater[F[_]] {
 
-private object Generators {
-  val projectUpdatesGen: Gen[ProjectUpdates] = projectVisibilities.map(ProjectUpdates(_))
 }
