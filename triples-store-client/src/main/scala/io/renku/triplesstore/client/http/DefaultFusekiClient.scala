@@ -55,7 +55,7 @@ final class DefaultFusekiClient[F[_]: Async: Logger](
 
     client.run(req).use { resp =>
       if (resp.status.isSuccess) ().pure[F]
-      else SparqlRequestError(resp).flatMap(Async[F].raiseError)
+      else SparqlRequestError(s"createDataset($name)", resp).flatMap(Async[F].raiseError)
     }
   }
 
@@ -66,7 +66,7 @@ final class DefaultFusekiClient[F[_]: Async: Logger](
     val req = DELETE(datasetsUri / name).withBasicAuth(cc.basicAuth)
     client.run(req).use { resp =>
       if (resp.status.isSuccess) ().pure[F]
-      else SparqlRequestError(resp).flatMap(Async[F].raiseError)
+      else SparqlRequestError(s"deleteDataset($name)", resp).flatMap(Async[F].raiseError)
     }
   }
 }

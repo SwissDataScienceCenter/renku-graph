@@ -81,7 +81,10 @@ object ProjectAuthSync {
   private final class VisibilityFinder[F[_]: MonadThrow](sparqlClient: SparqlClient[F]) {
     def find(slug: Slug): F[Option[Visibility]] =
       sparqlClient
-        .queryDecode[Visibility](sparql"""SELECT ?visibility
+        .queryDecode[Visibility](sparql"""PREFIX schema: <http://schema.org/>
+                                         |PREFIX renku: <https://swissdatasciencecenter.github.io/renku-ontology#>
+                                         |
+                                         |SELECT ?visibility
                                          |WHERE {
                                          |  BIND (${slug.asObject} AS ?slug)
                                          |  Graph ?id {

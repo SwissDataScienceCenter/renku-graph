@@ -40,7 +40,9 @@ trait SparqlClient[F[_]] {
   def query(request: SparqlQuery): F[Json]
 
   def queryDecode[A](request: SparqlQuery)(implicit d: RowDecoder[A], F: MonadThrow[F]): F[List[A]] = {
-    val decoder = Decoder.instance(c => c.downField("results").downField("bindings").as[List[A]])
+    val decoder = Decoder
+      .instance(c => c.downField("results").downField("bindings").as[List[A]])
+      .withErrorMessage(s"Decoding Sparql result failed for request: $request")
     F.flatMap(query(request))(json => decoder.decodeJson(json).fold(F.raiseError, F.pure))
   }
 }

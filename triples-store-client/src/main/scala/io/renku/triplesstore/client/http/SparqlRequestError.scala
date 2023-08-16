@@ -22,12 +22,12 @@ import cats.effect.Concurrent
 import cats.syntax.all._
 import org.http4s.{EntityDecoder, Response, Status}
 
-final case class SparqlRequestError(status: Status, body: String)
-    extends RuntimeException(s"Request failed with status=$status: $body") {
+final case class SparqlRequestError(req: String, status: Status, body: String)
+    extends RuntimeException(s"Sparql request '$req' failed with status=$status: $body") {
   override def fillInStackTrace(): Throwable = this
 }
 
 object SparqlRequestError {
-  def apply[F[_]: Concurrent](resp: Response[F]): F[SparqlRequestError] =
-    EntityDecoder.decodeText(resp).map(str => SparqlRequestError(resp.status, str))
+  def apply[F[_]: Concurrent](req: String, resp: Response[F]): F[SparqlRequestError] =
+    EntityDecoder.decodeText(resp).map(str => SparqlRequestError(req, resp.status, str))
 }

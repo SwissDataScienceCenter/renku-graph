@@ -51,7 +51,7 @@ final class DefaultSparqlClient[F[_]: Async: Logger](client: Client[F], config: 
 
     client.run(req).use { resp =>
       if (resp.status.isSuccess) ().pure[F]
-      else SparqlRequestError(resp).flatMap(Async[F].raiseError)
+      else SparqlRequestError(request.render, resp).flatMap(Async[F].raiseError)
     }
   }
 
@@ -68,7 +68,7 @@ final class DefaultSparqlClient[F[_]: Async: Logger](client: Client[F], config: 
 
     client.run(req).use { resp =>
       if (resp.status.isSuccess) ().pure[F]
-      else SparqlRequestError(resp).flatMap(Async[F].raiseError)
+      else SparqlRequestError(data.toJson.noSpaces, resp).flatMap(Async[F].raiseError)
     }
   }
 
@@ -82,6 +82,9 @@ final class DefaultSparqlClient[F[_]: Async: Logger](client: Client[F], config: 
         .withBasicAuth(config.basicAuth)
         .withEntity(request)
 
-    client.run(req).use(_.as[Json])
+    client.run(req).use { resp =>
+      if (resp.status.isSuccess) resp.as[Json]
+      else SparqlRequestError(request.render, resp).flatMap(Async[F].raiseError)
+    }
   }
 }
