@@ -47,7 +47,7 @@ import io.renku.interpreters.TestRoutesMetrics
 import io.renku.knowledgegraph.datasets.details.RequestedDataset
 import io.renku.testtools.IOSpec
 import org.http4s.MediaType.application
-import org.http4s.Method.{DELETE, GET, PUT}
+import org.http4s.Method.{DELETE, GET, PATCH}
 import org.http4s.Status._
 import org.http4s._
 import org.http4s.headers.`Content-Type`
@@ -563,10 +563,10 @@ class MicroserviceRoutesSpec
     }
   }
 
-  "PUT /knowledge-graph/projects/:namespace/../:name" should {
+  "PATCH /knowledge-graph/projects/:namespace/../:name" should {
 
     val projectSlug = projectSlugs.generateOne
-    val request     = Request[IO](PUT, Uri.unsafeFromString(s"knowledge-graph/projects/$projectSlug"))
+    val request     = Request[IO](PATCH, Uri.unsafeFromString(s"knowledge-graph/projects/$projectSlug"))
 
     s"return $Accepted for valid path parameters, user and payload" in new TestCase {
 
@@ -577,7 +577,7 @@ class MicroserviceRoutesSpec
         .returning(rightT[IO, EndpointSecurityException](AuthContext(authUser.option, projectSlug, Set(projectSlug))))
 
       (projectUpdateEndpoint
-        .`PUT /projects/:slug`(_: model.projects.Slug, _: Request[IO], _: AuthUser))
+        .`PATCH /projects/:slug`(_: model.projects.Slug, _: Request[IO], _: AuthUser))
         .expects(projectSlug, request, authUser.option.get)
         .returning(Response[IO](Accepted).pure[IO])
 

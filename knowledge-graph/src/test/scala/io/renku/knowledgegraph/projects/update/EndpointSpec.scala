@@ -55,7 +55,7 @@ class EndpointSpec extends AsyncFlatSpec with CustomAsyncIOSpec with should.Matc
       givenUpdatingProjectInGL(slug, newValues, authUser.accessToken, returning = EitherT.pure[IO, Json](()))
       givenSyncRepoMetadataSending(slug, newValues, returning = TriplesGeneratorClient.Result.success(()).pure[IO])
 
-      endpoint.`PUT /projects/:slug`(slug, Request[IO]().withEntity(newValues.asJson), authUser) >>= { response =>
+      endpoint.`PATCH /projects/:slug`(slug, Request[IO]().withEntity(newValues.asJson), authUser) >>= { response =>
         response.pure[IO].asserting(_.status shouldBe Status.Accepted) >>
           response.as[Json].asserting(_ shouldBe Message.Info("Project update accepted").asJson)
       }
@@ -66,7 +66,7 @@ class EndpointSpec extends AsyncFlatSpec with CustomAsyncIOSpec with should.Matc
     val authUser = authUsers.generateOne
     val slug     = projectSlugs.generateOne
 
-    endpoint.`PUT /projects/:slug`(slug, Request[IO]().withEntity(Json.obj()), authUser) >>= { response =>
+    endpoint.`PATCH /projects/:slug`(slug, Request[IO]().withEntity(Json.obj()), authUser) >>= { response =>
       response.pure[IO].asserting(_.status shouldBe Status.BadRequest) >>
         response.as[Message].asserting(_ shouldBe Message.Error("Invalid payload"))
     }
@@ -81,7 +81,7 @@ class EndpointSpec extends AsyncFlatSpec with CustomAsyncIOSpec with should.Matc
     val error = jsons.generateOne
     givenUpdatingProjectInGL(slug, newValues, authUser.accessToken, returning = EitherT.left(error.pure[IO]))
 
-    endpoint.`PUT /projects/:slug`(slug, Request[IO]().withEntity(newValues.asJson), authUser) >>= { response =>
+    endpoint.`PATCH /projects/:slug`(slug, Request[IO]().withEntity(newValues.asJson), authUser) >>= { response =>
       response.pure[IO].asserting(_.status shouldBe Status.BadRequest) >>
         response.as[Message].asserting(_ shouldBe Message.Error.fromJsonUnsafe(error))
     }
@@ -100,7 +100,7 @@ class EndpointSpec extends AsyncFlatSpec with CustomAsyncIOSpec with should.Matc
                              returning = EitherT(exception.raiseError[IO, Either[Json, Unit]])
     )
 
-    endpoint.`PUT /projects/:slug`(slug, Request[IO]().withEntity(newValues.asJson), authUser) >>= { response =>
+    endpoint.`PATCH /projects/:slug`(slug, Request[IO]().withEntity(newValues.asJson), authUser) >>= { response =>
       response.pure[IO].asserting(_.status shouldBe Status.InternalServerError) >>
         response.as[Message].asserting(_ shouldBe Message.Error("Update failed"))
     }
@@ -119,7 +119,7 @@ class EndpointSpec extends AsyncFlatSpec with CustomAsyncIOSpec with should.Matc
                                  returning = TriplesGeneratorClient.Result.failure(exception.getMessage).pure[IO]
     )
 
-    endpoint.`PUT /projects/:slug`(slug, Request[IO]().withEntity(newValues.asJson), authUser) >>= { response =>
+    endpoint.`PATCH /projects/:slug`(slug, Request[IO]().withEntity(newValues.asJson), authUser) >>= { response =>
       response.pure[IO].asserting(_.status shouldBe Status.InternalServerError) >>
         response.as[Message].asserting(_ shouldBe Message.Error("Update failed"))
     }

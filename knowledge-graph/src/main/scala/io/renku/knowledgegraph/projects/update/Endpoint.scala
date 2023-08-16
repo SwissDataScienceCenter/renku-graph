@@ -35,7 +35,7 @@ import org.http4s.{Request, Response}
 import org.typelevel.log4cats.Logger
 
 trait Endpoint[F[_]] {
-  def `PUT /projects/:slug`(slug: projects.Slug, request: Request[F], authUser: AuthUser): F[Response[F]]
+  def `PATCH /projects/:slug`(slug: projects.Slug, request: Request[F], authUser: AuthUser): F[Response[F]]
 }
 
 object Endpoint {
@@ -48,7 +48,7 @@ private class EndpointImpl[F[_]: Async: Logger](glProjectUpdater: GLProjectUpdat
 ) extends Http4sDsl[F]
     with Endpoint[F] {
 
-  override def `PUT /projects/:slug`(slug: projects.Slug, request: Request[F], authUser: AuthUser): F[Response[F]] =
+  override def `PATCH /projects/:slug`(slug: projects.Slug, request: Request[F], authUser: AuthUser): F[Response[F]] =
     decodePayload(request)
       .flatTap(updateGL(slug, authUser))
       .flatMap(updateTG(slug))
