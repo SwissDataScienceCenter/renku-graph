@@ -19,7 +19,7 @@
 package io.renku.triplesgenerator.events.consumers
 
 import cats.MonadThrow
-import cats.effect.Async
+import cats.effect._
 import cats.syntax.all._
 import fs2.io.net.Network
 import io.renku.graph.model.RenkuUrl
@@ -29,6 +29,7 @@ import io.renku.triplesstore.ProjectsConnectionConfig
 import io.renku.triplesstore.client.http.{RowDecoder, SparqlClient}
 import io.renku.triplesstore.client.syntax._
 import org.typelevel.log4cats.Logger
+import org.typelevel.log4cats.slf4j.Slf4jLogger
 
 trait ProjectAuthSync[F[_]] {
   def syncProject(slug: Slug, members: Set[ProjectMember]): F[Unit]
@@ -40,16 +41,17 @@ object ProjectAuthSync {
   def resource[F[_]: Async: Logger: Network](cc: ProjectsConnectionConfig)(implicit renkuUrl: RenkuUrl) =
     ProjectSparqlClient[F](cc).map(apply[F])
 
-  def apply[F[_]: MonadThrow](
+  def apply[F[_]: Sync](
       sparqlClient: ProjectSparqlClient[F]
   )(implicit renkuUrl: RenkuUrl): ProjectAuthSync[F] =
     new Impl[F](ProjectAuthService[F](sparqlClient, renkuUrl), sparqlClient)
 
-  private final class Impl[F[_]: MonadThrow](
+  private final class Impl[F[_]: Sync](
       projectAuthService: ProjectAuthService[F],
       // gitLabMemberFinder: GitLabProjectMembersFinder[F],
       sparqlClient: ProjectSparqlClient[F]
   ) extends ProjectAuthSync[F] {
+    implicit val logger: Logger[F] = Slf4jLogger.getLogger[F]
     private[this] val visibilityFinder: VisibilityFinder[F] =
       new VisibilityFinder[F](sparqlClient)
 
@@ -64,15 +66,18 @@ object ProjectAuthSync {
 //        }
 
     override def syncProject(slug: Slug, members: Set[ProjectMember]): F[Unit] =
-      visibilityFinder.find(slug).flatMap {
-        case Some(vis) => syncProject(ProjectAuthData(slug, members, vis))
-        case None      => ().pure[F]
-      }
+      logger.warn(s"Start looking for visibility for $slug") *>
+        visibilityFinder.find(slug).flatMap {
+          case Some(vis) => syncProject(ProjectAuthData(slug, members, vis))
+          case None      => ().pure[F]
+        }
 
     override def syncProject(data: ProjectAuthData): F[Unit] =
-      projectAuthService.update(data)
+      logger.warn(s"Syncing project auth using $data") *>
+        projectAuthService.update(data)
   }
 
+  // Hm, we should probably get this from gitlab? TODO
   private final class VisibilityFinder[F[_]: MonadThrow](sparqlClient: SparqlClient[F]) {
     def find(slug: Slug): F[Option[Visibility]] =
       sparqlClient
