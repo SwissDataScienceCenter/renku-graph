@@ -43,15 +43,15 @@ private class MicroserviceRoutes[F[_]: MonadThrow](
 
   import eventEndpoint._
   import org.http4s.HttpRoutes
-  import projectUpdateEndpoint.`PUT /projects/:slug`
+  import projectUpdateEndpoint.`PATCH /projects/:slug`
   import routesMetrics._
 
   // format: off
   lazy val routes: Resource[F, HttpRoutes[F]] = HttpRoutes.of[F] {
-    case req @ POST -> Root / "events"                       => processEvent(req)
-    case GET        -> Root / "ping"                         => Ok("pong")
-    case req @ PUT  -> Root / "projects" / ProjectSlug(slug) => `PUT /projects/:slug`(slug, req)
-    case GET        -> Root / "config-info"                  => Ok(configInfo)
+    case req @ POST  -> Root / "events"                       => processEvent(req)
+    case GET         -> Root / "ping"                         => Ok("pong")
+    case req @ PATCH -> Root / "projects" / ProjectSlug(slug) => `PATCH /projects/:slug`(slug, req)
+    case GET         -> Root / "config-info"                  => Ok(configInfo)
   }.withMetrics.map(_ <+> versionRoutes())
   // format: on
 
