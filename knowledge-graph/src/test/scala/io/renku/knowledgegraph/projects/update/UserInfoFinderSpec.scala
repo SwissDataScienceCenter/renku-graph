@@ -24,16 +24,15 @@ import cats.syntax.all._
 import eu.timepit.refined.api.Refined
 import eu.timepit.refined.auto._
 import eu.timepit.refined.collection.NonEmpty
+import io.circe.Encoder
 import io.circe.literal._
 import io.circe.syntax._
-import io.circe.{Encoder, Json}
+import io.renku.core.client.Generators.userInfos
+import io.renku.core.client.UserInfo
 import io.renku.generators.CommonGraphGenerators.userAccessTokens
 import io.renku.generators.Generators.Implicits._
-import io.renku.graph.model.RenkuTinyTypeGenerators.{projectGitHttpUrls, projectSlugs}
-import io.renku.graph.model.projects
 import io.renku.http.client.RestClient.ResponseMappingF
 import io.renku.http.client.{AccessToken, GitLabClient}
-import io.renku.http.tinytypes.TinyTypeURIEncoder._
 import io.renku.testtools.GitLabClientTools
 import org.http4s.Status.{NotFound, Ok}
 import org.http4s.circe._
@@ -44,7 +43,7 @@ import org.scalatest.EitherValues
 import org.scalatest.flatspec.AsyncFlatSpec
 import org.scalatest.matchers.should
 
-class ProjectGitUrlFinderSpec
+class UserInfoFinderSpec
     extends AsyncFlatSpec
     with AsyncIOSpec
     with AsyncMockFactory
@@ -52,57 +51,53 @@ class ProjectGitUrlFinderSpec
     with EitherValues
     with GitLabClientTools[IO] {
 
-  it should "call GL's GET gl/projects/:slug and return the http git url" in {
+  it should "call GL's GET gl/user and return the user info" in {
 
-    val slug        = projectSlugs.generateOne
-    val accessToken = userAccessTokens.generateOne
-    val maybeGitUrl = projectGitHttpUrls.generateOption
+    val accessToken  = userAccessTokens.generateOne
+    val someUserInfo = userInfos.generateSome
 
-    givenFetchProjectGitUrl(
-      slug,
+    givenFetchUserInfo(
       accessToken,
-      returning = maybeGitUrl.pure[IO]
+      returning = someUserInfo.pure[IO]
     )
 
-    finder.findGitUrl(slug, accessToken).asserting(_ shouldBe maybeGitUrl)
+    finder.findUserInfo(accessToken).asserting(_ shouldBe someUserInfo)
   }
 
-  it should "return some gitUrl if GL returns 200 with payload containing the 'http_url_to_repo'" in {
-    val gitUrl = projectGitHttpUrls.generateOne
-    mapResponse(Ok, Request[IO](), Response[IO](Ok).withEntity(gitUrl.asJson(payloadEncoder)))
-      .asserting(_ shouldBe Some(gitUrl))
+  it should "return some user info if GL returns 200 with relevant values in the payload" in {
+    val userInfo = userInfos.generateOne
+    mapResponse(Ok, Request[IO](), Response[IO](Ok).withEntity(userInfo.asJson))
+      .asserting(_ shouldBe Some(userInfo))
   }
 
-  it should "return no gitUrl if GL returns 404 NOT_FOUND" in {
+  it should "return no user info if GL returns 404 NOT_FOUND" in {
     mapResponse(NotFound, Request[IO](), Response[IO](NotFound))
       .asserting(_ shouldBe None)
   }
 
   private implicit val glClient: GitLabClient[IO] = mock[GitLabClient[IO]]
-  private lazy val finder = new ProjectGitUrlFinderImpl[IO]
+  private lazy val finder = new UserInfoFinderImpl[IO]
 
-  private def givenFetchProjectGitUrl(slug:        projects.Slug,
-                                      accessToken: AccessToken,
-                                      returning:   IO[Option[projects.GitHttpUrl]]
-  ) = {
-    val endpointName: String Refined NonEmpty = "single-project"
+  private def givenFetchUserInfo(accessToken: AccessToken, returning: IO[Option[UserInfo]]) = {
+    val endpointName: String Refined NonEmpty = "user"
     (glClient
-      .get(_: Uri, _: String Refined NonEmpty)(_: ResponseMappingF[IO, Option[projects.GitHttpUrl]])(
-        _: Option[AccessToken]
-      ))
-      .expects(uri"projects" / slug, endpointName, *, accessToken.some)
+      .get(_: Uri, _: String Refined NonEmpty)(_: ResponseMappingF[IO, Option[UserInfo]])(_: Option[AccessToken]))
+      .expects(uri"user", endpointName, *, accessToken.some)
       .returning(returning)
   }
 
-  private lazy val mapResponse: ResponseMappingF[IO, Option[projects.GitHttpUrl]] =
+  private lazy val mapResponse: ResponseMappingF[IO, Option[UserInfo]] =
     captureMapping(glClient)(
       finder
-        .findGitUrl(projectSlugs.generateOne, userAccessTokens.generateOne)
+        .findUserInfo(userAccessTokens.generateOne)
         .unsafeRunSync(),
-      projectGitHttpUrls.toGeneratorOfOptions
+      userInfos.toGeneratorOfOptions
     )
 
-  private lazy val payloadEncoder: Encoder[projects.GitHttpUrl] = Encoder.instance { url =>
-    Json.obj("http_url_to_repo" -> url.asJson)
+  private implicit lazy val payloadEncoder: Encoder[UserInfo] = Encoder.instance { case UserInfo(name, email) =>
+    json"""{
+      "name":  $name,
+      "email": $email
+    }"""
   }
 }
