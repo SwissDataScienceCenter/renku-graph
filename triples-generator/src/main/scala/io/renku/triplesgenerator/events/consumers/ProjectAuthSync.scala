@@ -48,22 +48,11 @@ object ProjectAuthSync {
 
   private final class Impl[F[_]: Sync](
       projectAuthService: ProjectAuthService[F],
-      // gitLabMemberFinder: GitLabProjectMembersFinder[F],
-      sparqlClient: ProjectSparqlClient[F]
+      sparqlClient:       ProjectSparqlClient[F]
   ) extends ProjectAuthSync[F] {
     implicit val logger: Logger[F] = Slf4jLogger.getLogger[F]
     private[this] val visibilityFinder: VisibilityFinder[F] =
       new VisibilityFinder[F](sparqlClient)
-
-    // TODO
-    // def syncProject(slug: Slug)(implicit maybeAccessToken: Option[AccessToken]): F[Unit] =
-//      (gitLabMemberFinder.findProjectMembers(slug), visibilityFinder.find(slug))
-//        .parFlatMapN {
-//          case (members, Some(vis)) =>
-//            syncProject(ProjectAuthData(slug, members.map(_.toProjectAuthMember), vis))
-//          case _ =>
-//            ().pure[F]
-//        }
 
     override def syncProject(slug: Slug, members: Set[ProjectMember]): F[Unit] =
       logger.warn(s"Start looking for visibility for $slug") *>
@@ -77,7 +66,7 @@ object ProjectAuthSync {
         projectAuthService.update(data)
   }
 
-  // Hm, we should probably get this from gitlab? TODO
+  // Hm, should we get this from gitlab? TODO
   private final class VisibilityFinder[F[_]: MonadThrow](sparqlClient: SparqlClient[F]) {
     def find(slug: Slug): F[Option[Visibility]] =
       sparqlClient
