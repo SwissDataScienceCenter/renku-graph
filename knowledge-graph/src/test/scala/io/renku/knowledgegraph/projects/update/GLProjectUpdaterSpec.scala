@@ -62,7 +62,7 @@ class GLProjectUpdaterSpec
 
     givenEditProjectAPICall(slug, newValues, accessToken, returning = ().asRight.pure[IO])
 
-    finder.updateProject(slug, newValues, accessToken).value.asserting(_.value shouldBe ())
+    finder.updateProject(slug, newValues, accessToken).asserting(_.value shouldBe ())
   }
 
   it should s"do nothing if neither new image nor visibility is set in the update" in {
@@ -71,7 +71,7 @@ class GLProjectUpdaterSpec
     val newValues   = projectUpdatesGen.generateOne.copy(newImage = None, newVisibility = None)
     val accessToken = accessTokens.generateOne
 
-    finder.updateProject(slug, newValues, accessToken).value.asserting(_.value shouldBe ())
+    finder.updateProject(slug, newValues, accessToken).asserting(_.value shouldBe ())
   }
 
   it should s"call GL's PUT gl/projects/:slug and return GL message if returned" in {
@@ -83,7 +83,7 @@ class GLProjectUpdaterSpec
     val error = jsons.generateOne
     givenEditProjectAPICall(slug, newValues, accessToken, returning = error.asLeft.pure[IO])
 
-    finder.updateProject(slug, newValues, accessToken).value.asserting(_.left.value shouldBe error)
+    finder.updateProject(slug, newValues, accessToken).asserting(_.left.value shouldBe error)
   }
 
   it should "succeed if PUT gl/projects/:slug returns 200 OK" in {
@@ -139,7 +139,6 @@ class GLProjectUpdaterSpec
                        projectUpdatesGen.suchThat(u => u.newImage.orElse(u.newVisibility).isDefined).generateOne,
                        accessTokens.generateOne
         )
-        .value
         .unsafeRunSync(),
       ().asRight[Json],
       method = PUT

@@ -19,7 +19,6 @@
 package io.renku.knowledgegraph.projects.update
 
 import cats.MonadThrow
-import cats.data.EitherT
 import cats.effect.Async
 import cats.syntax.all._
 import eu.timepit.refined.auto._
@@ -33,7 +32,7 @@ import org.http4s.implicits._
 import org.http4s.{Request, Response, Status, UrlForm}
 
 private trait GLProjectUpdater[F[_]] {
-  def updateProject(slug: projects.Slug, updates: ProjectUpdates, at: AccessToken): EitherT[F, Json, Unit]
+  def updateProject(slug: projects.Slug, updates: ProjectUpdates, at: AccessToken): F[Either[Json, Unit]]
 }
 
 private object GLProjectUpdater {
@@ -42,13 +41,11 @@ private object GLProjectUpdater {
 
 private class GLProjectUpdaterImpl[F[_]: Async: GitLabClient] extends GLProjectUpdater[F] {
 
-  override def updateProject(slug: projects.Slug, updates: ProjectUpdates, at: AccessToken): EitherT[F, Json, Unit] =
-    EitherT {
-      if ((updates.newImage orElse updates.newVisibility).isDefined)
-        GitLabClient[F].put(uri"projects" / slug, "edit-project", toUrlForm(updates))(mapResponse)(at.some)
-      else
-        ().asRight[Json].pure[F]
-    }
+  override def updateProject(slug: projects.Slug, updates: ProjectUpdates, at: AccessToken): F[Either[Json, Unit]] =
+    if ((updates.newImage orElse updates.newVisibility).isDefined)
+      GitLabClient[F].put(uri"projects" / slug, "edit-project", toUrlForm(updates))(mapResponse)(at.some)
+    else
+      ().asRight[Json].pure[F]
 
   private def toUrlForm: ProjectUpdates => UrlForm = { case ProjectUpdates(_, newImage, _, newVisibility) =>
     UrlForm.empty

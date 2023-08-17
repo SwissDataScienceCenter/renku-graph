@@ -39,36 +39,45 @@ private trait ProjectUpdater[F[_]] {
 
 private object ProjectUpdater {
   def apply[F[_]: Async: GitLabClient: MetricsRegistry: Logger]: F[ProjectUpdater[F]] =
-    TriplesGeneratorClient[F].map(new ProjectUpdaterImpl[F](BranchProtectionCheck[F], GLProjectUpdater[F], _))
+    TriplesGeneratorClient[F].map(
+      new ProjectUpdaterImpl[F](BranchProtectionCheck[F], ProjectGitUrlFinder[F], GLProjectUpdater[F], _)
+    )
 }
 
 private class ProjectUpdaterImpl[F[_]: Async: Logger](branchProtectionCheck: BranchProtectionCheck[F],
-                                                      glProjectUpdater: GLProjectUpdater[F],
-                                                      tgClient:         TriplesGeneratorClient[F]
+                                                      projectGitUrlFinder: ProjectGitUrlFinder[F],
+                                                      glProjectUpdater:    GLProjectUpdater[F],
+                                                      tgClient:            TriplesGeneratorClient[F]
 ) extends ProjectUpdater[F] {
 
-  import branchProtectionCheck.canPushToDefaultBranch
-
-  override def updateProject(slug: projects.Slug, updates: ProjectUpdates, authUser: AuthUser): F[Response[F]] =
+  override def updateProject(slug: projects.Slug, updates: ProjectUpdates, authUser: AuthUser): F[Response[F]] = {
     if ((updates.newDescription orElse updates.newKeywords).isEmpty)
       updateGL(slug, updates, authUser)
         .flatMap(_ => updateTG(slug, updates))
-        .merge
     else
-      canPushToDefaultBranch(slug, authUser.accessToken)
-        .flatMap {
-          case false => conflictResponse.pure[F]
-          case true  => acceptedResponse.pure[F]
+      canPushToDefaultBranch(slug, authUser)
+        .flatMap { _ =>
+          findProjectGitUrl(slug, authUser).as(acceptedResponse)
         }
+  }.merge
 
   private def updateGL(slug:     projects.Slug,
                        updates:  ProjectUpdates,
                        authUser: AuthUser
-  ): EitherT[F, Response[F], Unit] =
-    glProjectUpdater.updateProject(slug, updates, authUser.accessToken).leftMap(badRequest)
+  ): EitherT[F, Response[F], Unit] = EitherT {
+    glProjectUpdater
+      .updateProject(slug, updates, authUser.accessToken)
+      .map(_.leftMap(badRequest))
+      .handleErrorWith(glUpdateError(slug))
+  }
 
   private def badRequest(message: Json): Response[F] =
     Response[F](BadRequest).withEntity(Message.Error.fromJsonUnsafe(message))
+
+  private def glUpdateError(slug: projects.Slug): Throwable => F[Either[Response[F], Unit]] =
+    Logger[F]
+      .error(_)(show"Updating project $slug in GL failed")
+      .as(Response[F](InternalServerError).withEntity(Message.Error("Updating GL failed")).asLeft)
 
   private def updateTG(slug: projects.Slug, updates: ProjectUpdates): EitherT[F, Response[F], Response[F]] =
     EitherT {
@@ -82,19 +91,54 @@ private class ProjectUpdaterImpl[F[_]: Async: Logger](branchProtectionCheck: Bra
           )
         )
         .map(_.toEither)
+        .handleError(_.asLeft)
     }.biSemiflatMap(
-      serverError(slug),
+      tsUpdateError(slug),
       _ => acceptedResponse.pure[F]
     )
 
-  private def serverError(slug: projects.Slug): Throwable => F[Response[F]] =
+  private def tsUpdateError(slug: projects.Slug): Throwable => F[Response[F]] =
     Logger[F]
-      .error(_)(show"Updating project $slug failed")
-      .as(Response[F](InternalServerError).withEntity(Message.Error("Update failed")))
+      .error(_)(show"Updating project $slug in TS failed")
+      .as(Response[F](InternalServerError).withEntity(Message.Error("Updating TS failed")))
+
+  private def canPushToDefaultBranch(slug: projects.Slug, authUser: AuthUser) = EitherT {
+    branchProtectionCheck
+      .canPushToDefaultBranch(slug, authUser.accessToken)
+      .flatMap {
+        case false =>
+          Response[F](Conflict)
+            .withEntity(Message.Error("Updating project not possible; the user cannot push to the default branch"))
+            .asLeft[Unit]
+            .pure[F]
+        case true => ().asRight[Response[F]].pure[F]
+      }
+      .handleErrorWith(pushCheckError(slug))
+  }
+
+  private def pushCheckError(slug: projects.Slug): Throwable => F[Either[Response[F], Unit]] =
+    Logger[F]
+      .error(_)(show"Check if pushing to git for $slug possible failed")
+      .as(Response[F](InternalServerError).withEntity(Message.Error("Finding project repository access failed")).asLeft)
+
+  private def findProjectGitUrl(slug: projects.Slug, authUser: AuthUser) = EitherT {
+    projectGitUrlFinder
+      .findGitUrl(slug, authUser.accessToken)
+      .flatMap {
+        case Some(url) => url.asRight[Response[F]].pure[F]
+        case None =>
+          Response[F](InternalServerError)
+            .withEntity(Message.Error("Cannot find project info"))
+            .asLeft[projects.GitHttpUrl]
+            .pure[F]
+      }
+      .handleErrorWith(findingGLUrlError(slug))
+  }
+
+  private def findingGLUrlError(slug: projects.Slug): Throwable => F[Either[Response[F], projects.GitHttpUrl]] =
+    Logger[F]
+      .error(_)(show"Finding git url for $slug failed")
+      .as(Response[F](InternalServerError).withEntity(Message.Error("Finding project git url failed")).asLeft)
 
   private lazy val acceptedResponse = Response[F](Accepted).withEntity(Message.Info("Project update accepted"))
-  private lazy val conflictResponse = Response[F](Conflict)
-    .withEntity(
-      Message.Error("Updating project not possible; quite likely the user cannot push to the default branch")
-    )
 }

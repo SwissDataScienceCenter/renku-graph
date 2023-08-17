@@ -19,7 +19,6 @@
 package io.renku.knowledgegraph.projects.update
 
 import Generators._
-import cats.data.EitherT
 import cats.effect.IO
 import cats.syntax.all._
 import eu.timepit.refined.auto._
@@ -31,11 +30,11 @@ import io.renku.generators.Generators.Implicits._
 import io.renku.generators.Generators.{exceptions, jsons}
 import io.renku.graph.model.RenkuTinyTypeGenerators.projectSlugs
 import io.renku.graph.model.projects
-import io.renku.http.client.AccessToken
+import io.renku.http.client.UserAccessToken
 import io.renku.interpreters.TestLogger
 import io.renku.testtools.CustomAsyncIOSpec
 import io.renku.triplesgenerator.api.{TriplesGeneratorClient, ProjectUpdates => TGProjectUpdates}
-import org.http4s.Status.{Accepted, BadRequest, InternalServerError, Conflict}
+import org.http4s.Status.{Accepted, BadRequest, Conflict, InternalServerError}
 import org.http4s.circe._
 import org.scalamock.scalatest.AsyncMockFactory
 import org.scalatest.flatspec.AsyncFlatSpec
@@ -44,8 +43,8 @@ import org.scalatest.matchers.should
 class ProjectUpdaterSpec extends AsyncFlatSpec with CustomAsyncIOSpec with should.Matchers with AsyncMockFactory {
 
   it should "if only GL update needed " +
-    "send update only to GL and TG " +
-    "and return 202 Accepted when no failures" in {
+    "send update only to GL and TG and " +
+    "return 202 Accepted when no failures" in {
 
       val authUser = authUsers.generateOne
       val slug     = projectSlugs.generateOne
@@ -54,7 +53,7 @@ class ProjectUpdaterSpec extends AsyncFlatSpec with CustomAsyncIOSpec with shoul
         .suchThat(_.onlyGLUpdateNeeded)
         .generateOne
 
-      givenUpdatingProjectInGL(slug, updates, authUser.accessToken, returning = EitherT.pure[IO, Json](()))
+      givenUpdatingProjectInGL(slug, updates, authUser.accessToken, returning = ().asRight.pure[IO])
       givenSendingUpdateToTG(slug, updates, returning = TriplesGeneratorClient.Result.success(()).pure[IO])
 
       updater.updateProject(slug, updates, authUser) >>= { response =>
@@ -79,9 +78,62 @@ class ProjectUpdaterSpec extends AsyncFlatSpec with CustomAsyncIOSpec with shoul
             .as[Json]
             .asserting(
               _ shouldBe Message
-                .Error("Updating project not possible; quite likely the user cannot push to the default branch")
+                .Error("Updating project not possible; the user cannot push to the default branch")
                 .asJson
             )
+      }
+    }
+
+  it should "if core update needed " +
+    "check if pushing to the default branch is allowed " +
+    "and return 500 InternalServerError if check failed" in {
+
+      val authUser = authUsers.generateOne
+      val slug     = projectSlugs.generateOne
+      val updates  = projectUpdatesGen.suchThat(_.coreUpdateNeeded).generateOne
+
+      val exception = exceptions.generateOne
+      givenBranchProtectionChecking(slug, authUser.accessToken, returning = exception.raiseError[IO, Nothing])
+
+      updater.updateProject(slug, updates, authUser) >>= { response =>
+        response.pure[IO].asserting(_.status shouldBe InternalServerError) >>
+          response.as[Json].asserting(_ shouldBe Message.Error("Finding project repository access failed").asJson)
+      }
+    }
+
+  it should "if core update needed but " +
+    "finding project git url fails " +
+    "return 500 InternalServerError" in {
+
+      val authUser = authUsers.generateOne
+      val slug     = projectSlugs.generateOne
+      val updates  = projectUpdatesGen.suchThat(_.coreUpdateNeeded).generateOne
+
+      givenBranchProtectionChecking(slug, authUser.accessToken, returning = true.pure[IO])
+
+      val exception = exceptions.generateOne
+      givenProjectGitUrlFinding(slug, authUser.accessToken, returning = exception.raiseError[IO, Nothing])
+
+      updater.updateProject(slug, updates, authUser) >>= { response =>
+        response.pure[IO].asserting(_.status shouldBe InternalServerError) >>
+          response.as[Json].asserting(_ shouldBe Message.Error("Finding project git url failed").asJson)
+      }
+    }
+
+  it should "fail if core update needed and " +
+    "finding project git url returns None" in {
+
+      val authUser = authUsers.generateOne
+      val slug     = projectSlugs.generateOne
+      val updates  = projectUpdatesGen.suchThat(_.coreUpdateNeeded).generateOne
+
+      givenBranchProtectionChecking(slug, authUser.accessToken, returning = true.pure[IO])
+
+      givenProjectGitUrlFinding(slug, authUser.accessToken, returning = None.pure[IO])
+
+      updater.updateProject(slug, updates, authUser) >>= { response =>
+        response.pure[IO].asserting(_.status shouldBe InternalServerError) >>
+          response.as[Json].asserting(_ shouldBe Message.Error("Cannot find project info").asJson)
       }
     }
 
@@ -95,7 +147,7 @@ class ProjectUpdaterSpec extends AsyncFlatSpec with CustomAsyncIOSpec with shoul
       .generateOne
 
     val error = jsons.generateOne
-    givenUpdatingProjectInGL(slug, updates, authUser.accessToken, returning = EitherT.left(error.pure[IO]))
+    givenUpdatingProjectInGL(slug, updates, authUser.accessToken, returning = error.asLeft.pure[IO])
 
     updater.updateProject(slug, updates, authUser) >>= { response =>
       response.pure[IO].asserting(_.status shouldBe BadRequest) >>
@@ -103,7 +155,7 @@ class ProjectUpdaterSpec extends AsyncFlatSpec with CustomAsyncIOSpec with shoul
     }
   }
 
-  it should "fail if updating GL fails" in {
+  it should "return 500 InternalServerError if updating GL fails" in {
 
     val authUser = authUsers.generateOne
     val slug     = projectSlugs.generateOne
@@ -116,10 +168,13 @@ class ProjectUpdaterSpec extends AsyncFlatSpec with CustomAsyncIOSpec with shoul
     givenUpdatingProjectInGL(slug,
                              updates,
                              authUser.accessToken,
-                             returning = EitherT(exception.raiseError[IO, Either[Json, Unit]])
+                             returning = exception.raiseError[IO, Either[Json, Unit]]
     )
 
-    updater.updateProject(slug, updates, authUser).assertThrowsError[Exception](_ shouldBe exception)
+    updater.updateProject(slug, updates, authUser) >>= { response =>
+      response.pure[IO].asserting(_.status shouldBe InternalServerError) >>
+        response.as[Message].asserting(_ shouldBe Message.Error("Updating GL failed"))
+    }
   }
 
   it should "return 500 InternalServerError if updating project in TG failed" in {
@@ -131,7 +186,7 @@ class ProjectUpdaterSpec extends AsyncFlatSpec with CustomAsyncIOSpec with shoul
       .suchThat(_.onlyGLUpdateNeeded)
       .generateOne
 
-    givenUpdatingProjectInGL(slug, updates, authUser.accessToken, returning = EitherT.pure[IO, Json](()))
+    givenUpdatingProjectInGL(slug, updates, authUser.accessToken, returning = ().asRight.pure[IO])
     val exception = exceptions.generateOne
     givenSendingUpdateToTG(slug,
                            updates,
@@ -140,25 +195,34 @@ class ProjectUpdaterSpec extends AsyncFlatSpec with CustomAsyncIOSpec with shoul
 
     updater.updateProject(slug, updates, authUser) >>= { response =>
       response.pure[IO].asserting(_.status shouldBe InternalServerError) >>
-        response.as[Message].asserting(_ shouldBe Message.Error("Update failed"))
+        response.as[Message].asserting(_ shouldBe Message.Error("Updating TS failed"))
     }
   }
 
   private implicit val logger: TestLogger[IO] = TestLogger[IO]()
   private val branchProtectionCheck = mock[BranchProtectionCheck[IO]]
+  private val projectGitUrlFinder   = mock[ProjectGitUrlFinder[IO]]
   private val glProjectUpdater      = mock[GLProjectUpdater[IO]]
   private val tgClient              = mock[TriplesGeneratorClient[IO]]
-  private lazy val updater          = new ProjectUpdaterImpl[IO](branchProtectionCheck, glProjectUpdater, tgClient)
+  private lazy val updater =
+    new ProjectUpdaterImpl[IO](branchProtectionCheck, projectGitUrlFinder, glProjectUpdater, tgClient)
 
-  private def givenBranchProtectionChecking(slug: projects.Slug, at: AccessToken, returning: IO[Boolean]) =
+  private def givenBranchProtectionChecking(slug: projects.Slug, at: UserAccessToken, returning: IO[Boolean]) =
     (branchProtectionCheck.canPushToDefaultBranch _)
       .expects(slug, at)
       .returning(returning)
 
+  private def givenProjectGitUrlFinding(slug:      projects.Slug,
+                                        at:        UserAccessToken,
+                                        returning: IO[Option[projects.GitHttpUrl]]
+  ) = (projectGitUrlFinder.findGitUrl _)
+    .expects(slug, at)
+    .returning(returning)
+
   private def givenUpdatingProjectInGL(slug:      projects.Slug,
                                        updates:   ProjectUpdates,
-                                       at:        AccessToken,
-                                       returning: EitherT[IO, Json, Unit]
+                                       at:        UserAccessToken,
+                                       returning: IO[Either[Json, Unit]]
   ) = (glProjectUpdater.updateProject _)
     .expects(slug, updates, at)
     .returning(returning)
