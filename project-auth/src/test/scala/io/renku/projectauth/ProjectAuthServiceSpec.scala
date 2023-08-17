@@ -18,12 +18,15 @@
 
 package io.renku.projectauth
 
+import cats.data.NonEmptyList
 import cats.effect.IO
 import cats.effect.kernel.Resource
 import cats.effect.testing.scalatest.AsyncIOSpec
 import fs2.Stream
 import io.renku.generators.Generators.Implicits._
 import io.renku.graph.model.RenkuUrl
+import io.renku.graph.model.persons.GitLabId
+import io.renku.graph.model.projects.Visibility
 import io.renku.triplesstore.client.util.JenaContainerSpec
 import org.scalatest.flatspec.AsyncFlatSpec
 import org.scalatest.matchers.should
@@ -49,6 +52,88 @@ class ProjectAuthServiceSpec extends AsyncFlatSpec with AsyncIOSpec with JenaCon
 
         n <- s.getAll(15).compile.toVector
         _ = n shouldBe data.sortBy(_.path)
+      } yield ()
+    }
+  }
+
+  it should "work with no members" in {
+    withProjectAuthService.use { s =>
+      for {
+        data <- Generators.projectAuthDataGen.asStream.toIO
+                  .take(2)
+                  .map(_.copy(members = Set.empty))
+                  .compile
+                  .toVector
+        _ <- Stream
+               .emits(data)
+               .through(s.updateAll)
+               .compile
+               .drain
+
+        n <- s.getAll().compile.toVector
+        _ = n shouldBe data.sortBy(_.path)
+      } yield ()
+    }
+  }
+
+  it should "remove projects" in {
+    withProjectAuthService.use { s =>
+      for {
+        original <- Generators.projectAuthDataGen.asStream.toIO
+                      .take(1)
+                      .map(_.copy(visibility = Visibility.Internal))
+                      .compile
+                      .lastOrError
+        _ <- s.update(original)
+
+        n <- s.getAll().compile.toVector
+        _ = n.head shouldBe original
+
+        _ <- s.remove(original.path)
+        _ <- s.getAll().compile.toVector.asserting(v => v shouldBe Vector.empty)
+      } yield ()
+    }
+  }
+
+  it should "remove selectively" in {
+    withProjectAuthService.use { s =>
+      for {
+        data <- Generators.projectAuthDataGen.asStream.toIO
+                  .take(6)
+                  .compile
+                  .toVector
+        _ <- Stream.emits(data).through(s.updateAll).compile.drain
+
+        (toremove, tokeep) = data.splitAt(3)
+        _ <- s.remove(NonEmptyList.fromListUnsafe(toremove.map(_.path).toList))
+
+        _ <- s.getAll().compile.toVector.asserting(v => v shouldBe tokeep.sortBy(_.path))
+      } yield ()
+    }
+  }
+
+  it should "update new properties" in {
+    withProjectAuthService.use { s =>
+      for {
+        original <- Generators.projectAuthDataGen.asStream.toIO
+                      .take(1)
+                      .map(_.copy(visibility = Visibility.Internal))
+                      .compile
+                      .lastOrError
+        _ <- s.update(original)
+
+        n <- s.getAll().compile.toVector
+        _ = n.head shouldBe original
+
+        second = original.copy(visibility = Visibility.Public)
+        _  <- s.update(second)
+        n2 <- s.getAll().compile.toVector
+        _ = n2.head shouldBe second
+
+        third = second.copy(members = second.members + ProjectMember(GitLabId(43), Role.Reader))
+        _  <- s.update(third)
+        n3 <- s.getAll().compile.toVector
+        _ = n3.head shouldBe third
       } yield ()
     }
   }

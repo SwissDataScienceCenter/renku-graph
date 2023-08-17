@@ -18,22 +18,25 @@
 
 package io.renku.projectauth
 
-import io.renku.graph.model.RenkuTinyTypeGenerators
+import io.renku.graph.model.{RenkuTinyTypeGenerators, persons}
 import org.scalacheck.Gen
 
 object Generators {
+  private val fixedIds = 1 to 800
+  private val gitLabIds: Gen[persons.GitLabId] =
+    Gen.oneOf(fixedIds).map(persons.GitLabId.apply)
 
   val roleGen: Gen[Role] =
     Gen.oneOf(Role.all.toList)
 
   val memberGen: Gen[ProjectMember] = for {
     role <- roleGen
-    id   <- RenkuTinyTypeGenerators.personGitLabIds
+    id   <- gitLabIds
   } yield ProjectMember(id, role)
 
   val projectAuthDataGen: Gen[ProjectAuthData] = for {
     slug       <- RenkuTinyTypeGenerators.projectSlugs
-    members    <- Gen.choose(0, 15).flatMap(n => Gen.listOfN(n, memberGen))
+    members    <- Gen.choose(0, 150).flatMap(n => Gen.listOfN(n, memberGen))
     visibility <- RenkuTinyTypeGenerators.projectVisibilities
   } yield ProjectAuthData(slug, members.toSet, visibility)
 }

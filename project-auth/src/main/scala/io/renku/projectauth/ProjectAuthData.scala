@@ -23,8 +23,6 @@ import io.renku.graph.model.{RenkuUrl, Schemas}
 import io.renku.jsonld.JsonLD.JsonLDArray
 import io.renku.jsonld.syntax._
 import io.renku.jsonld.{EntityTypes, JsonLD, JsonLDEncoder}
-import io.renku.triplesstore.client.http.RowDecoder
-import io.renku.tinytypes.json.TinyTypeDecoders._
 
 final case class ProjectAuthData(
     path:       Slug,
@@ -33,7 +31,6 @@ final case class ProjectAuthData(
 )
 
 object ProjectAuthData {
-
   implicit def jsonLDEncoder(implicit renkuUrl: RenkuUrl): JsonLDEncoder[ProjectAuthData] =
     JsonLDEncoder.instance { data =>
       JsonLD.entity(
@@ -41,12 +38,8 @@ object ProjectAuthData {
         EntityTypes.of(Schemas.schema / "Project"),
         Schemas.renku / "slug"       -> data.path.asJsonLD,
         Schemas.renku / "visibility" -> data.visibility.asJsonLD,
-        Schemas.renku / "members" -> JsonLDArray(
-          data.members.toSeq.map(_.asJsonLD)
-        )
+        Schemas.renku / "memberId"   -> JsonLDArray(data.members.map(_.gitLabId.asJsonLD).toSeq),
+        Schemas.renku / "memberRole" -> JsonLDArray(data.members.map(_.encoded.asJsonLD).toSeq)
       )
     }
-
-  implicit def rowDecoder: RowDecoder[ProjectAuthData] =
-    RowDecoder.forProduct3("slug", "visibility", "members")(ProjectAuthData.apply)
 }

@@ -18,33 +18,30 @@
 
 package io.renku.projectauth
 
-import io.renku.graph.model.Schemas
 import io.renku.graph.model.persons.GitLabId
-import io.renku.jsonld.syntax._
-import io.renku.jsonld.{EntityId, EntityTypes, JsonLD, JsonLDEncoder}
-import io.renku.triplesstore.client.http.RowDecoder
-import io.renku.tinytypes.json.TinyTypeDecoders._
 
 final case class ProjectMember(
     gitLabId: GitLabId,
     role:     Role
-)
+) {
+
+  private[projectauth] def encoded: String =
+    s"${gitLabId.value}:${role.asString}"
+}
 
 object ProjectMember {
+  private[projectauth] def fromEncoded(str: String): Either[String, ProjectMember] =
+    str.split(':').toList match {
+      case idStr :: roleStr :: Nil =>
+        for {
+          id   <- idStr.toIntOption.map(GitLabId.apply).toRight(s"Invalid person GitLabId: $idStr")
+          role <- Role.fromString(roleStr)
+        } yield ProjectMember(id, role)
+
+      case _ =>
+        Left(s"Invalid encoded project member: $str")
+    }
 
   def fromGitLabData(gitLabId: GitLabId, accessLevel: Int): ProjectMember =
     ProjectMember(gitLabId, Role.fromGitLabAccessLevel(accessLevel))
-
-  implicit def jsonLDEncoder: JsonLDEncoder[ProjectMember] =
-    JsonLDEncoder.instance { member =>
-      JsonLD.entity(
-        EntityId.blank,
-        EntityTypes.of(Schemas.schema / "Member"),
-        Schemas.schema / "identifier" -> member.gitLabId.asJsonLD,
-        Schemas.schema / "role"       -> member.role.asString.asJsonLD
-      )
-    }
-
-  implicit def rowDecoder: RowDecoder[ProjectMember] =
-    RowDecoder.forProduct2("gitLabId", "role")(ProjectMember.apply)
 }
