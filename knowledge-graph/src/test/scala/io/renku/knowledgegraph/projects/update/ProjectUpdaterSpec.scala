@@ -24,13 +24,15 @@ import cats.syntax.all._
 import eu.timepit.refined.auto._
 import io.circe.Json
 import io.circe.syntax._
+import io.renku.core.client.Generators.{coreUrisVersioned, resultDetailedFailures, userInfos}
+import io.renku.core.client.{RenkuCoreClient, RenkuCoreUri, Result, UserInfo, ProjectUpdates => CoreProjectUpdates}
 import io.renku.data.Message
 import io.renku.generators.CommonGraphGenerators.authUsers
 import io.renku.generators.Generators.Implicits._
 import io.renku.generators.Generators.{exceptions, jsons}
-import io.renku.graph.model.RenkuTinyTypeGenerators.projectSlugs
+import io.renku.graph.model.RenkuTinyTypeGenerators.{projectGitHttpUrls, projectSlugs}
 import io.renku.graph.model.projects
-import io.renku.http.client.UserAccessToken
+import io.renku.http.client.{AccessToken, UserAccessToken}
 import io.renku.interpreters.TestLogger
 import io.renku.testtools.CustomAsyncIOSpec
 import io.renku.triplesgenerator.api.{TriplesGeneratorClient, ProjectUpdates => TGProjectUpdates}
@@ -113,6 +115,7 @@ class ProjectUpdaterSpec extends AsyncFlatSpec with CustomAsyncIOSpec with shoul
 
       val exception = exceptions.generateOne
       givenProjectGitUrlFinding(slug, authUser.accessToken, returning = exception.raiseError[IO, Nothing])
+      givenUserInfoFinding(authUser.accessToken, returning = userInfos.generateSome.pure[IO])
 
       updater.updateProject(slug, updates, authUser) >>= { response =>
         response.pure[IO].asserting(_.status shouldBe InternalServerError) >>
@@ -120,8 +123,9 @@ class ProjectUpdaterSpec extends AsyncFlatSpec with CustomAsyncIOSpec with shoul
       }
     }
 
-  it should "fail if core update needed and " +
-    "finding project git url returns None" in {
+  it should "if core update needed and " +
+    "finding project git url returns None " +
+    "return 500 InternalServerError" in {
 
       val authUser = authUsers.generateOne
       val slug     = projectSlugs.generateOne
@@ -130,10 +134,83 @@ class ProjectUpdaterSpec extends AsyncFlatSpec with CustomAsyncIOSpec with shoul
       givenBranchProtectionChecking(slug, authUser.accessToken, returning = true.pure[IO])
 
       givenProjectGitUrlFinding(slug, authUser.accessToken, returning = None.pure[IO])
+      givenUserInfoFinding(authUser.accessToken, returning = userInfos.generateSome.pure[IO])
 
       updater.updateProject(slug, updates, authUser) >>= { response =>
         response.pure[IO].asserting(_.status shouldBe InternalServerError) >>
           response.as[Json].asserting(_ shouldBe Message.Error("Cannot find project info").asJson)
+      }
+    }
+
+  it should "if core update needed and " +
+    "finding user info returns None " +
+    "return 500 InternalServerError" in {
+
+      val authUser = authUsers.generateOne
+      val slug     = projectSlugs.generateOne
+      val updates  = projectUpdatesGen.suchThat(_.coreUpdateNeeded).generateOne
+
+      givenBranchProtectionChecking(slug, authUser.accessToken, returning = true.pure[IO])
+      givenProjectGitUrlFinding(slug, authUser.accessToken, returning = projectGitHttpUrls.generateSome.pure[IO])
+      givenUserInfoFinding(authUser.accessToken, returning = None.pure[IO])
+
+      updater.updateProject(slug, updates, authUser) >>= { response =>
+        response.pure[IO].asserting(_.status shouldBe InternalServerError) >>
+          response.as[Json].asserting(_ shouldBe Message.Error("Cannot find user info").asJson)
+      }
+    }
+
+  it should "if core update needed and " +
+    "finding renku core URI fails " +
+    "return 500 InternalServerError" in {
+
+      val authUser = authUsers.generateOne
+      val slug     = projectSlugs.generateOne
+      val updates  = projectUpdatesGen.suchThat(_.coreUpdateNeeded).generateOne
+
+      givenBranchProtectionChecking(slug, authUser.accessToken, returning = true.pure[IO])
+
+      val projectGitUrl = projectGitHttpUrls.generateOne
+      givenProjectGitUrlFinding(slug, authUser.accessToken, returning = projectGitUrl.some.pure[IO])
+      givenUserInfoFinding(authUser.accessToken, returning = userInfos.generateSome.pure[IO])
+
+      val failedResult = resultDetailedFailures.generateOne
+      givenFindingCoreUri(projectGitUrl, authUser.accessToken, returning = failedResult)
+
+      updater.updateProject(slug, updates, authUser) >>= { response =>
+        response.pure[IO].asserting(_.status shouldBe InternalServerError) >>
+          response.as[Json].asserting(_ shouldBe Message.Error.fromExceptionMessage(failedResult).asJson)
+      }
+    }
+
+  it should "if core update needed and " +
+    "updating renku core fails " +
+    "return 500 InternalServerError" in {
+
+      val authUser = authUsers.generateOne
+      val slug     = projectSlugs.generateOne
+      val updates  = projectUpdatesGen.suchThat(_.coreUpdateNeeded).generateOne
+
+      givenBranchProtectionChecking(slug, authUser.accessToken, returning = true.pure[IO])
+
+      val projectGitUrl = projectGitHttpUrls.generateOne
+      givenProjectGitUrlFinding(slug, authUser.accessToken, returning = projectGitUrl.some.pure[IO])
+      val userInfo = userInfos.generateOne
+      givenUserInfoFinding(authUser.accessToken, returning = userInfo.some.pure[IO])
+      val coreUri = coreUrisVersioned.generateOne
+      givenFindingCoreUri(projectGitUrl, authUser.accessToken, returning = Result.success(coreUri))
+
+      val failedResult = resultDetailedFailures.generateOne
+      givenUpdatingProjectInCore(
+        coreUri,
+        CoreProjectUpdates(projectGitUrl, userInfo, updates.newDescription, updates.newKeywords),
+        authUser.accessToken,
+        returning = failedResult
+      )
+
+      updater.updateProject(slug, updates, authUser) >>= { response =>
+        response.pure[IO].asserting(_.status shouldBe InternalServerError) >>
+          response.as[Json].asserting(_ shouldBe Message.Error.fromExceptionMessage(failedResult).asJson)
       }
     }
 
@@ -202,10 +279,17 @@ class ProjectUpdaterSpec extends AsyncFlatSpec with CustomAsyncIOSpec with shoul
   private implicit val logger: TestLogger[IO] = TestLogger[IO]()
   private val branchProtectionCheck = mock[BranchProtectionCheck[IO]]
   private val projectGitUrlFinder   = mock[ProjectGitUrlFinder[IO]]
+  private val userInfoFinder        = mock[UserInfoFinder[IO]]
   private val glProjectUpdater      = mock[GLProjectUpdater[IO]]
   private val tgClient              = mock[TriplesGeneratorClient[IO]]
-  private lazy val updater =
-    new ProjectUpdaterImpl[IO](branchProtectionCheck, projectGitUrlFinder, glProjectUpdater, tgClient)
+  private val renkuCoreClient       = mock[RenkuCoreClient[IO]]
+  private lazy val updater = new ProjectUpdaterImpl[IO](branchProtectionCheck,
+                                                        projectGitUrlFinder,
+                                                        userInfoFinder,
+                                                        glProjectUpdater,
+                                                        tgClient,
+                                                        renkuCoreClient
+  )
 
   private def givenBranchProtectionChecking(slug: projects.Slug, at: UserAccessToken, returning: IO[Boolean]) =
     (branchProtectionCheck.canPushToDefaultBranch _)
@@ -218,6 +302,11 @@ class ProjectUpdaterSpec extends AsyncFlatSpec with CustomAsyncIOSpec with shoul
   ) = (projectGitUrlFinder.findGitUrl _)
     .expects(slug, at)
     .returning(returning)
+
+  private def givenUserInfoFinding(at: UserAccessToken, returning: IO[Option[UserInfo]]) =
+    (userInfoFinder.findUserInfo _)
+      .expects(at)
+      .returning(returning)
 
   private def givenUpdatingProjectInGL(slug:      projects.Slug,
                                        updates:   ProjectUpdates,
@@ -240,4 +329,20 @@ class ProjectUpdaterSpec extends AsyncFlatSpec with CustomAsyncIOSpec with shoul
       )
     )
     .returning(returning)
+
+  private def givenFindingCoreUri(gitUrl:    projects.GitHttpUrl,
+                                  at:        UserAccessToken,
+                                  returning: Result[RenkuCoreUri.Versioned]
+  ) = (renkuCoreClient
+    .findCoreUri(_: projects.GitHttpUrl, _: AccessToken))
+    .expects(gitUrl, at)
+    .returning(returning.pure[IO])
+
+  private def givenUpdatingProjectInCore(coreUri:   RenkuCoreUri.Versioned,
+                                         updates:   CoreProjectUpdates,
+                                         at:        UserAccessToken,
+                                         returning: Result[Unit]
+  ) = (renkuCoreClient.updateProject _)
+    .expects(coreUri, updates, at)
+    .returning(returning.pure[IO])
 }

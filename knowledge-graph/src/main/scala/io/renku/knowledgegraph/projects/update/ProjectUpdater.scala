@@ -18,11 +18,13 @@
 
 package io.renku.knowledgegraph.projects.update
 
+import cats.NonEmptyParallel
 import cats.data.EitherT
 import cats.effect.Async
 import cats.syntax.all._
 import eu.timepit.refined.auto._
 import io.circe.Json
+import io.renku.core.client.{RenkuCoreClient, UserInfo, ProjectUpdates => CoreProjectUpdates}
 import io.renku.data.Message
 import io.renku.graph.model.projects
 import io.renku.http.client.GitLabClient
@@ -38,16 +40,25 @@ private trait ProjectUpdater[F[_]] {
 }
 
 private object ProjectUpdater {
-  def apply[F[_]: Async: GitLabClient: MetricsRegistry: Logger]: F[ProjectUpdater[F]] =
-    TriplesGeneratorClient[F].map(
-      new ProjectUpdaterImpl[F](BranchProtectionCheck[F], ProjectGitUrlFinder[F], GLProjectUpdater[F], _)
-    )
+  def apply[F[_]: Async: NonEmptyParallel: GitLabClient: MetricsRegistry: Logger]: F[ProjectUpdater[F]] =
+    (TriplesGeneratorClient[F], RenkuCoreClient[F]())
+      .mapN(
+        new ProjectUpdaterImpl[F](BranchProtectionCheck[F],
+                                  ProjectGitUrlFinder[F],
+                                  UserInfoFinder[F],
+                                  GLProjectUpdater[F],
+                                  _,
+                                  _
+        )
+      )
 }
 
-private class ProjectUpdaterImpl[F[_]: Async: Logger](branchProtectionCheck: BranchProtectionCheck[F],
-                                                      projectGitUrlFinder: ProjectGitUrlFinder[F],
-                                                      glProjectUpdater:    GLProjectUpdater[F],
-                                                      tgClient:            TriplesGeneratorClient[F]
+private class ProjectUpdaterImpl[F[_]: Async: NonEmptyParallel: Logger](branchProtectionCheck: BranchProtectionCheck[F],
+                                                                        projectGitUrlFinder: ProjectGitUrlFinder[F],
+                                                                        userInfoFinder:      UserInfoFinder[F],
+                                                                        glProjectUpdater:    GLProjectUpdater[F],
+                                                                        tgClient:            TriplesGeneratorClient[F],
+                                                                        renkuCoreClient:     RenkuCoreClient[F]
 ) extends ProjectUpdater[F] {
 
   override def updateProject(slug: projects.Slug, updates: ProjectUpdates, authUser: AuthUser): F[Response[F]] = {
@@ -56,9 +67,8 @@ private class ProjectUpdaterImpl[F[_]: Async: Logger](branchProtectionCheck: Bra
         .flatMap(_ => updateTG(slug, updates))
     else
       canPushToDefaultBranch(slug, authUser)
-        .flatMap { _ =>
-          findProjectGitUrl(slug, authUser).as(acceptedResponse)
-        }
+        .flatMap(_ => findCoreProjectUpdates(slug, updates, authUser))
+        .flatMap(updates => findCoreUri(updates, authUser).map(updates -> _).map(_ => acceptedResponse))
   }.merge
 
   private def updateGL(slug:     projects.Slug,
@@ -121,7 +131,15 @@ private class ProjectUpdaterImpl[F[_]: Async: Logger](branchProtectionCheck: Bra
       .error(_)(show"Check if pushing to git for $slug possible failed")
       .as(Response[F](InternalServerError).withEntity(Message.Error("Finding project repository access failed")).asLeft)
 
-  private def findProjectGitUrl(slug: projects.Slug, authUser: AuthUser) = EitherT {
+  private def findCoreProjectUpdates(slug: projects.Slug, updates: ProjectUpdates, authUser: AuthUser) = EitherT {
+    (findProjectGitUrl(slug, authUser) -> findUserInfo(authUser))
+      .parMapN { (maybeProjectGitUrl, maybeUserInfo) =>
+        (maybeProjectGitUrl -> maybeUserInfo)
+          .mapN(CoreProjectUpdates(_, _, updates.newDescription, updates.newKeywords))
+      }
+  }
+
+  private def findProjectGitUrl(slug: projects.Slug, authUser: AuthUser) =
     projectGitUrlFinder
       .findGitUrl(slug, authUser.accessToken)
       .flatMap {
@@ -133,12 +151,41 @@ private class ProjectUpdaterImpl[F[_]: Async: Logger](branchProtectionCheck: Bra
             .pure[F]
       }
       .handleErrorWith(findingGLUrlError(slug))
-  }
 
   private def findingGLUrlError(slug: projects.Slug): Throwable => F[Either[Response[F], projects.GitHttpUrl]] =
     Logger[F]
       .error(_)(show"Finding git url for $slug failed")
       .as(Response[F](InternalServerError).withEntity(Message.Error("Finding project git url failed")).asLeft)
+
+  private def findUserInfo(authUser: AuthUser) =
+    userInfoFinder
+      .findUserInfo(authUser.accessToken)
+      .flatMap {
+        case Some(info) => info.asRight[Response[F]].pure[F]
+        case None =>
+          Response[F](InternalServerError)
+            .withEntity(Message.Error("Cannot find user info"))
+            .asLeft[UserInfo]
+            .pure[F]
+      }
+      .handleErrorWith(findingUserInfoError(authUser))
+
+  private def findingUserInfoError(user: AuthUser): Throwable => F[Either[Response[F], UserInfo]] =
+    Logger[F]
+      .error(_)(show"Finding userInfo for ${user.id} failed")
+      .as(Response[F](InternalServerError).withEntity(Message.Error("Finding user info failed")).asLeft)
+
+  private def findCoreUri(updates: CoreProjectUpdates, authUser: AuthUser) = EitherT {
+    renkuCoreClient
+      .findCoreUri(updates.projectUrl, authUser.accessToken)
+      .map(_.toEither)
+      .handleError(_.asLeft)
+  }.leftSemiflatMap(findingCoreUriError(updates))
+
+  private def findingCoreUriError(updates: CoreProjectUpdates): Throwable => F[Response[F]] = ex =>
+    Logger[F]
+      .error(ex)(show"Finding core uri for ${updates.projectUrl} failed")
+      .as(Response[F](InternalServerError).withEntity(Message.Error.fromExceptionMessage(ex)))
 
   private lazy val acceptedResponse = Response[F](Accepted).withEntity(Message.Info("Project update accepted"))
 }

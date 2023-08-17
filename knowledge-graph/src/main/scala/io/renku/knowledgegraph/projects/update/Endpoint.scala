@@ -18,6 +18,7 @@
 
 package io.renku.knowledgegraph.projects.update
 
+import cats.NonEmptyParallel
 import cats.data.EitherT
 import cats.effect.Async
 import cats.syntax.all._
@@ -37,7 +38,7 @@ trait Endpoint[F[_]] {
 }
 
 object Endpoint {
-  def apply[F[_]: Async: Logger: MetricsRegistry: GitLabClient]: F[Endpoint[F]] =
+  def apply[F[_]: Async: NonEmptyParallel: Logger: MetricsRegistry: GitLabClient]: F[Endpoint[F]] =
     ProjectUpdater[F].map(new EndpointImpl(_))
 }
 
