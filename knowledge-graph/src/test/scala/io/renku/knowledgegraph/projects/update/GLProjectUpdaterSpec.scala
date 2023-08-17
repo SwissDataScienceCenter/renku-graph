@@ -110,13 +110,17 @@ class GLProjectUpdaterSpec
       .put(_: Uri, _: String Refined NonEmpty, _: UrlForm)(_: ResponseMappingF[IO, Either[Json, Unit]])(
         _: Option[AccessToken]
       ))
-      .expects(uri"projects" / slug,
-               endpointName,
-               UrlForm("visibility" -> newValues.visibility.value),
-               *,
-               accessToken.some
-      )
+      .expects(uri"projects" / slug, endpointName, toUrlForm(newValues), *, accessToken.some)
       .returning(returning)
+  }
+
+  private def toUrlForm: ProjectUpdates => UrlForm = { case ProjectUpdates(newImage, newVisibility) =>
+    UrlForm(
+      List(
+        newImage.map("avatar" -> _.fold[String](null)(_.value)),
+        newVisibility.map("visibility" -> _.value)
+      ).flatten: _*
+    )
   }
 
   private lazy val mapResponse: ResponseMappingF[IO, Either[Json, Unit]] =

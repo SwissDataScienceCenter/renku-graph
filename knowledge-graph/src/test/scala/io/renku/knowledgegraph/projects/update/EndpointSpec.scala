@@ -24,7 +24,6 @@ import cats.syntax.all._
 import eu.timepit.refined.auto._
 import io.circe.literal._
 import io.circe.syntax._
-import io.circe.{Encoder, Json}
 import io.renku.data.Message
 import io.renku.generators.CommonGraphGenerators.{authUsers, httpStatuses}
 import io.renku.generators.Generators.Implicits._
@@ -61,7 +60,10 @@ class EndpointSpec extends AsyncFlatSpec with CustomAsyncIOSpec with should.Matc
     val authUser = authUsers.generateOne
     val slug     = projectSlugs.generateOne
 
-    endpoint.`PATCH /projects/:slug`(slug, Request[IO]().withEntity(Json.obj()), authUser) >>= { response =>
+    endpoint.`PATCH /projects/:slug`(slug,
+                                     Request[IO]().withEntity(json"""{"visibility": "unknown"}"""),
+                                     authUser
+    ) >>= { response =>
       response.pure[IO].asserting(_.status shouldBe Status.BadRequest) >>
         response.as[Message].asserting(_ shouldBe Message.Error("Invalid payload"))
     }
@@ -93,9 +95,4 @@ class EndpointSpec extends AsyncFlatSpec with CustomAsyncIOSpec with should.Matc
   ) = (projectUpdater.updateProject _)
     .expects(slug, udpates, authUser)
     .returning(returning)
-
-  private implicit lazy val payloadEncoder: Encoder[ProjectUpdates] = Encoder.instance {
-    case ProjectUpdates(visibility) =>
-      json"""{"visibility":  $visibility}"""
-  }
 }

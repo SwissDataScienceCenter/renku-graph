@@ -18,9 +18,15 @@
 
 package io.renku.knowledgegraph.projects.update
 
-import io.renku.graph.model.RenkuTinyTypeGenerators.projectVisibilities
+import io.renku.generators.Generators.Implicits._
+import io.renku.graph.model.RenkuTinyTypeGenerators.{imageUris, projectVisibilities}
 import org.scalacheck.Gen
 
 private object Generators {
-  val projectUpdatesGen: Gen[ProjectUpdates] = projectVisibilities.map(ProjectUpdates(_))
+
+  val projectUpdatesGen: Gen[ProjectUpdates] =
+    for {
+      maybeNewImages     <- imageUris.toGeneratorOfOptions.toGeneratorOfOptions
+      maybeNewVisibility <- projectVisibilities.toGeneratorOfOptions
+    } yield ProjectUpdates(maybeNewImages, maybeNewVisibility)
 }

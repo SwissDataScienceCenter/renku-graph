@@ -18,12 +18,38 @@
 
 package io.renku.knowledgegraph.projects.update
 
-import io.circe.Decoder
+import cats.syntax.all._
+import io.circe.syntax._
+import io.circe.{Decoder, DecodingFailure, Encoder, Json}
+import io.renku.graph.model.images.ImageUri
 import io.renku.graph.model.projects
+import io.renku.tinytypes.json.TinyTypeDecoders._
 
-private final case class ProjectUpdates(visibility: projects.Visibility)
+private final case class ProjectUpdates(newImage: Option[Option[ImageUri]], newVisibility: Option[projects.Visibility])
 
 private object ProjectUpdates {
+
+  lazy val empty: ProjectUpdates = ProjectUpdates(None, None)
+
+  implicit val encoder: Encoder[ProjectUpdates] = Encoder.instance { case ProjectUpdates(newImage, newVisibility) =>
+    Json.obj(
+      List(
+        newImage.map(v => "image" -> v.fold(Json.Null)(_.asJson)),
+        newVisibility.map(v => "visibility" -> v.asJson)
+      ).flatten: _*
+    )
+  }
+
   implicit val decoder: Decoder[ProjectUpdates] =
-    Decoder.instance(cur => cur.downField("visibility").as[projects.Visibility].map(ProjectUpdates(_)))
+    Decoder.instance { cur =>
+      for {
+        newImage <- cur
+                      .downField("image")
+                      .success
+                      .fold(Option.empty[Option[ImageUri]].asRight[DecodingFailure]) {
+                        _.as[Option[ImageUri]](blankStringToNoneDecoder(ImageUri)).map(_.some)
+                      }
+        newVisibility <- cur.downField("visibility").as[Option[projects.Visibility]]
+      } yield ProjectUpdates(newImage, newVisibility)
+    }
 }

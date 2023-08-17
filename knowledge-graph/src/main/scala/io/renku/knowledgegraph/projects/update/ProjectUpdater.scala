@@ -51,7 +51,6 @@ private class ProjectUpdaterImpl[F[_]: Async: Logger](glProjectUpdater: GLProjec
       .flatMap(_ => updateTG(slug, updates))
       .merge
 
-
   private def updateGL(slug:     projects.Slug,
                        updates:  ProjectUpdates,
                        authUser: AuthUser
@@ -64,7 +63,10 @@ private class ProjectUpdaterImpl[F[_]: Async: Logger](glProjectUpdater: GLProjec
   private def updateTG(slug: projects.Slug, updates: ProjectUpdates): EitherT[F, Response[F], Response[F]] =
     EitherT {
       tgClient
-        .updateProject(slug, TGProjectUpdates.empty.copy(newVisibility = updates.visibility.some))
+        .updateProject(
+          slug,
+          TGProjectUpdates.empty.copy(newImages = updates.newImage.map(_.toList), newVisibility = updates.newVisibility)
+        )
         .map(_.toEither)
     }.biSemiflatMap(
       serverError(slug),

@@ -93,7 +93,9 @@ object TinyTypeDecoders {
         .leftMap(_.getMessage)
     }
 
-  implicit def blankStringToNoneDecoder[TT <: StringTinyType](implicit tinyTypeFactory: From[TT]): Decoder[Option[TT]] =
+  implicit def blankStringToNoneDecoder[TT <: TinyType { type V = String }](implicit
+      tinyTypeFactory: From[TT]
+  ): Decoder[Option[TT]] =
     decodeOption(decodeString).emap((blankToNone andThen toOption[TT])(_).leftMap(_.getMessage()))
 
   private lazy val blankToNone: Option[String] => Option[NonBlank] = _.map(_.trim) >>= {

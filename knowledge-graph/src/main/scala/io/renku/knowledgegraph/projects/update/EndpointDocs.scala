@@ -24,15 +24,26 @@ import eu.timepit.refined.auto._
 import io.circe.literal._
 import io.renku.data.Message
 import io.renku.graph.model.projects
-import io.renku.knowledgegraph.docs.model.Operation.PUT
+import io.renku.knowledgegraph.docs.model.Operation.PATCH
 import io.renku.knowledgegraph.docs.model._
 
 object EndpointDocs extends docs.EndpointDocs {
 
   override lazy val path: Path = Path(
-    PUT(
+    PATCH(
       "Project Update",
-      "Update selected properties of the Project with the given slug",
+      """|API to update project data.
+         |
+         |Each of the properties can be either set to a new value or omitted in case there's no new value.
+         |
+         |The properties that can be updated are:
+         |* image - possible values are:
+         |  * `null` for removing the current image
+         |  * any relative or absolute link to the image
+         |* visibility - possible values are: `public`, `internal`, `private`
+         |
+         |In case no properties are set, no data will be changed.
+         |""".stripMargin,
       Uri / "projects" / namespace / projectName,
       RequestBody(
         "Properties with new values",
@@ -40,7 +51,10 @@ object EndpointDocs extends docs.EndpointDocs {
         Contents(
           MediaType.`application/json`(
             Schema.`Object`(properties = Map("visibility" -> Schema.EnumString(projects.Visibility.all.map(_.value)))),
-            json"""{"visibility": "public|internal|private"}"""
+            json"""{
+              "image":      "image.png",
+              "visibility": "public|internal|private"
+            }"""
           )
         )
       ),

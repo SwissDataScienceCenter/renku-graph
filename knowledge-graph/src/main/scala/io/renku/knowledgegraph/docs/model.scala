@@ -193,6 +193,22 @@ object model {
       )
     }
 
+    def PATCH(summary:           String,
+              description:       String,
+              uri:               Uri,
+              requestBody:       RequestBody,
+              statusAndResponse: (Status, Response)*
+    ): OpMapping = {
+      val parameters = uri.parts.flatMap {
+        case ParameterPart(parameter) => Some(parameter)
+        case _                        => None
+      }
+
+      OpMapping(Uri.getTemplate(uri.parts),
+                Patch(summary.some, description.some, parameters, requestBody.some, statusAndResponse.toMap, Nil)
+      )
+    }
+
     def PUT(summary:           String,
             description:       String,
             uri:               Uri,
@@ -223,6 +239,14 @@ object model {
                    requestBody: Option[RequestBody],
                    responses:   Map[Status, Response],
                    security:    List[SecurityRequirement]
+    ) extends Operation
+
+    case class Patch(summary:     Option[String],
+                     description: Option[String],
+                     parameters:  List[Parameter],
+                     requestBody: Option[RequestBody],
+                     responses:   Map[Status, Response],
+                     security:    List[SecurityRequirement]
     ) extends Operation
 
     case class Put(summary:     Option[String],

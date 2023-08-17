@@ -44,10 +44,14 @@ private class GLProjectUpdaterImpl[F[_]: Async: GitLabClient] extends GLProjectU
 
   override def updateProject(slug: projects.Slug, updates: ProjectUpdates, at: AccessToken): EitherT[F, Json, Unit] =
     EitherT {
-      GitLabClient[F].put(uri"projects" / slug, "edit-project", UrlForm("visibility" -> updates.visibility.value))(
-        mapResponse
-      )(at.some)
+      GitLabClient[F].put(uri"projects" / slug, "edit-project", toUrlForm(updates))(mapResponse)(at.some)
     }
+
+  private def toUrlForm: ProjectUpdates => UrlForm = { case ProjectUpdates(newImage, newVisibility) =>
+    UrlForm.empty
+      .updateFormField("avatar", newImage.map(_.fold[String](ifEmpty = null)(_.value)))
+      .updateFormField("visibility", newVisibility.map(_.value))
+  }
 
   private lazy val mapResponse: PartialFunction[(Status, Request[F], Response[F]), F[Either[Json, Unit]]] = {
     case (Ok, _, _)                => ().asRight[Json].pure[F]

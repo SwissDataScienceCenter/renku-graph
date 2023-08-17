@@ -126,6 +126,10 @@ class ProjectUpdaterSpec extends AsyncFlatSpec with CustomAsyncIOSpec with shoul
                                      updates:   ProjectUpdates,
                                      returning: IO[TriplesGeneratorClient.Result[Unit]]
   ) = (tgClient.updateProject _)
-    .expects(slug, TGProjectUpdates.empty.copy(newVisibility = updates.visibility.some))
+    .expects(slug,
+             TGProjectUpdates.empty.copy(newImages = updates.newImage.map(_.toList),
+                                         newVisibility = updates.newVisibility
+             )
+    )
     .returning(returning)
 }
