@@ -23,13 +23,13 @@ import cats.MonadThrow
 import cats.effect.IO
 import cats.syntax.all._
 import com.typesafe.config.Config
-import io.renku.generators.CommonGraphGenerators.accessTokens
+import io.renku.generators.CommonGraphGenerators.{accessTokens, userAccessTokens}
 import io.renku.generators.Generators.Implicits._
 import io.renku.generators.Generators.exceptions
 import io.renku.graph.model.GraphModelGenerators.{projectGitHttpUrls, projectSchemaVersions}
 import io.renku.graph.model.projects
 import io.renku.graph.model.versions.SchemaVersion
-import io.renku.http.client.AccessToken
+import io.renku.http.client.{AccessToken, UserAccessToken}
 import io.renku.interpreters.TestLogger
 import io.renku.testtools.CustomAsyncIOSpec
 import org.scalamock.scalatest.AsyncMockFactory
@@ -208,6 +208,21 @@ class RenkuCoreClientSpec
     }
   }
 
+  "updateProject" should {
+
+    "call the Core's postProjectUpdate API" in {
+
+      val coreUri     = coreUrisVersioned.generateOne
+      val updates     = projectUpdatesGen.generateOne
+      val accessToken = userAccessTokens.generateOne
+
+      val result = resultsGen(()).generateOne
+      givenPostingProjectUpdate(coreUri, updates, accessToken, returning = result)
+
+      client.updateProject(coreUri, updates, accessToken).asserting(_ shouldBe result)
+    }
+  }
+
   private implicit val logger: Logger[IO] = TestLogger()
   private val coreUriForSchemaLoader = mock[RenkuCoreUri.ForSchemaLoader]
   private val lowLevelApis           = mock[LowLevelApis[IO]]
@@ -254,4 +269,12 @@ class RenkuCoreClientSpec
       .loadFromConfig[IO](_: SchemaVersion, _: Config)(_: MonadThrow[IO]))
       .expects(*, config, *)
       .returning(failsWith.raiseError[IO, Nothing])
+
+  private def givenPostingProjectUpdate(coreUri:     RenkuCoreUri.Versioned,
+                                        updates:     ProjectUpdates,
+                                        accessToken: UserAccessToken,
+                                        returning:   Result[Unit]
+  ) = (lowLevelApis.postProjectUpdate _)
+    .expects(coreUri, updates, accessToken)
+    .returning(returning.pure[IO])
 }

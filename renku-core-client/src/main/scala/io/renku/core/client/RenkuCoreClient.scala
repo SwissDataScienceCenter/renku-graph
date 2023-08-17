@@ -25,7 +25,7 @@ import com.typesafe.config.{Config, ConfigFactory}
 import io.renku.control.Throttler
 import io.renku.graph.model.projects
 import io.renku.graph.model.versions.SchemaVersion
-import io.renku.http.client.{AccessToken, RestClient}
+import io.renku.http.client.{AccessToken, RestClient, UserAccessToken}
 import org.http4s.client.dsl.Http4sClientDsl
 import org.http4s.dsl.Http4sDsl
 import org.typelevel.log4cats.Logger
@@ -33,6 +33,10 @@ import org.typelevel.log4cats.Logger
 trait RenkuCoreClient[F[_]] {
   def findCoreUri(projectUrl:    projects.GitHttpUrl, accessToken: AccessToken): F[Result[RenkuCoreUri.Versioned]]
   def findCoreUri(schemaVersion: SchemaVersion): F[Result[RenkuCoreUri.Versioned]]
+  def updateProject(coreUri:     RenkuCoreUri.Versioned,
+                    updates:     ProjectUpdates,
+                    accessToken: UserAccessToken
+  ): F[Result[Unit]]
 }
 
 object RenkuCoreClient {
@@ -82,4 +86,9 @@ private class RenkuCoreClientImpl[F[_]: Async: Logger](coreUriForSchemaLoader: R
       uriForSchema   <- coreUriForSchemaLoader.loadFromConfig[F](schemaVersion, config)
       apiVersionsRes <- lowLevelApis.getApiVersion(uriForSchema)
     } yield apiVersionsRes.map(_.max).map(RenkuCoreUri.Versioned(uriForSchema, _))
+
+  override def updateProject(coreUri:     RenkuCoreUri.Versioned,
+                             updates:     ProjectUpdates,
+                             accessToken: UserAccessToken
+  ): F[Result[Unit]] = lowLevelApis.postProjectUpdate(coreUri, updates, accessToken)
 }

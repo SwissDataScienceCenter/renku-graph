@@ -27,6 +27,9 @@ import org.scalacheck.Gen
 
 object Generators {
 
+  def resultsGen[T](payloadGen: Gen[T]): Gen[Result[T]] =
+    Gen.oneOf(resultSuccesses(payloadGen), resultDetailedFailures)
+
   def resultSuccesses[T](payloadGen: Gen[T]): Gen[Result[T]] =
     payloadGen.map(Result.success)
 
