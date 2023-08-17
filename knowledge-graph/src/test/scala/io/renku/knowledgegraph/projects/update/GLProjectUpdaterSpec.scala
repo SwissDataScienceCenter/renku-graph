@@ -114,7 +114,7 @@ class GLProjectUpdaterSpec
       .returning(returning)
   }
 
-  private def toUrlForm: ProjectUpdates => UrlForm = { case ProjectUpdates(newImage, newVisibility) =>
+  private def toUrlForm: ProjectUpdates => UrlForm = { case ProjectUpdates(_, newImage, _, newVisibility) =>
     UrlForm(
       List(
         newImage.map("avatar" -> _.fold[String](null)(_.value)),

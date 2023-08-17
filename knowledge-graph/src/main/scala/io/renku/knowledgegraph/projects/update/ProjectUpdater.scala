@@ -65,7 +65,11 @@ private class ProjectUpdaterImpl[F[_]: Async: Logger](glProjectUpdater: GLProjec
       tgClient
         .updateProject(
           slug,
-          TGProjectUpdates.empty.copy(newImages = updates.newImage.map(_.toList), newVisibility = updates.newVisibility)
+          TGProjectUpdates(newDescription = updates.newDescription,
+                           newImages = updates.newImage.map(_.toList),
+                           newKeywords = updates.newKeywords,
+                           newVisibility = updates.newVisibility
+          )
         )
         .map(_.toEither)
     }.biSemiflatMap(

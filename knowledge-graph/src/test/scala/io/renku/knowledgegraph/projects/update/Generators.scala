@@ -19,14 +19,16 @@
 package io.renku.knowledgegraph.projects.update
 
 import io.renku.generators.Generators.Implicits._
-import io.renku.graph.model.RenkuTinyTypeGenerators.{imageUris, projectVisibilities}
+import io.renku.graph.model.RenkuTinyTypeGenerators.{imageUris, projectDescriptions, projectKeywords, projectVisibilities}
 import org.scalacheck.Gen
 
 private object Generators {
 
   val projectUpdatesGen: Gen[ProjectUpdates] =
     for {
-      maybeNewImages     <- imageUris.toGeneratorOfOptions.toGeneratorOfOptions
+      maybeNewDesc       <- projectDescriptions.toGeneratorOfOptions.toGeneratorOfOptions
+      maybeNewImage      <- imageUris.toGeneratorOfOptions.toGeneratorOfOptions
+      maybeNewKeywords   <- projectKeywords.toGeneratorOfSet().toGeneratorOfOptions
       maybeNewVisibility <- projectVisibilities.toGeneratorOfOptions
-    } yield ProjectUpdates(maybeNewImages, maybeNewVisibility)
+    } yield ProjectUpdates(maybeNewDesc, maybeNewImage, maybeNewKeywords, maybeNewVisibility)
 }

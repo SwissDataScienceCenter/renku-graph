@@ -36,6 +36,31 @@ class ProjectUpdatesSpec extends AnyFlatSpec with should.Matchers with ScalaChec
     }
   }
 
+  it should "lack of the description property to be considered as no-op for the property" in {
+
+    val updates = ProjectUpdates.empty.copy(newDescription = None)
+
+    updates.asJson shouldBe json"""{}"""
+
+    updates.asJson.hcursor.as[ProjectUpdates].value shouldBe updates
+  }
+
+  it should "description = null to be considered as description removal" in {
+
+    val updates = ProjectUpdates.empty.copy(newDescription = Some(None))
+
+    updates.asJson shouldBe json"""{"description":  null}"""
+
+    updates.asJson.hcursor.as[ProjectUpdates].value shouldBe updates
+  }
+
+  it should "description with a blank value to be considered as description removal" in {
+
+    val json = json"""{"description":  ${blankStrings().generateOne}}"""
+
+    json.asJson.hcursor.as[ProjectUpdates].value shouldBe ProjectUpdates.empty.copy(newDescription = Some(None))
+  }
+
   it should "lack of the image property to be considered as no-op for the property" in {
 
     val updates = ProjectUpdates.empty.copy(newImage = None)
@@ -45,7 +70,7 @@ class ProjectUpdatesSpec extends AnyFlatSpec with should.Matchers with ScalaChec
     updates.asJson.hcursor.as[ProjectUpdates].value shouldBe updates
   }
 
-  it should "image = null to be considered as descriptions removals" in {
+  it should "image = null to be considered as image removal" in {
 
     val updates = ProjectUpdates.empty.copy(newImage = Some(None))
 
@@ -54,7 +79,7 @@ class ProjectUpdatesSpec extends AnyFlatSpec with should.Matchers with ScalaChec
     updates.asJson.hcursor.as[ProjectUpdates].value shouldBe updates
   }
 
-  it should "image with a blank value to be considered as description removals" in {
+  it should "image with a blank value to be considered as image removal" in {
 
     val json = json"""{"image":  ${blankStrings().generateOne}}"""
 

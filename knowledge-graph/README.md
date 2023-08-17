@@ -818,9 +818,13 @@ API to update project data.
 Each of the properties can be either set to a new value or omitted in case there's no new value.
 
 The properties that can be updated are:
+* description - possible values are:
+  * `null` for removing the current description
+  * any non-blank String value
 * image - possible values are:
   * `null` for removing the current image
   * any relative or absolute link to the image
+* keywords - an array of String values; an empty array removes all the keywords
 * visibility - possible values are: `public`, `internal`, `private`
 
 In case no properties are set, no data will be changed.
@@ -833,8 +837,10 @@ The endpoint requires an authorization token to be passed. Supported headers are
 
 ```json
 {
-  "image":      "image.png",
-  "visibility": "public|internal|private"
+  "description": "a new project description",
+  "image":       "image.png",
+  "keywords":    ["keyword1", "keyword2"],
+  "visibility":  "public|internal|private"
 }
 ```
 

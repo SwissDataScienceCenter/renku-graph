@@ -47,7 +47,7 @@ private class GLProjectUpdaterImpl[F[_]: Async: GitLabClient] extends GLProjectU
       GitLabClient[F].put(uri"projects" / slug, "edit-project", toUrlForm(updates))(mapResponse)(at.some)
     }
 
-  private def toUrlForm: ProjectUpdates => UrlForm = { case ProjectUpdates(newImage, newVisibility) =>
+  private def toUrlForm: ProjectUpdates => UrlForm = { case ProjectUpdates(_, newImage, _, newVisibility) =>
     UrlForm.empty
       .updateFormField("avatar", newImage.map(_.fold[String](ifEmpty = null)(_.value)))
       .updateFormField("visibility", newVisibility.map(_.value))
