@@ -145,7 +145,7 @@ class BranchProtectionCheckSpec
     val endpointName: String Refined NonEmpty = "project-branches"
     (glClient
       .get(_: Uri, _: String Refined NonEmpty)(_: ResponseMappingF[IO, List[BranchInfo]])(_: Option[AccessToken]))
-      .expects(uri"projects" / slug, endpointName, *, accessToken.some)
+      .expects(uri"projects" / slug / "repository" / "branches", endpointName, *, accessToken.some)
       .returning(returning)
   }
 

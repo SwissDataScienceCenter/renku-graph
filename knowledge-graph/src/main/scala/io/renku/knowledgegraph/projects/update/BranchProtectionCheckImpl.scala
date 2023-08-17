@@ -46,7 +46,7 @@ private class BranchProtectionCheckImpl[F[_]: Async: GitLabClient] extends Branc
 
   override def canPushToDefaultBranch(slug: projects.Slug, at: AccessToken): F[Boolean] =
     GitLabClient[F]
-      .get(uri"projects" / slug, "project-branches")(mapResponse)(at.some)
+      .get(uri"projects" / slug / "repository" / "branches", "project-branches")(mapResponse)(at.some)
       .map(_.exists(branch => branch.default && branch.canPush))
 
   private lazy val mapResponse: PartialFunction[(Status, Request[F], Response[F]), F[List[BranchInfo]]] = {
