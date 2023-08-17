@@ -852,6 +852,7 @@ The endpoint requires an authorization token to be passed. Supported headers are
 | BAD_REQUEST (400)           | If the given payload is empty or malformed                                                                 |
 | UNAUTHORIZED (401)          | If given auth header cannot be authenticated                                                               |
 | NOT_FOUND (404)             | If there is no project with the given `namespace/name` or the user is not authorised to access the project |
+| CONFLICT (409)              | If updating the data is not possible, e.g. the user cannot push to the default branch                      |
 | INTERNAL SERVER ERROR (500) | Otherwise                                                                                                  |
 
 #### GET /knowledge-graph/projects/:namespace/:name/datasets

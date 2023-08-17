@@ -30,7 +30,7 @@ import io.renku.http.server.security.model.AuthUser
 import io.renku.metrics.MetricsRegistry
 import io.renku.triplesgenerator.api.{TriplesGeneratorClient, ProjectUpdates => TGProjectUpdates}
 import org.http4s.Response
-import org.http4s.Status.{Accepted, BadRequest, InternalServerError}
+import org.http4s.Status.{Accepted, BadRequest, Conflict, InternalServerError}
 import org.typelevel.log4cats.Logger
 
 private trait ProjectUpdater[F[_]] {
@@ -39,17 +39,27 @@ private trait ProjectUpdater[F[_]] {
 
 private object ProjectUpdater {
   def apply[F[_]: Async: GitLabClient: MetricsRegistry: Logger]: F[ProjectUpdater[F]] =
-    TriplesGeneratorClient[F].map(new ProjectUpdaterImpl[F](GLProjectUpdater[F], _))
+    TriplesGeneratorClient[F].map(new ProjectUpdaterImpl[F](BranchProtectionCheck[F], GLProjectUpdater[F], _))
 }
 
-private class ProjectUpdaterImpl[F[_]: Async: Logger](glProjectUpdater: GLProjectUpdater[F],
-                                                      tgClient: TriplesGeneratorClient[F]
+private class ProjectUpdaterImpl[F[_]: Async: Logger](branchProtectionCheck: BranchProtectionCheck[F],
+                                                      glProjectUpdater: GLProjectUpdater[F],
+                                                      tgClient:         TriplesGeneratorClient[F]
 ) extends ProjectUpdater[F] {
 
+  import branchProtectionCheck.canPushToDefaultBranch
+
   override def updateProject(slug: projects.Slug, updates: ProjectUpdates, authUser: AuthUser): F[Response[F]] =
-    updateGL(slug, updates, authUser)
-      .flatMap(_ => updateTG(slug, updates))
-      .merge
+    if ((updates.newDescription orElse updates.newKeywords).isEmpty)
+      updateGL(slug, updates, authUser)
+        .flatMap(_ => updateTG(slug, updates))
+        .merge
+    else
+      canPushToDefaultBranch(slug, authUser.accessToken)
+        .flatMap {
+          case false => conflictResponse.pure[F]
+          case true  => acceptedResponse.pure[F]
+        }
 
   private def updateGL(slug:     projects.Slug,
                        updates:  ProjectUpdates,
@@ -74,11 +84,17 @@ private class ProjectUpdaterImpl[F[_]: Async: Logger](glProjectUpdater: GLProjec
         .map(_.toEither)
     }.biSemiflatMap(
       serverError(slug),
-      _ => Response[F](Accepted).withEntity(Message.Info("Project update accepted")).pure[F]
+      _ => acceptedResponse.pure[F]
     )
 
   private def serverError(slug: projects.Slug): Throwable => F[Response[F]] =
     Logger[F]
       .error(_)(show"Updating project $slug failed")
       .as(Response[F](InternalServerError).withEntity(Message.Error("Update failed")))
+
+  private lazy val acceptedResponse = Response[F](Accepted).withEntity(Message.Info("Project update accepted"))
+  private lazy val conflictResponse = Response[F](Conflict)
+    .withEntity(
+      Message.Error("Updating project not possible; quite likely the user cannot push to the default branch")
+    )
 }

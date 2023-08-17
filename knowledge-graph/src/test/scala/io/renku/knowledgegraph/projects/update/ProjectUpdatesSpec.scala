@@ -24,65 +24,102 @@ import io.circe.syntax._
 import io.renku.generators.Generators.Implicits._
 import io.renku.generators.Generators.blankStrings
 import org.scalatest.EitherValues
-import org.scalatest.flatspec.AnyFlatSpec
 import org.scalatest.matchers.should
+import org.scalatest.wordspec.AnyWordSpec
 import org.scalatestplus.scalacheck.ScalaCheckPropertyChecks
 
-class ProjectUpdatesSpec extends AnyFlatSpec with should.Matchers with ScalaCheckPropertyChecks with EitherValues {
+class ProjectUpdatesSpec extends AnyWordSpec with should.Matchers with ScalaCheckPropertyChecks with EitherValues {
 
-  it should "encode/decode " in {
-    forAll(projectUpdatesGen) { updates =>
-      updates.asJson.hcursor.as[ProjectUpdates].value shouldBe updates
+  "onlyGLUpdateNeeded" should {
+
+    "return true if at least image and/or visibility is updated but not desc and keywords" in {
+      forAll(
+        projectUpdatesGen
+          .suchThat(u => (u.newImage orElse u.newVisibility).isDefined)
+          .map(_.copy(newDescription = None, newKeywords = None))
+      )(_.onlyGLUpdateNeeded shouldBe true)
+    }
+
+    "return false otherwise" in {
+      forAll(
+        projectUpdatesGen
+          .suchThat(u => (u.newDescription orElse u.newKeywords).isDefined)
+      )(_.onlyGLUpdateNeeded shouldBe false)
     }
   }
 
-  it should "lack of the description property to be considered as no-op for the property" in {
+  "coreUpdateNeeded" should {
 
-    val updates = ProjectUpdates.empty.copy(newDescription = None)
+    "return true if at least description and/or keywords is updated" in {
+      forAll(
+        projectUpdatesGen
+          .suchThat(u => (u.newDescription orElse u.newKeywords).isDefined)
+      )(_.coreUpdateNeeded shouldBe true)
+    }
 
-    updates.asJson shouldBe json"""{}"""
-
-    updates.asJson.hcursor.as[ProjectUpdates].value shouldBe updates
+    "return false otherwise" in {
+      forAll(projectUpdatesGen.map(_.copy(newDescription = None, newKeywords = None)))(
+        _.coreUpdateNeeded shouldBe false
+      )
+    }
   }
 
-  it should "description = null to be considered as description removal" in {
+  "encode/decode" should {
 
-    val updates = ProjectUpdates.empty.copy(newDescription = Some(None))
+    "encode/decode all standard cases" in {
+      forAll(projectUpdatesGen) { updates =>
+        updates.asJson.hcursor.as[ProjectUpdates].value shouldBe updates
+      }
+    }
 
-    updates.asJson shouldBe json"""{"description":  null}"""
+    "lack of the description property to be considered as no-op for the property" in {
 
-    updates.asJson.hcursor.as[ProjectUpdates].value shouldBe updates
-  }
+      val updates = ProjectUpdates.empty.copy(newDescription = None)
 
-  it should "description with a blank value to be considered as description removal" in {
+      updates.asJson shouldBe json"""{}"""
 
-    val json = json"""{"description":  ${blankStrings().generateOne}}"""
+      updates.asJson.hcursor.as[ProjectUpdates].value shouldBe updates
+    }
 
-    json.asJson.hcursor.as[ProjectUpdates].value shouldBe ProjectUpdates.empty.copy(newDescription = Some(None))
-  }
+    "description = null to be considered as description removal" in {
 
-  it should "lack of the image property to be considered as no-op for the property" in {
+      val updates = ProjectUpdates.empty.copy(newDescription = Some(None))
 
-    val updates = ProjectUpdates.empty.copy(newImage = None)
+      updates.asJson shouldBe json"""{"description":  null}"""
 
-    updates.asJson shouldBe json"""{}"""
+      updates.asJson.hcursor.as[ProjectUpdates].value shouldBe updates
+    }
 
-    updates.asJson.hcursor.as[ProjectUpdates].value shouldBe updates
-  }
+    "description with a blank value to be considered as description removal" in {
 
-  it should "image = null to be considered as image removal" in {
+      val json = json"""{"description":  ${blankStrings().generateOne}}"""
 
-    val updates = ProjectUpdates.empty.copy(newImage = Some(None))
+      json.asJson.hcursor.as[ProjectUpdates].value shouldBe ProjectUpdates.empty.copy(newDescription = Some(None))
+    }
 
-    updates.asJson shouldBe json"""{"image":  null}"""
+    "lack of the image property to be considered as no-op for the property" in {
 
-    updates.asJson.hcursor.as[ProjectUpdates].value shouldBe updates
-  }
+      val updates = ProjectUpdates.empty.copy(newImage = None)
 
-  it should "image with a blank value to be considered as image removal" in {
+      updates.asJson shouldBe json"""{}"""
 
-    val json = json"""{"image":  ${blankStrings().generateOne}}"""
+      updates.asJson.hcursor.as[ProjectUpdates].value shouldBe updates
+    }
 
-    json.asJson.hcursor.as[ProjectUpdates].value shouldBe ProjectUpdates.empty.copy(newImage = Some(None))
+    "image = null to be considered as image removal" in {
+
+      val updates = ProjectUpdates.empty.copy(newImage = Some(None))
+
+      updates.asJson shouldBe json"""{"image":  null}"""
+
+      updates.asJson.hcursor.as[ProjectUpdates].value shouldBe updates
+    }
+
+    "image with a blank value to be considered as image removal" in {
+
+      val json = json"""{"image":  ${blankStrings().generateOne}}"""
+
+      json.asJson.hcursor.as[ProjectUpdates].value shouldBe ProjectUpdates.empty.copy(newImage = Some(None))
+    }
   }
 }

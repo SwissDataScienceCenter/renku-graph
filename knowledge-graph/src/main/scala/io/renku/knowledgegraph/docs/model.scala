@@ -366,6 +366,7 @@ object model {
     case object BadRequest   extends Status(400, "Bad Request")
     case object Unauthorized extends Status(401, "Unauthorized")
     case object NotFound     extends Status(404, "Not Found")
+    case object Conflict     extends Status(409, "Conflict")
 
     case object InternalServerError extends Status(500, "Internal Server Error")
   }

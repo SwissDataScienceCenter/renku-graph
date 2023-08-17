@@ -30,7 +30,15 @@ private final case class ProjectUpdates(newDescription: Option[Option[projects.D
                                         newImage:       Option[Option[ImageUri]],
                                         newKeywords:    Option[Set[projects.Keyword]],
                                         newVisibility:  Option[projects.Visibility]
-)
+) {
+
+  lazy val onlyGLUpdateNeeded: Boolean =
+    (newImage orElse newVisibility).isDefined &&
+      (newDescription orElse newKeywords).isEmpty
+
+  lazy val coreUpdateNeeded: Boolean =
+    (newDescription orElse newKeywords).isDefined
+}
 
 private object ProjectUpdates {
 

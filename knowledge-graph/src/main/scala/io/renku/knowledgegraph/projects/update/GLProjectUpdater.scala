@@ -44,7 +44,10 @@ private class GLProjectUpdaterImpl[F[_]: Async: GitLabClient] extends GLProjectU
 
   override def updateProject(slug: projects.Slug, updates: ProjectUpdates, at: AccessToken): EitherT[F, Json, Unit] =
     EitherT {
-      GitLabClient[F].put(uri"projects" / slug, "edit-project", toUrlForm(updates))(mapResponse)(at.some)
+      if ((updates.newImage orElse updates.newVisibility).isDefined)
+        GitLabClient[F].put(uri"projects" / slug, "edit-project", toUrlForm(updates))(mapResponse)(at.some)
+      else
+        ().asRight[Json].pure[F]
     }
 
   private def toUrlForm: ProjectUpdates => UrlForm = { case ProjectUpdates(_, newImage, _, newVisibility) =>

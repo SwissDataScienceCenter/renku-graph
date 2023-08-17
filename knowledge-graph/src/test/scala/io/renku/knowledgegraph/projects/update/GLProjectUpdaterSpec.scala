@@ -57,7 +57,7 @@ class GLProjectUpdaterSpec
   it should s"call GL's PUT gl/projects/:slug and return unit on success" in {
 
     val slug        = projectSlugs.generateOne
-    val newValues   = projectUpdatesGen.generateOne
+    val newValues   = projectUpdatesGen.suchThat(u => u.newImage.orElse(u.newVisibility).isDefined).generateOne
     val accessToken = accessTokens.generateOne
 
     givenEditProjectAPICall(slug, newValues, accessToken, returning = ().asRight.pure[IO])
@@ -65,10 +65,19 @@ class GLProjectUpdaterSpec
     finder.updateProject(slug, newValues, accessToken).value.asserting(_.value shouldBe ())
   }
 
+  it should s"do nothing if neither new image nor visibility is set in the update" in {
+
+    val slug        = projectSlugs.generateOne
+    val newValues   = projectUpdatesGen.generateOne.copy(newImage = None, newVisibility = None)
+    val accessToken = accessTokens.generateOne
+
+    finder.updateProject(slug, newValues, accessToken).value.asserting(_.value shouldBe ())
+  }
+
   it should s"call GL's PUT gl/projects/:slug and return GL message if returned" in {
 
     val slug        = projectSlugs.generateOne
-    val newValues   = projectUpdatesGen.generateOne
+    val newValues   = projectUpdatesGen.suchThat(u => u.newImage.orElse(u.newVisibility).isDefined).generateOne
     val accessToken = accessTokens.generateOne
 
     val error = jsons.generateOne
@@ -126,7 +135,10 @@ class GLProjectUpdaterSpec
   private lazy val mapResponse: ResponseMappingF[IO, Either[Json, Unit]] =
     captureMapping(glClient)(
       finder
-        .updateProject(projectSlugs.generateOne, projectUpdatesGen.generateOne, accessTokens.generateOne)
+        .updateProject(projectSlugs.generateOne,
+                       projectUpdatesGen.suchThat(u => u.newImage.orElse(u.newVisibility).isDefined).generateOne,
+                       accessTokens.generateOne
+        )
         .value
         .unsafeRunSync(),
       ().asRight[Json],

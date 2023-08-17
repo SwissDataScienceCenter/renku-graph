@@ -80,6 +80,15 @@ object EndpointDocs extends docs.EndpointDocs {
         "Project not found",
         Contents(MediaType.`application/json`("Reason", Message.Info("Project does not exist")))
       ),
+      Status.Conflict -> Response(
+        "When the update is not possible due to current project configuration",
+        Contents(
+          MediaType.`application/json`(
+            "Reason",
+            Message.Info("Updating project not possible; quite likely the user cannot push to the default branch")
+          )
+        )
+      ),
       Status.InternalServerError -> Response("Error",
                                              Contents(MediaType.`application/json`("Reason", Message.Info("Message")))
       )

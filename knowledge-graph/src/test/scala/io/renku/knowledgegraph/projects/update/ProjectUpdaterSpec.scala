@@ -35,7 +35,7 @@ import io.renku.http.client.AccessToken
 import io.renku.interpreters.TestLogger
 import io.renku.testtools.CustomAsyncIOSpec
 import io.renku.triplesgenerator.api.{TriplesGeneratorClient, ProjectUpdates => TGProjectUpdates}
-import org.http4s.Status.{Accepted, BadRequest, InternalServerError}
+import org.http4s.Status.{Accepted, BadRequest, InternalServerError, Conflict}
 import org.http4s.circe._
 import org.scalamock.scalatest.AsyncMockFactory
 import org.scalatest.flatspec.AsyncFlatSpec
@@ -43,12 +43,16 @@ import org.scalatest.matchers.should
 
 class ProjectUpdaterSpec extends AsyncFlatSpec with CustomAsyncIOSpec with should.Matchers with AsyncMockFactory {
 
-  it should "send project update to GL and TG " +
+  it should "if only GL update needed " +
+    "send update only to GL and TG " +
     "and return 202 Accepted when no failures" in {
 
       val authUser = authUsers.generateOne
       val slug     = projectSlugs.generateOne
-      val updates  = projectUpdatesGen.generateOne
+      val updates = projectUpdatesGen
+        .map(_.copy(newDescription = None, newKeywords = None))
+        .suchThat(_.onlyGLUpdateNeeded)
+        .generateOne
 
       givenUpdatingProjectInGL(slug, updates, authUser.accessToken, returning = EitherT.pure[IO, Json](()))
       givenSendingUpdateToTG(slug, updates, returning = TriplesGeneratorClient.Result.success(()).pure[IO])
@@ -59,11 +63,36 @@ class ProjectUpdaterSpec extends AsyncFlatSpec with CustomAsyncIOSpec with shoul
       }
     }
 
+  it should "if core update needed " +
+    "check if pushing to the default branch is allowed " +
+    "and return 409 Conflict if it's not" in {
+
+      val authUser = authUsers.generateOne
+      val slug     = projectSlugs.generateOne
+      val updates  = projectUpdatesGen.suchThat(_.coreUpdateNeeded).generateOne
+
+      givenBranchProtectionChecking(slug, authUser.accessToken, returning = false.pure[IO])
+
+      updater.updateProject(slug, updates, authUser) >>= { response =>
+        response.pure[IO].asserting(_.status shouldBe Conflict) >>
+          response
+            .as[Json]
+            .asserting(
+              _ shouldBe Message
+                .Error("Updating project not possible; quite likely the user cannot push to the default branch")
+                .asJson
+            )
+      }
+    }
+
   it should "return 400 BadRequest if GL returns 400" in {
 
     val authUser = authUsers.generateOne
     val slug     = projectSlugs.generateOne
-    val updates  = projectUpdatesGen.generateOne
+    val updates = projectUpdatesGen
+      .map(_.copy(newDescription = None, newKeywords = None))
+      .suchThat(_.onlyGLUpdateNeeded)
+      .generateOne
 
     val error = jsons.generateOne
     givenUpdatingProjectInGL(slug, updates, authUser.accessToken, returning = EitherT.left(error.pure[IO]))
@@ -78,7 +107,10 @@ class ProjectUpdaterSpec extends AsyncFlatSpec with CustomAsyncIOSpec with shoul
 
     val authUser = authUsers.generateOne
     val slug     = projectSlugs.generateOne
-    val updates  = projectUpdatesGen.generateOne
+    val updates = projectUpdatesGen
+      .map(_.copy(newDescription = None, newKeywords = None))
+      .suchThat(_.onlyGLUpdateNeeded)
+      .generateOne
 
     val exception = exceptions.generateOne
     givenUpdatingProjectInGL(slug,
@@ -94,7 +126,10 @@ class ProjectUpdaterSpec extends AsyncFlatSpec with CustomAsyncIOSpec with shoul
 
     val authUser = authUsers.generateOne
     val slug     = projectSlugs.generateOne
-    val updates  = projectUpdatesGen.generateOne
+    val updates = projectUpdatesGen
+      .map(_.copy(newDescription = None, newKeywords = None))
+      .suchThat(_.onlyGLUpdateNeeded)
+      .generateOne
 
     givenUpdatingProjectInGL(slug, updates, authUser.accessToken, returning = EitherT.pure[IO, Json](()))
     val exception = exceptions.generateOne
@@ -110,9 +145,15 @@ class ProjectUpdaterSpec extends AsyncFlatSpec with CustomAsyncIOSpec with shoul
   }
 
   private implicit val logger: TestLogger[IO] = TestLogger[IO]()
-  private val glProjectUpdater = mock[GLProjectUpdater[IO]]
-  private val tgClient         = mock[TriplesGeneratorClient[IO]]
-  private lazy val updater     = new ProjectUpdaterImpl[IO](glProjectUpdater, tgClient)
+  private val branchProtectionCheck = mock[BranchProtectionCheck[IO]]
+  private val glProjectUpdater      = mock[GLProjectUpdater[IO]]
+  private val tgClient              = mock[TriplesGeneratorClient[IO]]
+  private lazy val updater          = new ProjectUpdaterImpl[IO](branchProtectionCheck, glProjectUpdater, tgClient)
+
+  private def givenBranchProtectionChecking(slug: projects.Slug, at: AccessToken, returning: IO[Boolean]) =
+    (branchProtectionCheck.canPushToDefaultBranch _)
+      .expects(slug, at)
+      .returning(returning)
 
   private def givenUpdatingProjectInGL(slug:      projects.Slug,
                                        updates:   ProjectUpdates,
