@@ -19,6 +19,7 @@
 package io.renku.projectauth
 
 import io.renku.graph.model.persons.GitLabId
+import io.renku.graph.model.projects.Role
 
 final case class ProjectMember(
     gitLabId: GitLabId,

@@ -19,7 +19,8 @@
 package io.renku.triplesgenerator.gitlab
 
 import io.renku.graph.model.GraphModelGenerators.{personGitLabIds, personNames}
-import io.renku.projectauth.Role
+import io.renku.graph.model.RenkuTinyTypeGenerators
+import io.renku.graph.model.projects.Role
 import org.scalacheck.Gen
 
 object Generators {
@@ -27,6 +28,7 @@ object Generators {
   implicit val gitLabProjectMembers: Gen[GitLabProjectMember] = for {
     id   <- personGitLabIds
     name <- personNames
-  } yield GitLabProjectMember(id, name, Role.toGitLabAccessLevel(Role.Owner))
+    role <- RenkuTinyTypeGenerators.roleGen
+  } yield GitLabProjectMember(id, name, Role.toGitLabAccessLevel(role))
 
 }

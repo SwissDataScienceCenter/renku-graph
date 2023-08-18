@@ -26,11 +26,8 @@ object Generators {
   private val gitLabIds: Gen[persons.GitLabId] =
     Gen.oneOf(fixedIds).map(persons.GitLabId.apply)
 
-  val roleGen: Gen[Role] =
-    Gen.oneOf(Role.all.toList)
-
   val memberGen: Gen[ProjectMember] = for {
-    role <- roleGen
+    role <- RenkuTinyTypeGenerators.roleGen
     id   <- gitLabIds
   } yield ProjectMember(id, role)
 

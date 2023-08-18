@@ -26,7 +26,7 @@ import fs2.Stream
 import io.renku.generators.Generators.Implicits._
 import io.renku.graph.model.RenkuUrl
 import io.renku.graph.model.persons.GitLabId
-import io.renku.graph.model.projects.Visibility
+import io.renku.graph.model.projects.{Role, Visibility}
 import io.renku.triplesstore.client.util.JenaContainerSpec
 import org.scalatest.flatspec.AsyncFlatSpec
 import org.scalatest.matchers.should
