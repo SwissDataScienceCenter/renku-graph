@@ -63,7 +63,7 @@ private class ProjectUpdaterImpl[F[_]: Async: NonEmptyParallel: Logger](branchPr
         for {
           coreUpdates <- findCoreProjectUpdates(slug, updates, authUser)
           coreUri     <- findCoreUri(coreUpdates, authUser)
-          _           <- updateCore(coreUri, coreUpdates, authUser)
+          _           <- updateCore(slug, coreUri, coreUpdates, authUser)
           _           <- updateGL(slug, updates, authUser)
           _           <- updateTG(slug, updates)
         } yield ()
@@ -127,10 +127,15 @@ private class ProjectUpdaterImpl[F[_]: Async: NonEmptyParallel: Logger](branchPr
       .handleError(_.asLeft)
       .flatMap(_.fold(Failure.onFindingCoreUri(_).raiseError[F, RenkuCoreUri.Versioned], _.pure[F]))
 
-  private def updateCore(coreUri: RenkuCoreUri.Versioned, updates: CoreProjectUpdates, authUser: AuthUser): F[Unit] =
+  private def updateCore(slug:     projects.Slug,
+                         coreUri:  RenkuCoreUri.Versioned,
+                         updates:  CoreProjectUpdates,
+                         authUser: AuthUser
+  ): F[Unit] = Async[F].start {
     renkuCoreClient
       .updateProject(coreUri, updates, authUser.accessToken)
       .map(_.toEither)
       .handleError(_.asLeft)
-      .flatMap(_.fold(Failure.onCoreUpdate(_).raiseError[F, Unit], _.pure[F]))
+      .flatMap(_.fold(Logger[F].error(_)(show"Updating project $slug failed"), _.pure[F]))
+  }.void
 }

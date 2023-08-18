@@ -21,7 +21,7 @@ package io.renku.knowledgegraph.projects.update
 import Generators._
 import cats.effect.IO
 import cats.syntax.all._
-import io.renku.core.client.Generators.{coreUrisVersioned, resultDetailedFailures, userInfos}
+import io.renku.core.client.Generators.{coreUrisVersioned, resultDetailedFailures, resultSuccesses, userInfos}
 import io.renku.core.client.{RenkuCoreClient, RenkuCoreUri, Result, UserInfo, ProjectUpdates => CoreProjectUpdates}
 import io.renku.data.Message
 import io.renku.generators.CommonGraphGenerators.authUsers
@@ -31,6 +31,7 @@ import io.renku.graph.model.RenkuTinyTypeGenerators.{projectGitHttpUrls, project
 import io.renku.graph.model.projects
 import io.renku.http.client.{AccessToken, UserAccessToken}
 import io.renku.interpreters.TestLogger
+import io.renku.interpreters.TestLogger.Level.Error
 import io.renku.testtools.CustomAsyncIOSpec
 import io.renku.triplesgenerator.api.{TriplesGeneratorClient, ProjectUpdates => TGProjectUpdates}
 import org.scalamock.scalatest.AsyncMockFactory
@@ -39,8 +40,8 @@ import org.scalatest.matchers.should
 
 class ProjectUpdaterSpec extends AsyncFlatSpec with CustomAsyncIOSpec with should.Matchers with AsyncMockFactory {
 
-  it should "if only GL update needed " +
-    "send update only to GL and TG" in {
+  it should "if only GL update needed, " +
+    "send update only to GL and TG and succeed on success" in {
 
       val authUser = authUsers.generateOne
       val slug     = projectSlugs.generateOne
@@ -49,6 +50,34 @@ class ProjectUpdaterSpec extends AsyncFlatSpec with CustomAsyncIOSpec with shoul
         .suchThat(_.onlyGLUpdateNeeded)
         .generateOne
 
+      givenUpdatingProjectInGL(slug, updates, authUser.accessToken, returning = ().asRight.pure[IO])
+      givenSendingUpdateToTG(slug, updates, returning = TriplesGeneratorClient.Result.success(()).pure[IO])
+
+      updater.updateProject(slug, updates, authUser).assertNoException
+    }
+
+  it should "if core update needed, " +
+    "send update to Core, GL and TG and succeed on success" in {
+
+      val authUser = authUsers.generateOne
+      val slug     = projectSlugs.generateOne
+      val updates  = projectUpdatesGen.suchThat(_.coreUpdateNeeded).generateOne
+
+      givenBranchProtectionChecking(slug, authUser.accessToken, returning = true.pure[IO])
+
+      val projectGitUrl = projectGitHttpUrls.generateOne
+      givenProjectGitUrlFinding(slug, authUser.accessToken, returning = projectGitUrl.some.pure[IO])
+      val userInfo = userInfos.generateOne
+      givenUserInfoFinding(authUser.accessToken, returning = userInfo.some.pure[IO])
+      val coreUri = coreUrisVersioned.generateOne
+      givenFindingCoreUri(projectGitUrl, authUser.accessToken, returning = Result.success(coreUri))
+
+      givenUpdatingProjectInCore(
+        coreUri,
+        CoreProjectUpdates(projectGitUrl, userInfo, updates.newDescription, updates.newKeywords),
+        authUser.accessToken,
+        returning = resultSuccesses(()).generateOne
+      )
       givenUpdatingProjectInGL(slug, updates, authUser.accessToken, returning = ().asRight.pure[IO])
       givenSendingUpdateToTG(slug, updates, returning = TriplesGeneratorClient.Result.success(()).pure[IO])
 
@@ -172,7 +201,7 @@ class ProjectUpdaterSpec extends AsyncFlatSpec with CustomAsyncIOSpec with shoul
     }
 
   it should "if core update needed, " +
-    "fail if updating renku core fails" in {
+    "log an error and succeed if updating renku core fails" in {
 
       val authUser = authUsers.generateOne
       val slug     = projectSlugs.generateOne
@@ -194,10 +223,12 @@ class ProjectUpdaterSpec extends AsyncFlatSpec with CustomAsyncIOSpec with shoul
         authUser.accessToken,
         returning = failedResult
       )
+      givenUpdatingProjectInGL(slug, updates, authUser.accessToken, returning = ().asRight.pure[IO])
+      givenSendingUpdateToTG(slug, updates, returning = TriplesGeneratorClient.Result.success(()).pure[IO])
 
-      updater
-        .updateProject(slug, updates, authUser)
-        .assertThrowsError[Exception](_ shouldBe Failure.onCoreUpdate(failedResult))
+      updater.updateProject(slug, updates, authUser).assertNoException >> {
+        logger.waitFor(Error(show"Updating project $slug failed", failedResult))
+      }
     }
 
   it should "fail if updating GL returns an error" in {
@@ -256,7 +287,7 @@ class ProjectUpdaterSpec extends AsyncFlatSpec with CustomAsyncIOSpec with shoul
       .assertThrowsError[Exception](_ shouldBe Failure.onTSUpdate(slug, exception))
   }
 
-  private implicit val logger: TestLogger[IO] = TestLogger[IO]()
+  private implicit lazy val logger: TestLogger[IO] = TestLogger[IO]()
   private val branchProtectionCheck = mock[BranchProtectionCheck[IO]]
   private val projectGitUrlFinder   = mock[ProjectGitUrlFinder[IO]]
   private val userInfoFinder        = mock[UserInfoFinder[IO]]

@@ -75,7 +75,4 @@ private object Failure {
 
   def onFindingCoreUri(cause: Throwable): Failure =
     Failure(Conflict, Message.Error.fromExceptionMessage(cause), cause)
-
-  def onCoreUpdate(cause: Throwable): Failure =
-    Failure(InternalServerError, Message.Error.fromExceptionMessage(cause), cause)
 }
