@@ -19,24 +19,18 @@
 package io.renku.knowledgegraph.projects.update
 
 import cats.NonEmptyParallel
-import cats.data.EitherT
 import cats.effect.Async
 import cats.syntax.all._
-import eu.timepit.refined.auto._
-import io.circe.Json
-import io.renku.core.client.{RenkuCoreClient, UserInfo, ProjectUpdates => CoreProjectUpdates}
-import io.renku.data.Message
+import io.renku.core.client.{RenkuCoreClient, RenkuCoreUri, UserInfo, ProjectUpdates => CoreProjectUpdates}
 import io.renku.graph.model.projects
 import io.renku.http.client.GitLabClient
 import io.renku.http.server.security.model.AuthUser
 import io.renku.metrics.MetricsRegistry
 import io.renku.triplesgenerator.api.{TriplesGeneratorClient, ProjectUpdates => TGProjectUpdates}
-import org.http4s.Response
-import org.http4s.Status.{Accepted, BadRequest, Conflict, InternalServerError}
 import org.typelevel.log4cats.Logger
 
 private trait ProjectUpdater[F[_]] {
-  def updateProject(slug: projects.Slug, updates: ProjectUpdates, authUser: AuthUser): F[Response[F]]
+  def updateProject(slug: projects.Slug, updates: ProjectUpdates, authUser: AuthUser): F[Unit]
 }
 
 private object ProjectUpdater {
@@ -61,131 +55,82 @@ private class ProjectUpdaterImpl[F[_]: Async: NonEmptyParallel: Logger](branchPr
                                                                         renkuCoreClient:     RenkuCoreClient[F]
 ) extends ProjectUpdater[F] {
 
-  override def updateProject(slug: projects.Slug, updates: ProjectUpdates, authUser: AuthUser): F[Response[F]] = {
-    if ((updates.newDescription orElse updates.newKeywords).isEmpty)
-      updateGL(slug, updates, authUser)
-        .flatMap(_ => updateTG(slug, updates))
+  override def updateProject(slug: projects.Slug, updates: ProjectUpdates, authUser: AuthUser): F[Unit] =
+    if (updates.onlyGLUpdateNeeded)
+      updateGL(slug, updates, authUser) >> updateTG(slug, updates)
     else
-      canPushToDefaultBranch(slug, authUser)
-        .flatMap(_ => findCoreProjectUpdates(slug, updates, authUser))
-        .flatMap(updates => findCoreUri(updates, authUser).map(updates -> _).map(_ => acceptedResponse))
-  }.merge
+      canPushToDefaultBranch(slug, authUser) >> {
+        for {
+          coreUpdates <- findCoreProjectUpdates(slug, updates, authUser)
+          coreUri     <- findCoreUri(coreUpdates, authUser)
+          _           <- updateCore(coreUri, coreUpdates, authUser)
+          _           <- updateGL(slug, updates, authUser)
+          _           <- updateTG(slug, updates)
+        } yield ()
+      }
 
-  private def updateGL(slug:     projects.Slug,
-                       updates:  ProjectUpdates,
-                       authUser: AuthUser
-  ): EitherT[F, Response[F], Unit] = EitherT {
+  private def updateGL(slug: projects.Slug, updates: ProjectUpdates, authUser: AuthUser): F[Unit] =
     glProjectUpdater
       .updateProject(slug, updates, authUser.accessToken)
-      .map(_.leftMap(badRequest))
-      .handleErrorWith(glUpdateError(slug))
-  }
+      .adaptError(Failure.onGLUpdate(slug, _))
+      .flatMap(_.fold(errMsg => Failure.badRequestOnGLUpdate(errMsg).raiseError[F, Unit], _.pure[F]))
 
-  private def badRequest(message: Json): Response[F] =
-    Response[F](BadRequest).withEntity(Message.Error.fromJsonUnsafe(message))
-
-  private def glUpdateError(slug: projects.Slug): Throwable => F[Either[Response[F], Unit]] =
-    Logger[F]
-      .error(_)(show"Updating project $slug in GL failed")
-      .as(Response[F](InternalServerError).withEntity(Message.Error("Updating GL failed")).asLeft)
-
-  private def updateTG(slug: projects.Slug, updates: ProjectUpdates): EitherT[F, Response[F], Response[F]] =
-    EitherT {
-      tgClient
-        .updateProject(
-          slug,
-          TGProjectUpdates(newDescription = updates.newDescription,
-                           newImages = updates.newImage.map(_.toList),
-                           newKeywords = updates.newKeywords,
-                           newVisibility = updates.newVisibility
-          )
+  private def updateTG(slug: projects.Slug, updates: ProjectUpdates): F[Unit] =
+    tgClient
+      .updateProject(
+        slug,
+        TGProjectUpdates(newDescription = updates.newDescription,
+                         newImages = updates.newImage.map(_.toList),
+                         newKeywords = updates.newKeywords,
+                         newVisibility = updates.newVisibility
         )
-        .map(_.toEither)
-        .handleError(_.asLeft)
-    }.biSemiflatMap(
-      tsUpdateError(slug),
-      _ => acceptedResponse.pure[F]
-    )
+      )
+      .map(_.toEither)
+      .handleError(_.asLeft)
+      .flatMap(_.fold(Failure.onTSUpdate(slug, _).raiseError[F, Unit], _.pure[F]))
 
-  private def tsUpdateError(slug: projects.Slug): Throwable => F[Response[F]] =
-    Logger[F]
-      .error(_)(show"Updating project $slug in TS failed")
-      .as(Response[F](InternalServerError).withEntity(Message.Error("Updating TS failed")))
-
-  private def canPushToDefaultBranch(slug: projects.Slug, authUser: AuthUser) = EitherT {
+  private def canPushToDefaultBranch(slug: projects.Slug, authUser: AuthUser): F[Unit] =
     branchProtectionCheck
       .canPushToDefaultBranch(slug, authUser.accessToken)
+      .adaptError(Failure.onBranchAccessCheck(slug, authUser.id, _))
       .flatMap {
-        case false =>
-          Response[F](Conflict)
-            .withEntity(Message.Error("Updating project not possible; the user cannot push to the default branch"))
-            .asLeft[Unit]
-            .pure[F]
-        case true => ().asRight[Response[F]].pure[F]
+        case false => Failure.cannotPushToBranch.raiseError[F, Unit]
+        case true  => ().pure[F]
       }
-      .handleErrorWith(pushCheckError(slug))
-  }
 
-  private def pushCheckError(slug: projects.Slug): Throwable => F[Either[Response[F], Unit]] =
-    Logger[F]
-      .error(_)(show"Check if pushing to git for $slug possible failed")
-      .as(Response[F](InternalServerError).withEntity(Message.Error("Finding project repository access failed")).asLeft)
-
-  private def findCoreProjectUpdates(slug: projects.Slug, updates: ProjectUpdates, authUser: AuthUser) = EitherT {
+  private def findCoreProjectUpdates(slug: projects.Slug, updates: ProjectUpdates, authUser: AuthUser) =
     (findProjectGitUrl(slug, authUser) -> findUserInfo(authUser))
-      .parMapN { (maybeProjectGitUrl, maybeUserInfo) =>
-        (maybeProjectGitUrl -> maybeUserInfo)
-          .mapN(CoreProjectUpdates(_, _, updates.newDescription, updates.newKeywords))
-      }
-  }
+      .parMapN(CoreProjectUpdates(_, _, updates.newDescription, updates.newKeywords))
 
-  private def findProjectGitUrl(slug: projects.Slug, authUser: AuthUser) =
+  private def findProjectGitUrl(slug: projects.Slug, authUser: AuthUser): F[projects.GitHttpUrl] =
     projectGitUrlFinder
       .findGitUrl(slug, authUser.accessToken)
+      .adaptError(Failure.onFindingProjectGitUrl(slug, _))
       .flatMap {
-        case Some(url) => url.asRight[Response[F]].pure[F]
-        case None =>
-          Response[F](InternalServerError)
-            .withEntity(Message.Error("Cannot find project info"))
-            .asLeft[projects.GitHttpUrl]
-            .pure[F]
+        case Some(url) => url.pure[F]
+        case None      => Failure.cannotFindProjectGitUrl.raiseError[F, projects.GitHttpUrl]
       }
-      .handleErrorWith(findingGLUrlError(slug))
 
-  private def findingGLUrlError(slug: projects.Slug): Throwable => F[Either[Response[F], projects.GitHttpUrl]] =
-    Logger[F]
-      .error(_)(show"Finding git url for $slug failed")
-      .as(Response[F](InternalServerError).withEntity(Message.Error("Finding project git url failed")).asLeft)
-
-  private def findUserInfo(authUser: AuthUser) =
+  private def findUserInfo(authUser: AuthUser): F[UserInfo] =
     userInfoFinder
       .findUserInfo(authUser.accessToken)
+      .adaptError(Failure.onFindingUserInfo(authUser.id, _))
       .flatMap {
-        case Some(info) => info.asRight[Response[F]].pure[F]
-        case None =>
-          Response[F](InternalServerError)
-            .withEntity(Message.Error("Cannot find user info"))
-            .asLeft[UserInfo]
-            .pure[F]
+        case Some(info) => info.pure[F]
+        case None       => Failure.cannotFindUserInfo(authUser.id).raiseError[F, UserInfo]
       }
-      .handleErrorWith(findingUserInfoError(authUser))
 
-  private def findingUserInfoError(user: AuthUser): Throwable => F[Either[Response[F], UserInfo]] =
-    Logger[F]
-      .error(_)(show"Finding userInfo for ${user.id} failed")
-      .as(Response[F](InternalServerError).withEntity(Message.Error("Finding user info failed")).asLeft)
-
-  private def findCoreUri(updates: CoreProjectUpdates, authUser: AuthUser) = EitherT {
+  private def findCoreUri(updates: CoreProjectUpdates, authUser: AuthUser): F[RenkuCoreUri.Versioned] =
     renkuCoreClient
       .findCoreUri(updates.projectUrl, authUser.accessToken)
       .map(_.toEither)
       .handleError(_.asLeft)
-  }.leftSemiflatMap(findingCoreUriError(updates))
+      .flatMap(_.fold(Failure.onFindingCoreUri(_).raiseError[F, RenkuCoreUri.Versioned], _.pure[F]))
 
-  private def findingCoreUriError(updates: CoreProjectUpdates): Throwable => F[Response[F]] = ex =>
-    Logger[F]
-      .error(ex)(show"Finding core uri for ${updates.projectUrl} failed")
-      .as(Response[F](InternalServerError).withEntity(Message.Error.fromExceptionMessage(ex)))
-
-  private lazy val acceptedResponse = Response[F](Accepted).withEntity(Message.Info("Project update accepted"))
+  private def updateCore(coreUri: RenkuCoreUri.Versioned, updates: CoreProjectUpdates, authUser: AuthUser): F[Unit] =
+    renkuCoreClient
+      .updateProject(coreUri, updates, authUser.accessToken)
+      .map(_.toEither)
+      .handleError(_.asLeft)
+      .flatMap(_.fold(Failure.onCoreUpdate(_).raiseError[F, Unit], _.pure[F]))
 }

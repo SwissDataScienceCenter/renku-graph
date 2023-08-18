@@ -23,6 +23,7 @@ import cats.effect.Async
 import cats.syntax.all._
 import eu.timepit.refined.auto._
 import io.circe.{Decoder, Json}
+import io.renku.data.Message
 import io.renku.graph.model.projects
 import io.renku.http.client.{AccessToken, GitLabClient}
 import io.renku.http.tinytypes.TinyTypeURIEncoder._
@@ -32,7 +33,7 @@ import org.http4s.implicits._
 import org.http4s.{Request, Response, Status, UrlForm}
 
 private trait GLProjectUpdater[F[_]] {
-  def updateProject(slug: projects.Slug, updates: ProjectUpdates, at: AccessToken): F[Either[Json, Unit]]
+  def updateProject(slug: projects.Slug, updates: ProjectUpdates, at: AccessToken): F[Either[Message, Unit]]
 }
 
 private object GLProjectUpdater {
@@ -41,11 +42,11 @@ private object GLProjectUpdater {
 
 private class GLProjectUpdaterImpl[F[_]: Async: GitLabClient] extends GLProjectUpdater[F] {
 
-  override def updateProject(slug: projects.Slug, updates: ProjectUpdates, at: AccessToken): F[Either[Json, Unit]] =
+  override def updateProject(slug: projects.Slug, updates: ProjectUpdates, at: AccessToken): F[Either[Message, Unit]] =
     if ((updates.newImage orElse updates.newVisibility).isDefined)
       GitLabClient[F].put(uri"projects" / slug, "edit-project", toUrlForm(updates))(mapResponse)(at.some)
     else
-      ().asRight[Json].pure[F]
+      ().asRight[Message].pure[F]
 
   private def toUrlForm: ProjectUpdates => UrlForm = { case ProjectUpdates(_, newImage, _, newVisibility) =>
     UrlForm.empty
@@ -53,9 +54,11 @@ private class GLProjectUpdaterImpl[F[_]: Async: GitLabClient] extends GLProjectU
       .updateFormField("visibility", newVisibility.map(_.value))
   }
 
-  private lazy val mapResponse: PartialFunction[(Status, Request[F], Response[F]), F[Either[Json, Unit]]] = {
-    case (Ok, _, _)                => ().asRight[Json].pure[F]
-    case (BadRequest, _, response) => response.as[Json](MonadThrow[F], jsonOf(Async[F], errorDecoder)).map(_.asLeft)
+  private lazy val mapResponse: PartialFunction[(Status, Request[F], Response[F]), F[Either[Message, Unit]]] = {
+    case (Ok, _, _) =>
+      ().asRight[Message].pure[F]
+    case (BadRequest, _, response) =>
+      response.as[Json](MonadThrow[F], jsonOf(Async[F], errorDecoder)).map(Message.Error.fromJsonUnsafe).map(_.asLeft)
   }
 
   private lazy val errorDecoder: Decoder[Json] = { cur =>

@@ -25,34 +25,36 @@ import eu.timepit.refined.auto._
 import io.circe.literal._
 import io.circe.syntax._
 import io.renku.data.Message
-import io.renku.generators.CommonGraphGenerators.{authUsers, httpStatuses}
+import io.renku.generators.CommonGraphGenerators.authUsers
 import io.renku.generators.Generators.Implicits._
-import io.renku.generators.Generators.{exceptions, sentences}
+import io.renku.generators.Generators.{exceptions, nonBlankStrings}
 import io.renku.graph.model.RenkuTinyTypeGenerators.projectSlugs
 import io.renku.graph.model.projects
 import io.renku.http.server.EndpointTester._
 import io.renku.http.server.security.model.AuthUser
 import io.renku.interpreters.TestLogger
 import io.renku.testtools.CustomAsyncIOSpec
-import org.http4s.{Request, Response, Status}
+import org.http4s.{Request, Status}
+import org.scalacheck.Gen
 import org.scalamock.scalatest.AsyncMockFactory
 import org.scalatest.flatspec.AsyncFlatSpec
 import org.scalatest.matchers.should
 
 class EndpointSpec extends AsyncFlatSpec with CustomAsyncIOSpec with should.Matchers with AsyncMockFactory {
 
-  it should "update the project and return the status got from the updater" in {
+  it should "update the project and return Accepted on success" in {
 
     val authUser = authUsers.generateOne
     val slug     = projectSlugs.generateOne
     val updates  = projectUpdatesGen.generateOne
 
-    val response = Response[IO](httpStatuses.generateOne).withEntity(Message.Info(sentences().generateOne).asJson)
-    givenUpdatingProject(slug, updates, authUser, returning = response.pure[IO])
+    givenUpdatingProject(slug, updates, authUser, returning = ().pure[IO])
 
     endpoint
-      .`PATCH /projects/:slug`(slug, Request[IO]().withEntity(updates.asJson), authUser)
-      .asserting(_ shouldBe response)
+      .`PATCH /projects/:slug`(slug, Request[IO]().withEntity(updates.asJson), authUser) >>= { response =>
+      response.pure[IO].asserting(_.status shouldBe Status.Accepted) >>
+        response.as[Message].asserting(_ shouldBe Message.Info("Project update accepted"))
+    }
   }
 
   it should "return 400 BadRequest if payload is malformed" in {
@@ -69,7 +71,28 @@ class EndpointSpec extends AsyncFlatSpec with CustomAsyncIOSpec with should.Matc
     }
   }
 
-  it should "return 500 InternalServerError if updating project fails" in {
+  it should "return response with the status from the known exception" in {
+
+    val authUser = authUsers.generateOne
+    val slug     = projectSlugs.generateOne
+    val updates  = projectUpdatesGen.generateOne
+
+    val failure = Gen
+      .oneOf(
+        Failure.badRequestOnGLUpdate(Message.Error(nonBlankStrings().generateOne)),
+        Failure.onGLUpdate(slug, exceptions.generateOne),
+        Failure.cannotPushToBranch
+      )
+      .generateOne
+    givenUpdatingProject(slug, updates, authUser, returning = failure.raiseError[IO, Nothing])
+
+    endpoint.`PATCH /projects/:slug`(slug, Request[IO]().withEntity(updates.asJson), authUser) >>= { response =>
+      response.pure[IO].asserting(_.status shouldBe failure.status) >>
+        response.as[Message].asserting(_ shouldBe failure.message)
+    }
+  }
+
+  it should "return 500 InternalServerError if updating project fails with an unknown exception" in {
 
     val authUser = authUsers.generateOne
     val slug     = projectSlugs.generateOne
@@ -89,10 +112,10 @@ class EndpointSpec extends AsyncFlatSpec with CustomAsyncIOSpec with should.Matc
   private lazy val endpoint  = new EndpointImpl[IO](projectUpdater)
 
   private def givenUpdatingProject(slug:      projects.Slug,
-                                   udpates:   ProjectUpdates,
+                                   updates:   ProjectUpdates,
                                    authUser:  AuthUser,
-                                   returning: IO[Response[IO]]
+                                   returning: IO[Unit]
   ) = (projectUpdater.updateProject _)
-    .expects(slug, udpates, authUser)
+    .expects(slug, updates, authUser)
     .returning(returning)
 }

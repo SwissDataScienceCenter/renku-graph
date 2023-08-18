@@ -21,9 +21,6 @@ package io.renku.knowledgegraph.projects.update
 import Generators._
 import cats.effect.IO
 import cats.syntax.all._
-import eu.timepit.refined.auto._
-import io.circe.Json
-import io.circe.syntax._
 import io.renku.core.client.Generators.{coreUrisVersioned, resultDetailedFailures, userInfos}
 import io.renku.core.client.{RenkuCoreClient, RenkuCoreUri, Result, UserInfo, ProjectUpdates => CoreProjectUpdates}
 import io.renku.data.Message
@@ -36,8 +33,6 @@ import io.renku.http.client.{AccessToken, UserAccessToken}
 import io.renku.interpreters.TestLogger
 import io.renku.testtools.CustomAsyncIOSpec
 import io.renku.triplesgenerator.api.{TriplesGeneratorClient, ProjectUpdates => TGProjectUpdates}
-import org.http4s.Status.{Accepted, BadRequest, Conflict, InternalServerError}
-import org.http4s.circe._
 import org.scalamock.scalatest.AsyncMockFactory
 import org.scalatest.flatspec.AsyncFlatSpec
 import org.scalatest.matchers.should
@@ -45,8 +40,7 @@ import org.scalatest.matchers.should
 class ProjectUpdaterSpec extends AsyncFlatSpec with CustomAsyncIOSpec with should.Matchers with AsyncMockFactory {
 
   it should "if only GL update needed " +
-    "send update only to GL and TG and " +
-    "return 202 Accepted when no failures" in {
+    "send update only to GL and TG" in {
 
       val authUser = authUsers.generateOne
       val slug     = projectSlugs.generateOne
@@ -58,15 +52,11 @@ class ProjectUpdaterSpec extends AsyncFlatSpec with CustomAsyncIOSpec with shoul
       givenUpdatingProjectInGL(slug, updates, authUser.accessToken, returning = ().asRight.pure[IO])
       givenSendingUpdateToTG(slug, updates, returning = TriplesGeneratorClient.Result.success(()).pure[IO])
 
-      updater.updateProject(slug, updates, authUser) >>= { response =>
-        response.pure[IO].asserting(_.status shouldBe Accepted) >>
-          response.as[Json].asserting(_ shouldBe Message.Info("Project update accepted").asJson)
-      }
+      updater.updateProject(slug, updates, authUser).assertNoException
     }
 
-  it should "if core update needed " +
-    "check if pushing to the default branch is allowed " +
-    "and return 409 Conflict if it's not" in {
+  it should "if core update needed, " +
+    "fail if pushing to the default branch check return false" in {
 
       val authUser = authUsers.generateOne
       val slug     = projectSlugs.generateOne
@@ -74,21 +64,11 @@ class ProjectUpdaterSpec extends AsyncFlatSpec with CustomAsyncIOSpec with shoul
 
       givenBranchProtectionChecking(slug, authUser.accessToken, returning = false.pure[IO])
 
-      updater.updateProject(slug, updates, authUser) >>= { response =>
-        response.pure[IO].asserting(_.status shouldBe Conflict) >>
-          response
-            .as[Json]
-            .asserting(
-              _ shouldBe Message
-                .Error("Updating project not possible; the user cannot push to the default branch")
-                .asJson
-            )
-      }
+      updater.updateProject(slug, updates, authUser).assertThrowsError[Exception](_ shouldBe Failure.cannotPushToBranch)
     }
 
-  it should "if core update needed " +
-    "check if pushing to the default branch is allowed " +
-    "and return 500 InternalServerError if check failed" in {
+  it should "if core update needed, " +
+    "fail if pushing to the default branch check fails" in {
 
       val authUser = authUsers.generateOne
       val slug     = projectSlugs.generateOne
@@ -97,15 +77,13 @@ class ProjectUpdaterSpec extends AsyncFlatSpec with CustomAsyncIOSpec with shoul
       val exception = exceptions.generateOne
       givenBranchProtectionChecking(slug, authUser.accessToken, returning = exception.raiseError[IO, Nothing])
 
-      updater.updateProject(slug, updates, authUser) >>= { response =>
-        response.pure[IO].asserting(_.status shouldBe InternalServerError) >>
-          response.as[Json].asserting(_ shouldBe Message.Error("Finding project repository access failed").asJson)
-      }
+      updater
+        .updateProject(slug, updates, authUser)
+        .assertThrowsError[Exception](_ shouldBe Failure.onBranchAccessCheck(slug, authUser.id, exception))
     }
 
-  it should "if core update needed but " +
-    "finding project git url fails " +
-    "return 500 InternalServerError" in {
+  it should "if core update needed, " +
+    "fail if finding project git url fails" in {
 
       val authUser = authUsers.generateOne
       val slug     = projectSlugs.generateOne
@@ -117,15 +95,13 @@ class ProjectUpdaterSpec extends AsyncFlatSpec with CustomAsyncIOSpec with shoul
       givenProjectGitUrlFinding(slug, authUser.accessToken, returning = exception.raiseError[IO, Nothing])
       givenUserInfoFinding(authUser.accessToken, returning = userInfos.generateSome.pure[IO])
 
-      updater.updateProject(slug, updates, authUser) >>= { response =>
-        response.pure[IO].asserting(_.status shouldBe InternalServerError) >>
-          response.as[Json].asserting(_ shouldBe Message.Error("Finding project git url failed").asJson)
-      }
+      updater
+        .updateProject(slug, updates, authUser)
+        .assertThrowsError[Exception](_ shouldBe Failure.onFindingProjectGitUrl(slug, exception))
     }
 
-  it should "if core update needed and " +
-    "finding project git url returns None " +
-    "return 500 InternalServerError" in {
+  it should "if core update needed, " +
+    "fail if finding project git url returns None" in {
 
       val authUser = authUsers.generateOne
       val slug     = projectSlugs.generateOne
@@ -136,15 +112,30 @@ class ProjectUpdaterSpec extends AsyncFlatSpec with CustomAsyncIOSpec with shoul
       givenProjectGitUrlFinding(slug, authUser.accessToken, returning = None.pure[IO])
       givenUserInfoFinding(authUser.accessToken, returning = userInfos.generateSome.pure[IO])
 
-      updater.updateProject(slug, updates, authUser) >>= { response =>
-        response.pure[IO].asserting(_.status shouldBe InternalServerError) >>
-          response.as[Json].asserting(_ shouldBe Message.Error("Cannot find project info").asJson)
-      }
+      updater
+        .updateProject(slug, updates, authUser)
+        .assertThrowsError[Exception](_ shouldBe Failure.cannotFindProjectGitUrl)
     }
 
-  it should "if core update needed and " +
-    "finding user info returns None " +
-    "return 500 InternalServerError" in {
+  it should "if core update needed, " +
+    "fail finding user info fails" in {
+
+      val authUser = authUsers.generateOne
+      val slug     = projectSlugs.generateOne
+      val updates  = projectUpdatesGen.suchThat(_.coreUpdateNeeded).generateOne
+
+      givenBranchProtectionChecking(slug, authUser.accessToken, returning = true.pure[IO])
+      givenProjectGitUrlFinding(slug, authUser.accessToken, returning = projectGitHttpUrls.generateSome.pure[IO])
+      val exception = exceptions.generateOne
+      givenUserInfoFinding(authUser.accessToken, returning = exception.raiseError[IO, Nothing])
+
+      updater
+        .updateProject(slug, updates, authUser)
+        .assertThrowsError[Exception](_ shouldBe Failure.onFindingUserInfo(authUser.id, exception))
+    }
+
+  it should "if core update needed, " +
+    "fail finding user info returns None" in {
 
       val authUser = authUsers.generateOne
       val slug     = projectSlugs.generateOne
@@ -154,15 +145,13 @@ class ProjectUpdaterSpec extends AsyncFlatSpec with CustomAsyncIOSpec with shoul
       givenProjectGitUrlFinding(slug, authUser.accessToken, returning = projectGitHttpUrls.generateSome.pure[IO])
       givenUserInfoFinding(authUser.accessToken, returning = None.pure[IO])
 
-      updater.updateProject(slug, updates, authUser) >>= { response =>
-        response.pure[IO].asserting(_.status shouldBe InternalServerError) >>
-          response.as[Json].asserting(_ shouldBe Message.Error("Cannot find user info").asJson)
-      }
+      updater
+        .updateProject(slug, updates, authUser)
+        .assertThrowsError[Exception](_ shouldBe Failure.cannotFindUserInfo(authUser.id))
     }
 
-  it should "if core update needed and " +
-    "finding renku core URI fails " +
-    "return 500 InternalServerError" in {
+  it should "if core update needed, " +
+    "fail if finding renku core URI fails" in {
 
       val authUser = authUsers.generateOne
       val slug     = projectSlugs.generateOne
@@ -177,15 +166,13 @@ class ProjectUpdaterSpec extends AsyncFlatSpec with CustomAsyncIOSpec with shoul
       val failedResult = resultDetailedFailures.generateOne
       givenFindingCoreUri(projectGitUrl, authUser.accessToken, returning = failedResult)
 
-      updater.updateProject(slug, updates, authUser) >>= { response =>
-        response.pure[IO].asserting(_.status shouldBe InternalServerError) >>
-          response.as[Json].asserting(_ shouldBe Message.Error.fromExceptionMessage(failedResult).asJson)
-      }
+      updater
+        .updateProject(slug, updates, authUser)
+        .assertThrowsError[Exception](_ shouldBe Failure.onFindingCoreUri(failedResult))
     }
 
-  it should "if core update needed and " +
-    "updating renku core fails " +
-    "return 500 InternalServerError" in {
+  it should "if core update needed, " +
+    "fail if updating renku core fails" in {
 
       val authUser = authUsers.generateOne
       val slug     = projectSlugs.generateOne
@@ -208,13 +195,12 @@ class ProjectUpdaterSpec extends AsyncFlatSpec with CustomAsyncIOSpec with shoul
         returning = failedResult
       )
 
-      updater.updateProject(slug, updates, authUser) >>= { response =>
-        response.pure[IO].asserting(_.status shouldBe InternalServerError) >>
-          response.as[Json].asserting(_ shouldBe Message.Error.fromExceptionMessage(failedResult).asJson)
-      }
+      updater
+        .updateProject(slug, updates, authUser)
+        .assertThrowsError[Exception](_ shouldBe Failure.onCoreUpdate(failedResult))
     }
 
-  it should "return 400 BadRequest if GL returns 400" in {
+  it should "fail if updating GL returns an error" in {
 
     val authUser = authUsers.generateOne
     val slug     = projectSlugs.generateOne
@@ -223,16 +209,15 @@ class ProjectUpdaterSpec extends AsyncFlatSpec with CustomAsyncIOSpec with shoul
       .suchThat(_.onlyGLUpdateNeeded)
       .generateOne
 
-    val error = jsons.generateOne
+    val error = Message.Error.fromJsonUnsafe(jsons.generateOne)
     givenUpdatingProjectInGL(slug, updates, authUser.accessToken, returning = error.asLeft.pure[IO])
 
-    updater.updateProject(slug, updates, authUser) >>= { response =>
-      response.pure[IO].asserting(_.status shouldBe BadRequest) >>
-        response.as[Message].asserting(_ shouldBe Message.Error.fromJsonUnsafe(error))
-    }
+    updater
+      .updateProject(slug, updates, authUser)
+      .assertThrowsError[Exception](_ shouldBe Failure.badRequestOnGLUpdate(error))
   }
 
-  it should "return 500 InternalServerError if updating GL fails" in {
+  it should "fail if updating GL fails" in {
 
     val authUser = authUsers.generateOne
     val slug     = projectSlugs.generateOne
@@ -245,16 +230,15 @@ class ProjectUpdaterSpec extends AsyncFlatSpec with CustomAsyncIOSpec with shoul
     givenUpdatingProjectInGL(slug,
                              updates,
                              authUser.accessToken,
-                             returning = exception.raiseError[IO, Either[Json, Unit]]
+                             returning = exception.raiseError[IO, Either[Message, Unit]]
     )
 
-    updater.updateProject(slug, updates, authUser) >>= { response =>
-      response.pure[IO].asserting(_.status shouldBe InternalServerError) >>
-        response.as[Message].asserting(_ shouldBe Message.Error("Updating GL failed"))
-    }
+    updater
+      .updateProject(slug, updates, authUser)
+      .assertThrowsError[Exception](_ shouldBe Failure.onGLUpdate(slug, exception))
   }
 
-  it should "return 500 InternalServerError if updating project in TG failed" in {
+  it should "fail if updating TG failed" in {
 
     val authUser = authUsers.generateOne
     val slug     = projectSlugs.generateOne
@@ -264,16 +248,12 @@ class ProjectUpdaterSpec extends AsyncFlatSpec with CustomAsyncIOSpec with shoul
       .generateOne
 
     givenUpdatingProjectInGL(slug, updates, authUser.accessToken, returning = ().asRight.pure[IO])
-    val exception = exceptions.generateOne
-    givenSendingUpdateToTG(slug,
-                           updates,
-                           returning = TriplesGeneratorClient.Result.failure(exception.getMessage).pure[IO]
-    )
+    val exception = TriplesGeneratorClient.Result.Failure(exceptions.generateOne.getMessage)
+    givenSendingUpdateToTG(slug, updates, returning = exception.pure[IO])
 
-    updater.updateProject(slug, updates, authUser) >>= { response =>
-      response.pure[IO].asserting(_.status shouldBe InternalServerError) >>
-        response.as[Message].asserting(_ shouldBe Message.Error("Updating TS failed"))
-    }
+    updater
+      .updateProject(slug, updates, authUser)
+      .assertThrowsError[Exception](_ shouldBe Failure.onTSUpdate(slug, exception))
   }
 
   private implicit val logger: TestLogger[IO] = TestLogger[IO]()
@@ -311,7 +291,7 @@ class ProjectUpdaterSpec extends AsyncFlatSpec with CustomAsyncIOSpec with shoul
   private def givenUpdatingProjectInGL(slug:      projects.Slug,
                                        updates:   ProjectUpdates,
                                        at:        UserAccessToken,
-                                       returning: IO[Either[Json, Unit]]
+                                       returning: IO[Either[Message, Unit]]
   ) = (glProjectUpdater.updateProject _)
     .expects(slug, updates, at)
     .returning(returning)

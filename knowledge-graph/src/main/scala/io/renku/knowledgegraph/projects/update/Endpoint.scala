@@ -48,9 +48,13 @@ private class EndpointImpl[F[_]: Async: Logger](projectUpdater: ProjectUpdater[F
 
   override def `PATCH /projects/:slug`(slug: projects.Slug, request: Request[F], authUser: AuthUser): F[Response[F]] =
     decodePayload(request)
-      .semiflatMap(projectUpdater.updateProject(slug, _, authUser))
+      .semiflatMap(
+        projectUpdater
+          .updateProject(slug, _, authUser)
+          .as(Response[F](Accepted).withEntity(Message.Info("Project update accepted")))
+      )
       .merge
-      .handleErrorWith(serverError(slug)(_))
+      .handleErrorWith(relevantError(slug)(_))
 
   private lazy val decodePayload: Request[F] => EitherT[F, Response[F], ProjectUpdates] = req =>
     EitherT {
@@ -64,8 +68,14 @@ private class EndpointImpl[F[_]: Async: Logger](projectUpdater: ProjectUpdater[F
     Response[F](BadRequest).withEntity(Message.Error("Invalid payload"))
   }
 
-  private def serverError(slug: projects.Slug): Throwable => F[Response[F]] =
-    Logger[F]
-      .error(_)(show"Updating project $slug failed")
-      .as(Response[F](InternalServerError).withEntity(Message.Error("Update failed")))
+  private def relevantError(slug: projects.Slug): Throwable => F[Response[F]] = {
+    case f: Failure =>
+      Logger[F]
+        .error(f)(show"Updating project $slug failed")
+        .as(Response[F](f.status).withEntity(f.message))
+    case ex: Exception =>
+      Logger[F]
+        .error(ex)(show"Updating project $slug failed")
+        .as(Response[F](InternalServerError).withEntity(Message.Error("Update failed")))
+  }
 }

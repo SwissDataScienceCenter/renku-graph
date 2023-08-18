@@ -27,6 +27,7 @@ import eu.timepit.refined.auto._
 import eu.timepit.refined.collection.NonEmpty
 import io.circe.Json
 import io.circe.literal._
+import io.renku.data.Message
 import io.renku.generators.CommonGraphGenerators.accessTokens
 import io.renku.generators.Generators.Implicits._
 import io.renku.generators.Generators.{jsons, nonEmptyStrings}
@@ -80,10 +81,12 @@ class GLProjectUpdaterSpec
     val newValues   = projectUpdatesGen.suchThat(u => u.newImage.orElse(u.newVisibility).isDefined).generateOne
     val accessToken = accessTokens.generateOne
 
-    val error = jsons.generateOne
+    val error = Message.Error.fromJsonUnsafe(jsons.generateOne)
     givenEditProjectAPICall(slug, newValues, accessToken, returning = error.asLeft.pure[IO])
 
-    finder.updateProject(slug, newValues, accessToken).asserting(_.left.value shouldBe error)
+    finder
+      .updateProject(slug, newValues, accessToken)
+      .asserting(_.left.value shouldBe error)
   }
 
   it should "succeed if PUT gl/projects/:slug returns 200 OK" in {
@@ -95,7 +98,7 @@ class GLProjectUpdaterSpec
     val error = nonEmptyStrings().generateOne
 
     mapResponse(BadRequest, Request[IO](), Response[IO](BadRequest).withEntity(json"""{"error": $error}"""))
-      .asserting(_.left.value shouldBe Json.fromString(error))
+      .asserting(_.left.value shouldBe Message.Error.fromJsonUnsafe(Json.fromString(error)))
   }
 
   it should "return left if PUT gl/projects/:slug returns 400 BAD_REQUEST with a message" in {
@@ -103,7 +106,7 @@ class GLProjectUpdaterSpec
     val message = jsons.generateOne
 
     mapResponse(BadRequest, Request[IO](), Response[IO](BadRequest).withEntity(json"""{"message": $message}"""))
-      .asserting(_.left.value shouldBe message)
+      .asserting(_.left.value shouldBe Message.Error.fromJsonUnsafe(message))
   }
 
   private implicit val glClient: GitLabClient[IO] = mock[GitLabClient[IO]]
@@ -112,11 +115,11 @@ class GLProjectUpdaterSpec
   private def givenEditProjectAPICall(slug:        projects.Slug,
                                       newValues:   ProjectUpdates,
                                       accessToken: AccessToken,
-                                      returning:   IO[Either[Json, Unit]]
+                                      returning:   IO[Either[Message, Unit]]
   ) = {
     val endpointName: String Refined NonEmpty = "edit-project"
     (glClient
-      .put(_: Uri, _: String Refined NonEmpty, _: UrlForm)(_: ResponseMappingF[IO, Either[Json, Unit]])(
+      .put(_: Uri, _: String Refined NonEmpty, _: UrlForm)(_: ResponseMappingF[IO, Either[Message, Unit]])(
         _: Option[AccessToken]
       ))
       .expects(uri"projects" / slug, endpointName, toUrlForm(newValues), *, accessToken.some)
@@ -132,7 +135,7 @@ class GLProjectUpdaterSpec
     )
   }
 
-  private lazy val mapResponse: ResponseMappingF[IO, Either[Json, Unit]] =
+  private lazy val mapResponse: ResponseMappingF[IO, Either[Message, Unit]] =
     captureMapping(glClient)(
       finder
         .updateProject(projectSlugs.generateOne,
@@ -140,7 +143,7 @@ class GLProjectUpdaterSpec
                        accessTokens.generateOne
         )
         .unsafeRunSync(),
-      ().asRight[Json],
+      ().asRight[Message],
       method = PUT
     )
 }
