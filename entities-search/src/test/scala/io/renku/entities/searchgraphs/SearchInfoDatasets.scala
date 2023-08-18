@@ -49,14 +49,16 @@ trait SearchInfoDatasets {
 
   def provisionProjects(projects: entities.Project*)(implicit
       entityFunctions: EntityFunctions[entities.Project],
-      graphsProducer:  GraphsProducer[entities.Project]
+      graphsProducer:  GraphsProducer[entities.Project],
+      renkuUrl:        RenkuUrl
   ): IO[Unit] = projects.traverse_[IO, Unit](provisionProject)
 
   def provisionProject(
       project: entities.Project
   )(implicit
       entityFunctions: EntityFunctions[entities.Project],
-      graphsProducer:  GraphsProducer[entities.Project]
+      graphsProducer:  GraphsProducer[entities.Project],
+      renkuUrl:        RenkuUrl
   ): IO[Unit] =
     uploadIO(projectsDataset, graphsProducer(project): _*) >> insertSearchInfo(project)
 

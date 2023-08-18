@@ -51,7 +51,7 @@ class ProjectAuthServiceSpec extends AsyncFlatSpec with AsyncIOSpec with JenaCon
                .drain
 
         n <- s.getAll(15).compile.toVector
-        _ = n shouldBe data.sortBy(_.path)
+        _ = n shouldBe data.sortBy(_.slug)
       } yield ()
     }
   }
@@ -71,7 +71,7 @@ class ProjectAuthServiceSpec extends AsyncFlatSpec with AsyncIOSpec with JenaCon
                .drain
 
         n <- s.getAll().compile.toVector
-        _ = n shouldBe data.sortBy(_.path)
+        _ = n shouldBe data.sortBy(_.slug)
       } yield ()
     }
   }
@@ -89,7 +89,7 @@ class ProjectAuthServiceSpec extends AsyncFlatSpec with AsyncIOSpec with JenaCon
         n <- s.getAll().compile.toVector
         _ = n.head shouldBe original
 
-        _ <- s.remove(original.path)
+        _ <- s.remove(original.slug)
         _ <- s.getAll().compile.toVector.asserting(v => v shouldBe Vector.empty)
       } yield ()
     }
@@ -105,9 +105,9 @@ class ProjectAuthServiceSpec extends AsyncFlatSpec with AsyncIOSpec with JenaCon
         _ <- Stream.emits(data).through(s.updateAll).compile.drain
 
         (toremove, tokeep) = data.splitAt(3)
-        _ <- s.remove(NonEmptyList.fromListUnsafe(toremove.map(_.path).toList))
+        _ <- s.remove(NonEmptyList.fromListUnsafe(toremove.map(_.slug).toList))
 
-        _ <- s.getAll().compile.toVector.asserting(v => v shouldBe tokeep.sortBy(_.path))
+        _ <- s.getAll().compile.toVector.asserting(v => v shouldBe tokeep.sortBy(_.slug))
       } yield ()
     }
   }

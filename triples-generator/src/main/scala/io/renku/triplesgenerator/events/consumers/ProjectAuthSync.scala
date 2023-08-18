@@ -29,7 +29,6 @@ import io.renku.triplesstore.ProjectsConnectionConfig
 import io.renku.triplesstore.client.http.{RowDecoder, SparqlClient}
 import io.renku.triplesstore.client.syntax._
 import org.typelevel.log4cats.Logger
-import org.typelevel.log4cats.slf4j.Slf4jLogger
 
 trait ProjectAuthSync[F[_]] {
   def syncProject(slug: Slug, members: Set[ProjectMember]): F[Unit]
@@ -50,20 +49,17 @@ object ProjectAuthSync {
       projectAuthService: ProjectAuthService[F],
       sparqlClient:       ProjectSparqlClient[F]
   ) extends ProjectAuthSync[F] {
-    implicit val logger: Logger[F] = Slf4jLogger.getLogger[F]
     private[this] val visibilityFinder: VisibilityFinder[F] =
       new VisibilityFinder[F](sparqlClient)
 
     override def syncProject(slug: Slug, members: Set[ProjectMember]): F[Unit] =
-      logger.warn(s"Start looking for visibility for $slug") *>
-        visibilityFinder.find(slug).flatMap {
-          case Some(vis) => syncProject(ProjectAuthData(slug, members, vis))
-          case None      => ().pure[F]
-        }
+      visibilityFinder.find(slug).flatMap {
+        case Some(vis) => syncProject(ProjectAuthData(slug, members, vis))
+        case None      => ().pure[F]
+      }
 
     override def syncProject(data: ProjectAuthData): F[Unit] =
-      logger.warn(s"Syncing project auth using $data") *>
-        projectAuthService.update(data)
+      projectAuthService.update(data)
   }
 
   // Hm, should we get this from gitlab? TODO

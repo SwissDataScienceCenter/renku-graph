@@ -25,7 +25,7 @@ import io.renku.jsonld.syntax._
 import io.renku.jsonld.{EntityTypes, JsonLD, JsonLDEncoder}
 
 final case class ProjectAuthData(
-    path:       Slug,
+    slug:       Slug,
     members:    Set[ProjectMember],
     visibility: Visibility
 )
@@ -34,9 +34,9 @@ object ProjectAuthData {
   implicit def jsonLDEncoder(implicit renkuUrl: RenkuUrl): JsonLDEncoder[ProjectAuthData] =
     JsonLDEncoder.instance { data =>
       JsonLD.entity(
-        ResourceId(data.path).asEntityId,
+        ResourceId(data.slug).asEntityId,
         EntityTypes.of(Schemas.schema / "Project"),
-        Schemas.renku / "slug"       -> data.path.asJsonLD,
+        Schemas.renku / "slug"       -> data.slug.asJsonLD,
         Schemas.renku / "visibility" -> data.visibility.asJsonLD,
         Schemas.renku / "memberId"   -> JsonLDArray(data.members.map(_.gitLabId.asJsonLD).toSeq),
         Schemas.renku / "memberRole" -> JsonLDArray(data.members.map(_.encoded.asJsonLD).toSeq)

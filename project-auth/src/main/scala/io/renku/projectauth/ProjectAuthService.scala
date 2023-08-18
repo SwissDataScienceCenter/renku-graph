@@ -69,9 +69,9 @@ object ProjectAuthService {
       sparqlClient.update(sparql"""PREFIX schema: <http://schema.org/>
                                   |PREFIX renku: <https://swissdatasciencecenter.github.io/renku-ontology#>
                                   |
-                                  |DELETE { Graph ${graph.asSparql} {?s ?p ?o} }
+                                  |DELETE { Graph $graph {?s ?p ?o} }
                                   |WHERE {
-                                  |  Graph ${graph.asSparql} {
+                                  |  Graph $graph {
                                   |    ?s a schema:Project;
                                   |       renku:slug ?slug;
                                   |       ?p ?o.
@@ -82,12 +82,12 @@ object ProjectAuthService {
 
     override def update(data: ProjectAuthData): F[Unit] = {
       val jsonld = NamedGraph.fromJsonLDsUnsafe(graph, data.asJsonLD)
-      remove(data.path) >> sparqlClient.upload(jsonld)
+      remove(data.slug) >> sparqlClient.upload(jsonld)
     }
 
     override def updateAll: Pipe[F, ProjectAuthData, Nothing] =
       _.chunks
-        .evalTap(_.toNel.map(_.map(_.path)).map(remove).getOrElse(().pure[F]))
+        .evalTap(_.toNel.map(_.map(_.slug)).map(remove).getOrElse(().pure[F]))
         .map(chunk =>
           chunk.toNel match { // TODO improve that ergonomics for NamedGraph in jsonld4s
             case Some(nel) => NamedGraph.fromJsonLDsUnsafe(graph, nel.head.asJsonLD, nel.tail.map(_.asJsonLD): _*)
