@@ -193,15 +193,16 @@ object Generators {
 
   def httpUrls(protocolGenerator: Gen[String] = Gen.oneOf("http", "https"),
                hostGenerator:     Gen[String] = nonEmptyStrings(),
-               portGenerator:     Gen[Option[Port]] = Gen.option(httpPorts),
+               portGenerator:     Gen[Option[Port]] = Gen.some(httpPorts),
                pathGenerator:     Gen[String] = relativePaths(minSegments = 0, maxSegments = 2)
   ): Gen[String] = for {
     protocol  <- protocolGenerator
-    maybePort <- portGenerator
     host      <- hostGenerator
+    maybePort <- portGenerator
     path      <- pathGenerator
+    portValidated = maybePort.map(p => s":$p").getOrElse("")
     pathValidated = if (path.isEmpty) "" else s"/$path"
-  } yield s"$protocol://$host${maybePort.map(p => s":$p").getOrElse("")}$pathValidated"
+  } yield s"$protocol://$host$portValidated$pathValidated"
 
   val localHttpUrls: Gen[String] = for {
     protocol <- Gen.oneOf("http", "https")
