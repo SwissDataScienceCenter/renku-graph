@@ -117,7 +117,7 @@ class LowLevelApisSpec
         val versionedUri = coreUrisVersioned(server.baseUri).generateOne
 
         server.stubFor {
-          post(s"/${versionedUri.apiVersion}/renku/project.edit")
+          post(s"/renku/${versionedUri.apiVersion}/project.edit")
             .withRequestBody(equalToJson(updates.asJson.spaces2))
             .withAccessToken(accessToken.some)
             .withHeader("renku-user-email", equalTo(updates.userInfo.email.value))

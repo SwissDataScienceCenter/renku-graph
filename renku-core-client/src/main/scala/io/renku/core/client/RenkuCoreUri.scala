@@ -34,7 +34,7 @@ object RenkuCoreUri {
   final case class Latest(uri: Uri)                                  extends RenkuCoreUri
   final case class ForSchema(uri: Uri, schemaVersion: SchemaVersion) extends RenkuCoreUri
   final case class Versioned(baseUri: ForSchema, apiVersion: ApiVersion) extends RenkuCoreUri {
-    val uri: Uri = baseUri.uri / apiVersion.value
+    val uri: Uri = baseUri.uri
   }
 
   object Latest {

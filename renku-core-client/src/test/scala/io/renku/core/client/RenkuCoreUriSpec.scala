@@ -110,12 +110,12 @@ class RenkuCoreUriSpec extends AnyWordSpec with should.Matchers with TryValues {
 
   "Versioned.uri" should {
 
-    "return a value that is composed from the baseUri and the apiVersion" in {
+    "return a value that is composed from the baseUri" in {
 
       val baseUri    = coreUrisForSchema.generateOne
       val apiVersion = apiVersions.generateOne
 
-      RenkuCoreUri.Versioned(baseUri, apiVersion).uri shouldBe baseUri.uri / apiVersion.value
+      RenkuCoreUri.Versioned(baseUri, apiVersion).uri shouldBe baseUri.uri
     }
   }
 

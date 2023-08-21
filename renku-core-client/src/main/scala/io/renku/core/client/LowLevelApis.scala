@@ -28,6 +28,7 @@ import io.renku.control.Throttler
 import io.renku.graph.model.projects
 import io.renku.graph.model.versions.SchemaVersion
 import io.renku.http.client.{AccessToken, RestClient, UserAccessToken}
+import io.renku.http.tinytypes.TinyTypeURIEncoder._
 import org.http4s.Header
 import org.http4s.circe._
 import org.http4s.client.dsl.Http4sClientDsl
@@ -106,7 +107,7 @@ private class LowLevelApisImpl[F[_]: Async: Logger](coreLatestUri: RenkuCoreUri.
                                  accessToken: UserAccessToken
   ): F[Result[Unit]] =
     send(
-      request(POST, uri.uri / "renku" / "project.edit", accessToken)
+      request(POST, uri.uri / "renku" / uri.apiVersion / "project.edit", accessToken)
         .withEntity(updates.asJson)
         .putHeaders(Header.Raw(ci"renku-user-email", updates.userInfo.email.value))
         .putHeaders(Header.Raw(ci"renku-user-fullname", updates.userInfo.name.value))
