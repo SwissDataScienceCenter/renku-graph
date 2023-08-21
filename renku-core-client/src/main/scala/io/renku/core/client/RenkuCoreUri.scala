@@ -55,14 +55,13 @@ object RenkuCoreUri {
   }
   object ForSchema extends ForSchemaLoader {
 
-    private val key = "services.renku-core-service-names"
+    private val key = "services.renku-core-service-urls"
 
     override def loadFromConfig[F[_]: MonadThrow](schemaVersion: SchemaVersion,
                                                   config:        Config = ConfigFactory.load
     ): F[ForSchema] =
       loadServiceNamesFromConfig(config)
         .flatMap(serviceNameForSchema(schemaVersion))
-        .map(v => s"http://$v")
         .flatMap(toUri[F](key, _))
         .map(ForSchema(_, schemaVersion))
 

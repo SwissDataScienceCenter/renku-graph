@@ -99,14 +99,14 @@ If release name contains chart name it will be used as a full name.
 {{/*
 Comma separated list of renku-core service names
 */}}
-{{- define "renkuCore.serviceNames" -}}
-{{- $serviceNames := list -}}
+{{- define "renkuCore.serviceUrls" -}}
+{{- $serviceUrls := list -}}
 {{- $coreBaseName := printf "%s-core" .Release.Name -}}
 {{- range $i, $k := (keys .Values.global.core.versions | sortAlpha) -}}
-{{- $serviceName := printf "%s-%s" $coreBaseName (get $.Values.global.core.versions $k).name -}}
-{{- $serviceNames = mustAppend $serviceNames $serviceName -}}
+{{- $serviceUrl := printf "http://%s-%s" $coreBaseName (get $.Values.global.core.versions $k).name -}}
+{{- $serviceUrls = mustAppend $serviceUrls $serviceUrl -}}
 {{- end -}}
-{{- join "," $serviceNames | quote -}}
+{{- join "," $serviceUrls | quote -}}
 {{- end -}}
 
 {{/*

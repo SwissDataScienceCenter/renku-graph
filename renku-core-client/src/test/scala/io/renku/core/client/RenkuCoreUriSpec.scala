@@ -63,7 +63,7 @@ class RenkuCoreUriSpec extends AnyWordSpec with should.Matchers with TryValues {
 
   "ForSchema.loadFromConfig" should {
 
-    "read the 'services.renku-core-service-names' from the Config, " +
+    "read the 'services.renku-core-service-urls' from the Config, " +
       "find the match by checking if the name contains the schemaVersion and " +
       "convert it to RenkuCoreUri.ForSchema" in {
 
@@ -131,10 +131,10 @@ class RenkuCoreUriSpec extends AnyWordSpec with should.Matchers with TryValues {
   private def configForServiceNames(schemaNames: List[String]) =
     ConfigFactory.parseString(
       s"""services {
-            renku-core-service-names = "${schemaNames.mkString(",")}"
+            renku-core-service-urls = "${schemaNames.mkString(",")}"
           }"""
     )
 
   private lazy val toSchemaNames: List[RenkuCoreUri.ForSchema] => List[String] =
-    _.map(_.uri.host.getOrElse(fail("no host in the uri")).value)
+    _.map(_.uri.renderString)
 }

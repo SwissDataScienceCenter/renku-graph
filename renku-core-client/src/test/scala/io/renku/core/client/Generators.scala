@@ -48,9 +48,9 @@ object Generators {
 
   implicit lazy val coreUrisForSchema: Gen[RenkuCoreUri.ForSchema] =
     for {
-      baseUri <- httpUrls(protocolGenerator = "http", portGenerator = httpPorts.toGeneratorOfNones, pathGenerator = "")
       schema  <- projectSchemaVersions
-    } yield RenkuCoreUri.ForSchema(Uri.unsafeFromString(show"$baseUri-v$schema"), schema)
+      baseUri <- httpUrls(hostGenerator = nonEmptyStrings().map(v => show"$v-v$schema"))
+    } yield RenkuCoreUri.ForSchema(Uri.unsafeFromString(baseUri), schema)
 
   def coreUrisForSchema(baseUri: Uri): Gen[RenkuCoreUri.ForSchema] =
     projectSchemaVersions.map(RenkuCoreUri.ForSchema(baseUri, _))
