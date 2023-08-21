@@ -41,7 +41,7 @@ trait RenkuCoreClient[F[_]] {
 
 object RenkuCoreClient {
   def apply[F[_]: Async: Logger](config: Config = ConfigFactory.load): F[RenkuCoreClient[F]] =
-    RenkuCoreUri.Current.loadFromConfig[F](config).map { coreCurrentUri =>
+    RenkuCoreUri.Latest.loadFromConfig[F](config).map { coreCurrentUri =>
       new RenkuCoreClientImpl[F](RenkuCoreUri.ForSchema, LowLevelApis[F](coreCurrentUri), config)
     }
 }

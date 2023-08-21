@@ -31,15 +31,15 @@ sealed trait RenkuCoreUri {
 
 object RenkuCoreUri {
 
-  final case class Current(uri: Uri)                                 extends RenkuCoreUri
+  final case class Latest(uri: Uri)                                 extends RenkuCoreUri
   final case class ForSchema(uri: Uri, schemaVersion: SchemaVersion) extends RenkuCoreUri
   final case class Versioned(baseUri: ForSchema, apiVersion: ApiVersion) extends RenkuCoreUri {
     val uri: Uri = baseUri.uri / apiVersion.value
   }
 
-  object Current {
-    def loadFromConfig[F[_]: MonadThrow](config: Config = ConfigFactory.load): F[Current] =
-      loadUrlFromConfig("services.renku-core-current.url", config).map(Current(_))
+  object Latest {
+    def loadFromConfig[F[_]: MonadThrow](config: Config = ConfigFactory.load): F[Latest] =
+      loadUrlFromConfig("services.renku-core-latest.url", config).map(Latest(_))
   }
 
   trait ForSchemaLoader {

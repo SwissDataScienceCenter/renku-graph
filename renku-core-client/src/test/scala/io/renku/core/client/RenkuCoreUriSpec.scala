@@ -33,19 +33,19 @@ import scala.util.Try
 
 class RenkuCoreUriSpec extends AnyWordSpec with should.Matchers with TryValues {
 
-  "Current.loadFromConfig" should {
+  "Latest.loadFromConfig" should {
 
-    "read the 'services.renku-core-current.url' from the Config" in {
+    "read the 'services.renku-core-latest.url' from the Config" in {
 
       val url    = httpUrls().generateOne
       val config = configForCurrent(url)
 
-      RenkuCoreUri.Current.loadFromConfig[Try](config).success.value shouldBe
-        RenkuCoreUri.Current(Uri.unsafeFromString(url))
+      RenkuCoreUri.Latest.loadFromConfig[Try](config).success.value shouldBe
+        RenkuCoreUri.Latest(Uri.unsafeFromString(url))
     }
 
     "fail if the url does not exist" in {
-      RenkuCoreUri.Current.loadFromConfig[Try](ConfigFactory.empty()).failure.exception.getMessage should include(
+      RenkuCoreUri.Latest.loadFromConfig[Try](ConfigFactory.empty()).failure.exception.getMessage should include(
         "Key not found: 'services'"
       )
     }
@@ -56,8 +56,8 @@ class RenkuCoreUriSpec extends AnyWordSpec with should.Matchers with TryValues {
 
       val config = configForCurrent(illegalUrl)
 
-      RenkuCoreUri.Current.loadFromConfig[Try](config).failure.exception.getMessage should include(
-        s"'$illegalUrl' is not a valid 'services.renku-core-current.url' uri"
+      RenkuCoreUri.Latest.loadFromConfig[Try](config).failure.exception.getMessage should include(
+        s"'$illegalUrl' is not a valid 'services.renku-core-latest.url' uri"
       )
     }
   }
@@ -120,7 +120,7 @@ class RenkuCoreUriSpec extends AnyWordSpec with should.Matchers with TryValues {
   private def configForCurrent(url: String) =
     ConfigFactory.parseString(
       s"""services {
-            renku-core-current {
+            renku-core-latest {
               url = "$url"
             }
           }"""

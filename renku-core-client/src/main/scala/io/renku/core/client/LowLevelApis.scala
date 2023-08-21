@@ -49,11 +49,11 @@ private trait LowLevelApis[F[_]] {
 }
 
 private object LowLevelApis {
-  def apply[F[_]: Async: Logger](coreCurrentUri: RenkuCoreUri.Current): LowLevelApis[F] =
-    new LowLevelApisImpl[F](coreCurrentUri, ClientTools[F])
+  def apply[F[_]: Async: Logger](coreLatestUri: RenkuCoreUri.Latest): LowLevelApis[F] =
+    new LowLevelApisImpl[F](coreLatestUri, ClientTools[F])
 }
 
-private class LowLevelApisImpl[F[_]: Async: Logger](coreCurrentUri: RenkuCoreUri.Current, clientTools: ClientTools[F])
+private class LowLevelApisImpl[F[_]: Async: Logger](coreLatestUri: RenkuCoreUri.Latest, clientTools: ClientTools[F])
     extends RestClient[F, Nothing](Throttler.noThrottling)
     with LowLevelApis[F]
     with Http4sDsl[F]
@@ -95,7 +95,7 @@ private class LowLevelApisImpl[F[_]: Async: Logger](coreCurrentUri: RenkuCoreUri
       res.downField("versions").as(decodeList(singleVersionDecoder))
     }
 
-    send(GET(coreCurrentUri.uri / "renku" / "versions")) {
+    send(GET(coreLatestUri.uri / "renku" / "versions")) {
       case (Ok, _, resp) => toResult[List[SchemaVersion]](resp)(decoder)
       case reqInfo       => toFailure[List[SchemaVersion]]("Version info cannot be found")(reqInfo)
     }

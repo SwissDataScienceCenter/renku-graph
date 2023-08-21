@@ -133,5 +133,5 @@ class LowLevelApisSpec
   }
 
   private implicit val logger: Logger[IO] = TestLogger()
-  private lazy val client = new LowLevelApisImpl[IO](RenkuCoreUri.Current(externalServiceBaseUri), ClientTools[IO])
+  private lazy val client = new LowLevelApisImpl[IO](RenkuCoreUri.Latest(externalServiceBaseUri), ClientTools[IO])
 }

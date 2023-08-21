@@ -43,8 +43,8 @@ object Generators {
   implicit lazy val migrationRequiredGen: Gen[MigrationRequired] =
     Gen.oneOf(MigrationRequired.yes, MigrationRequired.no)
 
-  implicit lazy val coreCurrentUris: Gen[RenkuCoreUri.Current] =
-    httpUrls().map(uri => RenkuCoreUri.Current(Uri.unsafeFromString(uri)))
+  implicit lazy val coreLatestUris: Gen[RenkuCoreUri.Latest] =
+    httpUrls().map(uri => RenkuCoreUri.Latest(Uri.unsafeFromString(uri)))
 
   implicit lazy val coreUrisForSchema: Gen[RenkuCoreUri.ForSchema] =
     for {
