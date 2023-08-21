@@ -31,15 +31,21 @@ sealed trait RenkuCoreUri {
 
 object RenkuCoreUri {
 
-  final case class Latest(uri: Uri)                                 extends RenkuCoreUri
+  final case class Latest(uri: Uri)                                  extends RenkuCoreUri
   final case class ForSchema(uri: Uri, schemaVersion: SchemaVersion) extends RenkuCoreUri
   final case class Versioned(baseUri: ForSchema, apiVersion: ApiVersion) extends RenkuCoreUri {
     val uri: Uri = baseUri.uri / apiVersion.value
   }
 
   object Latest {
+
+    private val key = "services.renku-core-latest.url"
+
     def loadFromConfig[F[_]: MonadThrow](config: Config = ConfigFactory.load): F[Latest] =
-      loadUrlFromConfig("services.renku-core-latest.url", config).map(Latest(_))
+      loadUrlFromConfig(config).map(Latest(_))
+
+    private def loadUrlFromConfig[F[_]: MonadThrow](config: Config): F[Uri] =
+      find[F, String](key, config).flatMap(toUri[F](key, _))
   }
 
   trait ForSchemaLoader {
@@ -49,16 +55,26 @@ object RenkuCoreUri {
   }
   object ForSchema extends ForSchemaLoader {
 
+    private val key = "services.renku-core-service-names"
+
     override def loadFromConfig[F[_]: MonadThrow](schemaVersion: SchemaVersion,
                                                   config:        Config = ConfigFactory.load
     ): F[ForSchema] =
-      loadUrlFromConfig(s"services.renku-core-v$schemaVersion.url", config).map(ForSchema(_, schemaVersion))
+      loadServiceNamesFromConfig(config)
+        .flatMap(serviceNameForSchema(schemaVersion))
+        .map(v => s"http://$v")
+        .flatMap(toUri[F](key, _))
+        .map(ForSchema(_, schemaVersion))
+
+    private def loadServiceNamesFromConfig[F[_]: MonadThrow](config: Config) =
+      find[F, String](key, config).map(_.split(",").toList.map(_.trim))
+
+    private def serviceNameForSchema[F[_]: MonadThrow](schemaVersion: SchemaVersion): List[String] => F[String] =
+      _.find(_ contains show"v$schemaVersion")
+        .fold(new Exception(show"No renku-core for $schemaVersion in the config").raiseError[F, String])(_.pure[F])
   }
 
   implicit def show[U <: RenkuCoreUri]: Show[U] = Show.show(_.uri.renderString)
-
-  private def loadUrlFromConfig[F[_]: MonadThrow](key: String, config: Config): F[Uri] =
-    find[F, String](key, config).flatMap(toUri[F](key, _))
 
   private def toUri[F[_]: MonadThrow](key: String, uri: String): F[Uri] =
     Uri

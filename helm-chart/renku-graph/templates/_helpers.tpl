@@ -90,6 +90,25 @@ If release name contains chart name it will be used as a full name.
 {{- printf "%s-commit-event-service" .Release.Name | trunc 63 | trimSuffix "-" -}}
 {{- end -}}
 {{- end -}}
+
+{{- define "renkuCoreLatest.fullname" -}}
+{{- $coreBaseName := printf "%s-core" .Release.Name -}}
+{{- printf "%s-%s" $coreBaseName (get $.Values.global.core.versions "latest").name -}}
+{{- end -}}
+
+{{/*
+Comma separated list of renku-core service names
+*/}}
+{{- define "renkuCore.serviceNames" -}}
+{{- $serviceNames := list -}}
+{{- $coreBaseName := printf "%s-core" .Release.Name -}}
+{{- range $i, $k := (keys .Values.global.core.versions | sortAlpha) -}}
+{{- $serviceName := printf "%s-%s" $coreBaseName (get $.Values.global.core.versions $k).name -}}
+{{- $serviceNames = mustAppend $serviceNames $serviceName -}}
+{{- end -}}
+{{- join "," $serviceNames | quote -}}
+{{- end -}}
+
 {{/*
 Create chart name and version as used by the chart label.
 */}}

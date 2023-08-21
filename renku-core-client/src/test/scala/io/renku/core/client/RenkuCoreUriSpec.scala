@@ -23,13 +23,12 @@ import com.typesafe.config.ConfigFactory
 import io.renku.generators.Generators.Implicits._
 import io.renku.generators.Generators.httpUrls
 import io.renku.graph.model.GraphModelGenerators.projectSchemaVersions
-import io.renku.graph.model.versions.SchemaVersion
 import org.http4s.Uri
 import org.scalatest.TryValues
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
 
-import scala.util.Try
+import scala.util.{Random, Try}
 
 class RenkuCoreUriSpec extends AnyWordSpec with should.Matchers with TryValues {
 
@@ -64,13 +63,17 @@ class RenkuCoreUriSpec extends AnyWordSpec with should.Matchers with TryValues {
 
   "ForSchema.loadFromConfig" should {
 
-    "read the 'services.renku-core-vXXX.url' from the Config" in {
+    "read the 'services.renku-core-service-names' from the Config, " +
+      "find the match by checking if the name contains the schemaVersion and " +
+      "convert it to RenkuCoreUri.ForSchema" in {
 
-      val uri    = coreUrisForSchema.generateOne
-      val config = configForSchema(uri.schemaVersion, uri.uri.renderString)
+        val uris   = coreUrisForSchema.generateNonEmptyList().toList
+        val config = configForServiceNames(toSchemaNames(uris))
 
-      RenkuCoreUri.ForSchema.loadFromConfig[Try](uri.schemaVersion, config).success.value shouldBe uri
-    }
+        val selectedUri = Random.shuffle(uris).head
+
+        RenkuCoreUri.ForSchema.loadFromConfig[Try](selectedUri.schemaVersion, config).success.value shouldBe selectedUri
+      }
 
     "fail if the url does not exist" in {
       RenkuCoreUri.ForSchema
@@ -80,18 +83,17 @@ class RenkuCoreUriSpec extends AnyWordSpec with should.Matchers with TryValues {
         .getMessage should include("Key not found: 'services'")
     }
 
-    "fail if the url is invalid" in {
+    "fail if there's no schema version for the schema" in {
 
-      val illegalUrl    = "?ddkf !&&"
+      val uris   = coreUrisForSchema.generateNonEmptyList().toList
+      val config = configForServiceNames(toSchemaNames(uris))
+
       val schemaVersion = projectSchemaVersions.generateOne
-
-      val config = configForSchema(schemaVersion, illegalUrl)
-
       RenkuCoreUri.ForSchema
         .loadFromConfig[Try](schemaVersion, config)
         .failure
         .exception
-        .getMessage should include(s"'$illegalUrl' is not a valid 'services.renku-core-v$schemaVersion.url' uri")
+        .getMessage should include(s"No renku-core for $schemaVersion in the config")
     }
   }
 
@@ -126,13 +128,13 @@ class RenkuCoreUriSpec extends AnyWordSpec with should.Matchers with TryValues {
           }"""
     )
 
-  private def configForSchema(schema: SchemaVersion, url: String) =
+  private def configForServiceNames(schemaNames: List[String]) =
     ConfigFactory.parseString(
       s"""services {
-            renku-core-v$schema {
-              schemaVersion = "$schema"
-              url = "$url"
-            }
+            renku-core-service-names = "${schemaNames.mkString(",")}"
           }"""
     )
+
+  private lazy val toSchemaNames: List[RenkuCoreUri.ForSchema] => List[String] =
+    _.map(_.uri.host.getOrElse(fail("no host in the uri")).value)
 }
