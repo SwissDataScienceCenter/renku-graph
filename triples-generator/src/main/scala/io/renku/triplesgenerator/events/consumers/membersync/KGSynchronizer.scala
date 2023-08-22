@@ -19,6 +19,7 @@
 package io.renku.triplesgenerator.events.consumers.membersync
 
 import io.renku.graph.model.projects
+import io.renku.triplesgenerator.gitlab.GitLabProjectMember
 
 private trait KGSynchronizer[F[_]] {
   def syncMembers(slug: projects.Slug, membersInGL: Set[GitLabProjectMember]): F[SyncSummary]
@@ -29,7 +30,7 @@ private object KGSynchronizerFunctions {
   def findMembersToAdd(membersInGitLab: Set[GitLabProjectMember],
                        membersInKG:     Set[KGProjectMember]
   ): Set[GitLabProjectMember] = membersInGitLab.collect {
-    case member @ GitLabProjectMember(gitlabId, _) if !membersInKG.exists(_.gitLabId == gitlabId) => member
+    case member @ GitLabProjectMember(gitlabId, _, _) if !membersInKG.exists(_.gitLabId == gitlabId) => member
   }
 
   def findMembersToRemove(membersInGitLab: Set[GitLabProjectMember],

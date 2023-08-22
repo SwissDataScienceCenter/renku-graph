@@ -29,6 +29,7 @@ import io.renku.graph.model.entities.Person
 import io.renku.graph.model.persons.GitLabId
 import io.renku.graph.model.views.RdfResource
 import io.renku.graph.model.views.SparqlLiteralEncoder.sparqlEncode
+import io.renku.triplesgenerator.gitlab.GitLabProjectMember
 import io.renku.triplesstore.SparqlQuery
 import io.renku.triplesstore.SparqlQuery.Prefixes
 
