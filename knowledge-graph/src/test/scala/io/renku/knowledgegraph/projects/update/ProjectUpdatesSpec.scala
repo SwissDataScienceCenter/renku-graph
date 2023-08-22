@@ -48,6 +48,22 @@ class ProjectUpdatesSpec extends AnyWordSpec with should.Matchers with ScalaChec
     }
   }
 
+  "glUpdateNeeded" should {
+
+    "return true if at least image and/or visibility is updated" in {
+      forAll(
+        projectUpdatesGen
+          .suchThat(u => (u.newImage orElse u.newVisibility).isDefined)
+      )(_.glUpdateNeeded shouldBe true)
+    }
+
+    "return false otherwise" in {
+      forAll(projectUpdatesGen.map(_.copy(newImage = None, newVisibility = None)))(
+        _.glUpdateNeeded shouldBe false
+      )
+    }
+  }
+
   "coreUpdateNeeded" should {
 
     "return true if at least description and/or keywords is updated" in {

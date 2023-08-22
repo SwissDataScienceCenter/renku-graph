@@ -33,6 +33,7 @@ import io.renku.http.client.{AccessToken, UserAccessToken}
 import io.renku.interpreters.TestLogger
 import io.renku.interpreters.TestLogger.Level.Error
 import io.renku.testtools.CustomAsyncIOSpec
+import io.renku.triplesgenerator.api.Generators.{projectUpdatesGen => tgUpdatesGen}
 import io.renku.triplesgenerator.api.{TriplesGeneratorClient, ProjectUpdates => TGProjectUpdates}
 import org.scalamock.scalatest.AsyncMockFactory
 import org.scalatest.flatspec.AsyncFlatSpec
@@ -50,8 +51,12 @@ class ProjectUpdaterSpec extends AsyncFlatSpec with CustomAsyncIOSpec with shoul
         .suchThat(_.onlyGLUpdateNeeded)
         .generateOne
 
-      givenUpdatingProjectInGL(slug, updates, authUser.accessToken, returning = ().asRight.pure[IO])
-      givenSendingUpdateToTG(slug, updates, returning = TriplesGeneratorClient.Result.success(()).pure[IO])
+      val glUpdated = glUpdatedProjectsGen.generateSome
+      givenUpdatingProjectInGL(slug, updates, authUser.accessToken, returning = glUpdated.asRight.pure[IO])
+
+      val tgUpdates = tgUpdatesGen.generateOne
+      givenTGUpdatesCalculation(updates, glUpdated, returning = tgUpdates.pure[IO])
+      givenSendingUpdateToTG(slug, tgUpdates, returning = TriplesGeneratorClient.Result.success(()).pure[IO])
 
       updater.updateProject(slug, updates, authUser).assertNoException
     }
@@ -78,8 +83,12 @@ class ProjectUpdaterSpec extends AsyncFlatSpec with CustomAsyncIOSpec with shoul
         authUser.accessToken,
         returning = resultSuccesses(()).generateOne
       )
-      givenUpdatingProjectInGL(slug, updates, authUser.accessToken, returning = ().asRight.pure[IO])
-      givenSendingUpdateToTG(slug, updates, returning = TriplesGeneratorClient.Result.success(()).pure[IO])
+
+      val glUpdated = glUpdatedProjectsGen.generateSome
+      givenUpdatingProjectInGL(slug, updates, authUser.accessToken, returning = glUpdated.asRight.pure[IO])
+      val tgUpdates = tgUpdatesGen.generateOne
+      givenTGUpdatesCalculation(updates, glUpdated, returning = tgUpdates.pure[IO])
+      givenSendingUpdateToTG(slug, tgUpdates, returning = TriplesGeneratorClient.Result.success(()).pure[IO])
 
       updater.updateProject(slug, updates, authUser).assertNoException
     }
@@ -223,8 +232,11 @@ class ProjectUpdaterSpec extends AsyncFlatSpec with CustomAsyncIOSpec with shoul
         authUser.accessToken,
         returning = failedResult
       )
-      givenUpdatingProjectInGL(slug, updates, authUser.accessToken, returning = ().asRight.pure[IO])
-      givenSendingUpdateToTG(slug, updates, returning = TriplesGeneratorClient.Result.success(()).pure[IO])
+      val glUpdated = glUpdatedProjectsGen.generateSome
+      givenUpdatingProjectInGL(slug, updates, authUser.accessToken, returning = glUpdated.asRight.pure[IO])
+      val tgUpdates = tgUpdatesGen.generateOne
+      givenTGUpdatesCalculation(updates, glUpdated, returning = tgUpdates.pure[IO])
+      givenSendingUpdateToTG(slug, tgUpdates, returning = TriplesGeneratorClient.Result.success(()).pure[IO])
 
       updater.updateProject(slug, updates, authUser).assertNoException >> {
         logger.waitFor(Error(show"Updating project $slug failed", failedResult))
@@ -261,7 +273,7 @@ class ProjectUpdaterSpec extends AsyncFlatSpec with CustomAsyncIOSpec with shoul
     givenUpdatingProjectInGL(slug,
                              updates,
                              authUser.accessToken,
-                             returning = exception.raiseError[IO, Either[Message, Unit]]
+                             returning = exception.raiseError[IO, Either[Message, Option[GLUpdatedProject]]]
     )
 
     updater
@@ -269,7 +281,7 @@ class ProjectUpdaterSpec extends AsyncFlatSpec with CustomAsyncIOSpec with shoul
       .assertThrowsError[Exception](_ shouldBe Failure.onGLUpdate(slug, exception))
   }
 
-  it should "fail if updating TG failed" in {
+  it should "fail if finding TG updates fails" in {
 
     val authUser = authUsers.generateOne
     val slug     = projectSlugs.generateOne
@@ -278,9 +290,32 @@ class ProjectUpdaterSpec extends AsyncFlatSpec with CustomAsyncIOSpec with shoul
       .suchThat(_.onlyGLUpdateNeeded)
       .generateOne
 
-    givenUpdatingProjectInGL(slug, updates, authUser.accessToken, returning = ().asRight.pure[IO])
+    val glUpdated = glUpdatedProjectsGen.generateSome
+    givenUpdatingProjectInGL(slug, updates, authUser.accessToken, returning = glUpdated.asRight.pure[IO])
+
     val exception = TriplesGeneratorClient.Result.Failure(exceptions.generateOne.getMessage)
-    givenSendingUpdateToTG(slug, updates, returning = exception.pure[IO])
+    givenTGUpdatesCalculation(updates, glUpdated, returning = exception.raiseError[IO, Nothing])
+
+    updater
+      .updateProject(slug, updates, authUser)
+      .assertThrowsError[Exception](_ shouldBe Failure.onTGUpdatesFinding(slug, exception))
+  }
+
+  it should "fail if updating TG fails" in {
+
+    val authUser = authUsers.generateOne
+    val slug     = projectSlugs.generateOne
+    val updates = projectUpdatesGen
+      .map(_.copy(newDescription = None, newKeywords = None))
+      .suchThat(_.onlyGLUpdateNeeded)
+      .generateOne
+
+    val glUpdated = glUpdatedProjectsGen.generateSome
+    givenUpdatingProjectInGL(slug, updates, authUser.accessToken, returning = glUpdated.asRight.pure[IO])
+    val tgUpdates = tgUpdatesGen.generateOne
+    givenTGUpdatesCalculation(updates, glUpdated, returning = tgUpdates.pure[IO])
+    val exception = TriplesGeneratorClient.Result.Failure(exceptions.generateOne.getMessage)
+    givenSendingUpdateToTG(slug, tgUpdates, returning = exception.pure[IO])
 
     updater
       .updateProject(slug, updates, authUser)
@@ -294,12 +329,14 @@ class ProjectUpdaterSpec extends AsyncFlatSpec with CustomAsyncIOSpec with shoul
   private val glProjectUpdater      = mock[GLProjectUpdater[IO]]
   private val tgClient              = mock[TriplesGeneratorClient[IO]]
   private val renkuCoreClient       = mock[RenkuCoreClient[IO]]
+  private val tgUpdatesFinder       = mock[TGUpdatesFinder[IO]]
   private lazy val updater = new ProjectUpdaterImpl[IO](branchProtectionCheck,
                                                         projectGitUrlFinder,
                                                         userInfoFinder,
                                                         glProjectUpdater,
                                                         tgClient,
-                                                        renkuCoreClient
+                                                        renkuCoreClient,
+                                                        tgUpdatesFinder
   )
 
   private def givenBranchProtectionChecking(slug: projects.Slug, at: UserAccessToken, returning: IO[Boolean]) =
@@ -322,23 +359,16 @@ class ProjectUpdaterSpec extends AsyncFlatSpec with CustomAsyncIOSpec with shoul
   private def givenUpdatingProjectInGL(slug:      projects.Slug,
                                        updates:   ProjectUpdates,
                                        at:        UserAccessToken,
-                                       returning: IO[Either[Message, Unit]]
+                                       returning: IO[Either[Message, Option[GLUpdatedProject]]]
   ) = (glProjectUpdater.updateProject _)
     .expects(slug, updates, at)
     .returning(returning)
 
   private def givenSendingUpdateToTG(slug:      projects.Slug,
-                                     updates:   ProjectUpdates,
+                                     updates:   TGProjectUpdates,
                                      returning: IO[TriplesGeneratorClient.Result[Unit]]
   ) = (tgClient.updateProject _)
-    .expects(
-      slug,
-      TGProjectUpdates(newDescription = updates.newDescription,
-                       newImages = updates.newImage.map(_.toList),
-                       newKeywords = updates.newKeywords,
-                       newVisibility = updates.newVisibility
-      )
-    )
+    .expects(slug, updates)
     .returning(returning)
 
   private def givenFindingCoreUri(gitUrl:    projects.GitHttpUrl,
@@ -356,4 +386,11 @@ class ProjectUpdaterSpec extends AsyncFlatSpec with CustomAsyncIOSpec with shoul
   ) = (renkuCoreClient.updateProject _)
     .expects(coreUri, updates, at)
     .returning(returning.pure[IO])
+
+  private def givenTGUpdatesCalculation(updates:               ProjectUpdates,
+                                        maybeGLUpdatedProject: Option[GLUpdatedProject],
+                                        returning:             IO[TGProjectUpdates]
+  ) = (tgUpdatesFinder.findTGProjectUpdates _)
+    .expects(updates, maybeGLUpdatedProject)
+    .returning(returning)
 }

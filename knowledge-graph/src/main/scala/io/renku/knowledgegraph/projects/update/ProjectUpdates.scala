@@ -36,6 +36,9 @@ private final case class ProjectUpdates(newDescription: Option[Option[projects.D
     (newImage orElse newVisibility).isDefined &&
       (newDescription orElse newKeywords).isEmpty
 
+  lazy val glUpdateNeeded: Boolean =
+    (newImage orElse newVisibility).isDefined
+
   lazy val coreUpdateNeeded: Boolean =
     (newDescription orElse newKeywords).isDefined
 }

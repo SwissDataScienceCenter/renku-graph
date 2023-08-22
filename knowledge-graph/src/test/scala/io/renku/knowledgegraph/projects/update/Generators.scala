@@ -31,4 +31,10 @@ private object Generators {
       maybeNewKeywords   <- projectKeywords.toGeneratorOfSet().toGeneratorOfOptions
       maybeNewVisibility <- projectVisibilities.toGeneratorOfOptions
     } yield ProjectUpdates(maybeNewDesc, maybeNewImage, maybeNewKeywords, maybeNewVisibility)
+
+  val glUpdatedProjectsGen: Gen[GLUpdatedProject] =
+    for {
+      maybeNewImage      <- imageUris.toGeneratorOfOptions
+      maybeNewVisibility <- projectVisibilities
+    } yield GLUpdatedProject(maybeNewImage, maybeNewVisibility)
 }

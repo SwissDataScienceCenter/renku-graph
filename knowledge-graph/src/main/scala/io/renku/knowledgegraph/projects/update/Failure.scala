@@ -49,6 +49,9 @@ private object Failure {
   def onGLUpdate(slug: projects.Slug, cause: Throwable): Failure =
     Failure(InternalServerError, Message.Error.unsafeApply(show"Updating project $slug in GitLab failed"), cause)
 
+  def onTGUpdatesFinding(slug: projects.Slug, cause: Throwable): Failure =
+    Failure(InternalServerError, Message.Error.unsafeApply(show"Finding TS updates for $slug failed"), cause)
+
   def onTSUpdate(slug: projects.Slug, cause: Throwable): Failure =
     Failure(InternalServerError, Message.Error.unsafeApply(show"Updating project $slug in TS failed"), cause)
 

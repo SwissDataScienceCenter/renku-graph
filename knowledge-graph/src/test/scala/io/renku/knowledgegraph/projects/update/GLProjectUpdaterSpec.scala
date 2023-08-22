@@ -25,8 +25,9 @@ import cats.syntax.all._
 import eu.timepit.refined.api.Refined
 import eu.timepit.refined.auto._
 import eu.timepit.refined.collection.NonEmpty
-import io.circe.Json
 import io.circe.literal._
+import io.circe.syntax._
+import io.circe.{Encoder, Json}
 import io.renku.data.Message
 import io.renku.generators.CommonGraphGenerators.accessTokens
 import io.renku.generators.Generators.Implicits._
@@ -55,15 +56,16 @@ class GLProjectUpdaterSpec
     with EitherValues
     with GitLabClientTools[IO] {
 
-  it should s"call GL's PUT gl/projects/:slug and return unit on success" in {
+  it should s"call GL's PUT gl/projects/:slug and return updated values on success" in {
 
-    val slug        = projectSlugs.generateOne
-    val newValues   = projectUpdatesGen.suchThat(u => u.newImage.orElse(u.newVisibility).isDefined).generateOne
-    val accessToken = accessTokens.generateOne
+    val slug           = projectSlugs.generateOne
+    val newValues      = projectUpdatesGen.suchThat(_.glUpdateNeeded).generateOne
+    val accessToken    = accessTokens.generateOne
+    val updatedProject = glUpdatedProjectsGen.generateOne
 
-    givenEditProjectAPICall(slug, newValues, accessToken, returning = ().asRight.pure[IO])
+    givenEditProjectAPICall(slug, newValues, accessToken, returning = updatedProject.asRight.pure[IO])
 
-    finder.updateProject(slug, newValues, accessToken).asserting(_.value shouldBe ())
+    finder.updateProject(slug, newValues, accessToken).asserting(_.value shouldBe updatedProject.some)
   }
 
   it should s"do nothing if neither new image nor visibility is set in the update" in {
@@ -72,7 +74,7 @@ class GLProjectUpdaterSpec
     val newValues   = projectUpdatesGen.generateOne.copy(newImage = None, newVisibility = None)
     val accessToken = accessTokens.generateOne
 
-    finder.updateProject(slug, newValues, accessToken).asserting(_.value shouldBe ())
+    finder.updateProject(slug, newValues, accessToken).asserting(_.value shouldBe None)
   }
 
   it should s"call GL's PUT gl/projects/:slug and return GL message if returned" in {
@@ -89,8 +91,10 @@ class GLProjectUpdaterSpec
       .asserting(_.left.value shouldBe error)
   }
 
-  it should "succeed if PUT gl/projects/:slug returns 200 OK" in {
-    mapResponse(Ok, Request[IO](), Response[IO]()).asserting(_.value shouldBe ())
+  it should "succeed and return updated values if PUT gl/projects/:slug returns 200 OK" in {
+    val updatedProject = glUpdatedProjectsGen.generateOne
+    mapResponse(Ok, Request[IO](), Response[IO]().withEntity(updatedProject.asJson))
+      .asserting(_.value shouldBe updatedProject)
   }
 
   it should "return left if PUT gl/projects/:slug returns 400 BAD_REQUEST with an error" in {
@@ -115,11 +119,11 @@ class GLProjectUpdaterSpec
   private def givenEditProjectAPICall(slug:        projects.Slug,
                                       newValues:   ProjectUpdates,
                                       accessToken: AccessToken,
-                                      returning:   IO[Either[Message, Unit]]
+                                      returning:   IO[Either[Message, GLUpdatedProject]]
   ) = {
     val endpointName: String Refined NonEmpty = "edit-project"
     (glClient
-      .put(_: Uri, _: String Refined NonEmpty, _: UrlForm)(_: ResponseMappingF[IO, Either[Message, Unit]])(
+      .put(_: Uri, _: String Refined NonEmpty, _: UrlForm)(_: ResponseMappingF[IO, Either[Message, GLUpdatedProject]])(
         _: Option[AccessToken]
       ))
       .expects(uri"projects" / slug, endpointName, toUrlForm(newValues), *, accessToken.some)
@@ -135,7 +139,7 @@ class GLProjectUpdaterSpec
     )
   }
 
-  private lazy val mapResponse: ResponseMappingF[IO, Either[Message, Unit]] =
+  private lazy val mapResponse: ResponseMappingF[IO, Either[Message, GLUpdatedProject]] =
     captureMapping(glClient)(
       finder
         .updateProject(projectSlugs.generateOne,
@@ -143,7 +147,15 @@ class GLProjectUpdaterSpec
                        accessTokens.generateOne
         )
         .unsafeRunSync(),
-      ().asRight[Message],
+      glUpdatedProjectsGen.generateOne.asRight[Message],
       method = PUT
     )
+
+  private implicit lazy val responseEncoder: Encoder[GLUpdatedProject] = Encoder.instance {
+    case GLUpdatedProject(image, visibility) =>
+      json"""{
+        "avatar_url": $image,
+        "visibility": $visibility
+      }"""
+  }
 }

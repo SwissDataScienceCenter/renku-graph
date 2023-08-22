@@ -42,7 +42,8 @@ private object ProjectUpdater {
                                   UserInfoFinder[F],
                                   GLProjectUpdater[F],
                                   _,
-                                  _
+                                  _,
+                                  TGUpdatesFinder[F]
         )
       )
 }
@@ -52,39 +53,43 @@ private class ProjectUpdaterImpl[F[_]: Async: NonEmptyParallel: Logger](branchPr
                                                                         userInfoFinder:      UserInfoFinder[F],
                                                                         glProjectUpdater:    GLProjectUpdater[F],
                                                                         tgClient:            TriplesGeneratorClient[F],
-                                                                        renkuCoreClient:     RenkuCoreClient[F]
+                                                                        renkuCoreClient:     RenkuCoreClient[F],
+                                                                        tgUpdatesFinder:     TGUpdatesFinder[F]
 ) extends ProjectUpdater[F] {
 
   override def updateProject(slug: projects.Slug, updates: ProjectUpdates, authUser: AuthUser): F[Unit] =
     if (updates.onlyGLUpdateNeeded)
-      updateGL(slug, updates, authUser) >> updateTG(slug, updates)
+      updateGL(slug, updates, authUser)
+        .flatMap(findTGUpdates(slug, updates, _))
+        .flatMap(updateTG(slug, _))
     else
       canPushToDefaultBranch(slug, authUser) >> {
         for {
           coreUpdates <- findCoreProjectUpdates(slug, updates, authUser)
           coreUri     <- findCoreUri(coreUpdates, authUser)
           _           <- updateCore(slug, coreUri, coreUpdates, authUser)
-          _           <- updateGL(slug, updates, authUser)
-          _           <- updateTG(slug, updates)
+          updated     <- updateGL(slug, updates, authUser)
+          tgUpdates   <- findTGUpdates(slug, updates, updated)
+          _           <- updateTG(slug, tgUpdates)
         } yield ()
       }
 
-  private def updateGL(slug: projects.Slug, updates: ProjectUpdates, authUser: AuthUser): F[Unit] =
+  private def updateGL(slug: projects.Slug, updates: ProjectUpdates, authUser: AuthUser): F[Option[GLUpdatedProject]] =
     glProjectUpdater
       .updateProject(slug, updates, authUser.accessToken)
       .adaptError(Failure.onGLUpdate(slug, _))
-      .flatMap(_.fold(errMsg => Failure.badRequestOnGLUpdate(errMsg).raiseError[F, Unit], _.pure[F]))
+      .flatMap(_.fold(err => Failure.badRequestOnGLUpdate(err).raiseError[F, Option[GLUpdatedProject]], _.pure[F]))
 
-  private def updateTG(slug: projects.Slug, updates: ProjectUpdates): F[Unit] =
+  private def findTGUpdates(slug:                  projects.Slug,
+                            updates:               ProjectUpdates,
+                            maybeGLUpdatedProject: Option[GLUpdatedProject]
+  ) = tgUpdatesFinder
+    .findTGProjectUpdates(updates, maybeGLUpdatedProject)
+    .adaptError(Failure.onTGUpdatesFinding(slug, _))
+
+  private def updateTG(slug: projects.Slug, updates: TGProjectUpdates): F[Unit] =
     tgClient
-      .updateProject(
-        slug,
-        TGProjectUpdates(newDescription = updates.newDescription,
-                         newImages = updates.newImage.map(_.toList),
-                         newKeywords = updates.newKeywords,
-                         newVisibility = updates.newVisibility
-        )
-      )
+      .updateProject(slug, updates)
       .map(_.toEither)
       .handleError(_.asLeft)
       .flatMap(_.fold(Failure.onTSUpdate(slug, _).raiseError[F, Unit], _.pure[F]))
