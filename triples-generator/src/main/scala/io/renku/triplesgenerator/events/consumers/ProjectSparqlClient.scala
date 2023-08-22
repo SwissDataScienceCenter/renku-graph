@@ -19,9 +19,13 @@
 package io.renku.triplesgenerator.events.consumers
 
 import cats.effect._
+import cats.syntax.all._
+import eu.timepit.refined.api.Refined
+import eu.timepit.refined.collection.NonEmpty
+import eu.timepit.refined.auto._
 import fs2.io.net.Network
 import io.renku.jsonld.JsonLD
-import io.renku.triplesstore.ProjectsConnectionConfig
+import io.renku.triplesstore.{ProjectsConnectionConfig, SparqlQueryTimeRecorder}
 import io.renku.triplesstore.client.http.{Retry, SparqlClient, SparqlQuery, SparqlUpdate}
 import org.typelevel.log4cats.Logger
 
@@ -29,17 +33,44 @@ import org.typelevel.log4cats.Logger
 trait ProjectSparqlClient[F[_]] extends SparqlClient[F]
 
 object ProjectSparqlClient {
-  def apply[F[_]: Network: Async: Logger](
+  def apply[F[_]: Network: Async: Logger: SparqlQueryTimeRecorder](
       cc:       ProjectsConnectionConfig,
       retryCfg: Retry.RetryConfig = Retry.RetryConfig.default
   ): Resource[F, ProjectSparqlClient[F]] = {
     val cfg = cc.toCC(Some(retryCfg))
+    val rec = SparqlQueryTimeRecorder[F].instance
     SparqlClient[F](cfg).map(c =>
       new ProjectSparqlClient[F] {
-        override def update(request: SparqlUpdate) = c.update(request)
-        override def upload(data:    JsonLD)       = c.upload(data)
-        override def query(request:  SparqlQuery)  = c.query(request)
+        override def update(request: SparqlUpdate) = {
+          val label = histogramLabel(request)
+          val work  = c.update(request)
+          rec
+            .measureExecutionTime(work, label)
+            .flatMap(rec.logExecutionTime(s"Execute sparql update '$label'"))
+        }
+
+        override def upload(data: JsonLD) = {
+          val label: String Refined NonEmpty = "jsonld upload"
+          val work = c.upload(data)
+          rec
+            .measureExecutionTime(work, label.some)
+            .flatMap(rec.logExecutionTime("Execute JSONLD upload"))
+        }
+
+        override def query(request: SparqlQuery) = {
+          val label = histogramLabel(request)
+          val work  = c.query(request)
+          rec
+            .measureExecutionTime(work, label)
+            .flatMap(rec.logExecutionTime(s"Execute sparql query '$label'"))
+        }
       }
     )
   }
+
+  private def histogramLabel(r: Any): Option[String Refined NonEmpty] =
+    r match {
+      case q: io.renku.triplesstore.SparqlQuery => q.name.some
+      case _ => None
+    }
 }
