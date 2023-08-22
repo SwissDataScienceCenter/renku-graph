@@ -25,6 +25,7 @@ import io.renku.graph.model.Schemas.schema
 import io.renku.graph.model.entities.Person
 import io.renku.graph.model.persons.{GitLabId, ResourceId}
 import io.renku.graph.model.{GraphClass, persons}
+import io.renku.triplesgenerator.gitlab.GitLabProjectMember
 import io.renku.triplesstore.ResultsDecoder._
 import io.renku.triplesstore.SparqlQuery.Prefixes
 import io.renku.triplesstore._
@@ -69,6 +70,11 @@ private class KGPersonFinderImpl[F[_]: Async: Logger: SparqlQueryTimeRecorder](
 }
 
 private object KGPersonFinder {
+  def apply[F[_]: Async: Logger: SparqlQueryTimeRecorder](
+      projectsConnectionConfig: ProjectsConnectionConfig
+  ): KGPersonFinder[F] =
+    new KGPersonFinderImpl(projectsConnectionConfig)
+
   def apply[F[_]: Async: Logger: SparqlQueryTimeRecorder]: F[KGPersonFinder[F]] =
     ProjectsConnectionConfig[F]().map(new KGPersonFinderImpl(_))
 }

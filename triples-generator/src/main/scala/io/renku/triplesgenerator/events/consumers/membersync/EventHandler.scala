@@ -21,6 +21,7 @@ package membersync
 
 import cats.effect.{Async, MonadCancelThrow}
 import cats.syntax.all._
+import fs2.io.net.Network
 import io.renku.events.{CategoryName, consumers}
 import io.renku.events.consumers.ProcessExecutor
 import io.renku.events.consumers.subscriptions.SubscriptionMechanism
@@ -62,12 +63,15 @@ private object EventHandler {
 
   import eu.timepit.refined.auto._
 
-  def apply[F[_]: Async: ReProvisioningStatus: GitLabClient: AccessTokenFinder: SparqlQueryTimeRecorder: Logger](
+  def apply[F[
+      _
+  ]: Async: Network: ReProvisioningStatus: GitLabClient: AccessTokenFinder: SparqlQueryTimeRecorder: Logger](
       subscriptionMechanism: SubscriptionMechanism[F],
-      tsWriteLock:           TsWriteLock[F]
+      tsWriteLock:           TsWriteLock[F],
+      projectSparqlClient:   ProjectSparqlClient[F]
   ): F[consumers.EventHandler[F]] = for {
     tsReadinessChecker  <- TSReadinessForEventsChecker[F]
-    membersSynchronizer <- MembersSynchronizer[F]
+    membersSynchronizer <- MembersSynchronizer[F](projectSparqlClient)
     processExecutor     <- ProcessExecutor.concurrent(processesCount = 1)
   } yield new EventHandler[F](
     categoryName,

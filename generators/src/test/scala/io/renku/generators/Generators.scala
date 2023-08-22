@@ -18,15 +18,18 @@
 
 package io.renku.generators
 
+import cats.arrow.FunctionK
 import cats.data.NonEmptyList
+import cats.effect.IO
 import cats.syntax.all._
-import cats.{Applicative, Functor, Monad, Semigroupal}
+import cats.{Applicative, Functor, Monad, Semigroupal, ~>}
 import com.comcast.ip4s.Port
 import eu.timepit.refined.api.Refined
 import eu.timepit.refined.auto._
 import eu.timepit.refined.collection.NonEmpty
 import eu.timepit.refined.numeric.{Negative, NonNegative, NonPositive, Positive}
 import eu.timepit.refined.string.Url
+import fs2.Stream
 import io.circe.{Encoder, Json}
 import org.scalacheck.Gen._
 import org.scalacheck.{Arbitrary, Gen}
@@ -354,6 +357,9 @@ object Generators {
       def generateNonEmptyList(min: Int = 1, max: Int = 5): NonEmptyList[T] =
         generateExample(nonEmptyList(generator, min, max))
 
+      def asStream: Stream[Gen, T] =
+        Stream.eval(generator) ++ asStream
+
       def generateOption: Option[T] = Gen.option(generator).sample getOrElse generateOption
 
       def generateSome: Option[T] = Option(generator.generateOne)
@@ -408,6 +414,15 @@ object Generators {
           case Some(value) => value.map(Gen.const)
           case None        => sequence
         }
+    }
+
+    private def runGen[A](ga: Gen[A]): IO[A] = IO(ga.generateOne)
+
+    private val genToIO: Gen ~> IO =
+      FunctionK.lift[Gen, IO](runGen)
+
+    implicit class GenStreamOps[A](gens: Stream[Gen, A]) {
+      def toIO: Stream[IO, A] = gens.translate(genToIO)
     }
 
     implicit def asArbitrary[T](implicit generator: Gen[T]): Arbitrary[T] = Arbitrary(generator)

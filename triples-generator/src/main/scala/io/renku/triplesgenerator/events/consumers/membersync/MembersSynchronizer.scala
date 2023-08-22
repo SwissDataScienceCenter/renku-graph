@@ -26,6 +26,8 @@ import io.renku.graph.tokenrepository.AccessTokenFinder
 import io.renku.http.client.{AccessToken, GitLabClient}
 import io.renku.logging.ExecutionTimeRecorder
 import io.renku.logging.ExecutionTimeRecorder.ElapsedTime
+import io.renku.triplesgenerator.events.consumers.ProjectSparqlClient
+import io.renku.triplesgenerator.gitlab.GitLabProjectMembersFinder
 import io.renku.triplesstore._
 import org.typelevel.log4cats.Logger
 
@@ -69,10 +71,12 @@ private class MembersSynchronizerImpl[F[_]: MonadThrow: AccessTokenFinder: Logge
 }
 
 private object MembersSynchronizer {
-  def apply[F[_]: Async: GitLabClient: AccessTokenFinder: Logger: SparqlQueryTimeRecorder]: F[MembersSynchronizer[F]] =
+  def apply[F[_]: Async: GitLabClient: AccessTokenFinder: Logger: SparqlQueryTimeRecorder](
+      projectSparqlClient: ProjectSparqlClient[F]
+  ): F[MembersSynchronizer[F]] =
     for {
       gitLabProjectMembersFinder <- GitLabProjectMembersFinder[F]
-      kgSynchronizer             <- namedgraphs.KGSynchronizer[F]
+      kgSynchronizer             <- namedgraphs.KGSynchronizer[F](projectSparqlClient)
       executionTimeRecorder      <- ExecutionTimeRecorder[F](maybeHistogram = None)
     } yield new MembersSynchronizerImpl[F](gitLabProjectMembersFinder, kgSynchronizer, executionTimeRecorder)
 }

@@ -16,7 +16,7 @@
  * limitations under the License.
  */
 
-package io.renku.triplesgenerator.events.consumers.membersync
+package io.renku.triplesgenerator.gitlab
 
 /*
  * Copyright 2021 Swiss Data Science Center (SDSC)
@@ -55,7 +55,7 @@ import io.renku.http.tinytypes.TinyTypeURIEncoder._
 import io.renku.interpreters.TestLogger
 import io.renku.stubbing.ExternalServiceStubbing
 import io.renku.testtools.{GitLabClientTools, IOSpec}
-import io.renku.triplesgenerator.events.consumers.membersync.Generators._
+import io.renku.triplesgenerator.gitlab.Generators._
 import org.http4s.Status.{Forbidden, Unauthorized}
 import org.http4s.implicits.http4sLiteralsSyntax
 import org.http4s.{Header, Headers, Request, Response, Status, Uri}
@@ -195,7 +195,8 @@ class GitLabProjectMembersFinderSpec
       json"""{
         "id":       ${member.gitLabId.value},
         "username": ${member.name.value},
-        "name":     ${member.name.value}
+        "name":     ${member.name.value},
+        "access_level": ${member.accessLevel}
       }"""
   }
 }

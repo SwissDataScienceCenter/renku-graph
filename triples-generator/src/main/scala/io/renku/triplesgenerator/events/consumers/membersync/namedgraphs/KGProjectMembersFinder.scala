@@ -75,6 +75,14 @@ private class KGProjectMembersFinderImpl[F[_]: Async: Logger: SparqlQueryTimeRec
 }
 
 private object KGProjectMembersFinder {
+  def apply[F[_]: Async: Logger: SparqlQueryTimeRecorder](
+      connectionConfig: ProjectsConnectionConfig,
+      renkuUrl:         RenkuUrl
+  ): KGProjectMembersFinder[F] = {
+    implicit val url: RenkuUrl = renkuUrl
+    new KGProjectMembersFinderImpl[F](connectionConfig)
+  }
+
   def apply[F[_]: Async: Logger: SparqlQueryTimeRecorder]: F[KGProjectMembersFinder[F]] = for {
     connectionConfig              <- ProjectsConnectionConfig[F]()
     implicit0(renkuUrl: RenkuUrl) <- RenkuUrlLoader[F]()
