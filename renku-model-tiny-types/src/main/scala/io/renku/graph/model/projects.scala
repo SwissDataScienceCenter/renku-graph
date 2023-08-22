@@ -210,7 +210,6 @@ object projects {
       with NonBlank[Keyword]
       with NonBlankTTJsonLDOps[Keyword]
 
-
   sealed trait Role extends Ordered[Role] {
     def asString: String
   }
@@ -254,14 +253,14 @@ object projects {
       accessLevel match {
         case n if n >= 50 => Owner
         case n if n >= 40 => Maintainer
-        case _ => Reader
+        case _            => Reader
       }
 
     def toGitLabAccessLevel(role: Role): Int =
       role match {
-        case Role.Owner => 50
+        case Role.Owner      => 50
         case Role.Maintainer => 40
-        case Role.Reader => 20
+        case Role.Reader     => 20
       }
 
     implicit val ordering: Ordering[Role] =
