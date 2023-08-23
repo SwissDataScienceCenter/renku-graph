@@ -42,11 +42,14 @@ import org.http4s.Method.PUT
 import org.http4s.Status.{BadRequest, Ok}
 import org.http4s.circe.CirceEntityEncoder._
 import org.http4s.implicits._
-import org.http4s.{Request, Response, Uri, UrlForm}
+import org.http4s.multipart.Multipart
+import org.http4s.{Request, Response, Uri}
+import org.scalamock.matchers.ArgCapture.CaptureOne
 import org.scalamock.scalatest.AsyncMockFactory
-import org.scalatest.EitherValues
 import org.scalatest.flatspec.AsyncFlatSpec
 import org.scalatest.matchers.should
+import org.scalatest.{EitherValues, OptionValues, Succeeded}
+import scodec.bits.ByteVector
 
 class GLProjectUpdaterSpec
     extends AsyncFlatSpec
@@ -54,6 +57,7 @@ class GLProjectUpdaterSpec
     with AsyncMockFactory
     with should.Matchers
     with EitherValues
+    with OptionValues
     with GitLabClientTools[IO] {
 
   it should s"call GL's PUT gl/projects/:slug and return updated values on success" in {
@@ -63,9 +67,12 @@ class GLProjectUpdaterSpec
     val accessToken    = accessTokens.generateOne
     val updatedProject = glUpdatedProjectsGen.generateOne
 
-    givenEditProjectAPICall(slug, newValues, accessToken, returning = updatedProject.asRight.pure[IO])
+    val multipartCaptor = givenEditProjectAPICall(slug, accessToken, returning = updatedProject.asRight.pure[IO])
 
-    finder.updateProject(slug, newValues, accessToken).asserting(_.value shouldBe updatedProject.some)
+    finder
+      .updateProject(slug, newValues, accessToken)
+      .asserting(_.value shouldBe updatedProject.some)
+      .flatMap(_ => verifyRequest(multipartCaptor, newValues))
   }
 
   it should s"do nothing if neither new image nor visibility is set in the update" in {
@@ -80,15 +87,13 @@ class GLProjectUpdaterSpec
   it should s"call GL's PUT gl/projects/:slug and return GL message if returned" in {
 
     val slug        = projectSlugs.generateOne
-    val newValues   = projectUpdatesGen.suchThat(u => u.newImage.orElse(u.newVisibility).isDefined).generateOne
+    val newValues   = projectUpdatesGen.suchThat(u => u.glUpdateNeeded).generateOne
     val accessToken = accessTokens.generateOne
 
     val error = Message.Error.fromJsonUnsafe(jsons.generateOne)
-    givenEditProjectAPICall(slug, newValues, accessToken, returning = error.asLeft.pure[IO])
+    givenEditProjectAPICall(slug, accessToken, returning = error.asLeft.pure[IO])
 
-    finder
-      .updateProject(slug, newValues, accessToken)
-      .asserting(_.left.value shouldBe error)
+    finder.updateProject(slug, newValues, accessToken).asserting(_.left.value shouldBe error)
   }
 
   it should "succeed and return updated values if PUT gl/projects/:slug returns 200 OK" in {
@@ -117,26 +122,18 @@ class GLProjectUpdaterSpec
   private lazy val finder = new GLProjectUpdaterImpl[IO]
 
   private def givenEditProjectAPICall(slug:        projects.Slug,
-                                      newValues:   ProjectUpdates,
                                       accessToken: AccessToken,
                                       returning:   IO[Either[Message, GLUpdatedProject]]
   ) = {
+    val multipartCaptor = CaptureOne[Multipart[IO]]()
     val endpointName: String Refined NonEmpty = "edit-project"
     (glClient
-      .put(_: Uri, _: String Refined NonEmpty, _: UrlForm)(_: ResponseMappingF[IO, Either[Message, GLUpdatedProject]])(
-        _: Option[AccessToken]
-      ))
-      .expects(uri"projects" / slug, endpointName, toUrlForm(newValues), *, accessToken.some)
+      .put(_: Uri, _: String Refined NonEmpty, _: Multipart[IO])(
+        _: ResponseMappingF[IO, Either[Message, GLUpdatedProject]]
+      )(_: Option[AccessToken]))
+      .expects(uri"projects" / slug, endpointName, capture(multipartCaptor), *, accessToken.some)
       .returning(returning)
-  }
-
-  private def toUrlForm: ProjectUpdates => UrlForm = { case ProjectUpdates(_, newImage, _, newVisibility) =>
-    UrlForm(
-      List(
-        newImage.map("avatar" -> _.fold[String](null)(_.value)),
-        newVisibility.map("visibility" -> _.value)
-      ).flatten: _*
-    )
+    multipartCaptor
   }
 
   private lazy val mapResponse: ResponseMappingF[IO, Either[Message, GLUpdatedProject]] =
@@ -150,6 +147,31 @@ class GLProjectUpdaterSpec
       glUpdatedProjectsGen.generateOne.asRight[Message],
       method = PUT
     )
+
+  private def verifyRequest(multipartCaptor: CaptureOne[Multipart[IO]], newValues: ProjectUpdates) = {
+
+    val parts = multipartCaptor.value.parts
+
+    def findPart(name: String) =
+      parts
+        .find(_.name.value == name)
+        .getOrElse(fail(s"No '$name' part"))
+
+    val visCheck = newValues.newVisibility
+      .map(v => findPart("visibility").as[String].asserting(_ shouldBe v.value))
+      .getOrElse(Succeeded.pure[IO])
+
+    val imageCheck = newValues.newImage
+      .map {
+        case None =>
+          findPart("avatar").body.covary[IO].compile.toList.asserting(_ shouldBe Nil)
+        case Some(v) =>
+          findPart("avatar").as[ByteVector].asserting(_ shouldBe v.data)
+      }
+      .getOrElse(Succeeded.pure[IO])
+
+    visCheck >> imageCheck
+  }
 
   private implicit lazy val responseEncoder: Encoder[GLUpdatedProject] = Encoder.instance {
     case GLUpdatedProject(image, visibility) =>

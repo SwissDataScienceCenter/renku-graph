@@ -18,16 +18,18 @@
 
 package io.renku.knowledgegraph.projects.update
 
+import ProjectUpdates.Image
 import cats.syntax.all._
 import io.circe.syntax._
 import io.circe.{Decoder, DecodingFailure, Encoder, Json}
-import io.renku.graph.model.images.ImageUri
 import io.renku.graph.model.projects
 import io.renku.tinytypes.json.TinyTypeDecoders._
 import io.renku.tinytypes.{From, TinyType}
+import org.http4s.MediaType
+import scodec.bits.ByteVector
 
 private final case class ProjectUpdates(newDescription: Option[Option[projects.Description]],
-                                        newImage:       Option[Option[ImageUri]],
+                                        newImage:       Option[Option[Image]],
                                         newKeywords:    Option[Set[projects.Keyword]],
                                         newVisibility:  Option[projects.Visibility]
 ) {
@@ -47,19 +49,20 @@ private object ProjectUpdates {
 
   lazy val empty: ProjectUpdates = ProjectUpdates(None, None, None, None)
 
-  implicit val encoder: Encoder[ProjectUpdates] = Encoder.instance {
-    case ProjectUpdates(newDescription, newImage, newKeywords, newVisibility) =>
+  final case class Image(name: String, mediaType: MediaType, data: ByteVector)
+
+  implicit val jsonEncoder: Encoder[ProjectUpdates] = Encoder.instance {
+    case ProjectUpdates(newDescription, _, newKeywords, newVisibility) =>
       Json.obj(
         List(
           newDescription.map(v => "description" -> v.fold(Json.Null)(_.asJson)),
-          newImage.map(v => "image" -> v.fold(Json.Null)(_.asJson)),
           newKeywords.map(v => "keywords" -> v.asJson),
           newVisibility.map(v => "visibility" -> v.asJson)
         ).flatten: _*
       )
   }
 
-  implicit val decoder: Decoder[ProjectUpdates] =
+  implicit val jsonDecoder: Decoder[ProjectUpdates] =
     Decoder.instance { cur =>
       def toOptionOfOption[T <: TinyType { type V = String }](prop: String, ttFactory: From[T]) =
         cur
@@ -71,9 +74,8 @@ private object ProjectUpdates {
 
       for {
         newDesc       <- toOptionOfOption("description", projects.Description)
-        newImage      <- toOptionOfOption("image", ImageUri)
         newKeywords   <- cur.downField("keywords").as[Option[List[projects.Keyword]]].map(_.map(_.toSet))
         newVisibility <- cur.downField("visibility").as[Option[projects.Visibility]]
-      } yield ProjectUpdates(newDesc, newImage, newKeywords, newVisibility)
+      } yield ProjectUpdates(newDesc, newImage = None, newKeywords, newVisibility)
     }
 }

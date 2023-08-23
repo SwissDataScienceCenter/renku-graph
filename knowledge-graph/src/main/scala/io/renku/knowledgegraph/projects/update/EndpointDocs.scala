@@ -34,7 +34,8 @@ object EndpointDocs extends docs.EndpointDocs {
       "Project Update",
       """|API to update project data.
          |
-         |Each of the properties can be either set to a new value or omitted in case there's no new value.
+         |Each of the properties can be either set to a new value or omitted in case there's no new value for it.
+         |The new values should be sent as a `multipart/form-data` in case there's new image or as JSON in case no update for an image is needed.
          |
          |The properties that can be updated are:
          |* description - possible values are:
@@ -42,7 +43,7 @@ object EndpointDocs extends docs.EndpointDocs {
          |  * any non-blank String value
          |* image - possible values are:
          |  * `null` for removing the current image
-         |  * any relative or absolute link to the image
+         |  * any file content
          |* keywords - an array of String values; an empty array removes all the keywords
          |* visibility - possible values are: `public`, `internal`, `private`
          |
@@ -57,10 +58,17 @@ object EndpointDocs extends docs.EndpointDocs {
             Schema.`Object`(properties = Map("visibility" -> Schema.EnumString(projects.Visibility.all.map(_.value)))),
             json"""{
               "description": "a new project description",
-              "image":       "image.png",
               "keywords":    ["keyword1", "keyword2"],
               "visibility":  "public|internal|private"
             }"""
+          ),
+          MediaType.`multipart/form-data`(
+            "Form data example",
+            """|'description="a new project description"';
+               |'keywords=[keyword1,keyword2]';
+               |'visibility="public|internal|private"';
+               |'image=@"path-to-my-image"'
+               |""".stripMargin
           )
         )
       ),

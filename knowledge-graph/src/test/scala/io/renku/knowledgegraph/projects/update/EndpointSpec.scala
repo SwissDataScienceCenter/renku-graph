@@ -42,11 +42,11 @@ import org.scalatest.matchers.should
 
 class EndpointSpec extends AsyncFlatSpec with CustomAsyncIOSpec with should.Matchers with AsyncMockFactory {
 
-  it should "update the project and return Accepted on success" in {
+  it should "decode the JSON payload, update the project and return Accepted on success" in {
 
     val authUser = authUsers.generateOne
     val slug     = projectSlugs.generateOne
-    val updates  = projectUpdatesGen.generateOne
+    val updates  = projectUpdatesGen.suchThat(_.newImage.isEmpty).generateOne
 
     givenUpdatingProject(slug, updates, authUser, returning = ().pure[IO])
 
@@ -75,7 +75,7 @@ class EndpointSpec extends AsyncFlatSpec with CustomAsyncIOSpec with should.Matc
 
     val authUser = authUsers.generateOne
     val slug     = projectSlugs.generateOne
-    val updates  = projectUpdatesGen.generateOne
+    val updates  = projectUpdatesGen.suchThat(_.newImage.isEmpty).generateOne
 
     val failure = Gen
       .oneOf(
@@ -96,7 +96,7 @@ class EndpointSpec extends AsyncFlatSpec with CustomAsyncIOSpec with should.Matc
 
     val authUser = authUsers.generateOne
     val slug     = projectSlugs.generateOne
-    val updates  = projectUpdatesGen.generateOne
+    val updates  = projectUpdatesGen.suchThat(_.newImage.isEmpty).generateOne
 
     val exception = exceptions.generateOne
     givenUpdatingProject(slug, updates, authUser, returning = exception.raiseError[IO, Nothing])

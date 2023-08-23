@@ -18,10 +18,12 @@
 
 package io.renku.knowledgegraph.projects.update
 
+import ProjectUpdates.Image
 import cats.MonadThrow
 import cats.effect.Async
 import cats.syntax.all._
 import eu.timepit.refined.auto._
+import fs2.Chunk
 import io.circe.{Decoder, Json}
 import io.renku.data.Message
 import io.renku.graph.model.projects
@@ -30,8 +32,11 @@ import io.renku.http.tinytypes.TinyTypeURIEncoder._
 import org.http4s.Status._
 import org.http4s.circe.CirceEntityDecoder._
 import org.http4s.circe.jsonOf
+import org.http4s.headers.{`Content-Disposition`, `Content-Type`}
 import org.http4s.implicits._
-import org.http4s.{Request, Response, Status, UrlForm}
+import org.http4s.multipart.{Multipart, Multiparts, Part}
+import org.http4s.{Headers, MediaType, Request, Response, Status}
+import org.typelevel.ci._
 
 private trait GLProjectUpdater[F[_]] {
   def updateProject(slug:    projects.Slug,
@@ -50,17 +55,38 @@ private class GLProjectUpdaterImpl[F[_]: Async: GitLabClient] extends GLProjectU
                              updates: ProjectUpdates,
                              at:      AccessToken
   ): F[Either[Message, Option[GLUpdatedProject]]] =
-    if (updates.glUpdateNeeded)
-      GitLabClient[F]
-        .put(uri"projects" / slug, "edit-project", toUrlForm(updates))(mapResponse)(at.some)
-        .map(_.map(_.some))
-    else
+    if (updates.glUpdateNeeded) {
+      implicit val token: Option[AccessToken] = at.some
+      toMultipart(updates)
+        .flatMap(
+          GitLabClient[F]
+            .put(uri"projects" / slug, "edit-project", _)(mapResponse)
+            .map(_.map(_.some))
+        )
+    } else
       Option.empty[GLUpdatedProject].asRight[Message].pure[F]
 
-  private def toUrlForm: ProjectUpdates => UrlForm = { case ProjectUpdates(_, newImage, _, newVisibility) =>
-    UrlForm.empty
-      .updateFormField("avatar", newImage.map(_.fold[String](ifEmpty = null)(_.value)))
-      .updateFormField("visibility", newVisibility.map(_.value))
+  private def toMultipart: ProjectUpdates => F[Multipart[F]] = { case ProjectUpdates(_, newImage, _, newVisibility) =>
+    val maybeVisibilityPart =
+      newVisibility.map(v => Part.formData[F]("visibility", v.value))
+
+    val maybeAvatarPart =
+      newImage.map(
+        _.fold(
+          Part[F](
+            Headers(`Content-Disposition`("form-data", Map(ci"name" -> "avatar")),
+                    `Content-Type`(MediaType.image.jpeg)
+            ),
+            fs2.Stream.empty
+          )
+        ) { case Image(name, mediaType, data) =>
+          Part.fileData[F]("avatar", name, fs2.Stream.chunk(Chunk.byteVector(data)), `Content-Type`(mediaType))
+        }
+      )
+
+    Multiparts
+      .forSync[F]
+      .flatMap(_.multipart(Vector(maybeVisibilityPart, maybeAvatarPart).flatten))
   }
 
   private lazy val mapResponse

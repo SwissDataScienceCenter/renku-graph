@@ -80,10 +80,10 @@ class ProjectUpdatesSpec extends AnyWordSpec with should.Matchers with ScalaChec
     }
   }
 
-  "encode/decode" should {
+  "JSON encode/decode" should {
 
     "encode/decode all standard cases" in {
-      forAll(projectUpdatesGen) { updates =>
+      forAll(projectUpdatesGen.suchThat(_.newImage.isEmpty)) { updates =>
         updates.asJson.hcursor.as[ProjectUpdates].value shouldBe updates
       }
     }
@@ -120,22 +120,6 @@ class ProjectUpdatesSpec extends AnyWordSpec with should.Matchers with ScalaChec
       updates.asJson shouldBe json"""{}"""
 
       updates.asJson.hcursor.as[ProjectUpdates].value shouldBe updates
-    }
-
-    "image = null to be considered as image removal" in {
-
-      val updates = ProjectUpdates.empty.copy(newImage = Some(None))
-
-      updates.asJson shouldBe json"""{"image":  null}"""
-
-      updates.asJson.hcursor.as[ProjectUpdates].value shouldBe updates
-    }
-
-    "image with a blank value to be considered as image removal" in {
-
-      val json = json"""{"image":  ${blankStrings().generateOne}}"""
-
-      json.asJson.hcursor.as[ProjectUpdates].value shouldBe ProjectUpdates.empty.copy(newImage = Some(None))
     }
   }
 }

@@ -815,7 +815,8 @@ Response body example for `Accept: application/ld+json`:
 
 API to update project data.
 
-Each of the properties can be either set to a new value or omitted in case there's no new value.
+Each of the properties can be either set to a new value or omitted in case there's no new value for it.
+The new values should be sent as a `multipart/form-data` in case there's new image or as JSON in case no update for an image is needed.
 
 The properties that can be updated are:
 * description - possible values are:
@@ -823,7 +824,7 @@ The properties that can be updated are:
   * any non-blank String value
 * image - possible values are:
   * `null` for removing the current image
-  * any relative or absolute link to the image
+  * any file content
 * keywords - an array of String values; an empty array removes all the keywords
 * visibility - possible values are: `public`, `internal`, `private`
 
@@ -835,14 +836,18 @@ The endpoint requires an authorization token to be passed. Supported headers are
 
 **Request**
 
+* case when there's no update for the image (with `Content-Type: application/json`) 
+
 ```json
 {
   "description": "a new project description",
-  "image":       "image.png",
   "keywords":    ["keyword1", "keyword2"],
   "visibility":  "public|internal|private"
 }
 ```
+
+* case when there's an update for the image (with `Content-Type: multipart/form-data`) each parameter has to be listed as a form data field.
+The `image` field has to contain the file data.
 
 **Response**
 

@@ -22,7 +22,7 @@ import cats.Show
 import cats.syntax.all._
 import io.circe.{Encoder, Json}
 import io.renku.jsonld.JsonLD
-import io.renku.knowledgegraph.docs.model.Example.{JsonExample, JsonLDExample}
+import io.renku.knowledgegraph.docs.model.Example.{JsonExample, JsonLDExample, StringExample}
 import io.renku.knowledgegraph.docs.model.OAuthFlows.OAuthFlow
 import io.renku.knowledgegraph.docs.model.Path.OpMapping
 
@@ -340,6 +340,9 @@ object model {
 
     def `application/json`: MediaType =
       MediaType.WithoutSchema("application/json", Map.empty)
+
+    def `multipart/form-data`(exampleName: String, example: String): MediaType =
+      MediaType.WithoutSchema("multipart/form-data", Map(exampleName -> StringExample(example)))
   }
 
   final case class Response(

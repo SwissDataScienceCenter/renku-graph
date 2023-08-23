@@ -28,8 +28,10 @@ import io.renku.graph.model.projects
 import io.renku.http.client.GitLabClient
 import io.renku.http.server.security.model.AuthUser
 import io.renku.metrics.MetricsRegistry
+import org.http4s.MediaType.application
 import org.http4s.circe.CirceEntityDecoder._
 import org.http4s.dsl.Http4sDsl
+import org.http4s.headers.`Content-Type`
 import org.http4s.{Request, Response}
 import org.typelevel.log4cats.Logger
 
@@ -56,13 +58,22 @@ private class EndpointImpl[F[_]: Async: Logger](projectUpdater: ProjectUpdater[F
       .merge
       .handleErrorWith(relevantError(slug)(_))
 
-  private lazy val decodePayload: Request[F] => EitherT[F, Response[F], ProjectUpdates] = req =>
-    EitherT {
-      req
-        .as[ProjectUpdates]
-        .map(_.asRight[Response[F]])
-        .handleError(badRequest(_).asLeft[ProjectUpdates])
-    }
+  private lazy val decodePayload: Request[F] => EitherT[F, Response[F], ProjectUpdates] = {
+    case req if req.contentType contains `Content-Type`(application.json) =>
+      EitherT {
+        req
+          .as[ProjectUpdates]
+          .map(_.asRight[Response[F]])
+          .handleError(badRequest(_).asLeft[ProjectUpdates])
+      }
+    case req =>
+      EitherT {
+        Response[F](InternalServerError)
+          .withEntity(Message.Error.unsafeApply(s"'${req.contentType}' not supported"))
+          .asLeft
+          .pure[F]
+      }
+  }
 
   private def badRequest: Throwable => Response[F] = { _ =>
     Response[F](BadRequest).withEntity(Message.Error("Invalid payload"))
