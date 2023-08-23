@@ -18,6 +18,7 @@
 
 package io.renku.triplesgenerator.events.consumers
 
+import cats.Monad
 import cats.effect._
 import cats.syntax.all._
 import eu.timepit.refined.api.Refined
@@ -33,39 +34,40 @@ import org.typelevel.log4cats.Logger
 trait ProjectSparqlClient[F[_]] extends SparqlClient[F]
 
 object ProjectSparqlClient {
+  def apply[F[_]: Monad: Logger: SparqlQueryTimeRecorder](c: SparqlClient[F]) =
+    new ProjectSparqlClient[F] {
+      private[this] val rec = SparqlQueryTimeRecorder[F].instance
+      override def update(request: SparqlUpdate) = {
+        val label = histogramLabel(request)
+        val work  = c.update(request)
+        rec
+          .measureExecutionTime(work, label)
+          .flatMap(rec.logExecutionTime(s"Execute sparql update '$label'"))
+      }
+
+      override def upload(data: JsonLD) = {
+        val label: String Refined NonEmpty = "jsonld upload"
+        val work = c.upload(data)
+        rec
+          .measureExecutionTime(work, label.some)
+          .flatMap(rec.logExecutionTime("Execute JSONLD upload"))
+      }
+
+      override def query(request: SparqlQuery) = {
+        val label = histogramLabel(request)
+        val work  = c.query(request)
+        rec
+          .measureExecutionTime(work, label)
+          .flatMap(rec.logExecutionTime(s"Execute sparql query '$label'"))
+      }
+    }
+
   def apply[F[_]: Network: Async: Logger: SparqlQueryTimeRecorder](
       cc:       ProjectsConnectionConfig,
       retryCfg: Retry.RetryConfig = Retry.RetryConfig.default
   ): Resource[F, ProjectSparqlClient[F]] = {
     val cfg = cc.toCC(Some(retryCfg))
-    val rec = SparqlQueryTimeRecorder[F].instance
-    SparqlClient[F](cfg).map(c =>
-      new ProjectSparqlClient[F] {
-        override def update(request: SparqlUpdate) = {
-          val label = histogramLabel(request)
-          val work  = c.update(request)
-          rec
-            .measureExecutionTime(work, label)
-            .flatMap(rec.logExecutionTime(s"Execute sparql update '$label'"))
-        }
-
-        override def upload(data: JsonLD) = {
-          val label: String Refined NonEmpty = "jsonld upload"
-          val work = c.upload(data)
-          rec
-            .measureExecutionTime(work, label.some)
-            .flatMap(rec.logExecutionTime("Execute JSONLD upload"))
-        }
-
-        override def query(request: SparqlQuery) = {
-          val label = histogramLabel(request)
-          val work  = c.query(request)
-          rec
-            .measureExecutionTime(work, label)
-            .flatMap(rec.logExecutionTime(s"Execute sparql query '$label'"))
-        }
-      }
-    )
+    SparqlClient[F](cfg).map(apply(_))
   }
 
   private def histogramLabel(r: Any): Option[String Refined NonEmpty] =

@@ -25,7 +25,7 @@ import org.scalatest.{BeforeAndAfterAll, Suite}
 import org.typelevel.log4cats.Logger
 
 /** Trait for having a client directly accessible using "unsafe" effects. */
-trait JenaContainerDirectSpec extends JenaContainerSpec with BeforeAndAfterAll { self: Suite =>
+trait JenaContainerDirectSupport extends JenaContainerSupport with BeforeAndAfterAll { self: Suite =>
   implicit def logger: Logger[IO]
 
   implicit val ioRuntime: IORuntime
