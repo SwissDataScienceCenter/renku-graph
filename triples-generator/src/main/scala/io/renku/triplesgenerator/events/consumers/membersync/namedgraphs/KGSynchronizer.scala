@@ -20,27 +20,36 @@ package io.renku.triplesgenerator.events.consumers.membersync
 package namedgraphs
 
 import cats.MonadThrow
-import cats.effect.Async
+import cats.effect._
 import cats.syntax.all._
-import io.renku.graph.model.projects
+import io.renku.graph.config.RenkuUrlLoader
+import io.renku.graph.model.{RenkuUrl, projects}
+import io.renku.triplesgenerator.events.consumers.{ProjectAuthSync, ProjectSparqlClient}
+import io.renku.triplesgenerator.gitlab.GitLabProjectMember
 import io.renku.triplesstore._
 import org.typelevel.log4cats.Logger
 
 private[membersync] object KGSynchronizer {
-  def apply[F[_]: Async: Logger: SparqlQueryTimeRecorder]: F[KGSynchronizer[F]] =
+  def apply[F[_]: Async: Logger: SparqlQueryTimeRecorder](
+      projectSparqlClient: ProjectSparqlClient[F]
+  ): F[KGSynchronizer[F]] =
     for {
-      kgProjectMembersFinder <- KGProjectMembersFinder[F]
-      kgPersonFinder         <- KGPersonFinder[F]
-      updatesCreator         <- UpdatesCreator[F]
-      connectionConfig       <- ProjectsConnectionConfig[F]()
-      tsClient               <- TSClient[F](connectionConfig).pure[F]
-    } yield new KGSynchronizerImpl[F](kgProjectMembersFinder, kgPersonFinder, updatesCreator, tsClient)
+      implicit0(renkuUrl: RenkuUrl) <- RenkuUrlLoader[F]()
+      projectConnectionCfg          <- ProjectsConnectionConfig[F]()
+      kgProjectMembersFinder = KGProjectMembersFinder[F](projectConnectionCfg, renkuUrl)
+      kgPersonFinder         = KGPersonFinder[F](projectConnectionCfg)
+      updatesCreator <- UpdatesCreator[F]
+      tsClient        = TSClient[F](projectConnectionCfg)
+      projectAuthSync = ProjectAuthSync[F](projectSparqlClient)
+    } yield new KGSynchronizerImpl[F](kgProjectMembersFinder, kgPersonFinder, updatesCreator, projectAuthSync, tsClient)
 }
 
-private class KGSynchronizerImpl[F[_]: MonadThrow](kgMembersFinder: KGProjectMembersFinder[F],
-                                                   kgPersonFinder: KGPersonFinder[F],
-                                                   updatesCreator: UpdatesCreator,
-                                                   tsClient:       TSClient[F]
+private class KGSynchronizerImpl[F[_]: MonadThrow](
+    kgMembersFinder: KGProjectMembersFinder[F],
+    kgPersonFinder:  KGPersonFinder[F],
+    updatesCreator:  UpdatesCreator,
+    projectAuthSync: ProjectAuthSync[F],
+    tsClient:        TSClient[F]
 ) extends KGSynchronizer[F] {
   import KGSynchronizerFunctions._
 
@@ -52,5 +61,7 @@ private class KGSynchronizerImpl[F[_]: MonadThrow](kgMembersFinder: KGProjectMem
     membersToRemove  = findMembersToRemove(membersInGL, membersInKG)
     removalUpdates   = updatesCreator.removal(slug, membersToRemove)
     _ <- (insertionUpdates ::: removalUpdates).map(tsClient.updateWithNoResult).sequence
+
+    _ <- projectAuthSync.syncProject(slug, membersInGL.map(_.toProjectAuthMember))
   } yield SyncSummary(membersAdded = membersToAdd.size, membersRemoved = membersToRemove.size)
 }

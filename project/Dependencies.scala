@@ -12,6 +12,7 @@ object Dependencies {
     val circeGenericExtras     = "0.14.3"
     val circeOptics            = "0.14.1"
     val diffx                  = "0.8.3"
+    val fs2                    = "3.8.0"
     val http4s                 = "0.23.23"
     val http4sEmber            = "0.23.23"
     val http4sPrometheus       = "0.24.4"
@@ -131,10 +132,14 @@ object Dependencies {
     "org.typelevel" %% "log4cats-core" % V.log4cats
   )
 
-  val testContainersPostgres = Seq(
-    "com.dimafeng" %% "testcontainers-scala-scalatest"  % V.testContainersScala,
-    "com.dimafeng" %% "testcontainers-scala-postgresql" % V.testContainersScala
+  val testContainersScalaTest = Seq(
+    "com.dimafeng" %% "testcontainers-scala-scalatest" % V.testContainersScala
   )
+  val testContainersPostgres =
+    testContainersScalaTest ++
+      Seq(
+        "com.dimafeng" %% "testcontainers-scala-postgresql" % V.testContainersScala
+      )
 
   val wiremock = Seq(
     "com.github.tomakehurst" % "wiremock-jre8" % V.wiremock
@@ -174,6 +179,10 @@ object Dependencies {
 
   val jsonld4s = Seq(
     "io.renku" %% "jsonld4s" % V.jsonld4s
+  )
+
+  val fs2Core = Seq(
+    "co.fs2" %% "fs2-core" % V.fs2
   )
 
   val catsCore = Seq(

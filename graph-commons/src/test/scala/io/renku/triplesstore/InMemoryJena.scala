@@ -21,10 +21,8 @@ package io.renku.triplesstore
 import cats.effect.IO
 import cats.effect.unsafe.IORuntime
 import cats.syntax.all._
-import com.dimafeng.testcontainers.{FixedHostPortGenericContainer, GenericContainer, SingleContainer}
-import eu.timepit.refined.api.Refined
+import com.dimafeng.testcontainers.SingleContainer
 import eu.timepit.refined.auto._
-import eu.timepit.refined.numeric.Positive
 import io.circe.{Decoder, HCursor, Json}
 import io.renku.graph.model._
 import io.renku.graph.model.entities.{EntityFunctions, Person}
@@ -36,8 +34,7 @@ import io.renku.jsonld._
 import io.renku.logging.TestSparqlQueryTimeRecorder
 import io.renku.triplesstore.client.model.{Quad, Triple}
 import io.renku.triplesstore.client.syntax._
-import org.testcontainers.containers
-import org.testcontainers.containers.wait.strategy.Wait
+import io.renku.triplesstore.client.util.{JenaContainer, JenaRunMode}
 
 import scala.collection.mutable
 import scala.language.reflectiveCalls
@@ -48,35 +45,9 @@ trait InMemoryJena {
 
   private val adminCredentials = BasicAuthCredentials(BasicAuthUsername("admin"), BasicAuthPassword("admin"))
 
-  lazy val container: SingleContainer[_] = jenaRunMode match {
-    case JenaRunMode.GenericContainer =>
-      GenericContainer(
-        dockerImage = "renku/renku-jena:0.0.21",
-        exposedPorts = Seq(3030),
-        waitStrategy = Wait forHttp "/$/ping"
-      )
-    case JenaRunMode.FixedPortContainer(fixedPort) =>
-      FixedHostPortGenericContainer(
-        imageName = "renku/renku-jena:0.0.21",
-        exposedPorts = Seq(3030),
-        exposedHostPort = fixedPort,
-        exposedContainerPort = fixedPort,
-        waitStrategy = Wait forHttp "/$/ping"
-      )
-    case JenaRunMode.Local(_) =>
-      new GenericContainer(new containers.GenericContainer("") {
-        override def start(): Unit = ()
-        override def stop():  Unit = ()
-      })
-  }
+  lazy val container: SingleContainer[_] = JenaContainer.create(jenaRunMode)
 
-  private lazy val fusekiServerPort: Int Refined Positive = jenaRunMode match {
-    case JenaRunMode.GenericContainer         => Refined.unsafeApply(container.mappedPort(container.exposedPorts.head))
-    case JenaRunMode.FixedPortContainer(port) => port
-    case JenaRunMode.Local(port)              => port
-  }
-
-  lazy val fusekiUrl: FusekiUrl = FusekiUrl(s"http://localhost:$fusekiServerPort")
+  lazy val fusekiUrl: FusekiUrl = FusekiUrl(JenaContainer.fusekiUrl(jenaRunMode, container))
 
   private val datasets: mutable.Map[FusekiUrl => DatasetConnectionConfig, DatasetConfigFile] = mutable.Map.empty
 

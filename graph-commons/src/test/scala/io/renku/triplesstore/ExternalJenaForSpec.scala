@@ -20,6 +20,7 @@ package io.renku.triplesstore
 
 import eu.timepit.refined.auto._
 import io.renku.testtools.IOSpec
+import io.renku.triplesstore.client.util.JenaRunMode
 import org.scalatest.Suite
 
 /** Use this trait as a replacement for [[InMemoryJenaForSpec]] to connect to a locally/externally running Jena without 
