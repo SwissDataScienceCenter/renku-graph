@@ -26,7 +26,6 @@ import io.renku.graph.tokenrepository.AccessTokenFinder
 import io.renku.http.client.{AccessToken, GitLabClient}
 import io.renku.logging.ExecutionTimeRecorder
 import io.renku.logging.ExecutionTimeRecorder.ElapsedTime
-import io.renku.triplesgenerator.events.consumers.ProjectSparqlClient
 import io.renku.triplesgenerator.gitlab.GitLabProjectMembersFinder
 import io.renku.triplesstore._
 import org.typelevel.log4cats.Logger

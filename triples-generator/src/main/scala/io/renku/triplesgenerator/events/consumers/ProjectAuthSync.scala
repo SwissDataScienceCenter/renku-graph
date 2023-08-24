@@ -25,7 +25,7 @@ import fs2.io.net.Network
 import io.renku.graph.model.RenkuUrl
 import io.renku.graph.model.projects.{Slug, Visibility}
 import io.renku.projectauth.{ProjectAuthData, ProjectAuthService, ProjectMember}
-import io.renku.triplesstore.{ProjectsConnectionConfig, SparqlQueryTimeRecorder}
+import io.renku.triplesstore.{ProjectSparqlClient, ProjectsConnectionConfig, SparqlQueryTimeRecorder}
 import io.renku.triplesstore.client.http.{RowDecoder, SparqlClient}
 import io.renku.triplesstore.client.syntax._
 import org.typelevel.log4cats.Logger

@@ -1,18 +1,34 @@
-package io.renku.triplesgenerator.events.consumers
+/*
+ * Copyright 2023 Swiss Data Science Center (SDSC)
+ * A partnership between École Polytechnique Fédérale de Lausanne (EPFL) and
+ * Eidgenössische Technische Hochschule Zürich (ETHZ).
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+package io.renku.triplesstore
 
 import cats.effect.IO
 import cats.effect.testing.scalatest.AsyncIOSpec
 import eu.timepit.refined.auto._
 import io.prometheus.client.Histogram
-import io.renku.graph.model.RenkuUrl
-import io.renku.graph.model.projects.{Slug, Visibility}
+import io.renku.cli.model.CliSoftwareAgent
+import io.renku.graph.model.agents
 import io.renku.interpreters.TestLogger
 import io.renku.jsonld.syntax._
 import io.renku.logging.TestExecutionTimeRecorder
-import io.renku.projectauth.ProjectAuthData
 import io.renku.triplesstore.client.syntax._
 import io.renku.triplesstore.client.util.JenaContainerSupport
-import io.renku.triplesstore.{SparqlQuery, SparqlQueryTimeRecorder}
 import org.scalatest.flatspec.AsyncFlatSpec
 import org.scalatest.matchers.should
 import org.typelevel.log4cats.Logger
@@ -42,7 +58,6 @@ class ProjectSparqlClientSpec extends AsyncFlatSpec with AsyncIOSpec with JenaCo
   }
 
   it should "measure execution time for named queries" in {
-    implicit val renkuUrl: RenkuUrl = RenkuUrl("http://localhost")
     val histogram = makeHistogram.unsafeRunSync()
     implicit val sr: SparqlQueryTimeRecorder[IO] = makeSparqlQueryTimeRecorder(histogram)
     withProjectClient.use { c =>
@@ -74,7 +89,7 @@ class ProjectSparqlClientSpec extends AsyncFlatSpec with AsyncIOSpec with JenaCo
         _ = assertSampled(histogram)
 
         _ <- IO(resetHistogram(histogram))
-        data = ProjectAuthData(Slug("a/b"), Set.empty, Visibility.Public).asJsonLD
+        data = CliSoftwareAgent(agents.ResourceId("http://u.rl"), agents.Name("test")).asJsonLD
         _ <- c.upload(data)
         _ = assertSampled(histogram)
       } yield ()

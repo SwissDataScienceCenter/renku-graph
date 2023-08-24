@@ -42,7 +42,7 @@ import io.renku.triplesgenerator.events.consumers.tsmigrationrequest.migrations.
 import io.renku.triplesgenerator.events.consumers.tsprovisioning.{minprojectinfo, triplesgenerated}
 import io.renku.triplesgenerator.init.{CliVersionCompatibilityChecker, CliVersionCompatibilityVerifier}
 import io.renku.triplesgenerator.metrics.MetricsService
-import io.renku.triplesstore.{ProjectsConnectionConfig, SparqlQueryTimeRecorder}
+import io.renku.triplesstore.{ProjectSparqlClient, ProjectsConnectionConfig, SparqlQueryTimeRecorder}
 import natchez.Trace.Implicits.noop
 import org.http4s.server.Server
 import org.typelevel.log4cats.Logger

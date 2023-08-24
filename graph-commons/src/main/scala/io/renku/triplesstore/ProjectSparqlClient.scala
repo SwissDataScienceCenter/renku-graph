@@ -16,7 +16,7 @@
  * limitations under the License.
  */
 
-package io.renku.triplesgenerator.events.consumers
+package io.renku.triplesstore
 
 import cats.Monad
 import cats.effect._
@@ -26,7 +26,6 @@ import eu.timepit.refined.collection.NonEmpty
 import eu.timepit.refined.auto._
 import fs2.io.net.Network
 import io.renku.jsonld.JsonLD
-import io.renku.triplesstore.{ProjectsConnectionConfig, SparqlQueryTimeRecorder}
 import io.renku.triplesstore.client.http.{Retry, SparqlClient, SparqlQuery, SparqlUpdate}
 import org.typelevel.log4cats.Logger
 

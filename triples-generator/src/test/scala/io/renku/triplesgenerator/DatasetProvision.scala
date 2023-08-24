@@ -25,8 +25,8 @@ import io.renku.graph.model.projects.Role
 import io.renku.graph.model.{RenkuUrl, entities}
 import io.renku.logging.{ExecutionTimeRecorder, TestExecutionTimeRecorder}
 import io.renku.projectauth.ProjectMember
-import io.renku.triplesgenerator.events.consumers.{ProjectAuthSync, ProjectSparqlClient}
-import io.renku.triplesstore.{GraphsProducer, InMemoryJena, ProjectsDataset, SparqlQueryTimeRecorder}
+import io.renku.triplesgenerator.events.consumers.ProjectAuthSync
+import io.renku.triplesstore._
 
 trait DatasetProvision extends SearchInfoDatasets { self: ProjectsDataset with InMemoryJena =>
 
