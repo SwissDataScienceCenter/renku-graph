@@ -68,14 +68,20 @@ object Microservice extends IOMicroservice {
       dbSessionPool <- Resource
                          .eval(new TgLockDbConfigProvider[IO].map(SessionPoolResource[IO, TgLockDB]))
                          .flatMap(identity)
-    } yield (config, dbSessionPool)
+      projectConnConfig <- Resource.eval(ProjectsConnectionConfig[IO](config))
+      projectsSparql    <- ProjectSparqlClient[IO](projectConnConfig)
+    } yield (config, dbSessionPool, projectsSparql)
 
-    resources.use { case (config, dbSessionPool) =>
-      doRun(config, dbSessionPool)
+    resources.use { case (config, dbSessionPool, projectSparqlClient) =>
+      doRun(config, dbSessionPool, projectSparqlClient)
     }
   }
 
-  private def doRun(config: Config, dbSessionPool: SessionResource[IO, TgLockDB]): IO[ExitCode] = for {
+  private def doRun(
+      config:              Config,
+      dbSessionPool:       SessionResource[IO, TgLockDB],
+      projectSparqlClient: ProjectSparqlClient[IO]
+  ): IO[ExitCode] = for {
     implicit0(mr: MetricsRegistry[IO])           <- MetricsRegistry[IO]()
     implicit0(sqtr: SparqlQueryTimeRecorder[IO]) <- SparqlQueryTimeRecorder[IO]()
     implicit0(gc: GitLabClient[IO])              <- GitLabClient[IO]()
@@ -94,7 +100,7 @@ object Microservice extends IOMicroservice {
     sentryInitializer              <- SentryInitializer[IO]
     cliVersionCompatChecker        <- CliVersionCompatibilityChecker[IO](config)
     awaitingGenerationSubscription <- awaitinggeneration.SubscriptionFactory[IO]
-    membersSyncSubscription        <- membersync.SubscriptionFactory[IO](tsWriteLock)
+    membersSyncSubscription        <- membersync.SubscriptionFactory[IO](tsWriteLock, projectSparqlClient)
     triplesGeneratedSubscription   <- triplesgenerated.SubscriptionFactory[IO](tsWriteLock)
     cleanUpSubscription            <- cleanup.SubscriptionFactory[IO](tsWriteLock)
     minProjectInfoSubscription     <- minprojectinfo.SubscriptionFactory[IO](tsWriteLock)

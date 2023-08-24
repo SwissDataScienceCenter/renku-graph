@@ -27,6 +27,7 @@ import io.circe.literal._
 import io.renku.generators.CommonGraphGenerators.accessTokens
 import io.renku.generators.Generators.Implicits._
 import io.renku.graph.model.RenkuTinyTypeGenerators.{personGitLabIds, projectIds}
+import io.renku.graph.model.projects.Role
 import io.renku.graph.model.{persons, projects}
 import io.renku.http.client.RestClient.ResponseMappingF
 import io.renku.http.client.{AccessToken, GitLabClient}
@@ -176,6 +177,8 @@ class MemberRightsCheckerSpec
     with TableDrivenPropertyChecks
     with should.Matchers {
 
+  def accessLevel(r: Role): Int = Role.toGitLabAccessLevel(r)
+
   "checkValid" should {
 
     "return boolean based on the response from the GET to GL's project member API" in new TestCase {
@@ -193,23 +196,23 @@ class MemberRightsCheckerSpec
       Table(
         ("Case", "Response", "Expected Result"),
         ("ok role 30 and active",
-         Response[IO](Ok).withEntity(json"""{"access_level": ${Role.Developer.value}, "state": "active"}"""),
+         Response[IO](Ok).withEntity(json"""{"access_level": ${accessLevel(Role.Reader)}, "state": "active"}"""),
          false
         ),
         ("ok role 40 and active",
-         Response[IO](Ok).withEntity(json"""{"access_level": ${Role.Maintainer.value}, "state": "active"}"""),
+         Response[IO](Ok).withEntity(json"""{"access_level": ${accessLevel(Role.Maintainer)}, "state": "active"}"""),
          true
         ),
         ("ok role 40 and non-active",
-         Response[IO](Ok).withEntity(json"""{"access_level": ${Role.Owner.value}, "state": "waiting"}"""),
+         Response[IO](Ok).withEntity(json"""{"access_level": ${accessLevel(Role.Owner)}, "state": "waiting"}"""),
          false
         ),
         ("ok role 40 and no state",
-         Response[IO](Ok).withEntity(json"""{"access_level": ${Role.Owner.value}}"""),
+         Response[IO](Ok).withEntity(json"""{"access_level": ${accessLevel(Role.Owner)}}"""),
          false
         ),
         ("ok role 50 and active",
-         Response[IO](Ok).withEntity(json"""{"access_level": ${Role.Owner.value}, "state": "active"}"""),
+         Response[IO](Ok).withEntity(json"""{"access_level": ${accessLevel(Role.Owner)}, "state": "active"}"""),
          true
         ),
         ("ok invalid", Response[IO](Ok).withEntity(json"""{}"""), false),
@@ -228,13 +231,6 @@ class MemberRightsCheckerSpec
         responseMapping(BadRequest, Request[IO](), Response[IO](BadRequest)).unsafeRunSync()
       }
     }
-  }
-
-  private sealed trait Role { val value: Int }
-  private object Role {
-    case object Developer  extends Role { val value: Int = 30 }
-    case object Maintainer extends Role { val value: Int = 40 }
-    case object Owner      extends Role { val value: Int = 50 }
   }
 
   private trait TestCase {

@@ -19,7 +19,6 @@
 package io.renku.triplesgenerator.events.consumers.membersync
 package namedgraphs
 
-import Generators.gitLabProjectMembers
 import cats.effect.IO
 import cats.syntax.all._
 import io.renku.generators.Generators.Implicits._
@@ -29,6 +28,7 @@ import io.renku.interpreters.TestLogger
 import io.renku.logging.TestSparqlQueryTimeRecorder
 import io.renku.testtools.IOSpec
 import io.renku.triplesstore.{InMemoryJenaForSpec, ProjectsDataset, SparqlQueryTimeRecorder}
+import io.renku.triplesgenerator.gitlab.Generators._
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
 import org.scalatestplus.scalacheck.ScalaCheckPropertyChecks

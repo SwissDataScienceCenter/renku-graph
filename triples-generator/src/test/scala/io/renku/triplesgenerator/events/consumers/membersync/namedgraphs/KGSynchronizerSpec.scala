@@ -26,6 +26,10 @@ import io.renku.generators.Generators.Implicits._
 import io.renku.generators.Generators._
 import io.renku.graph.model.GraphModelGenerators._
 import io.renku.graph.model.{RenkuUrl, projects}
+import io.renku.projectauth.ProjectMember
+import io.renku.triplesgenerator.events.consumers.ProjectAuthSync
+import io.renku.triplesgenerator.gitlab.GitLabProjectMember
+import io.renku.triplesgenerator.gitlab.Generators._
 import io.renku.triplesstore.TSClient
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.matchers.should
@@ -75,6 +79,11 @@ class KGSynchronizerSpec extends AnyWordSpec with MockFactory with should.Matche
           .returning(().pure[Try])
       }
 
+      (projectAuthSync
+        .syncProject(_: projects.Slug, _: Set[ProjectMember]))
+        .expects(projectSlug, membersInGitLab.map(_.toProjectAuthMember))
+        .returning(().pure[Try])
+
       synchronizer.syncMembers(projectSlug, membersInGitLab) shouldBe
         SyncSummary(missingMembersWithIds.size, membersToRemove.size).pure[Try]
     }
@@ -98,7 +107,9 @@ class KGSynchronizerSpec extends AnyWordSpec with MockFactory with should.Matche
     val kgPersonFinder         = mock[KGPersonFinder[Try]]
     val updatesCreator         = mock[UpdatesCreator]
     val tsClient               = mock[TSClient[Try]]
+    val projectAuthSync        = mock[ProjectAuthSync[Try]]
 
-    val synchronizer = new KGSynchronizerImpl[Try](kgProjectMembersFinder, kgPersonFinder, updatesCreator, tsClient)
+    val synchronizer =
+      new KGSynchronizerImpl[Try](kgProjectMembersFinder, kgPersonFinder, updatesCreator, projectAuthSync, tsClient)
   }
 }

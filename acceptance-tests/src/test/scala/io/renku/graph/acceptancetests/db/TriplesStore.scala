@@ -25,6 +25,7 @@ import io.renku.db.DBConfigProvider
 import io.renku.triplesgenerator.TgLockDB.SessionResource
 import io.renku.triplesgenerator.{TgLockDB, TgLockDbConfigProvider}
 import io.renku.triplesstore._
+import io.renku.triplesstore.client.util.JenaRunMode
 import org.typelevel.log4cats.Logger
 
 import scala.concurrent.duration._

@@ -18,9 +18,12 @@
 
 package io.renku.graph.model
 
+import cats.data.NonEmptyList
+import cats.kernel.Order
 import cats.syntax.all._
 import eu.timepit.refined.api.Refined
 import eu.timepit.refined.numeric.Positive
+import io.circe.{Decoder, Encoder}
 import io.renku.graph.model.views.{EntityIdJsonLDOps, NonBlankTTJsonLDOps, TinyTypeJsonLDOps, UrlResourceRenderer}
 import io.renku.jsonld.{EntityId, JsonLDDecoder, JsonLDEncoder}
 import io.renku.tinytypes.constraints._
@@ -206,4 +209,70 @@ object projects {
       extends TinyTypeFactory[Keyword](new Keyword(_))
       with NonBlank[Keyword]
       with NonBlankTTJsonLDOps[Keyword]
+
+  sealed trait Role extends Ordered[Role] {
+    def asString: String
+  }
+
+  object Role {
+    case object Owner extends Role {
+      val asString = "owner"
+
+      override def compare(that: Role): Int =
+        if (that == this) 0 else 1
+    }
+
+    case object Maintainer extends Role {
+      val asString = "maintainer"
+
+      override def compare(that: Role): Int =
+        if (that == this) 0
+        else if (that == Owner) -1
+        else 1
+    }
+
+    case object Reader extends Role {
+      val asString = "reader"
+
+      override def compare(that: Role): Int =
+        if (that == this) 0
+        else -1
+    }
+
+    val all: NonEmptyList[Role] =
+      NonEmptyList.of(Owner, Maintainer, Reader)
+
+    def fromString(str: String): Either[String, Role] =
+      all.find(_.asString.equalsIgnoreCase(str)).toRight(s"Invalid role name: $str")
+
+    def unsafeFromString(str: String): Role =
+      fromString(str).fold(sys.error, identity)
+
+    /** Translated from here: https://docs.gitlab.com/ee/api/members.html#roles */
+    def fromGitLabAccessLevel(accessLevel: Int) =
+      accessLevel match {
+        case n if n >= 50 => Owner
+        case n if n >= 40 => Maintainer
+        case _            => Reader
+      }
+
+    def toGitLabAccessLevel(role: Role): Int =
+      role match {
+        case Role.Owner      => 50
+        case Role.Maintainer => 40
+        case Role.Reader     => 20
+      }
+
+    implicit val ordering: Ordering[Role] =
+      Ordering.by(r => -all.toList.indexOf(r))
+
+    implicit val order: Order[Role] =
+      Order.fromOrdering
+
+    implicit val jsonDecoder: Decoder[Role] =
+      Decoder.decodeString.emap(fromString)
+
+    implicit val jsonEncoder: Encoder[Role] =
+      Encoder.encodeString.contramap(_.asString)
+  }
 }
