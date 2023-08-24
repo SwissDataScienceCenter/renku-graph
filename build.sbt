@@ -108,7 +108,10 @@ lazy val graphCommons = project
   .in(file("graph-commons"))
   .withId("graph-commons")
   .settings(commonSettings)
-  .dependsOn(renkuModel % "compile->compile; test->test")
+  .dependsOn(
+    renkuModel  % "compile->compile; test->test",
+    projectAuth % "compile->compile; test->test"
+  )
   .enablePlugins(AutomateHeaderPlugin)
 
 lazy val eventLogApi = project
