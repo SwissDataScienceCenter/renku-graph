@@ -25,12 +25,13 @@ import cats.syntax.all._
 import fs2.io.net.Network
 import fs2.{Pipe, Stream}
 import io.circe.Decoder
+import io.renku.graph.model.RenkuUrl
 import io.renku.graph.model.projects.{Slug, Visibility}
-import io.renku.graph.model.{RenkuUrl, Schemas}
 import io.renku.jsonld.NamedGraph
 import io.renku.jsonld.syntax._
 import io.renku.tinytypes.json.TinyTypeDecoders._
 import io.renku.triplesstore.client.http.{ConnectionConfig, RowDecoder, SparqlClient}
+import io.renku.triplesstore.client.sparql.Fragment
 import io.renku.triplesstore.client.syntax._
 import org.typelevel.log4cats.Logger
 
@@ -46,7 +47,7 @@ trait ProjectAuthService[F[_]] {
   def remove(slugs: NonEmptyList[Slug]): F[Unit]
   def remove(slug:  Slug, more: Slug*): F[Unit] = remove(NonEmptyList(slug, more.toList))
 
-  def getAll(chunkSize: Int = 100): Stream[F, ProjectAuthData]
+  def getAll(filter: QueryFilter, chunkSize: Int = 100): Stream[F, ProjectAuthData]
 }
 
 object ProjectAuthService {
@@ -62,7 +63,7 @@ object ProjectAuthService {
 
   private final class Impl[F[_]: MonadThrow](sparqlClient: SparqlClient[F], renkuUrl: RenkuUrl)
       extends ProjectAuthService[F] {
-    private[this] val graph = Schemas.renku / "ProjectAuth"
+    private[this] val graph = ProjectAuth.graph
     private implicit val rUrl: RenkuUrl = renkuUrl
 
     override def remove(slugs: NonEmptyList[Slug]): F[Unit] =
@@ -97,13 +98,13 @@ object ProjectAuthService {
         .evalMap(sparqlClient.upload)
         .drain
 
-    override def getAll(chunkSize: Int): Stream[F, ProjectAuthData] =
-      streamAll(chunkSize)
+    override def getAll(filter: QueryFilter, chunkSize: Int): Stream[F, ProjectAuthData] =
+      streamAll(filter, chunkSize)
 
-    private def streamAll(chunkSize: Int) =
+    private def streamAll(filter: QueryFilter, chunkSize: Int) =
       Stream
         .iterate(0)(_ + chunkSize)
-        .evalMap(offset => getChunk(chunkSize, offset))
+        .evalMap(offset => getChunk(filter, chunkSize, offset))
         .takeWhile(_.nonEmpty)
         .flatMap(Stream.emits)
         .groupAdjacentBy(_._1)
@@ -114,7 +115,7 @@ object ProjectAuthService {
         }
         .unNone
 
-    private def getChunk(limit: Int, offset: Int) =
+    private def getChunk(filter: QueryFilter, limit: Int, offset: Int) =
       sparqlClient.queryDecode[(Slug, Visibility, Option[ProjectMember])](
         sparql"""PREFIX schema: <http://schema.org/>
                 |PREFIX renku: <https://swissdatasciencecenter.github.io/renku-ontology#>
@@ -128,6 +129,8 @@ object ProjectAuthService {
                 |    OPTIONAL {
                 |      ?project renku:memberRole ?memberRole.
                 |    }
+                |    ${slugFilter(filter)}
+                |    ${memberFilter(filter)}
                 |  }
                 |}
                 |ORDER BY ?slug
@@ -135,6 +138,22 @@ object ProjectAuthService {
                 |LIMIT $limit
                 |""".stripMargin
       )
+
+    private def slugFilter(f: QueryFilter) =
+      f.slug.map(s => sparql"?project renku:slug ${s.value}.").getOrElse(Fragment.empty)
+
+    private def memberFilter(f: QueryFilter) =
+      f.member match {
+        case s if s.isEmpty   => Fragment.empty
+        case s if s.size == 1 => sparql"?project renku:memberId ${s.head.value}"
+        case s =>
+          sparql"""
+                  |?project renku:memberId ?memberId.
+                  |VALUES (?memberId) {
+                  |  ${s.map(_.value)}
+                  |}.
+                  |""".stripMargin
+      }
 
     private implicit val projectMemberDecoder: Decoder[ProjectMember] =
       Decoder.decodeString.emap(ProjectMember.fromEncoded)

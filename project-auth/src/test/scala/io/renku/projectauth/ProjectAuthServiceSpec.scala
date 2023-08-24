@@ -24,9 +24,9 @@ import cats.effect.kernel.Resource
 import cats.effect.testing.scalatest.AsyncIOSpec
 import fs2.Stream
 import io.renku.generators.Generators.Implicits._
-import io.renku.graph.model.RenkuUrl
 import io.renku.graph.model.persons.GitLabId
-import io.renku.graph.model.projects.{Role, Visibility}
+import io.renku.graph.model.projects.{Role, Slug, Visibility}
+import io.renku.graph.model.{RenkuTinyTypeGenerators, RenkuUrl}
 import io.renku.triplesstore.client.util.JenaContainerSupport
 import org.scalatest.flatspec.AsyncFlatSpec
 import org.scalatest.matchers.should
@@ -50,7 +50,7 @@ class ProjectAuthServiceSpec extends AsyncFlatSpec with AsyncIOSpec with JenaCon
                .compile
                .drain
 
-        n <- s.getAll(15).compile.toVector
+        n <- s.getAll(QueryFilter.all, 15).compile.toVector
         _ = n shouldBe data.sortBy(_.slug)
       } yield ()
     }
@@ -70,7 +70,7 @@ class ProjectAuthServiceSpec extends AsyncFlatSpec with AsyncIOSpec with JenaCon
                .compile
                .drain
 
-        n <- s.getAll().compile.toVector
+        n <- s.getAll(QueryFilter.all).compile.toVector
         _ = n shouldBe data.sortBy(_.slug)
       } yield ()
     }
@@ -86,11 +86,11 @@ class ProjectAuthServiceSpec extends AsyncFlatSpec with AsyncIOSpec with JenaCon
                       .lastOrError
         _ <- s.update(original)
 
-        n <- s.getAll().compile.toVector
+        n <- s.getAll(QueryFilter.all).compile.toVector
         _ = n.head shouldBe original
 
         _ <- s.remove(original.slug)
-        _ <- s.getAll().compile.toVector.asserting(v => v shouldBe Vector.empty)
+        _ <- s.getAll(QueryFilter.all).compile.toVector.asserting(v => v shouldBe Vector.empty)
       } yield ()
     }
   }
@@ -107,7 +107,7 @@ class ProjectAuthServiceSpec extends AsyncFlatSpec with AsyncIOSpec with JenaCon
         (toremove, tokeep) = data.splitAt(3)
         _ <- s.remove(NonEmptyList.fromListUnsafe(toremove.map(_.slug).toList))
 
-        _ <- s.getAll().compile.toVector.asserting(v => v shouldBe tokeep.sortBy(_.slug))
+        _ <- s.getAll(QueryFilter.all).compile.toVector.asserting(v => v shouldBe tokeep.sortBy(_.slug))
       } yield ()
     }
   }
@@ -122,18 +122,63 @@ class ProjectAuthServiceSpec extends AsyncFlatSpec with AsyncIOSpec with JenaCon
                       .lastOrError
         _ <- s.update(original)
 
-        n <- s.getAll().compile.toVector
+        n <- s.getAll(QueryFilter.all).compile.toVector
         _ = n.head shouldBe original
 
         second = original.copy(visibility = Visibility.Public)
         _  <- s.update(second)
-        n2 <- s.getAll().compile.toVector
+        n2 <- s.getAll(QueryFilter.all).compile.toVector
         _ = n2.head shouldBe second
 
         third = second.copy(members = second.members + ProjectMember(GitLabId(43), Role.Reader))
         _  <- s.update(third)
-        n3 <- s.getAll().compile.toVector
+        n3 <- s.getAll(QueryFilter.all).compile.toVector
         _ = n3.head shouldBe third
+      } yield ()
+    }
+  }
+
+  it should "search for a specific project by slug" in {
+    withProjectAuthService.use { s =>
+      for {
+        original <- Generators.projectAuthDataGen.asStream.toIO
+                      .take(1)
+                      .compile
+                      .lastOrError
+        _ <- s.update(original)
+
+        found <- s.getAll(QueryFilter.all.withSlug(original.slug)).compile.lastOrError
+        nf    <- s.getAll(QueryFilter.all.withSlug(Slug(original.slug.value + "x"))).compile.last
+
+        _ = found shouldBe original
+        _ = nf    shouldBe None
+      } yield ()
+    }
+  }
+
+  it should "search by member ids" in {
+    withProjectAuthService.use { s =>
+      for {
+        original <- Generators.projectAuthDataGen
+                      .suchThat(_.members.nonEmpty)
+                      .asStream
+                      .toIO
+                      .take(1)
+                      .compile
+                      .lastOrError
+        _ <- s.update(original)
+
+        found <- s.getAll(QueryFilter.all.withMember(original.members.head.gitLabId)).compile.lastOrError
+
+        gId <- IO(
+                 RenkuTinyTypeGenerators.personGitLabIds
+                   .suchThat(id => !original.members.map(_.gitLabId).contains(id))
+                   .generateOne
+               )
+        nf <- s.getAll(QueryFilter.all.withMember(gId)).compile.last
+
+        _ = found shouldBe original
+        _ = nf    shouldBe None
       } yield ()
     }
   }
