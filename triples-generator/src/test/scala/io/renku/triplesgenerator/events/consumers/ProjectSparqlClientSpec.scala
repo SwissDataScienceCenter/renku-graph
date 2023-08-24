@@ -2,16 +2,17 @@ package io.renku.triplesgenerator.events.consumers
 
 import cats.effect.IO
 import cats.effect.testing.scalatest.AsyncIOSpec
-import eu.timepit.refined.api.Refined
 import eu.timepit.refined.auto._
 import io.prometheus.client.Histogram
-import io.renku.graph.model.Schemas
+import io.renku.graph.model.RenkuUrl
+import io.renku.graph.model.projects.{Slug, Visibility}
 import io.renku.interpreters.TestLogger
+import io.renku.jsonld.syntax._
 import io.renku.logging.TestExecutionTimeRecorder
-import io.renku.triplesstore.SparqlQuery.Prefixes
-import io.renku.triplesstore.{SparqlQuery, SparqlQueryTimeRecorder}
+import io.renku.projectauth.ProjectAuthData
 import io.renku.triplesstore.client.syntax._
 import io.renku.triplesstore.client.util.JenaContainerSupport
+import io.renku.triplesstore.{SparqlQuery, SparqlQueryTimeRecorder}
 import org.scalatest.flatspec.AsyncFlatSpec
 import org.scalatest.matchers.should
 import org.typelevel.log4cats.Logger
@@ -29,33 +30,53 @@ class ProjectSparqlClientSpec extends AsyncFlatSpec with AsyncIOSpec with JenaCo
   def withProjectClient(implicit sqr: SparqlQueryTimeRecorder[IO]) =
     withDataset("projects").map(ProjectSparqlClient.apply(_))
 
+  def assertSampled(histogram: Histogram) =
+    histogram.collect().get(0).samples.size should be > 0
+
+  def assertNotSampled(histogram: Histogram) =
+    histogram.collect().get(0).samples.size shouldBe 0
+
+  def resetHistogram(histogram: Histogram) = {
+    histogram.clear()
+    assertNotSampled(histogram)
+  }
+
   it should "measure execution time for named queries" in {
+    implicit val renkuUrl: RenkuUrl = RenkuUrl("http://localhost")
     val histogram = makeHistogram.unsafeRunSync()
     implicit val sr: SparqlQueryTimeRecorder[IO] = makeSparqlQueryTimeRecorder(histogram)
     withProjectClient.use { c =>
       for {
-        a <- IO(histogram.collect())
-        _ = a.get(0).samples.size() shouldBe 0
+        _ <- IO(assertNotSampled(histogram))
+        up = SparqlQuery.apply(
+               name = "test-update",
+               prefixes = Set.empty,
+               body = sparql"""
+                              |PREFIX p: <http://schema.org/>
+                              |INSERT DATA {
+                              |    p:fred p:hasSpouse p:wilma .
+                              |    p:fred p:hasChild p:pebbles .
+                              |    p:wilma p:hasChild p:pebbles .
+                              |    p:pebbles p:hasSpouse p:bamm-bamm ;
+                              |        p:hasChild p:roxy, p:chip.
+                              |}""".stripMargin
+             )
+        _ <- c.update(up)
+        _ = assertSampled(histogram)
 
-        q = SparqlQuery.apply(
-              name = "test-update",
-              prefixes = Prefixes
-                .of(Schemas.prov -> "prov", Schemas.renku -> "renku", Schemas.schema -> "schema", Schemas.xsd -> "xsd")
-                .map(p => Refined.unsafeApply(p.value)),
-              body = sparql"""
-                             |PREFIX p: <http://bedrock/>
-                             |INSERT DATA {
-                             |    p:fred p:hasSpouse p:wilma .
-                             |    p:fred p:hasChild p:pebbles .
-                             |    p:wilma p:hasChild p:pebbles .
-                             |    p:pebbles p:hasSpouse p:bamm-bamm ;
-                             |        p:hasChild p:roxy, p:chip.
-                             |}""".stripMargin
+        _ <- IO(resetHistogram(histogram))
+        q = SparqlQuery(
+              name = "test-query",
+              prefixes = Set.empty,
+              body = sparql"SELECT * WHERE { ?s ?p ?o } LIMIT 1"
             )
-        _ <- c.update(q)
+        _ <- c.query(q)
+        _ = assertSampled(histogram)
 
-        x = histogram.collect()
-        _ = x.get(0).samples.size() should be > 0
+        _ <- IO(resetHistogram(histogram))
+        data = ProjectAuthData(Slug("a/b"), Set.empty, Visibility.Public).asJsonLD
+        _ <- c.upload(data)
+        _ = assertSampled(histogram)
       } yield ()
     }
   }
@@ -66,10 +87,10 @@ class ProjectSparqlClientSpec extends AsyncFlatSpec with AsyncIOSpec with JenaCo
 
     withProjectClient.use { c =>
       for {
-        a <- IO(histogram.collect())
-        _ = a.get(0).samples.size() shouldBe 0
+        _ <- IO(assertNotSampled(histogram))
+
         q = sparql"""
-                    |PREFIX p: <http://bedrock/>
+                    |PREFIX p: <http://schema.org/>
                     |INSERT DATA {
                     |    p:fred p:hasSpouse p:wilma .
                     |    p:fred p:hasChild p:pebbles .
@@ -80,8 +101,7 @@ class ProjectSparqlClientSpec extends AsyncFlatSpec with AsyncIOSpec with JenaCo
 
         _ <- c.update(q)
 
-        x = histogram.collect()
-        _ = x.get(0).samples.size() shouldBe 0
+        _ = assertNotSampled(histogram)
       } yield ()
     }
   }
