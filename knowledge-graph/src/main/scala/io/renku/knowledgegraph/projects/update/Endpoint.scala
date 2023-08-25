@@ -85,12 +85,18 @@ private class EndpointImpl[F[_]: Async: Logger](projectUpdater: ProjectUpdater[F
 
   private def relevantError(slug: projects.Slug): Throwable => F[Response[F]] = {
     case f: Failure =>
-      Logger[F]
-        .error(f)(show"Updating project $slug failed")
+      logFailure(slug)(f)
         .as(Response[F](f.status).withEntity(f.message))
     case ex: Exception =>
       Logger[F]
         .error(ex)(show"Updating project $slug failed")
         .as(Response[F](InternalServerError).withEntity(Message.Error("Update failed")))
+  }
+
+  private def logFailure(slug: projects.Slug): Failure => F[Unit] = {
+    case f if f.status == BadRequest || f.status == Conflict =>
+      Logger[F].info(show"Updating project $slug failed: ${f.getMessage}")
+    case f =>
+      Logger[F].error(f)(show"Updating project $slug failed")
   }
 }
