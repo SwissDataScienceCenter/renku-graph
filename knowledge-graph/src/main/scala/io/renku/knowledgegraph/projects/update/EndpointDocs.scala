@@ -39,7 +39,7 @@ object EndpointDocs extends docs.EndpointDocs {
          |
          |The properties that can be updated are:
          |* description - possible values are:
-         |  * `null` for removing the current description
+         |  * `null` or blank value for removing the current description
          |  * any non-blank String value
          |* image - possible values are:
          |  * `null` for removing the current image
@@ -54,6 +54,38 @@ object EndpointDocs extends docs.EndpointDocs {
         "Properties with new values",
         required = true,
         Contents(
+          MediaType.`multipart/form-data`(
+            "Multipart request example",
+            """|PATCH /knowledge-graph/projects/namespace/name HTTP/1.1
+               |Host: dev.renku.ch
+               |Authorization: Bearer <XXX>
+               |Content-Length: 575
+               |Content-Type: multipart/form-data; boundary=----WebKitFormBoundary7MA4YWxkTrZu0gW
+               |
+               |------WebKitFormBoundary7MA4YWxkTrZu0gW
+               |Content-Disposition: form-data; name="visibility"
+               |
+               |public
+               |------WebKitFormBoundary7MA4YWxkTrZu0gW
+               |Content-Disposition: form-data; name="description"
+               |
+               |desc test 1
+               |------WebKitFormBoundary7MA4YWxkTrZu0gW
+               |Content-Disposition: form-data; name="keywords[]"
+               |
+               |key1
+               |------WebKitFormBoundary7MA4YWxkTrZu0gW
+               |Content-Disposition: form-data; name="keywords[]"
+               |
+               |key2
+               |------WebKitFormBoundary7MA4YWxkTrZu0gW
+               |Content-Disposition: form-data; name="image"; filename="image.png"
+               |Content-Type: image/png
+               |
+               |(data)
+               |------WebKitFormBoundary7MA4YWxkTrZu0gW--
+               |""".stripMargin
+          ),
           MediaType.`application/json`(
             Schema.`Object`(properties = Map("visibility" -> Schema.EnumString(projects.Visibility.all.map(_.value)))),
             json"""{
@@ -61,14 +93,6 @@ object EndpointDocs extends docs.EndpointDocs {
               "keywords":    ["keyword1", "keyword2"],
               "visibility":  "public|internal|private"
             }"""
-          ),
-          MediaType.`multipart/form-data`(
-            "Form data example",
-            """|'description="a new project description"';
-               |'keywords=[keyword1,keyword2]';
-               |'visibility="public|internal|private"';
-               |'image=@"path-to-my-image"'
-               |""".stripMargin
           )
         )
       ),

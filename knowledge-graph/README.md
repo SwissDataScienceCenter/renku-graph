@@ -836,7 +836,39 @@ The endpoint requires an authorization token to be passed. Supported headers are
 
 **Request**
 
-* case when there's no update for the image (with `Content-Type: application/json`) 
+* Multipart request (preferred) 
+```
+PATCH /knowledge-graph/projects/jakub.chrobasik/create-test-10 HTTP/1.1
+Host: dev.renku.ch
+Authorization: Bearer <XXX>
+Content-Length: 575
+Content-Type: multipart/form-data; boundary=----WebKitFormBoundary7MA4YWxkTrZu0gW
+
+------WebKitFormBoundary7MA4YWxkTrZu0gW
+Content-Disposition: form-data; name="visibility"
+
+public
+------WebKitFormBoundary7MA4YWxkTrZu0gW
+Content-Disposition: form-data; name="description"
+
+desc test 1
+------WebKitFormBoundary7MA4YWxkTrZu0gW
+Content-Disposition: form-data; name="keywords[]"
+
+key1
+------WebKitFormBoundary7MA4YWxkTrZu0gW
+Content-Disposition: form-data; name="keywords[]"
+
+key2
+------WebKitFormBoundary7MA4YWxkTrZu0gW
+Content-Disposition: form-data; name="image"; filename="image.png"
+Content-Type: image/png
+
+(data)
+------WebKitFormBoundary7MA4YWxkTrZu0gW--
+```
+
+* JSON request (updating image not possible) 
 
 ```json
 {
@@ -845,9 +877,6 @@ The endpoint requires an authorization token to be passed. Supported headers are
   "visibility":  "public|internal|private"
 }
 ```
-
-* case when there's an update for the image (with `Content-Type: multipart/form-data`) each parameter has to be listed as a form data field.
-The `image` field has to contain the file data.
 
 **Response**
 
