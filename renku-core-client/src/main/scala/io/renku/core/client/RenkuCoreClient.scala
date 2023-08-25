@@ -64,7 +64,7 @@ private class RenkuCoreClientImpl[F[_]: Async: Logger](coreUriForSchemaLoader: R
       .flatMap(_.findM(migratedAndMatchingSchema(projectUrl, accessToken)))
       .flatMapF[RenkuCoreUri.Versioned] {
         case Some(sv) => findCoreUri(sv)
-        case None     => Result.failure(show"No API for $projectUrl. Quite likely migration required").pure[F].widen
+        case None     => Result.failure("Project in unsupported version. Quite likely migration required").pure[F].widen
       }
       .value
 

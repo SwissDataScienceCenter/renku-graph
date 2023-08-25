@@ -148,7 +148,7 @@ class RenkuCoreClientSpec
 
       client
         .findCoreUri(projectUrl, accessToken)
-        .asserting(_ shouldBe Result.failure(show"No API for $projectUrl. Quite likely migration required"))
+        .asserting(_ shouldBe Result.failure("Project in unsupported version. Quite likely migration required"))
     }
 
     "fail if any of the calls towards the Core API fails" in {
