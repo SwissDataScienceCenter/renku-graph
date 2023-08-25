@@ -78,12 +78,14 @@ class MemoryLockSpec extends AsyncWordSpec with AsyncIOSpec with should.Matchers
     for {
       (state, lock) <- Lock.memory0[IO, Int]
       latch         <- CountDownLatch[IO](1)
+      lockAcquired  <- Deferred[IO, Unit]
 
       // initial state is empty
       _ <- state.get.asserting(_ shouldBe empty)
 
       // one mutex if active
-      _ <- Async[IO].start(lock(1).use(_ => latch.await))
+      _ <- Async[IO].start(lock(1).use(_ => lockAcquired.complete(()) >> latch.await))
+      _ <- lockAcquired.get
       _ <- state.get.asserting(_.size shouldBe 1)
 
       // once released, mutex must be removed from map
