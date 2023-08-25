@@ -24,7 +24,7 @@ import cats.effect._
 import cats.syntax.all._
 import io.renku.graph.config.RenkuUrlLoader
 import io.renku.graph.model.{RenkuUrl, projects}
-import io.renku.triplesgenerator.events.consumers.{ProjectAuthSync, ProjectSparqlClient}
+import io.renku.triplesgenerator.events.consumers.ProjectAuthSync
 import io.renku.triplesgenerator.gitlab.GitLabProjectMember
 import io.renku.triplesstore._
 import org.typelevel.log4cats.Logger

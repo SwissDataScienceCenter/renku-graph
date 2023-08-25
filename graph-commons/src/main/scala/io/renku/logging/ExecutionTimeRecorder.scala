@@ -39,15 +39,15 @@ abstract class ExecutionTimeRecorder[F[_]](threshold: ElapsedTime) {
       maybeHistogramLabel: Option[String Refined NonEmpty] = None
   ): F[(ElapsedTime, A)]
 
-  def measureAndLogTime[A](condition: PartialFunction[A, String])(
+  def measureAndLogTime[A](message: PartialFunction[A, String])(
       block: F[A]
   )(implicit F: Monad[F], L: Logger[F]): F[A] =
-    measureExecutionTime(block).flatMap(logExecutionTimeWhen(condition))
+    measureExecutionTime(block).flatMap(logExecutionTimeWhen(message))
 
   def logExecutionTimeWhen[A](
-      condition: PartialFunction[A, String]
+      message: PartialFunction[A, String]
   )(implicit F: Applicative[F], L: Logger[F]): ((ElapsedTime, A)) => F[A] = { resultAndTime =>
-    logWarningIfAboveThreshold(resultAndTime, condition.lift).as(resultAndTime._2)
+    logWarningIfAboveThreshold(resultAndTime, message.lift).as(resultAndTime._2)
   }
 
   def logExecutionTime[A](
@@ -58,10 +58,10 @@ abstract class ExecutionTimeRecorder[F[_]](threshold: ElapsedTime) {
 
   private def logWarningIfAboveThreshold[A](
       resultAndTime: (ElapsedTime, A),
-      condition:     A => Option[String]
+      withMessage:   A => Option[String]
   )(implicit F: Applicative[F], L: Logger[F]): F[Unit] = {
     val (elapsedTime, result) = resultAndTime
-    condition(result)
+    withMessage(result)
       .filter(_ => elapsedTime >= threshold)
       .map(message => L.warn(s"$message in ${elapsedTime}ms"))
       .getOrElse(F.unit)

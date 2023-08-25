@@ -25,7 +25,7 @@ import fs2.io.net.Network
 import io.renku.graph.model.RenkuUrl
 import io.renku.graph.model.projects.{Slug, Visibility}
 import io.renku.projectauth.{ProjectAuthData, ProjectAuthService, ProjectMember}
-import io.renku.triplesstore.ProjectsConnectionConfig
+import io.renku.triplesstore.{ProjectSparqlClient, ProjectsConnectionConfig, SparqlQueryTimeRecorder}
 import io.renku.triplesstore.client.http.{RowDecoder, SparqlClient}
 import io.renku.triplesstore.client.syntax._
 import org.typelevel.log4cats.Logger
@@ -37,7 +37,9 @@ trait ProjectAuthSync[F[_]] {
 
 object ProjectAuthSync {
 
-  def resource[F[_]: Async: Logger: Network](cc: ProjectsConnectionConfig)(implicit renkuUrl: RenkuUrl) =
+  def resource[F[_]: Async: Logger: Network: SparqlQueryTimeRecorder](cc: ProjectsConnectionConfig)(implicit
+      renkuUrl: RenkuUrl
+  ) =
     ProjectSparqlClient[F](cc).map(apply[F])
 
   def apply[F[_]: Sync](
