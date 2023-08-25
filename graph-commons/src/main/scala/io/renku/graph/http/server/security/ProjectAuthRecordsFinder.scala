@@ -21,6 +21,7 @@ package io.renku.graph.http.server.security
 import cats.effect.{Async, Sync}
 import cats.effect.kernel.Resource
 import cats.syntax.all._
+import eu.timepit.refined.auto._
 import fs2.io.net.Network
 import io.renku.graph.http.server.security.Authorizer.SecurityRecordFinder
 import io.renku.graph.model.{RenkuUrl, projects}
@@ -45,18 +46,20 @@ object ProjectAuthRecordsFinder {
   ): ProjectAuthRecordsFinder[F] =
     new Impl[F](projectSparqlClient.asProjectAuthService(renkuUrl))
 
-  def apply[F[_]: Sync: SparqlQueryTimeRecorder](
+  def apply[F[_]: Sync: SparqlQueryTimeRecorder: Logger](
       projectAuthService: ProjectAuthService[F]
   ): ProjectAuthRecordsFinder[F] =
     new Impl[F](projectAuthService)
 
-  private final class Impl[F[_]: Sync: SparqlQueryTimeRecorder](
+  private final class Impl[F[_]: Sync: SparqlQueryTimeRecorder: Logger](
       projectAuthService: ProjectAuthService[F]
   ) extends ProjectAuthRecordsFinder[F] {
+    private[this] val timeRecorder = SparqlQueryTimeRecorder[F]
     override def apply(slug: projects.Slug, user: Option[model.AuthUser]): F[List[Authorizer.SecurityRecord]] = {
       val filter = QueryFilter.all.withSlug(slug)
-      projectAuthService.getAll(filter).compile.toList.map { data =>
-        data.map(d =>
+      val data   = projectAuthService.getAll(filter).compile.toList
+      timeRecorder.reportTime("project-security-records")(data).map { list =>
+        list.map(d =>
           Authorizer.SecurityRecord(
             visibility = d.visibility,
             projectSlug = d.slug,
