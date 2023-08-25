@@ -50,8 +50,22 @@ class EndpointSpec extends AsyncFlatSpec with CustomAsyncIOSpec with should.Matc
 
     givenUpdatingProject(slug, updates, authUser, returning = ().pure[IO])
 
-    endpoint
-      .`PATCH /projects/:slug`(slug, Request[IO]().withEntity(updates.asJson), authUser) >>= { response =>
+    endpoint.`PATCH /projects/:slug`(slug, Request[IO]().withEntity(updates.asJson), authUser) >>= { response =>
+      response.pure[IO].asserting(_.status shouldBe Status.Accepted) >>
+        response.as[Message].asserting(_ shouldBe Message.Info("Project update accepted"))
+    }
+  }
+
+  it should "decode the Multipart payload, update the project and return Accepted on success" in {
+
+    val authUser = authUsers.generateOne
+    val slug     = projectSlugs.generateOne
+    val updates  = projectUpdatesGen.generateOne
+
+    givenUpdatingProject(slug, updates, authUser, returning = ().pure[IO])
+
+    MultipartRequestEncoder[IO].encode(updates).map(mp => Request[IO]().withEntity(mp).putHeaders(mp.headers)) >>=
+      (req => endpoint.`PATCH /projects/:slug`(slug, req, authUser)) >>= { response =>
       response.pure[IO].asserting(_.status shouldBe Status.Accepted) >>
         response.as[Message].asserting(_ shouldBe Message.Info("Project update accepted"))
     }

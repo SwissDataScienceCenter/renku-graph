@@ -28,10 +28,11 @@ import io.renku.graph.model.projects
 import io.renku.http.client.GitLabClient
 import io.renku.http.server.security.model.AuthUser
 import io.renku.metrics.MetricsRegistry
-import org.http4s.MediaType.application
+import org.http4s.MediaType.{application, multipartType}
 import org.http4s.circe.CirceEntityDecoder._
 import org.http4s.dsl.Http4sDsl
 import org.http4s.headers.`Content-Type`
+import org.http4s.multipart.Multipart
 import org.http4s.{Request, Response}
 import org.typelevel.log4cats.Logger
 
@@ -49,30 +50,33 @@ private class EndpointImpl[F[_]: Async: Logger](projectUpdater: ProjectUpdater[F
     with Endpoint[F] {
 
   override def `PATCH /projects/:slug`(slug: projects.Slug, request: Request[F], authUser: AuthUser): F[Response[F]] =
-    decodePayload(request)
-      .semiflatMap(
+    EitherT(decodePayload(request))
+      .semiflatMap { updates =>
         projectUpdater
-          .updateProject(slug, _, authUser)
+          .updateProject(slug, updates, authUser)
           .as(Response[F](Accepted).withEntity(Message.Info("Project update accepted")))
-      )
+          .flatTap(_ => Logger[F].info(show"Project $slug updated with $updates"))
+      }
       .merge
-      .handleErrorWith(relevantError(slug)(_))
+      .handleErrorWith(relevantError(slug))
 
-  private lazy val decodePayload: Request[F] => EitherT[F, Response[F], ProjectUpdates] = {
+  private lazy val decodePayload: Request[F] => F[Either[Response[F], ProjectUpdates]] = {
     case req if req.contentType contains `Content-Type`(application.json) =>
-      EitherT {
-        req
-          .as[ProjectUpdates]
-          .map(_.asRight[Response[F]])
-          .handleError(badRequest(_).asLeft[ProjectUpdates])
-      }
+      req
+        .as[ProjectUpdates]
+        .map(_.asRight[Response[F]])
+        .handleError(badRequest(_).asLeft[ProjectUpdates])
+    case req if req.contentType.map(_.mediaType).exists(_.satisfies(multipartType("form-data"))) =>
+      req
+        .as[Multipart[F]]
+        .flatMap(MultipartRequestDecoder[F].decode)
+        .map(_.asRight[Response[F]])
+        .handleError(badRequest(_).asLeft[ProjectUpdates])
     case req =>
-      EitherT {
-        Response[F](InternalServerError)
-          .withEntity(Message.Error.unsafeApply(s"'${req.contentType}' not supported"))
-          .asLeft
-          .pure[F]
-      }
+      Response[F](InternalServerError)
+        .withEntity(Message.Error.unsafeApply(s"'${req.contentType}' not supported"))
+        .asLeft[ProjectUpdates]
+        .pure[F]
   }
 
   private def badRequest: Throwable => Response[F] = { _ =>

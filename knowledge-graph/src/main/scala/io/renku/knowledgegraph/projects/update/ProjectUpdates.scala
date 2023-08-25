@@ -19,6 +19,7 @@
 package io.renku.knowledgegraph.projects.update
 
 import ProjectUpdates.Image
+import cats.Show
 import cats.syntax.all._
 import io.circe.syntax._
 import io.circe.{Decoder, DecodingFailure, Encoder, Json}
@@ -50,6 +51,11 @@ private object ProjectUpdates {
   lazy val empty: ProjectUpdates = ProjectUpdates(None, None, None, None)
 
   final case class Image(name: String, mediaType: MediaType, data: ByteVector)
+  object Image {
+    implicit val show: Show[Image] = Show.show { case Image(name, mediaType, _) =>
+      show"$name ($mediaType)"
+    }
+  }
 
   implicit val jsonEncoder: Encoder[ProjectUpdates] = Encoder.instance {
     case ProjectUpdates(newDescription, _, newKeywords, newVisibility) =>
@@ -62,20 +68,32 @@ private object ProjectUpdates {
       )
   }
 
-  implicit val jsonDecoder: Decoder[ProjectUpdates] =
-    Decoder.instance { cur =>
-      def toOptionOfOption[T <: TinyType { type V = String }](prop: String, ttFactory: From[T]) =
-        cur
-          .downField(prop)
-          .success
-          .fold(Option.empty[Option[T]].asRight[DecodingFailure]) {
-            _.as[Option[T]](blankStringToNoneDecoder(ttFactory)).map(_.some)
-          }
+  implicit val jsonDecoder: Decoder[ProjectUpdates] = Decoder.instance { cur =>
+    def toOptionOfOption[T <: TinyType { type V = String }](prop: String, ttFactory: From[T]) =
+      cur
+        .downField(prop)
+        .success
+        .fold(Option.empty[Option[T]].asRight[DecodingFailure]) {
+          _.as[Option[T]](blankStringToNoneDecoder(ttFactory)).map(_.some)
+        }
 
-      for {
-        newDesc       <- toOptionOfOption("description", projects.Description)
-        newKeywords   <- cur.downField("keywords").as[Option[List[projects.Keyword]]].map(_.map(_.toSet))
-        newVisibility <- cur.downField("visibility").as[Option[projects.Visibility]]
-      } yield ProjectUpdates(newDesc, newImage = None, newKeywords, newVisibility)
-    }
+    for {
+      newDesc       <- toOptionOfOption("description", projects.Description)
+      newKeywords   <- cur.downField("keywords").as[Option[List[projects.Keyword]]].map(_.map(_.toSet))
+      newVisibility <- cur.downField("visibility").as[Option[projects.Visibility]]
+    } yield ProjectUpdates(newDesc, newImage = None, newKeywords, newVisibility)
+  }
+
+  implicit val show: Show[ProjectUpdates] = Show.show {
+    case ProjectUpdates(newDescription, newImage, newKeywords, newVisibility) =>
+      def showOption[T](opt: Option[T])(implicit show: Show[T]) =
+        opt.fold(ifEmpty = "none")(_.show)
+
+      List(
+        newDescription.map(v => s"description=${showOption(v)}"),
+        newImage.map(v => s"image=${showOption(v)}"),
+        newKeywords.map(v => s"keywords=${v.mkString(", ")}"),
+        newVisibility.map(v => s"visibility=$v")
+      ).flatten.mkString(", ")
+  }
 }

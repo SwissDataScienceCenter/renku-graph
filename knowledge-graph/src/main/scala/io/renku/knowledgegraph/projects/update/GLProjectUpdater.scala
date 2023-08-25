@@ -57,37 +57,35 @@ private class GLProjectUpdaterImpl[F[_]: Async: GitLabClient] extends GLProjectU
   ): F[Either[Message, Option[GLUpdatedProject]]] =
     if (updates.glUpdateNeeded) {
       implicit val token: Option[AccessToken] = at.some
-      toMultipart(updates)
-        .flatMap(
-          GitLabClient[F]
-            .put(uri"projects" / slug, "edit-project", _)(mapResponse)
-            .map(_.map(_.some))
-        )
+      toMultipart(updates).flatMap(
+        GitLabClient[F]
+          .put(uri"projects" / slug, "edit-project", _)(mapResponse)
+          .map(_.map(_.some))
+      )
     } else
       Option.empty[GLUpdatedProject].asRight[Message].pure[F]
 
-  private def toMultipart: ProjectUpdates => F[Multipart[F]] = { case ProjectUpdates(_, newImage, _, newVisibility) =>
-    val maybeVisibilityPart =
-      newVisibility.map(v => Part.formData[F]("visibility", v.value))
-
-    val maybeAvatarPart =
-      newImage.map(
-        _.fold(
-          Part[F](
-            Headers(`Content-Disposition`("form-data", Map(ci"name" -> "avatar")),
-                    `Content-Type`(MediaType.image.jpeg)
-            ),
-            fs2.Stream.empty
-          )
-        ) { case Image(name, mediaType, data) =>
-          Part.fileData[F]("avatar", name, fs2.Stream.chunk(Chunk.byteVector(data)), `Content-Type`(mediaType))
-        }
-      )
-
-    Multiparts
-      .forSync[F]
-      .flatMap(_.multipart(Vector(maybeVisibilityPart, maybeAvatarPart).flatten))
+  private lazy val toMultipart: ProjectUpdates => F[Multipart[F]] = {
+    case ProjectUpdates(_, newImage, _, newVisibility) =>
+      Multiparts
+        .forSync[F]
+        .flatMap(_.multipart(Vector(maybeVisibilityPart(newVisibility), maybeAvatarPart(newImage)).flatten))
   }
+
+  private def maybeVisibilityPart(newVisibility: Option[projects.Visibility]) =
+    newVisibility.map(v => Part.formData[F]("visibility", v.value))
+
+  private def maybeAvatarPart(newImage: Option[Option[Image]]) =
+    newImage.map(
+      _.fold(
+        Part[F](
+          Headers(`Content-Disposition`("form-data", Map(ci"name" -> "avatar")), `Content-Type`(MediaType.image.jpeg)),
+          fs2.Stream.empty
+        )
+      ) { case Image(name, mediaType, data) =>
+        Part.fileData[F]("avatar", name, fs2.Stream.chunk(Chunk.byteVector(data)), `Content-Type`(mediaType))
+      }
+    )
 
   private lazy val mapResponse
       : PartialFunction[(Status, Request[F], Response[F]), F[Either[Message, GLUpdatedProject]]] = {
