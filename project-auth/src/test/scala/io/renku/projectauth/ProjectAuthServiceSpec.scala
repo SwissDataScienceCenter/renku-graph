@@ -20,36 +20,29 @@ package io.renku.projectauth
 
 import cats.data.NonEmptyList
 import cats.effect.IO
-import cats.effect.kernel.Resource
 import cats.effect.testing.scalatest.AsyncIOSpec
-import fs2.Stream
 import io.renku.generators.Generators.Implicits._
 import io.renku.graph.model.persons.GitLabId
 import io.renku.graph.model.projects.{Role, Slug, Visibility}
 import io.renku.graph.model.{RenkuTinyTypeGenerators, RenkuUrl}
-import io.renku.triplesstore.client.util.JenaContainerSupport
 import org.scalatest.flatspec.AsyncFlatSpec
 import org.scalatest.matchers.should
 import org.typelevel.log4cats.Logger
 import org.typelevel.log4cats.slf4j.Slf4jLogger
 
-class ProjectAuthServiceSpec extends AsyncFlatSpec with AsyncIOSpec with JenaContainerSupport with should.Matchers {
+class ProjectAuthServiceSpec
+    extends AsyncFlatSpec
+    with AsyncIOSpec
+    with ProjectAuthServiceSupport
+    with should.Matchers {
   implicit val logger:   Logger[IO] = Slf4jLogger.getLogger[IO]
   implicit val renkuUrl: RenkuUrl   = RenkuUrl("http://localhost/renku")
 
-  def withProjectAuthService: Resource[IO, ProjectAuthService[IO]] =
-    withDataset("projectauth").map(ProjectAuthService[IO](_, renkuUrl))
+  def randomData(num: Int) = Generators.projectAuthDataGen.asStream.take(num)
 
   it should "add data" in {
-    withProjectAuthService.use { s =>
+    withProjectAuthServiceData(randomData(20)).use { case (s, data) =>
       for {
-        data <- Generators.projectAuthDataGen.asStream.toIO.take(20).compile.toVector
-        _ <- Stream
-               .emits(data)
-               .through(s.updateAll)
-               .compile
-               .drain
-
         n <- s.getAll(QueryFilter.all, 15).compile.toVector
         _ = n shouldBe data.sortBy(_.slug)
       } yield ()
@@ -57,19 +50,8 @@ class ProjectAuthServiceSpec extends AsyncFlatSpec with AsyncIOSpec with JenaCon
   }
 
   it should "work with no members" in {
-    withProjectAuthService.use { s =>
+    withProjectAuthServiceData(randomData(2)).use { case (s, data) =>
       for {
-        data <- Generators.projectAuthDataGen.asStream.toIO
-                  .take(2)
-                  .map(_.copy(members = Set.empty))
-                  .compile
-                  .toVector
-        _ <- Stream
-               .emits(data)
-               .through(s.updateAll)
-               .compile
-               .drain
-
         n <- s.getAll(QueryFilter.all).compile.toVector
         _ = n shouldBe data.sortBy(_.slug)
       } yield ()
@@ -77,55 +59,36 @@ class ProjectAuthServiceSpec extends AsyncFlatSpec with AsyncIOSpec with JenaCon
   }
 
   it should "remove projects" in {
-    withProjectAuthService.use { s =>
+    val data = Generators.projectAuthData.withVisibility(Visibility.Internal).stream
+    withProjectAuthServiceData(data.take(1)).use { case (s, original) =>
       for {
-        original <- Generators.projectAuthDataGen.asStream.toIO
-                      .take(1)
-                      .map(_.copy(visibility = Visibility.Internal))
-                      .compile
-                      .lastOrError
-        _ <- s.update(original)
+        n <- s.getAll(QueryFilter.all).compile.toList
+        _ = n shouldBe original
 
-        n <- s.getAll(QueryFilter.all).compile.toVector
-        _ = n.head shouldBe original
-
-        _ <- s.remove(original.slug)
+        _ <- s.remove(original.head.slug)
         _ <- s.getAll(QueryFilter.all).compile.toVector.asserting(v => v shouldBe Vector.empty)
       } yield ()
     }
   }
 
   it should "remove selectively" in {
-    withProjectAuthService.use { s =>
+    withProjectAuthServiceData(randomData(6)).use { case (s, data) =>
+      val (toremove, tokeep) = data.splitAt(3)
       for {
-        data <- Generators.projectAuthDataGen.asStream.toIO
-                  .take(6)
-                  .compile
-                  .toVector
-        _ <- Stream.emits(data).through(s.updateAll).compile.drain
-
-        (toremove, tokeep) = data.splitAt(3)
         _ <- s.remove(NonEmptyList.fromListUnsafe(toremove.map(_.slug).toList))
-
         _ <- s.getAll(QueryFilter.all).compile.toVector.asserting(v => v shouldBe tokeep.sortBy(_.slug))
       } yield ()
     }
   }
 
   it should "update new properties" in {
-    withProjectAuthService.use { s =>
+    val data = Generators.projectAuthData.withVisibility(Visibility.Internal).stream
+    withProjectAuthServiceData(data.take(1)).use { case (s, original) =>
       for {
-        original <- Generators.projectAuthDataGen.asStream.toIO
-                      .take(1)
-                      .map(_.copy(visibility = Visibility.Internal))
-                      .compile
-                      .lastOrError
-        _ <- s.update(original)
+        n <- s.getAll(QueryFilter.all).compile.toList
+        _ = n shouldBe original
 
-        n <- s.getAll(QueryFilter.all).compile.toVector
-        _ = n.head shouldBe original
-
-        second = original.copy(visibility = Visibility.Public)
+        second = original.head.copy(visibility = Visibility.Public)
         _  <- s.update(second)
         n2 <- s.getAll(QueryFilter.all).compile.toVector
         _ = n2.head shouldBe second
@@ -139,45 +102,30 @@ class ProjectAuthServiceSpec extends AsyncFlatSpec with AsyncIOSpec with JenaCon
   }
 
   it should "search for a specific project by slug" in {
-    withProjectAuthService.use { s =>
+    withProjectAuthServiceData(randomData(1)).use { case (s, original) =>
       for {
-        original <- Generators.projectAuthDataGen.asStream.toIO
-                      .take(1)
-                      .compile
-                      .lastOrError
-        _ <- s.update(original)
+        found <- s.getAll(QueryFilter.all.withSlug(original.head.slug)).compile.lastOrError
+        nf    <- s.getAll(QueryFilter.all.withSlug(Slug(original.head.slug.value + "x"))).compile.last
 
-        found <- s.getAll(QueryFilter.all.withSlug(original.slug)).compile.lastOrError
-        nf    <- s.getAll(QueryFilter.all.withSlug(Slug(original.slug.value + "x"))).compile.last
-
-        _ = found shouldBe original
+        _ = found shouldBe original.head
         _ = nf    shouldBe None
       } yield ()
     }
   }
 
-  it should "search by member ids" in {
-    withProjectAuthService.use { s =>
+  it should "search by member id" in {
+    withProjectAuthServiceData(randomData(1)).use { case (s, original) =>
       for {
-        original <- Generators.projectAuthDataGen
-                      .suchThat(_.members.nonEmpty)
-                      .asStream
-                      .toIO
-                      .take(1)
-                      .compile
-                      .lastOrError
-        _ <- s.update(original)
-
-        found <- s.getAll(QueryFilter.all.withMember(original.members.head.gitLabId)).compile.lastOrError
+        found <- s.getAll(QueryFilter.all.withMember(original.head.members.head.gitLabId)).compile.lastOrError
 
         gId <- IO(
                  RenkuTinyTypeGenerators.personGitLabIds
-                   .suchThat(id => !original.members.map(_.gitLabId).contains(id))
+                   .suchThat(id => !original.head.members.map(_.gitLabId).contains(id))
                    .generateOne
                )
         nf <- s.getAll(QueryFilter.all.withMember(gId)).compile.last
 
-        _ = found shouldBe original
+        _ = found shouldBe original.head
         _ = nf    shouldBe None
       } yield ()
     }

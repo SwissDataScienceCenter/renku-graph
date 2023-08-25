@@ -25,7 +25,7 @@ import cats.syntax.all._
 import fs2.io.net.Network
 import fs2.{Pipe, Stream}
 import io.circe.Decoder
-import io.renku.graph.model.RenkuUrl
+import io.renku.graph.model.{RenkuUrl, Schemas}
 import io.renku.graph.model.projects.{Slug, Visibility}
 import io.renku.jsonld.NamedGraph
 import io.renku.jsonld.syntax._
@@ -67,8 +67,8 @@ object ProjectAuthService {
     private implicit val rUrl: RenkuUrl = renkuUrl
 
     override def remove(slugs: NonEmptyList[Slug]): F[Unit] =
-      sparqlClient.update(sparql"""PREFIX schema: <http://schema.org/>
-                                  |PREFIX renku: <https://swissdatasciencecenter.github.io/renku-ontology#>
+      sparqlClient.update(sparql"""${"schema" -> Schemas.schema}
+                                  |${"renku"   -> Schemas.renku}
                                   |
                                   |DELETE { Graph $graph {?s ?p ?o} }
                                   |WHERE {

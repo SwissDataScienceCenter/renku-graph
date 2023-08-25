@@ -18,7 +18,11 @@
 
 package io.renku.projectauth
 
+import cats.syntax.all._
+import io.renku.graph.model.persons.GitLabId
+import io.renku.graph.model.projects.{Role, Slug, Visibility}
 import io.renku.graph.model.{RenkuTinyTypeGenerators, persons}
+import io.renku.generators.Generators.Implicits._
 import org.scalacheck.Gen
 
 object Generators {
@@ -31,9 +35,34 @@ object Generators {
     id   <- gitLabIds
   } yield ProjectMember(id, role)
 
-  val projectAuthDataGen: Gen[ProjectAuthData] = for {
-    slug       <- RenkuTinyTypeGenerators.projectSlugs
-    members    <- Gen.choose(0, 150).flatMap(n => Gen.listOfN(n, memberGen))
-    visibility <- RenkuTinyTypeGenerators.projectVisibilities
-  } yield ProjectAuthData(slug, members.toSet, visibility)
+  def projectAuthData: ProjectAuthDataBuilder = ProjectAuthDataBuilder()
+
+  val projectAuthDataGen: Gen[ProjectAuthData] =
+    projectAuthData.build
+
+  final case class ProjectAuthDataBuilder(
+      slug:       Gen[Slug] = RenkuTinyTypeGenerators.projectSlugs,
+      members:    Gen[Set[ProjectMember]] = Gen.choose(0, 150).flatMap(n => Gen.listOfN(n, memberGen)).map(_.toSet),
+      visibility: Gen[Visibility] = RenkuTinyTypeGenerators.projectVisibilities
+  ) {
+    def withMembers(members: (Int, Role)*): ProjectAuthDataBuilder =
+      copy(members = Gen.const(members.map(t => ProjectMember(GitLabId(t._1), t._2)).toSet))
+
+    def withRoles(roles: Role*): ProjectAuthDataBuilder =
+      copy(members = roles.traverse(r => gitLabIds.map(id => ProjectMember(id, r))).map(_.toSet))
+
+    def withSlug(slug: Slug): ProjectAuthDataBuilder =
+      copy(slug = Gen.const(slug))
+
+    def withVisibility(v: Visibility): ProjectAuthDataBuilder =
+      copy(visibility = Gen.const(v))
+
+    val build = for {
+      s <- slug
+      m <- members
+      v <- visibility
+    } yield ProjectAuthData(s, m, v)
+
+    val stream = build.asStream
+  }
 }

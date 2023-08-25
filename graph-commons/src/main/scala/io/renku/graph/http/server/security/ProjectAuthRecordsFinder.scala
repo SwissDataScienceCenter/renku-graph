@@ -18,14 +18,14 @@
 
 package io.renku.graph.http.server.security
 
-import cats.effect.Async
+import cats.effect.{Async, Sync}
 import cats.effect.kernel.Resource
 import cats.syntax.all._
 import fs2.io.net.Network
 import io.renku.graph.http.server.security.Authorizer.SecurityRecordFinder
 import io.renku.graph.model.{RenkuUrl, projects}
 import io.renku.http.server.security.model
-import io.renku.projectauth.QueryFilter
+import io.renku.projectauth.{ProjectAuthService, QueryFilter}
 import io.renku.triplesstore.{ProjectSparqlClient, ProjectsConnectionConfig, SparqlQueryTimeRecorder}
 import org.typelevel.log4cats.Logger
 
@@ -39,18 +39,20 @@ object ProjectAuthRecordsFinder {
   ): Resource[F, ProjectAuthRecordsFinder[F]] =
     ProjectSparqlClient(connCfg).map(c => apply[F](c, renkuUrl))
 
-  def apply[F[_]: Async: Network: Logger: SparqlQueryTimeRecorder](
+  def apply[F[_]: Sync: Logger: SparqlQueryTimeRecorder](
       projectSparqlClient: ProjectSparqlClient[F],
       renkuUrl:            RenkuUrl
   ): ProjectAuthRecordsFinder[F] =
-    new Impl[F](projectSparqlClient, renkuUrl)
+    new Impl[F](projectSparqlClient.asProjectAuthService(renkuUrl))
 
-  private final class Impl[F[_]: Async: Logger: SparqlQueryTimeRecorder](
-      projectSparqlClient: ProjectSparqlClient[F],
-      renkuUrl:            RenkuUrl
+  def apply[F[_]: Sync: SparqlQueryTimeRecorder](
+      projectAuthService: ProjectAuthService[F]
+  ): ProjectAuthRecordsFinder[F] =
+    new Impl[F](projectAuthService)
+
+  private final class Impl[F[_]: Sync: SparqlQueryTimeRecorder](
+      projectAuthService: ProjectAuthService[F]
   ) extends ProjectAuthRecordsFinder[F] {
-    private[this] val projectAuthService = projectSparqlClient.asProjectAuthService(renkuUrl)
-
     override def apply(slug: projects.Slug, user: Option[model.AuthUser]): F[List[Authorizer.SecurityRecord]] = {
       val filter = QueryFilter.all.withSlug(slug)
       projectAuthService.getAll(filter).compile.toList.map { data =>
