@@ -16,8 +16,10 @@
  * limitations under the License.
  */
 
-package io.renku.tokenrepository.repository.deletion
+package io.renku.tokenrepository.repository
+package deletion
 
+import RepositoryGenerators.deletionResults
 import cats.effect.IO
 import cats.syntax.all._
 import io.renku.data.Message
@@ -26,57 +28,57 @@ import io.renku.generators.Generators.Implicits._
 import io.renku.generators.Generators._
 import io.renku.graph.model.GraphModelGenerators._
 import io.renku.interpreters.TestLogger
-import io.renku.interpreters.TestLogger.Level.Error
-import io.renku.testtools.IOSpec
+import io.renku.interpreters.TestLogger.Level.{Error, Info}
+import io.renku.testtools.CustomAsyncIOSpec
 import org.http4s._
 import org.http4s.headers.`Content-Type`
-import org.scalamock.scalatest.MockFactory
+import org.scalamock.scalatest.AsyncMockFactory
+import org.scalatest.flatspec.AsyncFlatSpec
 import org.scalatest.matchers.should
-import org.scalatest.wordspec.AnyWordSpec
 
-class DeleteTokenEndpointSpec extends AnyWordSpec with IOSpec with MockFactory with should.Matchers {
+class DeleteTokenEndpointSpec extends AsyncFlatSpec with CustomAsyncIOSpec with AsyncMockFactory with should.Matchers {
 
-  "associateToken" should {
-
-    "respond with NO_CONTENT if the token removal was successful" in new TestCase {
-
-      (tokenRemover.delete _)
-        .expects(projectId, maybeAccessToken)
-        .returning(IO.unit)
-
-      val response = endpoint.deleteToken(projectId, maybeAccessToken).unsafeRunSync()
-
-      response.status                                shouldBe Status.NoContent
-      response.body.compile.toVector.unsafeRunSync() shouldBe empty
-
-      logger.expectNoLogs()
-    }
-
-    "respond with INTERNAL_SERVER_ERROR if token removal fails" in new TestCase {
-
-      val exception = exceptions.generateOne
-      (tokenRemover.delete _)
-        .expects(projectId, maybeAccessToken)
-        .returning(exception.raiseError[IO, Unit])
-
-      val response = endpoint.deleteToken(projectId, maybeAccessToken).unsafeRunSync()
-
-      response.status      shouldBe Status.InternalServerError
-      response.contentType shouldBe Some(`Content-Type`(MediaType.application.json))
-      val expectedMessage = s"Deleting token for projectId: $projectId failed"
-      response.as[Message].unsafeRunSync() shouldBe Message.Error.unsafeApply(expectedMessage)
-
-      logger.loggedOnly(Error(expectedMessage, exception))
-    }
-  }
-
-  private trait TestCase {
+  it should "respond with NO_CONTENT if the token removal was successful" in {
 
     val projectId        = projectIds.generateOne
     val maybeAccessToken = accessTokens.generateOption
+    val deletionResult   = deletionResults.generateOne
+    (tokenRemover.delete _)
+      .expects(projectId, maybeAccessToken)
+      .returning(deletionResult.pure[IO])
 
-    implicit val logger: TestLogger[IO] = TestLogger[IO]()
-    val tokenRemover = mock[TokenRemover[IO]]
-    val endpoint     = new DeleteTokenEndpointImpl[IO](tokenRemover)
+    endpoint
+      .deleteToken(projectId, maybeAccessToken)
+      .flatMap { response =>
+        response.status.pure[IO].asserting(_ shouldBe Status.NoContent) >>
+          response.body.compile.toVector.asserting(_ shouldBe Vector.empty)
+      } >> {
+      deletionResult match {
+        case DeletionResult.Deleted    => IO(logger.loggedOnly(Info(show"Token for project $projectId deleted")))
+        case DeletionResult.NotExisted => IO(logger.expectNoLogs())
+      }
+    }
   }
+
+  it should "respond with INTERNAL_SERVER_ERROR if token removal fails" in {
+
+    val projectId        = projectIds.generateOne
+    val maybeAccessToken = accessTokens.generateOption
+    val exception        = exceptions.generateOne
+    (tokenRemover.delete _)
+      .expects(projectId, maybeAccessToken)
+      .returning(exception.raiseError[IO, DeletionResult])
+
+    val expectedMessage = s"Deleting token for projectId: $projectId failed"
+    endpoint.deleteToken(projectId, maybeAccessToken).flatMap { response =>
+      response.status.pure[IO].asserting(_ shouldBe Status.InternalServerError) >>
+        response.contentType.pure[IO].asserting(_ shouldBe Some(`Content-Type`(MediaType.application.json))) >>
+        response.as[Message].asserting(_ shouldBe Message.Error.unsafeApply(expectedMessage))
+    } >>
+      IO(logger.loggedOnly(Error(expectedMessage, exception)))
+  }
+
+  private implicit lazy val logger: TestLogger[IO] = TestLogger[IO]()
+  private lazy val tokenRemover = mock[TokenRemover[IO]]
+  private lazy val endpoint     = new DeleteTokenEndpointImpl[IO](tokenRemover)
 }

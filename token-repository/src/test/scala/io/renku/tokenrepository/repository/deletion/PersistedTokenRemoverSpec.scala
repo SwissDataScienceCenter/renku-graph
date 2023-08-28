@@ -40,7 +40,7 @@ class PersistedTokenRemoverSpec
   "delete" should {
 
     "succeed if token does not exist" in new TestCase {
-      remover.delete(projectId).unsafeRunSync() shouldBe ()
+      remover.delete(projectId).unsafeRunSync() shouldBe DeletionResult.NotExisted
     }
 
     "succeed if token exists" in new TestCase {
@@ -49,7 +49,7 @@ class PersistedTokenRemoverSpec
       insert(projectId, projectSlug, encryptedToken)
       findToken(projectId) shouldBe Some(encryptedToken.value)
 
-      remover.delete(projectId).unsafeRunSync() shouldBe ()
+      remover.delete(projectId).unsafeRunSync() shouldBe DeletionResult.Deleted
 
       findToken(projectId) shouldBe None
     }

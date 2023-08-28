@@ -32,91 +32,87 @@ import io.renku.graph.model.projects
 import io.renku.http.client.RestClient.ResponseMappingF
 import io.renku.http.client.{AccessToken, GitLabClient}
 import io.renku.http.server.EndpointTester._
+import io.renku.http.tinytypes.TinyTypeURIEncoder._
 import io.renku.interpreters.TestLogger
-import io.renku.testtools.{GitLabClientTools, IOSpec}
+import io.renku.testtools.{CustomAsyncIOSpec, GitLabClientTools}
 import org.http4s.implicits._
 import org.http4s.{Request, Response, Status, Uri}
-import org.scalamock.scalatest.MockFactory
+import org.scalamock.scalatest.AsyncMockFactory
+import org.scalatest.flatspec.AsyncFlatSpec
 import org.scalatest.matchers.should
 import org.scalatest.prop.TableDrivenPropertyChecks
-import org.scalatest.wordspec.AnyWordSpec
 
 class ProjectSlugFinderSpec
-    extends AnyWordSpec
-    with IOSpec
+    extends AsyncFlatSpec
+    with CustomAsyncIOSpec
     with should.Matchers
-    with MockFactory
+    with AsyncMockFactory
     with GitLabClientTools[IO]
     with TableDrivenPropertyChecks {
 
-  "findProjectSlug" should {
+  forAll {
+    Table(
+      "Token type"              -> "token",
+      "Project Access Token"    -> projectAccessTokens.generateOne,
+      "User OAuth Access Token" -> userOAuthAccessTokens.generateOne,
+      "Personal Access Token"   -> personalAccessTokens.generateOne
+    )
+  } { (tokenType, accessToken: AccessToken) =>
+    it should s"return fetched Project's slug if service responds with OK and a valid body - case when $tokenType given" in {
 
-    forAll {
-      Table(
-        "Token type"              -> "token",
-        "Project Access Token"    -> projectAccessTokens.generateOne,
-        "User OAuth Access Token" -> userOAuthAccessTokens.generateOne,
-        "Personal Access Token"   -> personalAccessTokens.generateOne
-      )
-    } { (tokenType, accessToken: AccessToken) =>
-      s"return fetched Project's slug if service responds with OK and a valid body - case when $tokenType given" in new TestCase {
+      val projectId   = projectIds.generateOne
+      val projectSlug = projectSlugs.generateOne
 
-        val endpointName: String Refined NonEmpty = "single-project"
-        (gitLabClient
-          .get(_: Uri, _: String Refined NonEmpty)(_: ResponseMappingF[IO, Option[projects.Slug]])(
-            _: Option[AccessToken]
-          ))
-          .expects(uri"projects" / projectId.value, endpointName, *, Option(accessToken))
-          .returning(projectSlug.some.pure[IO])
+      val endpointName: String Refined NonEmpty = "single-project"
+      (gitLabClient
+        .get(_: Uri, _: String Refined NonEmpty)(_: ResponseMappingF[IO, Option[projects.Slug]])(
+          _: Option[AccessToken]
+        ))
+        .expects(uri"projects" / projectId, endpointName, *, Option(accessToken))
+        .returning(projectSlug.some.pure[IO])
 
-        slugFinder.findProjectSlug(projectId, accessToken).value.unsafeRunSync() shouldBe projectSlug.some
-      }
-    }
-
-    "map OK response body to project slug" in new TestCase {
-      mapResponse(Status.Ok, Request[IO](), Response[IO](Status.Ok).withEntity(projectJson))
-        .unsafeRunSync() shouldBe projectSlug.some
-    }
-
-    Status.Unauthorized :: Status.Forbidden :: Status.NotFound :: Nil foreach { status =>
-      s"map $status response to None" in new TestCase {
-        mapResponse(status, Request[IO](), Response[IO](status)).unsafeRunSync() shouldBe None
-      }
-    }
-
-    "map UNAUTHORIZED response to None" in new TestCase {
-      mapResponse(Status.Unauthorized, Request[IO](), Response[IO](Status.Unauthorized)).unsafeRunSync() shouldBe None
-    }
-
-    "return an Exception if remote responds with status different than OK, NOT_FOUND or UNAUTHORIZED" in new TestCase {
-      intercept[Exception] {
-        mapResponse(Status.BadRequest, Request[IO](), Response[IO](Status.BadRequest)).unsafeRunSync()
-      }
-    }
-
-    "return a RuntimeException if remote client responds with unexpected body" in new TestCase {
-      intercept[Exception] {
-        mapResponse(Status.Ok, Request[IO](), Response[IO](Status.Ok).withEntity(Json.obj())).unsafeRunSync()
-      }
+      slugFinder.findProjectSlug(projectId, accessToken).asserting(_ shouldBe projectSlug.some)
     }
   }
 
-  private trait TestCase {
+  it should "map OK response body to project slug" in {
+
     val projectId   = projectIds.generateOne
     val projectSlug = projectSlugs.generateOne
 
-    private implicit val logger: TestLogger[IO]   = TestLogger[IO]()
-    implicit val gitLabClient:   GitLabClient[IO] = mock[GitLabClient[IO]]
-    val slugFinder = new ProjectSlugFinderImpl[IO]
+    mapResponse(Status.Ok, Request[IO](), Response[IO](Status.Ok).withEntity(projectJson(projectId, projectSlug)))
+      .asserting(_ shouldBe projectSlug.some)
+  }
 
-    lazy val projectJson = json"""{
+  Status.Unauthorized :: Status.Forbidden :: Status.NotFound :: Nil foreach { status =>
+    it should s"map $status response to None" in {
+      mapResponse(status, Request[IO](), Response[IO](status)).asserting(_ shouldBe None)
+    }
+  }
+
+  it should "map UNAUTHORIZED response to None" in {
+    mapResponse(Status.Unauthorized, Request[IO](), Response[IO](Status.Unauthorized)).asserting(_ shouldBe None)
+  }
+
+  it should "throws a MatchError if remote responds with status different than OK, NOT_FOUND or UNAUTHORIZED" in {
+    IO(mapResponse(Status.BadRequest, Request[IO](), Response[IO](Status.BadRequest))).flatten.assertThrows[MatchError]
+  }
+
+  it should "return an Exception if remote client responds with unexpected body" in {
+    mapResponse(Status.Ok, Request[IO](), Response[IO](Status.Ok).withEntity(Json.obj())).assertThrows[Exception]
+  }
+
+  private implicit val logger:       TestLogger[IO]   = TestLogger[IO]()
+  private implicit val gitLabClient: GitLabClient[IO] = mock[GitLabClient[IO]]
+  private lazy val slugFinder = new ProjectSlugFinderImpl[IO]
+
+  private def projectJson(projectId: projects.GitLabId, projectSlug: projects.Slug) = json"""{
       "id":                  $projectId,
       "path_with_namespace": $projectSlug
     }"""
 
-    lazy val mapResponse = captureMapping(gitLabClient)(
-      findingMethod = slugFinder.findProjectSlug(projectId, accessTokens.generateOne).value.unsafeRunSync(),
-      resultGenerator = projectSlugs.generateOption
-    )
-  }
+  private lazy val mapResponse = captureMapping(gitLabClient)(
+    findingMethod = slugFinder.findProjectSlug(projectIds.generateOne, accessTokens.generateOne).unsafeRunSync(),
+    resultGenerator = projectSlugs.generateOption
+  )
 }
