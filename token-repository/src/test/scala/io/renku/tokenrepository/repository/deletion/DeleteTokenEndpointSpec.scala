@@ -33,10 +33,16 @@ import io.renku.testtools.CustomAsyncIOSpec
 import org.http4s._
 import org.http4s.headers.`Content-Type`
 import org.scalamock.scalatest.AsyncMockFactory
+import org.scalatest.BeforeAndAfterEach
 import org.scalatest.flatspec.AsyncFlatSpec
 import org.scalatest.matchers.should
 
-class DeleteTokenEndpointSpec extends AsyncFlatSpec with CustomAsyncIOSpec with AsyncMockFactory with should.Matchers {
+class DeleteTokenEndpointSpec
+    extends AsyncFlatSpec
+    with CustomAsyncIOSpec
+    with AsyncMockFactory
+    with should.Matchers
+    with BeforeAndAfterEach {
 
   it should "respond with NO_CONTENT if the token removal was successful" in {
 
@@ -81,4 +87,6 @@ class DeleteTokenEndpointSpec extends AsyncFlatSpec with CustomAsyncIOSpec with 
   private implicit lazy val logger: TestLogger[IO] = TestLogger[IO]()
   private lazy val tokenRemover = mock[TokenRemover[IO]]
   private lazy val endpoint     = new DeleteTokenEndpointImpl[IO](tokenRemover)
+
+  protected override def beforeEach() = logger.reset()
 }
