@@ -44,7 +44,7 @@ class DeleteTokenEndpointImpl[F[_]: Async: Logger](tokenRemover: TokenRemover[F]
       .recoverWith(errorHttpResult(projectId))
 
   private def logSuccess(projectId: GitLabId): DeletionResult => F[Unit] = {
-    case DeletionResult.Deleted    => Logger[F].info(show"Token for project $projectId deleted")
+    case DeletionResult.Deleted    => Logger[F].info(show"Token removed for $projectId")
     case DeletionResult.NotExisted => ().pure[F]
   }
 

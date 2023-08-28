@@ -85,7 +85,7 @@ private class TokensCreatorImpl[F[_]: MonadThrow: Logger](
       checkValid(projectId, token) >>= {
         case true => token.some.pure[F]
         case false =>
-          deleteAndLogSuccess(projectId, userToken, show"Token for $projectId removed as got invalidated in GL")
+          deleteAndLogSuccess(projectId, userToken, show"Token removed for $projectId as got invalidated in GL")
             .as(Option.empty)
       }
   }
@@ -108,7 +108,7 @@ private class TokensCreatorImpl[F[_]: MonadThrow: Logger](
           case None =>
             deleteAndLogSuccess(projectId,
                                 userToken,
-                                show"Token for $projectId removed as project does not exist in GL"
+                                show"Token removed for $projectId as project does not exist in GL"
             ).as(Option.empty)
           case Some(actualGLSlug) =>
             findPersistedProjectSlug(projectId) >>= {
