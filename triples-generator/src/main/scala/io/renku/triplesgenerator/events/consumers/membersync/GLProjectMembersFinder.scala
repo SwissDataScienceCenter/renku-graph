@@ -16,7 +16,7 @@
  * limitations under the License.
  */
 
-package io.renku.triplesgenerator.gitlab
+package io.renku.triplesgenerator.events.consumers.membersync
 
 import cats.effect.Async
 import cats.syntax.all._
@@ -27,6 +27,7 @@ import io.circe.Decoder
 import io.renku.graph.model.persons.{GitLabId, Name}
 import io.renku.graph.model.projects.Slug
 import io.renku.http.client.{AccessToken, GitLabClient}
+import io.renku.http.tinytypes.TinyTypeURIEncoder._
 import io.renku.projectauth.ProjectMember
 import io.renku.tinytypes.json.TinyTypeDecoders._
 import org.http4s.Status.{Forbidden, NotFound, Ok, Unauthorized}
@@ -36,14 +37,14 @@ import org.http4s.implicits.http4sLiteralsSyntax
 import org.typelevel.ci._
 import org.typelevel.log4cats.Logger
 
-trait GitLabProjectMembersFinder[F[_]] {
+private trait GLProjectMembersFinder[F[_]] {
   def findProjectMembers(slug: Slug)(implicit maybeAccessToken: Option[AccessToken]): F[Set[GitLabProjectMember]]
 }
 
-private class GitLabProjectMembersFinderImpl[F[_]: Async: GitLabClient: Logger] extends GitLabProjectMembersFinder[F] {
+private class GLProjectMembersFinderImpl[F[_]: Async: GitLabClient: Logger] extends GLProjectMembersFinder[F] {
 
   override def findProjectMembers(slug: Slug)(implicit mat: Option[AccessToken]): F[Set[GitLabProjectMember]] =
-    fetch(uri"projects" / slug.show / "members" / "all")
+    fetch(uri"projects" / slug / "members" / "all")
 
   private val glApiName: String Refined NonEmpty = "project-members"
 
@@ -95,12 +96,11 @@ private class GitLabProjectMembersFinderImpl[F[_]: Async: GitLabClient: Logger] 
     Decoder.forProduct3("id", "name", "access_level")(GitLabProjectMember.apply)
 }
 
-object GitLabProjectMembersFinder {
-  def apply[F[_]: Async: GitLabClient: Logger]: F[GitLabProjectMembersFinder[F]] =
-    new GitLabProjectMembersFinderImpl[F].pure[F].widen[GitLabProjectMembersFinder[F]]
+private object GLProjectMembersFinder {
+  def apply[F[_]: Async: GitLabClient: Logger]: GLProjectMembersFinder[F] = new GLProjectMembersFinderImpl[F]
 }
 
-final case class GitLabProjectMember(gitLabId: GitLabId, name: Name, accessLevel: Int) {
+private final case class GitLabProjectMember(gitLabId: GitLabId, name: Name, accessLevel: Int) {
   def toProjectAuthMember: ProjectMember =
     ProjectMember.fromGitLabData(gitLabId, accessLevel)
 }

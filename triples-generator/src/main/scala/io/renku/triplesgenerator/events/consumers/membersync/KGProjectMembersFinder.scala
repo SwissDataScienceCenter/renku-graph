@@ -17,7 +17,6 @@
  */
 
 package io.renku.triplesgenerator.events.consumers.membersync
-package namedgraphs
 
 import cats.effect.Async
 import cats.syntax.all._
@@ -26,7 +25,7 @@ import io.renku.graph.model.Schemas.schema
 import io.renku.graph.model._
 import io.renku.graph.model.entities.Person
 import io.renku.graph.model.persons.GitLabId
-import io.renku.graph.model.projects.{Slug, ResourceId}
+import io.renku.graph.model.projects.{ResourceId, Slug}
 import io.renku.graph.model.views.RdfResource
 import io.renku.triplesstore.ResultsDecoder._
 import io.renku.triplesstore.SparqlQuery.Prefixes
