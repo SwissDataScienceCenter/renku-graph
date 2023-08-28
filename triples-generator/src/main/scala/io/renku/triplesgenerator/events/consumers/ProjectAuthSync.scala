@@ -39,7 +39,7 @@ object ProjectAuthSync {
 
   def resource[F[_]: Async: Logger: Network: SparqlQueryTimeRecorder](cc: ProjectsConnectionConfig)(implicit
       renkuUrl: RenkuUrl
-  ) =
+  ): Resource[F, ProjectAuthSync[F]] =
     ProjectSparqlClient[F](cc).map(apply[F])
 
   def apply[F[_]: Sync](
@@ -51,6 +51,7 @@ object ProjectAuthSync {
       projectAuthService: ProjectAuthService[F],
       sparqlClient:       ProjectSparqlClient[F]
   ) extends ProjectAuthSync[F] {
+
     private[this] val visibilityFinder: VisibilityFinder[F] =
       new VisibilityFinder[F](sparqlClient)
 

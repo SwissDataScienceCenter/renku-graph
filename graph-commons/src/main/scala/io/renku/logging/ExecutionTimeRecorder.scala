@@ -18,7 +18,7 @@
 
 package io.renku.logging
 
-import cats.effect.{Clock, Sync}
+import cats.effect.{Clock, Resource, Sync}
 import cats.syntax.all._
 import cats.{Applicative, Monad}
 import com.typesafe.config.{Config, ConfigFactory}
@@ -76,29 +76,29 @@ class ExecutionTimeRecorderImpl[F[_]: Sync: Clock: Logger](
   override def measureExecutionTime[A](
       block:               F[A],
       maybeHistogramLabel: Option[String Refined NonEmpty] = None
-  ): F[(ElapsedTime, A)] = Clock[F]
-    .timed {
-      maybeHistogram match {
-        case None => block
-        case Some(histogram) =>
-          for {
-            maybeTimer <- maybeStartTimer(histogram, maybeHistogramLabel)
-            result     <- block
-            _          <- maybeTimer.map(_.observeDuration.void).getOrElse(().pure[F])
-          } yield result
+  ): F[(ElapsedTime, A)] =
+    Clock[F]
+      .timed {
+        maybeHistogram match {
+          case None            => block
+          case Some(histogram) => timerResource(histogram, maybeHistogramLabel).surround(block)
+        }
       }
-    }
-    .map { case (elapsedTime, result) => ElapsedTime(elapsedTime) -> result }
+      .map { case (elapsedTime, result) => ElapsedTime(elapsedTime) -> result }
 
-  private def maybeStartTimer(histogram: Histogram[F], maybeHistogramLabel: Option[String Refined NonEmpty]) =
-    histogram -> maybeHistogramLabel match {
-      case (h: SingleValueHistogram[F], None)    => h.startTimer().map(_.some)
-      case (h: LabeledHistogram[F], Some(label)) => h.startTimer(label.value).map(_.some)
-      case (h: SingleValueHistogram[F], Some(label)) =>
-        Logger[F].error(s"Label $label sent for a Single Value Histogram ${h.name}") >> None.pure[F]
-      case (h: LabeledHistogram[F], None) =>
-        Logger[F].error(s"No label sent for a Labeled Histogram ${h.name}") >> None.pure[F]
-    }
+  private lazy val timerResource
+      : (Histogram[F], Option[String Refined NonEmpty]) => Resource[F, Option[Histogram.Timer[F]]] = {
+    case (h: SingleValueHistogram[F], None) =>
+      Resource.make(h.startTimer().map(_.some))(_.map(_.observeDuration.void).getOrElse(().pure[F]))
+    case (h: LabeledHistogram[F], Some(label)) =>
+      Resource.make(h.startTimer(label.value).map(_.some))(_.map(_.observeDuration.void).getOrElse(().pure[F]))
+    case (_: LabeledHistogram[F], None) =>
+      Resource.pure[F, Option[Histogram.Timer[F]]](Option.empty[Histogram.Timer[F]])
+    case (h: SingleValueHistogram[F], Some(label)) =>
+      Resource
+        .pure[F, Option[Histogram.Timer[F]]](Option.empty[Histogram.Timer[F]])
+        .evalTap(_ => Logger[F].error(s"Label $label sent for a Single Value Histogram ${h.name}"))
+  }
 }
 
 object ExecutionTimeRecorder {
