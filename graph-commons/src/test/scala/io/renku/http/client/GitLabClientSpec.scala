@@ -41,6 +41,7 @@ import org.http4s.Method._
 import org.http4s.Status.{Accepted, NotFound, Ok, Unauthorized}
 import org.http4s.circe.CirceEntityCodec.circeEntityDecoder
 import org.http4s.multipart.{Multiparts, Part}
+import org.http4s.util.Renderer
 import org.http4s.{Header, Method, Request, Response, Status, Uri}
 import org.scalacheck.Gen
 import org.scalamock.scalatest.MockFactory
@@ -248,7 +249,7 @@ class GitLabClientSpec
             )
             .withHeader(
               "Content-Type",
-              containing(s"${multipart.`form-data`.mainType}/${multipart.`form-data`.subType}")
+              containing(Renderer.renderString(multipart.`form-data`))
             )
             .withHeader(
               "Content-Type",
