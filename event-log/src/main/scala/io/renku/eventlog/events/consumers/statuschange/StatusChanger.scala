@@ -64,13 +64,17 @@ private[statuschange] class StatusChangerImpl[F[_]: MonadCancelThrow: SessionRes
   private def rollback[E <: StatusChangeEvent](transaction: Transaction[F])(savepoint: transaction.Savepoint)(event: E)(
       dbUpdater: DBUpdater[F, E]
   ): Throwable => UpdateOp[F] = { err =>
-    val throwAll: PartialFunction[Throwable, UpdateOp[F]] = { e => Kleisli.liftF(e.raiseError[F, DBUpdateResults]) }
+    def executeRollback: Throwable => F[DBUpdateResults] = { failure =>
+      if ((dbUpdater onRollback event).isDefinedAt(failure))
+        SessionResource[F]
+          .useK((dbUpdater onRollback event).apply(failure))
+          .handleErrorWith(executeRollback)
+      else
+        failure.raiseError[F, DBUpdateResults]
+    }
 
     Kleisli.liftF {
-      transaction.rollback(savepoint) >>
-        SessionResource[F].useK(
-          (dbUpdater onRollback event).applyOrElse(err, throwAll)
-        )
+      transaction.rollback(savepoint) >> executeRollback(err)
     }
   }
 }

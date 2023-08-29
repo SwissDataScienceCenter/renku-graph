@@ -18,6 +18,7 @@
 
 package io.renku.eventlog.events.consumers.statuschange
 
+import SkunkExceptionsGenerators.postgresErrors
 import cats.data.Kleisli
 import cats.effect.IO
 import cats.syntax.all._
@@ -44,6 +45,7 @@ import org.scalacheck.Gen
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
+import skunk.SqlState.{DeadlockDetected, ForeignKeyViolation}
 import skunk._
 import skunk.implicits._
 
@@ -97,6 +99,29 @@ class StatusChangerSpec
 
       findEvent(eventId).map(_._2) shouldBe Some(initialStatus)
       findAllEventDeliveries       shouldBe Nil
+    }
+
+    "retry the rollback procedure if it fails with an error that the rollback can deal with" in new MockedTestCase {
+
+      val updateFailure = postgresErrors(DeadlockDetected).generateOne
+      (dbUpdater.updateDB _).expects(event).returning(Kleisli.liftF(updateFailure.raiseError[IO, DBUpdateResults]))
+
+      val rollbackFailure = postgresErrors(ForeignKeyViolation).generateOne
+      val updateResults   = updateResultsGen(event).generateOne
+      val rollbackF: RollbackOp[IO] = {
+        case DeadlockDetected(_) =>
+          Kleisli.liftF[IO, Session[IO], DBUpdateResults](rollbackFailure.raiseError[IO, DBUpdateResults])
+        case ForeignKeyViolation(_) =>
+          Kleisli.pure[IO, Session[IO], DBUpdateResults](updateResults)
+      }
+      (dbUpdater.onRollback _)
+        .expects(event)
+        .returning(rollbackF)
+        .atLeastOnce()
+
+      (gaugesUpdater.updateGauges _).expects(updateResults).returning(().pure[IO])
+
+      statusChanger.updateStatuses(dbUpdater)(event).unsafeRunSync() shouldBe ()
     }
 
     "succeed if updating the gauge fails" in new MockedTestCase {
