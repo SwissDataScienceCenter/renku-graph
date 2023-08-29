@@ -21,8 +21,9 @@ package io.renku.triplesgenerator.events.consumers.membersync
 import cats.syntax.all._
 import io.renku.generators.Generators.Implicits._
 import io.renku.generators.Generators.positiveInts
-import io.renku.graph.model.GraphModelGenerators.{personGitLabIds, personResourceIds}
-import io.renku.graph.model.RenkuUrl
+import io.renku.graph.model.GraphModelGenerators.{personGitLabIds, personNames, personResourceIds}
+import io.renku.graph.model.projects.Role
+import io.renku.graph.model.{RenkuTinyTypeGenerators, RenkuUrl}
 import org.scalacheck.Gen
 
 private object Generators {
@@ -34,4 +35,10 @@ private object Generators {
 
   lazy val syncSummaries: Gen[SyncSummary] =
     (positiveInts().map(_.value), positiveInts().map(_.value)).mapN(SyncSummary)
+
+  implicit val gitLabProjectMembers: Gen[GitLabProjectMember] = for {
+    id   <- personGitLabIds
+    name <- personNames
+    role <- RenkuTinyTypeGenerators.roleGen
+  } yield GitLabProjectMember(id, name, Role.toGitLabAccessLevel(role))
 }

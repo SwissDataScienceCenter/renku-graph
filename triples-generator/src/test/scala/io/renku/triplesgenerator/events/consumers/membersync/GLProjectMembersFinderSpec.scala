@@ -16,7 +16,7 @@
  * limitations under the License.
  */
 
-package io.renku.triplesgenerator.gitlab
+package io.renku.triplesgenerator.events.consumers.membersync
 
 /*
  * Copyright 2021 Swiss Data Science Center (SDSC)
@@ -36,6 +36,7 @@ package io.renku.triplesgenerator.gitlab
  * limitations under the License.
  */
 
+import Generators._
 import cats.effect.IO
 import cats.syntax.all._
 import eu.timepit.refined.api.Refined
@@ -55,7 +56,6 @@ import io.renku.http.tinytypes.TinyTypeURIEncoder._
 import io.renku.interpreters.TestLogger
 import io.renku.stubbing.ExternalServiceStubbing
 import io.renku.testtools.{GitLabClientTools, IOSpec}
-import io.renku.triplesgenerator.gitlab.Generators._
 import org.http4s.Status.{Forbidden, Unauthorized}
 import org.http4s.implicits.http4sLiteralsSyntax
 import org.http4s.{Header, Headers, Request, Response, Status, Uri}
@@ -66,7 +66,7 @@ import org.scalatest.wordspec.AnyWordSpec
 import org.scalatestplus.scalacheck.ScalaCheckPropertyChecks
 import org.typelevel.ci._
 
-class GitLabProjectMembersFinderSpec
+class GLProjectMembersFinderSpec
     extends AnyWordSpec
     with IOSpec
     with ExternalServiceStubbing
@@ -94,8 +94,6 @@ class GitLabProjectMembersFinderSpec
 
       finder.findProjectMembers(slug).unsafeRunSync() shouldBe projectMembers
     }
-
-    // test map response
 
     "parse results and request next page" in new TestCase {
 
@@ -158,7 +156,7 @@ class GitLabProjectMembersFinderSpec
 
     private implicit val logger: TestLogger[IO]   = TestLogger[IO]()
     implicit val gitLabClient:   GitLabClient[IO] = mock[GitLabClient[IO]]
-    val finder = new GitLabProjectMembersFinderImpl[IO]
+    val finder = new GLProjectMembersFinderImpl[IO]
 
     def setGitLabClientExpectation(projectSlug:              projects.Slug,
                                    maybePage:                Option[Int] = None,
