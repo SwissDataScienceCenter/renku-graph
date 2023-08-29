@@ -40,10 +40,15 @@ class DeleteTokenEndpointImpl[F[_]: Async: Logger](tokenRemover: TokenRemover[F]
     with DeleteTokenEndpoint[F] {
 
   override def deleteToken(projectId: GitLabId, maybeAccessToken: Option[AccessToken]): F[Response[F]] =
-    (tokenRemover.delete(projectId, maybeAccessToken) >> NoContent())
-      .recoverWith(httpResult(projectId))
+    (tokenRemover.delete(projectId, maybeAccessToken).flatMap(logSuccess(projectId)) >> NoContent())
+      .recoverWith(errorHttpResult(projectId))
 
-  private def httpResult(projectId: GitLabId): PartialFunction[Throwable, F[Response[F]]] = {
+  private def logSuccess(projectId: GitLabId): DeletionResult => F[Unit] = {
+    case DeletionResult.Deleted    => Logger[F].info(show"Token removed for $projectId")
+    case DeletionResult.NotExisted => ().pure[F]
+  }
+
+  private def errorHttpResult(projectId: GitLabId): PartialFunction[Throwable, F[Response[F]]] = {
     case NonFatal(exception) =>
       val message = Message.Error.unsafeApply(s"Deleting token for projectId: $projectId failed")
       Logger[F].error(exception)(message.show) >> InternalServerError(message)

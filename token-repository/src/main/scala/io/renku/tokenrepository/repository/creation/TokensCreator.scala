@@ -31,7 +31,7 @@ import io.renku.http.client.AccessToken.ProjectAccessToken
 import io.renku.http.client.{AccessToken, GitLabClient}
 import io.renku.tokenrepository.repository.AccessTokenCrypto.EncryptedAccessToken
 import io.renku.tokenrepository.repository.ProjectsTokensDB.SessionResource
-import io.renku.tokenrepository.repository.deletion.{TokenRemover, TokensRevoker}
+import io.renku.tokenrepository.repository.deletion.{DeletionResult, TokenRemover, TokensRevoker}
 import io.renku.tokenrepository.repository.fetching.PersistedTokensFinder
 import io.renku.tokenrepository.repository.metrics.QueriesExecutionTimes
 import org.typelevel.log4cats.Logger
@@ -83,10 +83,18 @@ private class TokensCreatorImpl[F[_]: MonadThrow: Logger](
     case None => Option.empty[AccessToken].pure[F]
     case Some(token) =>
       checkValid(projectId, token) >>= {
-        case true  => token.some.pure[F]
-        case false => tokenRemover.delete(projectId, userToken.some).as(Option.empty)
+        case true => token.some.pure[F]
+        case false =>
+          deleteAndLogSuccess(projectId, userToken, show"Token removed for $projectId as got invalidated in GL")
+            .as(Option.empty)
       }
   }
+
+  private def deleteAndLogSuccess(projectId: projects.GitLabId, mat: AccessToken, message: String) =
+    tokenRemover.delete(projectId, mat.some) >>= {
+      case DeletionResult.Deleted    => Logger[F].info(message)
+      case DeletionResult.NotExisted => ().pure[F]
+    }
 
   private def replaceSlugIfChangedOrRemove(
       projectId: projects.GitLabId,
@@ -96,16 +104,19 @@ private class TokensCreatorImpl[F[_]: MonadThrow: Logger](
     case Some(token) =>
       projectSlugFinder
         .findProjectSlug(projectId, token)
-        .semiflatMap(actualSlug =>
-          findPersistedProjectSlug(projectId).flatMap {
-            case `actualSlug` => ().pure[F]
-            case _            => updateSlug(Project(projectId, actualSlug))
-          }
-        )
-        .cataF(
-          default = tokenRemover.delete(projectId, userToken.some).as(Option.empty),
-          _ => token.some.pure[F]
-        )
+        .flatMap {
+          case None =>
+            deleteAndLogSuccess(projectId,
+                                userToken,
+                                show"Token removed for $projectId as project does not exist in GL"
+            ).as(Option.empty)
+          case Some(actualGLSlug) =>
+            findPersistedProjectSlug(projectId) >>= {
+              case Some(`actualGLSlug`) => token.some.pure[F]
+              case Some(_)              => updateSlug(Project(projectId, actualGLSlug)).as(token.some)
+              case _                    => Option.empty[AccessToken].pure[F]
+            }
+        }
   }
 
   private def checkIfDue(projectId: projects.GitLabId): Option[AccessToken] => F[Option[AccessToken]] = {
@@ -123,7 +134,7 @@ private class TokensCreatorImpl[F[_]: MonadThrow: Logger](
     }
 
   private def findProjectSlug(projectId: projects.GitLabId, userToken: AccessToken): OptionT[F, Project] =
-    projectSlugFinder.findProjectSlug(projectId, userToken).map(Project(projectId, _))
+    OptionT(projectSlugFinder.findProjectSlug(projectId, userToken)).map(Project(projectId, _))
 
   private def createNewToken(userToken: AccessToken)(project: Project): OptionT[F, (Project, TokenCreationInfo)] =
     createProjectAccessToken(project.id, userToken).map(project -> _)

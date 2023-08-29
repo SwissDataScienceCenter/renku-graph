@@ -19,6 +19,7 @@
 package io.renku.tokenrepository.repository
 package deletion
 
+import RepositoryGenerators.deletionResults
 import cats.effect._
 import cats.syntax.all._
 import io.renku.generators.CommonGraphGenerators.accessTokens
@@ -26,48 +27,45 @@ import io.renku.generators.Generators.Implicits._
 import io.renku.graph.model.RenkuTinyTypeGenerators.projectIds
 import io.renku.graph.model.projects
 import io.renku.http.client.AccessToken
-import io.renku.interpreters.TestLogger
-import io.renku.testtools.IOSpec
-import org.scalamock.scalatest.MockFactory
-import org.scalatest.flatspec.AnyFlatSpec
+import io.renku.testtools.CustomAsyncIOSpec
+import org.scalamock.scalatest.AsyncMockFactory
+import org.scalatest.flatspec.AsyncFlatSpec
 import org.scalatest.matchers.should
 
-class TokenRemoverSpec extends AnyFlatSpec with IOSpec with should.Matchers with MockFactory {
+class TokenRemoverSpec extends AsyncFlatSpec with CustomAsyncIOSpec with should.Matchers with AsyncMockFactory {
 
-  it should "remove the token from DB and revoke project tokens from GL if user access token is given" in new TestCase {
+  it should "remove the token from DB and revoke project tokens from GL if user access token is given" in {
 
-    val projectId = projectIds.generateOne
-    givenDBRemoval(projectId, returning = ().pure[IO])
+    val projectId      = projectIds.generateOne
+    val deletionResult = deletionResults.generateOne
+    givenDBRemoval(projectId, returning = deletionResult.pure[IO])
 
     val accessToken = accessTokens.generateOne
     givenSuccessfulTokensRevoking(projectId, accessToken)
 
-    tokenRemover.delete(projectId, accessToken.some).unsafeRunSync() shouldBe ()
+    tokenRemover.delete(projectId, accessToken.some).asserting(_ shouldBe deletionResult)
   }
 
-  it should "just remove the token from DB if no user access token is given" in new TestCase {
+  it should "just remove the token from DB if no user access token is given" in {
 
-    val projectId = projectIds.generateOne
-    givenDBRemoval(projectId, returning = ().pure[IO])
+    val projectId      = projectIds.generateOne
+    val deletionResult = deletionResults.generateOne
+    givenDBRemoval(projectId, returning = deletionResult.pure[IO])
 
-    tokenRemover.delete(projectId, maybeAccessToken = None).unsafeRunSync() shouldBe ()
+    tokenRemover.delete(projectId, maybeAccessToken = None).asserting(_ shouldBe deletionResult)
   }
 
-  private trait TestCase {
+  private val dbTokenRemover    = mock[PersistedTokenRemover[IO]]
+  private val tokensRevoker     = mock[TokensRevoker[IO]]
+  private lazy val tokenRemover = new TokenRemoverImpl[IO](dbTokenRemover, tokensRevoker)
 
-    implicit val logger: TestLogger[IO] = TestLogger[IO]()
-    private val dbTokenRemover = mock[PersistedTokenRemover[IO]]
-    private val tokensRevoker  = mock[TokensRevoker[IO]]
-    val tokenRemover           = new TokenRemoverImpl[IO](dbTokenRemover, tokensRevoker)
+  private def givenDBRemoval(projectId: projects.GitLabId, returning: IO[DeletionResult]) =
+    (dbTokenRemover.delete _)
+      .expects(projectId)
+      .returning(returning)
 
-    def givenDBRemoval(projectId: projects.GitLabId, returning: IO[Unit]) =
-      (dbTokenRemover.delete _)
-        .expects(projectId)
-        .returning(returning)
-
-    def givenSuccessfulTokensRevoking(projectId: projects.GitLabId, accessToken: AccessToken) =
-      (tokensRevoker.revokeAllTokens _)
-        .expects(projectId, Option.empty[AccessTokenId], accessToken)
-        .returning(().pure[IO])
-  }
+  private def givenSuccessfulTokensRevoking(projectId: projects.GitLabId, accessToken: AccessToken) =
+    (tokensRevoker.revokeAllTokens _)
+      .expects(projectId, Option.empty[AccessTokenId], accessToken)
+      .returning(().pure[IO])
 }

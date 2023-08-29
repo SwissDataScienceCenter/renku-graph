@@ -18,31 +18,30 @@
 
 package io.renku.tokenrepository.repository.creation
 
-import cats.data.OptionT
 import cats.effect.Async
 import cats.syntax.all._
 import eu.timepit.refined.auto._
 import io.renku.graph.model.projects
 import io.renku.http.client.{AccessToken, GitLabClient}
+import io.renku.http.tinytypes.TinyTypeURIEncoder._
 import org.typelevel.log4cats.Logger
 
 private trait ProjectSlugFinder[F[_]] {
-  def findProjectSlug(projectId: projects.GitLabId, accessToken: AccessToken): OptionT[F, projects.Slug]
+  def findProjectSlug(projectId: projects.GitLabId, accessToken: AccessToken): F[Option[projects.Slug]]
 }
 
 private class ProjectSlugFinderImpl[F[_]: Async: GitLabClient: Logger] extends ProjectSlugFinder[F] {
 
-  import org.http4s.circe.jsonOf
   import cats.effect._
   import cats.syntax.all._
   import io.circe._
   import org.http4s.Status.{Forbidden, NotFound, Ok, Unauthorized}
   import org.http4s._
+  import org.http4s.circe.jsonOf
   import org.http4s.implicits._
 
-  def findProjectSlug(projectId: projects.GitLabId, accessToken: AccessToken): OptionT[F, projects.Slug] = OptionT {
-    GitLabClient[F].get(uri"projects" / projectId.value, "single-project")(mapResponse)(accessToken.some)
-  }
+  def findProjectSlug(projectId: projects.GitLabId, accessToken: AccessToken): F[Option[projects.Slug]] =
+    GitLabClient[F].get(uri"projects" / projectId, "single-project")(mapResponse)(accessToken.some)
 
   private lazy val mapResponse: PartialFunction[(Status, Request[F], Response[F]), F[Option[projects.Slug]]] = {
     case (Ok, _, response)                           => response.as[projects.Slug].map(Option.apply)
