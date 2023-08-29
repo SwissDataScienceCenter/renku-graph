@@ -824,7 +824,7 @@ The properties that can be updated are:
   * any non-blank String value
 * image - possible values are:
   * `null` for removing the current image
-  * any file content
+  * any image file; at the moment GitLab accepts images of size 200kB max and media type of: `image/png`, `image/jpeg`, `image/gif`, `image/bmp`, `image/tiff`, `image/vnd.microsoft.icon` 
 * keywords - an array of String values; an empty array removes all the keywords
 * visibility - possible values are: `public`, `internal`, `private`
 
