@@ -18,12 +18,12 @@
 
 package io.renku.eventlog.events.consumers.statuschange
 
-import SkunkExceptionsGenerators.postgresErrors
 import cats.data.Kleisli
 import cats.effect.IO
 import cats.syntax.all._
 import eu.timepit.refined.auto._
 import io.renku.db.{DbClient, SqlStatement}
+import io.renku.eventlog.EventLogDB.SessionResource
 import io.renku.eventlog._
 import io.renku.eventlog.api.events.StatusChangeEvent._
 import io.renku.eventlog.api.events.{StatusChangeEvent, StatusChangeGenerators}
@@ -45,7 +45,6 @@ import org.scalacheck.Gen
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
-import skunk.SqlState.{DeadlockDetected, ForeignKeyViolation}
 import skunk._
 import skunk.implicits._
 
@@ -69,13 +68,16 @@ class StatusChangerSpec
       statusChanger.updateStatuses(dbUpdater)(event).unsafeRunSync() shouldBe ()
     }
 
-    "rollbacks, run the updater's onRollback and fail if the updater does not handle the exception" in new MockedTestCase {
+    "rollbacks, run the updater's onRollback and fail if the updater doesn't handle the exception" in new MockedTestCase {
 
       val exception = exceptions.generateOne
       (dbUpdater.updateDB _).expects(event).returning(Kleisli.liftF(exception.raiseError[IO, DBUpdateResults]))
 
-      val onRollbackF = PartialFunction.empty[Throwable, UpdateOp[IO]]
-      (dbUpdater.onRollback _).expects(event).returning(onRollbackF)
+      val onRollbackF = PartialFunction.empty[Throwable, IO[DBUpdateResults]]
+      (dbUpdater
+        .onRollback(_: StatusChangeEvent)(_: SessionResource[IO]))
+        .expects(event, sessionResource)
+        .returning(onRollbackF)
 
       intercept[Exception](
         statusChanger.updateStatuses(dbUpdater)(event).unsafeRunSync()
@@ -101,29 +103,6 @@ class StatusChangerSpec
       findAllEventDeliveries       shouldBe Nil
     }
 
-    "retry the rollback procedure if it fails with an error that the rollback can deal with" in new MockedTestCase {
-
-      val updateFailure = postgresErrors(DeadlockDetected).generateOne
-      (dbUpdater.updateDB _).expects(event).returning(Kleisli.liftF(updateFailure.raiseError[IO, DBUpdateResults]))
-
-      val rollbackFailure = postgresErrors(ForeignKeyViolation).generateOne
-      val updateResults   = updateResultsGen(event).generateOne
-      val rollbackF: RollbackOp[IO] = {
-        case DeadlockDetected(_) =>
-          Kleisli.liftF[IO, Session[IO], DBUpdateResults](rollbackFailure.raiseError[IO, DBUpdateResults])
-        case ForeignKeyViolation(_) =>
-          Kleisli.pure[IO, Session[IO], DBUpdateResults](updateResults)
-      }
-      (dbUpdater.onRollback _)
-        .expects(event)
-        .returning(rollbackF)
-        .atLeastOnce()
-
-      (gaugesUpdater.updateGauges _).expects(updateResults).returning(().pure[IO])
-
-      statusChanger.updateStatuses(dbUpdater)(event).unsafeRunSync() shouldBe ()
-    }
-
     "succeed if updating the gauge fails" in new MockedTestCase {
 
       val exception = Generators.exceptions.generateOne
@@ -136,7 +115,7 @@ class StatusChangerSpec
     }
   }
 
-  trait MockedTestCase {
+  private trait MockedTestCase {
 
     val event = Gen
       .oneOf(
@@ -153,7 +132,7 @@ class StatusChangerSpec
     val statusChanger = new StatusChangerImpl[IO](gaugesUpdater)
   }
 
-  trait NonMockedTestCase {
+  private trait NonMockedTestCase {
 
     val eventId               = compoundEventIds.generateOne
     val initialStatus         = EventStatus.New
@@ -195,19 +174,21 @@ class StatusChangerSpec
         passingQuery.run(session) >> failingQuery.run(session)
       }
 
-      override def onRollback(event: StatusChangeEvent): RollbackOp[IO] = { _ =>
-        Kleisli {
-          SqlStatement[IO](name = "onRollback dbUpdater query")
-            .command[EventId *: projects.GitLabId *: EmptyTuple](
-              sql"""DELETE FROM event_delivery
-                    WHERE event_id = $eventIdEncoder AND project_id = $projectIdEncoder
+      override def onRollback(event: StatusChangeEvent)(implicit sr: SessionResource[IO]): RollbackOp[IO] = { _ =>
+        sr.useK {
+          Kleisli {
+            SqlStatement[IO](name = "onRollback dbUpdater query")
+              .command[EventId *: projects.GitLabId *: EmptyTuple](
+                sql"""DELETE FROM event_delivery
+                      WHERE event_id = $eventIdEncoder AND project_id = $projectIdEncoder
                """.command
-            )
-            .arguments(eventId.id *: eventId.projectId *: EmptyTuple)
-            .build
-            .mapResult(_ => DBUpdateResults.ForProjects.empty.widen)
-            .queryExecution
-            .run
+              )
+              .arguments(eventId.id *: eventId.projectId *: EmptyTuple)
+              .build
+              .mapResult(_ => DBUpdateResults.ForProjects.empty.widen)
+              .queryExecution
+              .run
+          }
         }
       }
     }
