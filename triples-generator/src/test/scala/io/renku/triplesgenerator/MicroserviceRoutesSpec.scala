@@ -70,12 +70,12 @@ class MicroserviceRoutesSpec extends AnyWordSpec with IOSpec with MockFactory wi
     }
   }
 
-  "PUT /projects/:slug" should {
+  "PATCH /projects/:slug" should {
 
     "return Ok with message in response" in new TestCase {
 
       val slug         = projectSlugs.generateOne
-      val request      = Request[IO](Method.PUT, uri"/projects" / slug)
+      val request      = Request[IO](Method.PATCH, uri"/projects" / slug)
       val responseInfo = Message.Info("Project updated")
 
       givenProjectUpdateEndpoint(slug, request, returning = Response[IO](Ok).withEntity(responseInfo))
@@ -88,7 +88,7 @@ class MicroserviceRoutesSpec extends AnyWordSpec with IOSpec with MockFactory wi
     }
 
     "return the default response for illegal slug" in new TestCase {
-      routes.call(Request[IO](Method.PUT, uri"/projects" / "illegal-slug")).status shouldBe ServiceUnavailable
+      routes.call(Request[IO](Method.PATCH, uri"/projects" / "illegal-slug")).status shouldBe ServiceUnavailable
     }
   }
 
@@ -131,7 +131,7 @@ class MicroserviceRoutesSpec extends AnyWordSpec with IOSpec with MockFactory wi
       }
 
     def givenProjectUpdateEndpoint(slug: model.projects.Slug, request: Request[IO], returning: Response[IO]) =
-      (projectUpdateEndpoint.`PUT /projects/:slug` _)
+      (projectUpdateEndpoint.`PATCH /projects/:slug` _)
         .expects(slug, request)
         .returning(returning.pure[IO])
   }

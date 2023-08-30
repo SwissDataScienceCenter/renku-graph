@@ -196,5 +196,4 @@ object Dependencies {
   val scalacheck = Seq(
     "org.scalacheck" %% "scalacheck" % V.scalacheck
   )
-
 }

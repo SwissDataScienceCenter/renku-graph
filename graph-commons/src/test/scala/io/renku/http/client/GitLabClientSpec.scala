@@ -36,10 +36,13 @@ import io.renku.logging.TestExecutionTimeRecorder
 import io.renku.metrics.GitLabApiCallRecorder
 import io.renku.stubbing.ExternalServiceStubbing
 import io.renku.testtools.IOSpec
-import org.http4s.Method.{GET, _}
+import org.http4s.MediaType.multipart
+import org.http4s.Method._
 import org.http4s.Status.{Accepted, NotFound, Ok, Unauthorized}
 import org.http4s.circe.CirceEntityCodec.circeEntityDecoder
-import org.http4s.{Header, Method, Request, Response, Status, Uri, UrlForm}
+import org.http4s.multipart.{Multiparts, Part}
+import org.http4s.util.Renderer
+import org.http4s.{Header, Method, Request, Response, Status, Uri}
 import org.scalacheck.Gen
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.TryValues
@@ -226,45 +229,39 @@ class GitLabClientSpec
 
   "put" should {
 
-    val mapPutResponse: PartialFunction[(Status, Request[IO], Response[IO]), IO[Unit]] = {
-      case (Accepted, _, _)     => ().pure[IO]
-      case (Unauthorized, _, _) => UnauthorizedException.raiseError[IO, Unit]
-    }
-
     forAll(tokenScenarios) { (tokenType, accessToken: AccessToken) =>
-      s"send form data with the $tokenType to the endpoint" in new TestCase {
+      s"send the given multipart request with the $tokenType to the endpoint" in new TestCase {
 
-        val propName  = nonEmptyStrings().generateOne
-        val propValue = nonEmptyStrings().generateOne
+        implicit val mat: Option[AccessToken] = accessToken.some
+        val partName  = nonEmptyStrings().generateOne
+        val partValue = nonEmptyStrings().generateOne
+
+        val multipartPayload = Multiparts
+          .forSync[IO]
+          .flatMap(_.multipart(Vector(Part.formData[IO](partName, partValue))))
+          .unsafeRunSync()
 
         stubFor {
           put(s"/api/v4/$path")
             .withAccessToken(accessToken.some)
-            .withRequestBody(equalTo(s"$propName=$propValue"))
+            .withMultipartRequestBody(
+              aMultipart(partName).withBody(equalTo(partValue))
+            )
+            .withHeader(
+              "Content-Type",
+              containing(Renderer.renderString(multipart.`form-data`))
+            )
+            .withHeader(
+              "Content-Type",
+              containing(s"""boundary="${multipartPayload.boundary.value}"""")
+            )
             .willReturn(aResponse().withStatus(Accepted.code))
         }
 
         client
-          .put(path, endpointName, UrlForm(propName -> propValue))(mapPutResponse)(accessToken.some)
+          .put(path, endpointName, multipartPayload) { case (Accepted, _, _) => ().pure[IO] }
           .unsafeRunSync() shouldBe ()
       }
-    }
-
-    "return an UnauthorizedException if remote client responds with UNAUTHORIZED" in new TestCase {
-
-      val propName  = nonEmptyStrings().generateOne
-      val propValue = nonEmptyStrings().generateOne
-
-      stubFor {
-        put(s"/api/v4/$path")
-          .withAccessToken(maybeAccessToken)
-          .withRequestBody(equalTo(s"$propName=$propValue"))
-          .willReturn(unauthorized())
-      }
-
-      intercept[Exception] {
-        client.put(path, endpointName, UrlForm(propName -> propValue))(mapPutResponse).unsafeRunSync()
-      } shouldBe UnauthorizedException
     }
   }
 

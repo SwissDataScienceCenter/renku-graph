@@ -15,7 +15,7 @@ The following routes may be slightly different when accessed via the main Renku 
 | GET    | ```/knowledge-graph/ontology```                                          | Returns ontology used in the Knowledge Graph                                         |
 | DELETE | ```/knowledge-graph/projects/:namespace/:name```                         | Deletes the project with the given `namespace/name` from knowledge-graph and GitLab  |
 | GET    | ```/knowledge-graph/projects/:namespace/:name```                         | Returns details of the project with the given `namespace/name`                       |
-| PUT    | ```/knowledge-graph/projects/:namespace/:name```                         | Updates selected properties of the project with the given `namespace/name`           |
+| PATCH  | ```/knowledge-graph/projects/:namespace/:name```                         | Updates selected properties of the project with the given `namespace/name`           |
 | GET    | ```/knowledge-graph/projects/:namespace/:name/datasets```                | Returns datasets of the project with the given `slug`                                |
 | GET    | ```/knowledge-graph/projects/:namespace/:name/datasets/:dsName/tags```   | Returns tags of the dataset with the given `dsName` on project with the given `slug` |
 | GET    | ```/knowledge-graph/projects/:namespace/:name/files/:location/lineage``` | Returns the lineage for a the path (location) of a file on a project                 |
@@ -811,10 +811,24 @@ Response body example for `Accept: application/ld+json`:
 }
 ```
 
-#### PUT /knowledge-graph/projects/:namespace/:name
+#### PATCH /knowledge-graph/projects/:namespace/:name
 
-API to update selected properies of the project with the given `namespace/name` in both the Triples Store and GitLab
+API to update project data.
 
+Each of the properties can be either set to a new value or omitted in case there's no new value for it.
+The new values should be sent as a `multipart/form-data` in case there's new image or as JSON in case no update for an image is needed.
+
+The properties that can be updated are:
+* description - possible values are:
+  * `null` for removing the current description
+  * any non-blank String value
+* image - possible values are:
+  * `null` for removing the current image
+  * any image file; at the moment GitLab accepts images of size 200kB max and media type of: `image/png`, `image/jpeg`, `image/gif`, `image/bmp`, `image/tiff`, `image/vnd.microsoft.icon` 
+* keywords - an array of String values; an empty array removes all the keywords
+* visibility - possible values are: `public`, `internal`, `private`
+
+In case no properties are set, no data will be changed.
 The endpoint requires an authorization token to be passed. Supported headers are:
 
 - `Authorization: Bearer <token>` with OAuth Token obtained from GitLab
@@ -822,9 +836,45 @@ The endpoint requires an authorization token to be passed. Supported headers are
 
 **Request**
 
+* Multipart request (preferred) 
+```
+PATCH /knowledge-graph/projects/jakub.chrobasik/create-test-10 HTTP/1.1
+Host: dev.renku.ch
+Authorization: Bearer <XXX>
+Content-Length: 575
+Content-Type: multipart/form-data; boundary=----WebKitFormBoundary7MA4YWxkTrZu0gW
+
+------WebKitFormBoundary7MA4YWxkTrZu0gW
+Content-Disposition: form-data; name="visibility"
+
+public
+------WebKitFormBoundary7MA4YWxkTrZu0gW
+Content-Disposition: form-data; name="description"
+
+desc test 1
+------WebKitFormBoundary7MA4YWxkTrZu0gW
+Content-Disposition: form-data; name="keywords[]"
+
+key1
+------WebKitFormBoundary7MA4YWxkTrZu0gW
+Content-Disposition: form-data; name="keywords[]"
+
+key2
+------WebKitFormBoundary7MA4YWxkTrZu0gW
+Content-Disposition: form-data; name="image"; filename="image.png"
+Content-Type: image/png
+
+(data)
+------WebKitFormBoundary7MA4YWxkTrZu0gW--
+```
+
+* JSON request (updating image not possible) 
+
 ```json
 {
-  "visibility": "public|internal|private"
+  "description": "a new project description",
+  "keywords":    ["keyword1", "keyword2"],
+  "visibility":  "public|internal|private"
 }
 ```
 
@@ -836,6 +886,7 @@ The endpoint requires an authorization token to be passed. Supported headers are
 | BAD_REQUEST (400)           | If the given payload is empty or malformed                                                                 |
 | UNAUTHORIZED (401)          | If given auth header cannot be authenticated                                                               |
 | NOT_FOUND (404)             | If there is no project with the given `namespace/name` or the user is not authorised to access the project |
+| CONFLICT (409)              | If updating the data is not possible, e.g. the user cannot push to the default branch                      |
 | INTERNAL SERVER ERROR (500) | Otherwise                                                                                                  |
 
 #### GET /knowledge-graph/projects/:namespace/:name/datasets

@@ -71,7 +71,7 @@ private class TriplesGeneratorClientImpl[F[_]: Async: Logger](tgUri: Uri)
   import org.http4s.circe._
 
   override def updateProject(slug: projects.Slug, updates: ProjectUpdates): F[Result[Unit]] =
-    send(PUT(tgUri / "projects" / slug) withEntity updates.asJson) {
+    send(PATCH(tgUri / "projects" / slug) withEntity updates.asJson) {
       case (Ok, _, _)       => Result.success(()).pure[F]
       case (NotFound, _, _) => Result.failure[Unit]("Project for update does not exist").pure[F]
       case (status, req, _) =>

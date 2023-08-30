@@ -47,7 +47,7 @@ class EndpointSpec extends AsyncFlatSpec with CustomAsyncIOSpec with should.Matc
     val updates = projectUpdatesGen.generateOne
     givenProjectUpdating(slug, updates, returning = ProjectUpdater.Result.Updated.pure[IO])
 
-    endpoint.`PUT /projects/:slug`(slug, Request[IO]().withEntity(updates.asJson)) >>= { response =>
+    endpoint.`PATCH /projects/:slug`(slug, Request[IO]().withEntity(updates.asJson)) >>= { response =>
       response.status.pure[IO].asserting(_ shouldBe Ok) >>
         response.contentType.pure[IO].asserting(_ shouldBe `Content-Type`(application.json).some) >>
         response.as[Message].asserting(_ shouldBe Message.Info("Project updated"))
@@ -59,7 +59,7 @@ class EndpointSpec extends AsyncFlatSpec with CustomAsyncIOSpec with should.Matc
     val slug    = projectSlugs.generateOne
     val request = Request[IO]().withEntity(Json.obj("visibility" -> Json.obj("newValue" -> "invalid".asJson)))
 
-    endpoint.`PUT /projects/:slug`(slug, request) >>= { response =>
+    endpoint.`PATCH /projects/:slug`(slug, request) >>= { response =>
       response.status.pure[IO].asserting(_ shouldBe BadRequest) >>
         response.contentType.pure[IO].asserting(_ shouldBe `Content-Type`(application.json).some) >>
         response.as[Message].asserting(_ shouldBe Message.Error("Invalid payload"))
@@ -72,7 +72,7 @@ class EndpointSpec extends AsyncFlatSpec with CustomAsyncIOSpec with should.Matc
     val updates = projectUpdatesGen.generateOne
     givenProjectUpdating(slug, updates, returning = ProjectUpdater.Result.NotExists.pure[IO])
 
-    endpoint.`PUT /projects/:slug`(slug, Request[IO]().withEntity(updates.asJson)) >>= { response =>
+    endpoint.`PATCH /projects/:slug`(slug, Request[IO]().withEntity(updates.asJson)) >>= { response =>
       response.status.pure[IO].asserting(_ shouldBe NotFound) >>
         response.contentType.pure[IO].asserting(_ shouldBe `Content-Type`(application.json).some) >>
         response.as[Message].asserting(_ shouldBe Message.Info("Project not found"))

@@ -251,6 +251,7 @@ abstract class RestClient[F[_]: Async: Logger, ThrottlingTarget](
       new MultipartBuilder(request, parts).build()
 
     class MultipartBuilder private[RequestOps] (request: Request[F], parts: Vector[Part[F]] = Vector.empty[Part[F]]) {
+
       def addPart[PartType](name: String, value: PartType)(implicit
           encoder: PartEncoder[PartType]
       ): MultipartBuilder =

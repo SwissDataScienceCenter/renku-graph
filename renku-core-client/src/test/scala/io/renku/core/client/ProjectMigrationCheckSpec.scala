@@ -16,14 +16,26 @@
  * limitations under the License.
  */
 
-package io.renku.knowledgegraph.projects.update
+package io.renku.core.client
 
-import io.circe.Decoder
-import io.renku.graph.model.projects
+import Generators._
+import TestModelCodecs.projectMigrationCheckEnc
+import io.circe.syntax._
+import io.renku.generators.Generators.Implicits._
+import org.scalatest.EitherValues
+import org.scalatest.flatspec.AnyFlatSpec
+import org.scalatest.matchers.should
+import org.scalatestplus.scalacheck.ScalaCheckPropertyChecks
 
-private final case class NewValues(visibility: projects.Visibility)
+class ProjectMigrationCheckSpec
+    extends AnyFlatSpec
+    with should.Matchers
+    with EitherValues
+    with ScalaCheckPropertyChecks {
 
-private object NewValues {
-  implicit val decoder: Decoder[NewValues] =
-    Decoder.instance(cur => cur.downField("visibility").as[projects.Visibility].map(NewValues(_)))
+  it should "decode from JSON" in {
+    forAll { migrationCheck: ProjectMigrationCheck =>
+      migrationCheck.asJson.hcursor.as[ProjectMigrationCheck].value shouldBe migrationCheck
+    }
+  }
 }

@@ -23,31 +23,12 @@ import io.renku.generators.Generators._
 import io.renku.graph.model.GraphModelGenerators._
 import model.Permissions.AccessLevel
 import model.Permissions.AccessLevel._
-import model.Urls.{HttpUrl, SshUrl}
+import model.Urls.SshUrl
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
 import org.scalatestplus.scalacheck.ScalaCheckPropertyChecks
 
 class modelSpec extends AnyWordSpec with ScalaCheckPropertyChecks with should.Matchers {
-
-  "HttpUrl" should {
-
-    "instantiate for valid absolute git urls" in {
-      forAll(httpUrls(), projectSlugs) { (httpUrl, projectSlug) =>
-        val url = s"$httpUrl/$projectSlug.git"
-        HttpUrl.from(url).map(_.value) shouldBe Right(url)
-      }
-    }
-
-    "fail instantiation for non-absolute urls" in {
-      val url = s"${relativePaths().generateOne}/${projectSlugs.generateOne}.git"
-
-      val Left(exception) = HttpUrl.from(url)
-
-      exception            shouldBe an[IllegalArgumentException]
-      exception.getMessage shouldBe s"$url is not a valid repository http url"
-    }
-  }
 
   "SshUrl" should {
 
