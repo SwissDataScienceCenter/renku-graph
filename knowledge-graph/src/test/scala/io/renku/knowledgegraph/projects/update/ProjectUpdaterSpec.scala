@@ -19,6 +19,7 @@
 package io.renku.knowledgegraph.projects.update
 
 import Generators._
+import ProvisioningStatusFinder.ProvisioningStatus
 import cats.effect.IO
 import cats.syntax.all._
 import io.renku.core.client.Generators.{coreUrisVersioned, resultDetailedFailures, resultSuccesses, userInfos}
@@ -28,6 +29,7 @@ import io.renku.generators.CommonGraphGenerators.authUsers
 import io.renku.generators.Generators.Implicits._
 import io.renku.generators.Generators.{exceptions, jsons}
 import io.renku.graph.model.RenkuTinyTypeGenerators.{projectGitHttpUrls, projectSlugs}
+import io.renku.graph.model.events.EventStatus
 import io.renku.graph.model.projects
 import io.renku.http.client.{AccessToken, UserAccessToken}
 import io.renku.interpreters.TestLogger
@@ -68,7 +70,7 @@ class ProjectUpdaterSpec extends AsyncFlatSpec with CustomAsyncIOSpec with shoul
       val slug     = projectSlugs.generateOne
       val updates  = projectUpdatesGen.suchThat(_.coreUpdateNeeded).generateOne
 
-      givenBranchProtectionChecking(slug, authUser.accessToken, returning = true.pure[IO])
+      givenPrerequisitesCheckFine(slug, authUser.accessToken)
 
       val projectGitUrl = projectGitHttpUrls.generateOne
       givenProjectGitUrlFinding(slug, authUser.accessToken, returning = projectGitUrl.some.pure[IO])
@@ -94,13 +96,50 @@ class ProjectUpdaterSpec extends AsyncFlatSpec with CustomAsyncIOSpec with shoul
     }
 
   it should "if core update needed, " +
+    "fail if the project is in unhealthy status from the provisioning point of view" in {
+
+      val authUser = authUsers.generateOne
+      val slug     = projectSlugs.generateOne
+
+      givenBranchProtectionChecking(slug, authUser.accessToken, returning = true.pure[IO])
+
+      val provisioningStatus = ProvisioningStatus.Unhealthy(EventStatus.GenerationNonRecoverableFailure)
+      givenProvisioningStatusFinding(slug, returning = provisioningStatus.pure[IO])
+
+      val updates = projectUpdatesGen.suchThat(_.coreUpdateNeeded).generateOne
+
+      updater
+        .updateProject(slug, updates, authUser)
+        .assertThrowsError[Exception](_ shouldBe Failure.onProvisioningNotHealthy(slug, provisioningStatus))
+    }
+
+  it should "if core update needed, " +
+    "fail if checking the project status from the provisioning point of view fails" in {
+
+      val authUser = authUsers.generateOne
+      val slug     = projectSlugs.generateOne
+
+      givenBranchProtectionChecking(slug, authUser.accessToken, returning = true.pure[IO])
+
+      val exception = exceptions.generateOne
+      givenProvisioningStatusFinding(slug, returning = exception.raiseError[IO, Nothing])
+
+      val updates = projectUpdatesGen.suchThat(_.coreUpdateNeeded).generateOne
+
+      updater
+        .updateProject(slug, updates, authUser)
+        .assertThrowsError[Exception](_ shouldBe Failure.onProvisioningStatusCheck(slug, exception))
+    }
+
+  it should "if core update needed, " +
     "fail if pushing to the default branch check return false" in {
 
       val authUser = authUsers.generateOne
       val slug     = projectSlugs.generateOne
-      val updates  = projectUpdatesGen.suchThat(_.coreUpdateNeeded).generateOne
 
       givenBranchProtectionChecking(slug, authUser.accessToken, returning = false.pure[IO])
+      givenProvisioningStatusFinding(slug, returning = ProvisioningStatus.Healthy.pure[IO])
+      val updates = projectUpdatesGen.suchThat(_.coreUpdateNeeded).generateOne
 
       updater.updateProject(slug, updates, authUser).assertThrowsError[Exception](_ shouldBe Failure.cannotPushToBranch)
     }
@@ -114,6 +153,7 @@ class ProjectUpdaterSpec extends AsyncFlatSpec with CustomAsyncIOSpec with shoul
 
       val exception = exceptions.generateOne
       givenBranchProtectionChecking(slug, authUser.accessToken, returning = exception.raiseError[IO, Nothing])
+      givenProvisioningStatusFinding(slug, returning = ProvisioningStatus.Healthy.pure[IO])
 
       updater
         .updateProject(slug, updates, authUser)
@@ -127,7 +167,7 @@ class ProjectUpdaterSpec extends AsyncFlatSpec with CustomAsyncIOSpec with shoul
       val slug     = projectSlugs.generateOne
       val updates  = projectUpdatesGen.suchThat(_.coreUpdateNeeded).generateOne
 
-      givenBranchProtectionChecking(slug, authUser.accessToken, returning = true.pure[IO])
+      givenPrerequisitesCheckFine(slug, authUser.accessToken)
 
       val exception = exceptions.generateOne
       givenProjectGitUrlFinding(slug, authUser.accessToken, returning = exception.raiseError[IO, Nothing])
@@ -145,7 +185,7 @@ class ProjectUpdaterSpec extends AsyncFlatSpec with CustomAsyncIOSpec with shoul
       val slug     = projectSlugs.generateOne
       val updates  = projectUpdatesGen.suchThat(_.coreUpdateNeeded).generateOne
 
-      givenBranchProtectionChecking(slug, authUser.accessToken, returning = true.pure[IO])
+      givenPrerequisitesCheckFine(slug, authUser.accessToken)
 
       givenProjectGitUrlFinding(slug, authUser.accessToken, returning = None.pure[IO])
       givenUserInfoFinding(authUser.accessToken, returning = userInfos.generateSome.pure[IO])
@@ -162,7 +202,8 @@ class ProjectUpdaterSpec extends AsyncFlatSpec with CustomAsyncIOSpec with shoul
       val slug     = projectSlugs.generateOne
       val updates  = projectUpdatesGen.suchThat(_.coreUpdateNeeded).generateOne
 
-      givenBranchProtectionChecking(slug, authUser.accessToken, returning = true.pure[IO])
+      givenPrerequisitesCheckFine(slug, authUser.accessToken)
+
       givenProjectGitUrlFinding(slug, authUser.accessToken, returning = projectGitHttpUrls.generateSome.pure[IO])
       val exception = exceptions.generateOne
       givenUserInfoFinding(authUser.accessToken, returning = exception.raiseError[IO, Nothing])
@@ -179,7 +220,8 @@ class ProjectUpdaterSpec extends AsyncFlatSpec with CustomAsyncIOSpec with shoul
       val slug     = projectSlugs.generateOne
       val updates  = projectUpdatesGen.suchThat(_.coreUpdateNeeded).generateOne
 
-      givenBranchProtectionChecking(slug, authUser.accessToken, returning = true.pure[IO])
+      givenPrerequisitesCheckFine(slug, authUser.accessToken)
+
       givenProjectGitUrlFinding(slug, authUser.accessToken, returning = projectGitHttpUrls.generateSome.pure[IO])
       givenUserInfoFinding(authUser.accessToken, returning = None.pure[IO])
 
@@ -195,7 +237,7 @@ class ProjectUpdaterSpec extends AsyncFlatSpec with CustomAsyncIOSpec with shoul
       val slug     = projectSlugs.generateOne
       val updates  = projectUpdatesGen.suchThat(_.coreUpdateNeeded).generateOne
 
-      givenBranchProtectionChecking(slug, authUser.accessToken, returning = true.pure[IO])
+      givenPrerequisitesCheckFine(slug, authUser.accessToken)
 
       val projectGitUrl = projectGitHttpUrls.generateOne
       givenProjectGitUrlFinding(slug, authUser.accessToken, returning = projectGitUrl.some.pure[IO])
@@ -216,7 +258,7 @@ class ProjectUpdaterSpec extends AsyncFlatSpec with CustomAsyncIOSpec with shoul
       val slug     = projectSlugs.generateOne
       val updates  = projectUpdatesGen.suchThat(_.coreUpdateNeeded).generateOne
 
-      givenBranchProtectionChecking(slug, authUser.accessToken, returning = true.pure[IO])
+      givenPrerequisitesCheckFine(slug, authUser.accessToken)
 
       val projectGitUrl = projectGitHttpUrls.generateOne
       givenProjectGitUrlFinding(slug, authUser.accessToken, returning = projectGitUrl.some.pure[IO])
@@ -323,14 +365,16 @@ class ProjectUpdaterSpec extends AsyncFlatSpec with CustomAsyncIOSpec with shoul
   }
 
   private implicit lazy val logger: TestLogger[IO] = TestLogger[IO]()
-  private val branchProtectionCheck = mock[BranchProtectionCheck[IO]]
-  private val projectGitUrlFinder   = mock[ProjectGitUrlFinder[IO]]
-  private val userInfoFinder        = mock[UserInfoFinder[IO]]
-  private val glProjectUpdater      = mock[GLProjectUpdater[IO]]
-  private val tgClient              = mock[TriplesGeneratorClient[IO]]
-  private val renkuCoreClient       = mock[RenkuCoreClient[IO]]
-  private val tgUpdatesFinder       = mock[TGUpdatesFinder[IO]]
-  private lazy val updater = new ProjectUpdaterImpl[IO](branchProtectionCheck,
+  private val provisioningStatusFinder = mock[ProvisioningStatusFinder[IO]]
+  private val branchProtectionCheck    = mock[BranchProtectionCheck[IO]]
+  private val projectGitUrlFinder      = mock[ProjectGitUrlFinder[IO]]
+  private val userInfoFinder           = mock[UserInfoFinder[IO]]
+  private val glProjectUpdater         = mock[GLProjectUpdater[IO]]
+  private val tgClient                 = mock[TriplesGeneratorClient[IO]]
+  private val renkuCoreClient          = mock[RenkuCoreClient[IO]]
+  private val tgUpdatesFinder          = mock[TGUpdatesFinder[IO]]
+  private lazy val updater = new ProjectUpdaterImpl[IO](provisioningStatusFinder,
+                                                        branchProtectionCheck,
                                                         projectGitUrlFinder,
                                                         userInfoFinder,
                                                         glProjectUpdater,
@@ -338,6 +382,16 @@ class ProjectUpdaterSpec extends AsyncFlatSpec with CustomAsyncIOSpec with shoul
                                                         renkuCoreClient,
                                                         tgUpdatesFinder
   )
+
+  private def givenPrerequisitesCheckFine(slug: projects.Slug, at: UserAccessToken) = {
+    givenProvisioningStatusFinding(slug, returning = ProvisioningStatus.Healthy.pure[IO])
+    givenBranchProtectionChecking(slug, at, returning = true.pure[IO])
+  }
+
+  private def givenProvisioningStatusFinding(slug: projects.Slug, returning: IO[ProvisioningStatus]) =
+    (provisioningStatusFinder.checkHealthy _)
+      .expects(slug)
+      .returning(returning)
 
   private def givenBranchProtectionChecking(slug: projects.Slug, at: UserAccessToken, returning: IO[Boolean]) =
     (branchProtectionCheck.canPushToDefaultBranch _)

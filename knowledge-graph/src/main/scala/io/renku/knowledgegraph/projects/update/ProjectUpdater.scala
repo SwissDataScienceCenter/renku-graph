@@ -18,6 +18,7 @@
 
 package io.renku.knowledgegraph.projects.update
 
+import ProvisioningStatusFinder.ProvisioningStatus.Unhealthy
 import cats.NonEmptyParallel
 import cats.effect.Async
 import cats.syntax.all._
@@ -35,9 +36,10 @@ private trait ProjectUpdater[F[_]] {
 
 private object ProjectUpdater {
   def apply[F[_]: Async: NonEmptyParallel: GitLabClient: MetricsRegistry: Logger]: F[ProjectUpdater[F]] =
-    (TriplesGeneratorClient[F], RenkuCoreClient[F]())
+    (ProvisioningStatusFinder[F], TriplesGeneratorClient[F], RenkuCoreClient[F]())
       .mapN(
-        new ProjectUpdaterImpl[F](BranchProtectionCheck[F],
+        new ProjectUpdaterImpl[F](_,
+                                  BranchProtectionCheck[F],
                                   ProjectGitUrlFinder[F],
                                   UserInfoFinder[F],
                                   GLProjectUpdater[F],
@@ -48,13 +50,15 @@ private object ProjectUpdater {
       )
 }
 
-private class ProjectUpdaterImpl[F[_]: Async: NonEmptyParallel: Logger](branchProtectionCheck: BranchProtectionCheck[F],
-                                                                        projectGitUrlFinder: ProjectGitUrlFinder[F],
-                                                                        userInfoFinder:      UserInfoFinder[F],
-                                                                        glProjectUpdater:    GLProjectUpdater[F],
-                                                                        tgClient:            TriplesGeneratorClient[F],
-                                                                        renkuCoreClient:     RenkuCoreClient[F],
-                                                                        tgUpdatesFinder:     TGUpdatesFinder[F]
+private class ProjectUpdaterImpl[F[_]: Async: NonEmptyParallel: Logger](
+    provisioningStatusFinder: ProvisioningStatusFinder[F],
+    branchProtectionCheck:    BranchProtectionCheck[F],
+    projectGitUrlFinder:      ProjectGitUrlFinder[F],
+    userInfoFinder:           UserInfoFinder[F],
+    glProjectUpdater:         GLProjectUpdater[F],
+    tgClient:                 TriplesGeneratorClient[F],
+    renkuCoreClient:          RenkuCoreClient[F],
+    tgUpdatesFinder:          TGUpdatesFinder[F]
 ) extends ProjectUpdater[F] {
 
   override def updateProject(slug: projects.Slug, updates: ProjectUpdates, authUser: AuthUser): F[Unit] =
@@ -63,7 +67,7 @@ private class ProjectUpdaterImpl[F[_]: Async: NonEmptyParallel: Logger](branchPr
         .flatMap(findTGUpdates(slug, updates, _))
         .flatMap(updateTG(slug, _))
     else
-      canPushToDefaultBranch(slug, authUser) >> {
+      checkPrerequisites(slug, authUser) >> {
         for {
           coreUpdates <- findCoreProjectUpdates(slug, updates, authUser)
           coreUri     <- findCoreUri(coreUpdates, authUser)
@@ -93,6 +97,19 @@ private class ProjectUpdaterImpl[F[_]: Async: NonEmptyParallel: Logger](branchPr
       .map(_.toEither)
       .handleError(_.asLeft)
       .flatMap(_.fold(Failure.onTSUpdate(slug, _).raiseError[F, Unit], _.pure[F]))
+
+  private def checkPrerequisites(slug: projects.Slug, authUser: AuthUser): F[Unit] =
+    (noProvisioningFailures(slug), canPushToDefaultBranch(slug, authUser))
+      .parMapN((_, _) => ())
+
+  private def noProvisioningFailures(slug: projects.Slug): F[Unit] =
+    provisioningStatusFinder
+      .checkHealthy(slug)
+      .adaptError(Failure.onProvisioningStatusCheck(slug, _))
+      .flatMap {
+        case r @ Unhealthy(_) => Failure.onProvisioningNotHealthy(slug, r).raiseError[F, Unit]
+        case _                => ().pure[F]
+      }
 
   private def canPushToDefaultBranch(slug: projects.Slug, authUser: AuthUser): F[Unit] =
     branchProtectionCheck

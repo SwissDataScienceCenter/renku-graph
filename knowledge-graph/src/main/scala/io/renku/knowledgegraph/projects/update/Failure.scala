@@ -18,6 +18,7 @@
 
 package io.renku.knowledgegraph.projects.update
 
+import ProvisioningStatusFinder.ProvisioningStatus.Unhealthy
 import cats.syntax.all._
 import eu.timepit.refined.auto._
 import io.renku.data.Message
@@ -57,6 +58,17 @@ private object Failure {
 
   val cannotPushToBranch: Failure =
     Failure(Conflict, Message.Error("Updating project not possible; the user cannot push to the default branch"))
+
+  def onProvisioningNotHealthy(slug: projects.Slug, unhealthy: Unhealthy): Failure =
+    Failure(
+      Conflict,
+      Message.Error.unsafeApply(
+        show"Project $slug in unhealthy state: ${unhealthy.status}; Fix the project manually on contact administrator"
+      )
+    )
+
+  def onProvisioningStatusCheck(slug: projects.Slug, cause: Throwable): Failure =
+    Failure(InternalServerError, Message.Error.unsafeApply(show"Check if project $slug in healthy state failed"), cause)
 
   def onBranchAccessCheck(slug: projects.Slug, userId: persons.GitLabId, cause: Throwable): Failure =
     Failure(InternalServerError,
