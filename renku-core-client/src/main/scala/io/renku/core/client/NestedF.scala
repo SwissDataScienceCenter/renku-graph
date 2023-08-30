@@ -50,13 +50,18 @@ private class NestedF[F[_]: Monad] {
         fa.value.map(_.map(f))
       }
 
-    override def tailRecM[A, B](a: A)(f: A => NestedF[Either[A, B]]): NestedF[B] = Nested {
-      f(a).value >>= {
-        case Result.Success(Right(vb)) => Result.success(vb).pure[F]
-        case Result.Success(Left(va))  => tailRecM(va)(f).value
-        case f: Result.Failure => f.pure[F].widen
-      }
-    }
+    override def tailRecM[A, B](a: A)(f: A => NestedF[Either[A, B]]): NestedF[B] =
+      Nested[F, Result, B](
+        Monad[F].tailRecM[Result[A], Result[B]](Result.success(a)) {
+          case failure: Result.Failure => failure.asInstanceOf[Result[B]].asRight[Result[A]].pure[F]
+          case Result.Success(v) =>
+            f(v).value.map {
+              case failure: Result.Failure => failure.asRight[Result[A]]
+              case Result.Success(Left(a))  => Left(Result.success(a))
+              case Result.Success(Right(a)) => Right(Result.success(a))
+            }
+        }
+      )
   }
 
   implicit class NestedFOps[A](nestedF: NestedF[A]) {

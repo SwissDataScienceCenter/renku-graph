@@ -68,9 +68,13 @@ object Result {
       }
 
     override def tailRecM[A, B](a: A)(f: A => Result[Either[A, B]]): Result[B] =
-      flatMap(f(a)) {
-        case Left(v)  => tailRecM[A, B](v)(f)
-        case Right(b) => success(b)
-      }
+      FlatMap[Either[Throwable, *]]
+        .tailRecM(a)(f(_).toEither)
+        .fold({
+                case f: Failure => f
+                case err => Result.failure(err.getMessage)
+              },
+              Result.success
+        )
   }
 }
