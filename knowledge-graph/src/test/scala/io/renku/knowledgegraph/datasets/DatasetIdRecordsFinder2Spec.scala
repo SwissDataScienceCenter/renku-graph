@@ -20,20 +20,47 @@ package io.renku.knowledgegraph.datasets
 
 import cats.effect.IO
 import cats.effect.testing.scalatest.AsyncIOSpec
+import io.renku.generators.Generators.Implicits._
+import io.renku.graph.model.projects.Role
+import io.renku.graph.model.testentities.Person
+import io.renku.graph.model.testentities.generators.EntitiesGenerators
+import io.renku.graph.model.{GitLabApiUrl, RenkuUrl}
 import io.renku.interpreters.TestLogger
 import io.renku.knowledgegraph.DatasetProvision
-import io.renku.triplesstore.{InMemoryJena, ProjectsDataset}
+import io.renku.triplesstore.{ExternalJenaForSpec, ProjectsDataset}
 import org.scalatest.flatspec.AsyncFlatSpec
 import org.typelevel.log4cats.Logger
 
 class DatasetIdRecordsFinder2Spec
     extends AsyncFlatSpec
     with AsyncIOSpec
-    with InMemoryJena
+    // with InMemoryJenaForSpec
+    with ExternalJenaForSpec
     with ProjectsDataset
     with DatasetProvision {
 
-  implicit val ioLogger: Logger[IO] = TestLogger()
+  implicit val renkuUrl:  RenkuUrl     = RenkuUrl("http://u.rl")
+  implicit val gitlabUrl: GitLabApiUrl = GitLabApiUrl("http://gitl.ab")
+  implicit val ioLogger:  Logger[IO]   = TestLogger()
 
+  it should "find security records" in {
+    val project =
+      EntitiesGenerators
+        .renkuProjectEntities(
+          visibilityGen = EntitiesGenerators.visibilityPrivate,
+          creatorGen = EntitiesGenerators.personEntities(EntitiesGenerators.withGitLabId)
+        )
+        .withDatasets(
+          EntitiesGenerators.datasetEntities(EntitiesGenerators.provenanceInternal())
+        )
+        .suchThat(_.members.nonEmpty)
+        .generateOne
 
+    val memberDef: PartialFunction[Person, Role] = {
+      case p if p == project.members.head => Role.Owner
+    }
+
+    provisionTestProjectAndMembers(project, memberDef)
+
+  }
 }
