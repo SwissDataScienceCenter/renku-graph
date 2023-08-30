@@ -29,7 +29,7 @@ import org.typelevel.log4cats.Logger
 
 import scala.concurrent.duration._
 
-trait JenaContainerSpec extends ForAllTestContainer { self: Suite =>
+trait JenaContainerSupport extends ForAllTestContainer { self: Suite =>
 
   protected val runMode: JenaRunMode = JenaRunMode.GenericContainer
   protected val timeout: Duration    = 2.minutes

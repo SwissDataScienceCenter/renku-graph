@@ -23,6 +23,7 @@ import cats.kernel.Monoid
 import cats.syntax.all._
 import eu.timepit.refined.auto._
 import io.renku.db.{DbClient, SqlStatement}
+import io.renku.eventlog.EventLogDB.SessionResource
 import io.renku.eventlog.TypeSerializers._
 import io.renku.eventlog.api.events.StatusChangeEvent.ToAwaitingDeletion
 import io.renku.eventlog.events.consumers.statuschange
@@ -70,5 +71,6 @@ private[statuschange] class DbUpdater[F[_]: MonadCancelThrow: QueriesExecutionTi
       }
   }
 
-  override def onRollback(event: ToAwaitingDeletion): RollbackOp[F] = RollbackOp.empty
+  override def onRollback(event: ToAwaitingDeletion)(implicit sr: SessionResource[F]): RollbackOp[F] =
+    RollbackOp.empty
 }

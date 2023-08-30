@@ -20,26 +20,26 @@ package io.renku.eventlog.events.consumers.statuschange.projecteventstonew
 
 import cats.Show
 import cats.data.Kleisli
-import cats.syntax.all._
+import cats.effect.IO
 import io.circe.Encoder
+import io.renku.eventlog.EventLogDB
+import io.renku.eventlog.EventLogDB.SessionResource
 import io.renku.eventlog.api.events.StatusChangeEvent.ProjectEventsToNew
 import io.renku.eventlog.api.events.StatusChangeGenerators
 import io.renku.eventlog.events.consumers.statuschange.StatusChangeEventsQueue.EventType
 import io.renku.eventlog.events.consumers.statuschange.{DBUpdateResults, DBUpdater, StatusChangeEventsQueue}
 import io.renku.generators.Generators.Implicits._
-import org.scalamock.scalatest.MockFactory
-import org.scalatest.TryValues
+import io.renku.testtools.CustomAsyncIOSpec
+import org.scalamock.scalatest.AsyncMockFactory
 import org.scalatest.matchers.should
-import org.scalatest.wordspec.AnyWordSpec
+import org.scalatest.wordspec.AsyncWordSpec
 import skunk.Session
 
-import scala.util.Try
-
-class DbUpdaterSpec extends AnyWordSpec with should.Matchers with TryValues with MockFactory {
+class DbUpdaterSpec extends AsyncWordSpec with CustomAsyncIOSpec with should.Matchers with AsyncMockFactory {
 
   "updateDB" should {
 
-    "offer the ProjectEventsToNew event to the queue" in new TestCase {
+    "offer the ProjectEventsToNew event to the queue" in {
       (queue
         .offer(_: ProjectEventsToNew)(_: Encoder[ProjectEventsToNew],
                                       _: EventType[ProjectEventsToNew],
@@ -48,21 +48,20 @@ class DbUpdaterSpec extends AnyWordSpec with should.Matchers with TryValues with
         .expects(event, *, *, *)
         .returning(Kleisli.pure(()))
 
-      handler.updateDB(event)(session) shouldBe DBUpdateResults.ForProjects.empty.pure[Try]
+      handler.updateDB(event)(session).asserting(_ shouldBe DBUpdateResults.ForProjects.empty)
     }
   }
 
   "onRollback" should {
-    "return RollbackOp.empty" in new TestCase {
-      handler.onRollback(event) shouldBe DBUpdater.RollbackOp.empty[Try]
+    "return RollbackOp.empty" in {
+      implicit val sr: SessionResource[IO] = mock[io.renku.db.SessionResource[IO, EventLogDB]]
+      handler.onRollback(event)(sr) shouldBe DBUpdater.RollbackOp.empty[IO]
     }
   }
 
-  private trait TestCase {
-    val event   = StatusChangeGenerators.projectEventsToNewEvents.generateOne
-    val session = mock[Session[Try]]
+  private lazy val event   = StatusChangeGenerators.projectEventsToNewEvents.generateOne
+  private lazy val session = mock[Session[IO]]
 
-    val queue   = mock[StatusChangeEventsQueue[Try]]
-    val handler = new DbUpdater[Try](queue)
-  }
+  private lazy val queue   = mock[StatusChangeEventsQueue[IO]]
+  private lazy val handler = new DbUpdater[IO](queue)
 }

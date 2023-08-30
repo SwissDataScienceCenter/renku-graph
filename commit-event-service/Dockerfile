@@ -10,7 +10,7 @@ COPY . .
 RUN export PATH="/usr/local/sbt/bin:$PATH" && \
     apk update && apk add --no-cache --virtual .build-dependencies bash wget tar git && \
     mkdir -p "/usr/local/sbt" && \
-    wget -qO  - "https://github.com/sbt/sbt/releases/download/v1.9.3/sbt-1.9.3.tgz" | tar xz -C /usr/local/sbt --strip-components=1 && \
+    wget -qO  - "https://github.com/sbt/sbt/releases/download/v1.9.4/sbt-1.9.4.tgz" | tar xz -C /usr/local/sbt --strip-components=1 && \
     sbt writeVersionToVersionSbt && \
     sbt writeVersionToVersionConf && \
     sbt "project commit-event-service" stage  && \

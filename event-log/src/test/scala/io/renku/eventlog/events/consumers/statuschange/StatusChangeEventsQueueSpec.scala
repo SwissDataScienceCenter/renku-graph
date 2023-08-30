@@ -114,7 +114,7 @@ class StatusChangeEventsQueueSpec
     }
 
     "continue if there are general problems with dequeueing" in {
-      implicit val failingSessionResource: SessionResource[IO] = new io.renku.db.SessionResource[IO, EventLogDB](
+      implicit val failingSessionResource: SessionResource[IO] = io.renku.db.SessionResource[IO, EventLogDB](
         Session.single[IO](
           host = dbConfig.host.value,
           port = Generators.positiveInts().generateOne.value,
