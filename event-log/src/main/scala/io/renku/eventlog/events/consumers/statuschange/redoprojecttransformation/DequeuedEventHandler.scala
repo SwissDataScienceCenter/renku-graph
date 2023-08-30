@@ -22,6 +22,7 @@ package redoprojecttransformation
 import cats.effect.Async
 import cats.syntax.all._
 import io.renku.db.DbClient
+import io.renku.eventlog.EventLogDB.SessionResource
 import io.renku.eventlog.TypeSerializers
 import io.renku.eventlog.api.events.StatusChangeEvent.RedoProjectTransformation
 import io.renku.eventlog.events.consumers.statuschange.DBUpdater.{RollbackOp, UpdateOp}
@@ -30,9 +31,9 @@ import io.renku.eventlog.metrics.QueriesExecutionTimes
 
 import java.time.Instant
 
-trait DequeuedEventHandler[F[_]] extends DBUpdater[F, RedoProjectTransformation]
+private[statuschange] trait DequeuedEventHandler[F[_]] extends DBUpdater[F, RedoProjectTransformation]
 
-object DequeuedEventHandler {
+private[statuschange] object DequeuedEventHandler {
   def apply[F[_]: Async: QueriesExecutionTimes]: F[DequeuedEventHandler[F]] =
     new DequeuedEventHandlerImpl[F]().pure.widen
 }
@@ -128,5 +129,6 @@ private class DequeuedEventHandlerImpl[F[_]: Async: QueriesExecutionTimes](
       .void
   }
 
-  override def onRollback(event: RedoProjectTransformation): RollbackOp[F] = RollbackOp.empty
+  override def onRollback(event: RedoProjectTransformation)(implicit sr: SessionResource[F]): RollbackOp[F] =
+    RollbackOp.empty
 }

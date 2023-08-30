@@ -26,14 +26,16 @@ import skunk.exception.PostgresErrorException
 object SkunkExceptionsGenerators {
 
   def postgresErrors(sqlState: SqlState): Gen[PostgresErrorException] =
-    nonEmptyStrings().map(postgresMessage =>
-      new PostgresErrorException(sql = "SELECT 1",
-                                 sqlOrigin = None,
-                                 info = Map(
-                                   'C' -> sqlState.code,
-                                   'M' -> postgresMessage
-                                 ),
-                                 history = Nil
-      )
+    for {
+      postgresMessage <- nonEmptyStrings()
+      severity        <- Gen.oneOf("ERROR", "FATAL", "PANIC", "WARNING", "NOTICE", "DEBUG", "INFO", "LOG")
+    } yield new PostgresErrorException(sql = "SELECT 1",
+                                       sqlOrigin = None,
+                                       info = Map(
+                                         'C' -> sqlState.code,
+                                         'M' -> postgresMessage,
+                                         'S' -> severity
+                                       ),
+                                       history = Nil
     )
 }

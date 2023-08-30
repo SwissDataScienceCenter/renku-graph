@@ -39,7 +39,7 @@ trait InMemoryProjectsTokensDb extends ForAllTestContainer with TokenRepositoryT
 
   override val container: PostgreSQLContainer = PostgresContainer.container(dbConfig)
 
-  implicit lazy val sessionResource: SessionResource[IO] = new io.renku.db.SessionResource[IO, ProjectsTokensDB](
+  implicit lazy val sessionResource: SessionResource[IO] = io.renku.db.SessionResource[IO, ProjectsTokensDB](
     Session.single(
       host = container.host,
       database = dbConfig.name.value,

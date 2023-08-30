@@ -22,6 +22,8 @@ import cats.Show
 import cats.data.Kleisli
 import cats.syntax.all._
 import io.circe.Encoder
+import io.renku.eventlog.EventLogDB
+import io.renku.eventlog.EventLogDB.SessionResource
 import io.renku.eventlog.api.events.StatusChangeEvent
 import io.renku.eventlog.api.events.StatusChangeEvent.RedoProjectTransformation
 import io.renku.eventlog.events.consumers.statuschange.StatusChangeEventsQueue.EventType
@@ -54,6 +56,7 @@ class DbUpdaterSpec extends AnyWordSpec with should.Matchers with MockFactory {
 
   "onRollback" should {
     "return RollbackOp.empty" in new TestCase {
+      implicit val sr: SessionResource[Try] = mock[io.renku.db.SessionResource[Try, EventLogDB]]
       handler.onRollback(event) shouldBe DBUpdater.RollbackOp.empty[Try]
     }
   }

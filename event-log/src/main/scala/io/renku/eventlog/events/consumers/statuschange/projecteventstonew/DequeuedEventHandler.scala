@@ -26,6 +26,7 @@ import cleaning.ProjectCleaner
 import eu.timepit.refined.auto._
 import io.renku.db.implicits.PreparedQueryOps
 import io.renku.db.{DbClient, SqlStatement}
+import io.renku.eventlog.EventLogDB.SessionResource
 import io.renku.eventlog.TypeSerializers._
 import io.renku.eventlog.api.events.StatusChangeEvent.ProjectEventsToNew
 import io.renku.eventlog.events.consumers.statuschange.DBUpdater.{RollbackOp, UpdateOp}
@@ -46,9 +47,9 @@ import skunk.implicits._
 import java.time.Instant
 import scala.util.control.NonFatal
 
-trait DequeuedEventHandler[F[_]] extends DBUpdater[F, ProjectEventsToNew]
+private[statuschange] trait DequeuedEventHandler[F[_]] extends DBUpdater[F, ProjectEventsToNew]
 
-object DequeuedEventHandler {
+private[statuschange] object DequeuedEventHandler {
 
   def apply[F[_]: Async: AccessTokenFinder: Logger: QueriesExecutionTimes: MetricsRegistry]
       : F[DBUpdater[F, ProjectEventsToNew]] =
@@ -245,14 +246,14 @@ object DequeuedEventHandler {
         Kleisli.liftF(Logger[F].error(error)(s"$categoryName: project clean up failed: ${project.show}; will retry"))
     }
 
-    override def onRollback(event: ProjectEventsToNew): RollbackOp[F] = {
+    override def onRollback(event: ProjectEventsToNew)(implicit sr: SessionResource[F]): RollbackOp[F] = {
       case SqlState.DeadlockDetected(_)    => logAndRetry(event, "Deadlock")
       case SqlState.ForeignKeyViolation(_) => logAndRetry(event, "ForeignKeyViolation")
     }
 
-    private def logAndRetry(event: ProjectEventsToNew, message: String) =
-      Kleisli.liftF[F, Session[F], Unit](
-        Logger[F].info(show"$categoryName: $message happened while processing $event; retrying")
-      ) >> updateDB(event)
+    private def logAndRetry(event: ProjectEventsToNew, message: String)(implicit sr: SessionResource[F]) =
+      Logger[F].info(show"$categoryName: $message happened while processing $event; retrying") >>
+        sr.useK(updateDB(event))
+          .handleErrorWith(onRollback(event))
   }
 }
