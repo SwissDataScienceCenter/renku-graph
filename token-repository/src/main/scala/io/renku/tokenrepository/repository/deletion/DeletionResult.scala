@@ -16,19 +16,13 @@
  * limitations under the License.
  */
 
-package io.renku.triplesgenerator.gitlab
+package io.renku.tokenrepository.repository.deletion
 
-import io.renku.graph.model.GraphModelGenerators.{personGitLabIds, personNames}
-import io.renku.graph.model.RenkuTinyTypeGenerators
-import io.renku.graph.model.projects.Role
-import org.scalacheck.Gen
+sealed trait DeletionResult {
+  lazy val widen: DeletionResult = this
+}
 
-object Generators {
-
-  implicit val gitLabProjectMembers: Gen[GitLabProjectMember] = for {
-    id   <- personGitLabIds
-    name <- personNames
-    role <- RenkuTinyTypeGenerators.roleGen
-  } yield GitLabProjectMember(id, name, Role.toGitLabAccessLevel(role))
-
+object DeletionResult {
+  case object Deleted    extends DeletionResult
+  case object NotExisted extends DeletionResult
 }

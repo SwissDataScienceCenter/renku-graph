@@ -22,14 +22,14 @@ package membersync
 import cats.effect.{Async, MonadCancelThrow}
 import cats.syntax.all._
 import fs2.io.net.Network
-import io.renku.events.{CategoryName, consumers}
 import io.renku.events.consumers.ProcessExecutor
 import io.renku.events.consumers.subscriptions.SubscriptionMechanism
+import io.renku.events.{CategoryName, consumers}
 import io.renku.graph.model.projects
 import io.renku.graph.tokenrepository.AccessTokenFinder
-import io.renku.lock.syntax._
 import io.renku.http.client.GitLabClient
 import io.renku.lock.Lock
+import io.renku.lock.syntax._
 import io.renku.triplesgenerator.TgLockDB.TsWriteLock
 import io.renku.triplesstore.{ProjectSparqlClient, SparqlQueryTimeRecorder}
 import org.typelevel.log4cats.Logger

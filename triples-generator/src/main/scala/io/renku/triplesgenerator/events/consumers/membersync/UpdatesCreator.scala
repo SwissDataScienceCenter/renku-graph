@@ -17,19 +17,17 @@
  */
 
 package io.renku.triplesgenerator.events.consumers.membersync
-package namedgraphs
 
 import cats.MonadThrow
 import cats.syntax.all._
 import eu.timepit.refined.auto._
 import io.renku.graph.config.{GitLabUrlLoader, RenkuUrlLoader}
-import io.renku.graph.model._
 import io.renku.graph.model.Schemas.schema
+import io.renku.graph.model._
 import io.renku.graph.model.entities.Person
 import io.renku.graph.model.persons.GitLabId
 import io.renku.graph.model.views.RdfResource
 import io.renku.graph.model.views.SparqlLiteralEncoder.sparqlEncode
-import io.renku.triplesgenerator.gitlab.GitLabProjectMember
 import io.renku.triplesstore.SparqlQuery
 import io.renku.triplesstore.SparqlQuery.Prefixes
 

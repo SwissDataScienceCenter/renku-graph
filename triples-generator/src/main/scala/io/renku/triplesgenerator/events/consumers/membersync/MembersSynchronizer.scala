@@ -26,7 +26,6 @@ import io.renku.graph.tokenrepository.AccessTokenFinder
 import io.renku.http.client.{AccessToken, GitLabClient}
 import io.renku.logging.ExecutionTimeRecorder
 import io.renku.logging.ExecutionTimeRecorder.ElapsedTime
-import io.renku.triplesgenerator.gitlab.GitLabProjectMembersFinder
 import io.renku.triplesstore._
 import org.typelevel.log4cats.Logger
 
@@ -37,7 +36,8 @@ private trait MembersSynchronizer[F[_]] {
 }
 
 private class MembersSynchronizerImpl[F[_]: MonadThrow: AccessTokenFinder: Logger](
-    glMembersFinder:       GitLabProjectMembersFinder[F],
+    glMembersFinder:       GLProjectMembersFinder[F],
+    glVisibilityFinder:    GLProjectVisibilityFinder[F],
     kgSynchronizer:        KGSynchronizer[F],
     executionTimeRecorder: ExecutionTimeRecorder[F]
 ) extends MembersSynchronizer[F] {
@@ -51,7 +51,8 @@ private class MembersSynchronizerImpl[F[_]: MonadThrow: AccessTokenFinder: Logge
       _                                   <- Logger[F].info(show"$categoryName: $slug accepted")
       implicit0(mat: Option[AccessToken]) <- findAccessToken(slug)
       membersInGL                         <- glMembersFinder.findProjectMembers(slug)
-      _                                   <- syncMembers(slug, kgSynchronizer.syncMembers(_, membersInGL))
+      maybeVisibility                     <- glVisibilityFinder.findVisibility(slug)
+      _ <- syncMembers(slug, kgSynchronizer.syncMembers(_, membersInGL, maybeVisibility))
     } yield ()
   } recoverWith { case NonFatal(exception) =>
     Logger[F].error(exception)(s"$categoryName: Members synchronized for project $slug failed")
@@ -74,8 +75,11 @@ private object MembersSynchronizer {
       projectSparqlClient: ProjectSparqlClient[F]
   ): F[MembersSynchronizer[F]] =
     for {
-      gitLabProjectMembersFinder <- GitLabProjectMembersFinder[F]
-      kgSynchronizer             <- namedgraphs.KGSynchronizer[F](projectSparqlClient)
-      executionTimeRecorder      <- ExecutionTimeRecorder[F](maybeHistogram = None)
-    } yield new MembersSynchronizerImpl[F](gitLabProjectMembersFinder, kgSynchronizer, executionTimeRecorder)
+      kgSynchronizer        <- KGSynchronizer[F](projectSparqlClient)
+      executionTimeRecorder <- ExecutionTimeRecorder[F](maybeHistogram = None)
+    } yield new MembersSynchronizerImpl[F](GLProjectMembersFinder[F],
+                                           GLProjectVisibilityFinder[F],
+                                           kgSynchronizer,
+                                           executionTimeRecorder
+    )
 }

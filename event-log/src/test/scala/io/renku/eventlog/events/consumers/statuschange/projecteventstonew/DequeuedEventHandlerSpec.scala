@@ -49,7 +49,7 @@ import org.scalamock.scalatest.MockFactory
 import org.scalatest.matchers.should
 import org.scalatest.prop.TableDrivenPropertyChecks
 import org.scalatest.wordspec.AnyWordSpec
-import skunk.SqlState
+import skunk.SqlState.{DeadlockDetected, ForeignKeyViolation}
 
 import java.time.Instant
 import scala.util.Random
@@ -181,8 +181,8 @@ class DequeuedEventHandlerSpec
     forAll(
       Table(
         "failure name"        -> "failure",
-        "Deadlock"            -> postgresErrors(SqlState.DeadlockDetected).generateOne,
-        "ForeignKeyViolation" -> postgresErrors(SqlState.ForeignKeyViolation).generateOne
+        "Deadlock"            -> postgresErrors(DeadlockDetected).generateOne,
+        "ForeignKeyViolation" -> postgresErrors(ForeignKeyViolation).generateOne
       )
     ) { (failureName, failure) =>
       s"run the updateDB on $failureName" in new TestCase {
@@ -195,11 +195,8 @@ class DequeuedEventHandlerSpec
 
         (projectCleaner.cleanUp _).expects(project).returns(Kleisli.pure(()))
 
-        sessionResource
-          .useK((dbUpdater onRollback ProjectEventsToNew(project))(failure))
-          .unsafeRunSync() shouldBe DBUpdateResults.ForProjects(project.slug,
-                                                                Map(AwaitingDeletion -> 0, Deleting -> -1)
-        )
+        (dbUpdater onRollback ProjectEventsToNew(project)).apply(failure).unsafeRunSync() shouldBe
+          DBUpdateResults.ForProjects(project.slug, Map(AwaitingDeletion -> 0, Deleting -> -1))
 
         findEvent(event) shouldBe None
       }

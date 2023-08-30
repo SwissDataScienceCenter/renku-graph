@@ -48,7 +48,7 @@ trait ContainerEventLogDb extends ForAllTestContainer { self: Suite =>
       1
     )
 
-  implicit lazy val sessionResource: SessionResource[IO] = new io.renku.db.SessionResource[IO, EventLogDB](
+  implicit lazy val sessionResource: SessionResource[IO] = io.renku.db.SessionResource[IO, EventLogDB](
     Session.single(
       host = dbConfig.host,
       port = dbConfig.port,

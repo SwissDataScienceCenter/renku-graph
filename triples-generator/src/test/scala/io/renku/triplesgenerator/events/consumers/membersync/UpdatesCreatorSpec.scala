@@ -17,7 +17,6 @@
  */
 
 package io.renku.triplesgenerator.events.consumers.membersync
-package namedgraphs
 
 import Generators._
 import cats.syntax.all._
@@ -32,7 +31,6 @@ import io.renku.graph.model.views.RdfResource
 import io.renku.graph.model.{GraphClass, persons, projects}
 import io.renku.testtools.IOSpec
 import io.renku.triplesgenerator.events.consumers.membersync.PersonOps._
-import io.renku.triplesgenerator.gitlab.Generators._
 import io.renku.triplesstore.SparqlQuery.Prefixes
 import io.renku.triplesstore.{InMemoryJenaForSpec, ProjectsDataset, SparqlQuery}
 import org.scalatest.matchers.should

@@ -17,7 +17,6 @@
  */
 
 package io.renku.triplesgenerator.events.consumers.membersync
-package namedgraphs
 
 import cats.effect.Async
 import cats.syntax.all._
@@ -25,7 +24,6 @@ import io.renku.graph.model.Schemas.schema
 import io.renku.graph.model.entities.Person
 import io.renku.graph.model.persons.{GitLabId, ResourceId}
 import io.renku.graph.model.{GraphClass, persons}
-import io.renku.triplesgenerator.gitlab.GitLabProjectMember
 import io.renku.triplesstore.ResultsDecoder._
 import io.renku.triplesstore.SparqlQuery.Prefixes
 import io.renku.triplesstore._

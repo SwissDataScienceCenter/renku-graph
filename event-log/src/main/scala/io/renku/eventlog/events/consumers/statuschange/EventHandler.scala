@@ -35,7 +35,7 @@ import io.renku.graph.tokenrepository.AccessTokenFinder
 import io.renku.metrics.MetricsRegistry
 import org.typelevel.log4cats.Logger
 
-final class EventHandler[F[_]: Async: Logger: MetricsRegistry: QueriesExecutionTimes](
+final class EventHandler[F[_]: Async: SessionResource: Logger: MetricsRegistry: QueriesExecutionTimes](
     processExecutor:     ProcessExecutor[F],
     statusChanger:       StatusChanger[F],
     eventSender:         EventSender[F],
@@ -71,7 +71,7 @@ final class EventHandler[F[_]: Async: Logger: MetricsRegistry: QueriesExecutionT
       override def updateDB(event: StatusChangeEvent): UpdateOp[F] =
         dbUpdaterFor(event)._1
 
-      override def onRollback(event: StatusChangeEvent): RollbackOp[F] =
+      override def onRollback(event: StatusChangeEvent)(implicit sr: SessionResource[F]): RollbackOp[F] =
         dbUpdaterFor(event)._2
     }
 
