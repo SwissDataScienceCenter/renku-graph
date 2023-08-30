@@ -33,9 +33,11 @@ import org.typelevel.log4cats.Logger
 trait ProjectSparqlClient[F[_]] extends SparqlClient[F]
 
 object ProjectSparqlClient {
-  def apply[F[_]: Monad: Logger: SparqlQueryTimeRecorder](c: SparqlClient[F]) =
+
+  def apply[F[_]: Monad: Logger: SparqlQueryTimeRecorder](c: SparqlClient[F]): ProjectSparqlClient[F] =
     new ProjectSparqlClient[F] {
       private[this] val rec = SparqlQueryTimeRecorder[F].instance
+
       override def update(request: SparqlUpdate) = {
         val label = histogramLabel(request)
         val work  = c.update(request)
