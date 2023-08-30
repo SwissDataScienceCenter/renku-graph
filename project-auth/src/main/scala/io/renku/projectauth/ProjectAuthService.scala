@@ -24,13 +24,12 @@ import cats.effect._
 import cats.syntax.all._
 import fs2.io.net.Network
 import fs2.{Pipe, Stream}
-import io.circe.Decoder
+import io.renku.graph.model.projects.Slug
 import io.renku.graph.model.{RenkuUrl, Schemas}
-import io.renku.graph.model.projects.{Slug, Visibility}
 import io.renku.jsonld.NamedGraph
 import io.renku.jsonld.syntax._
-import io.renku.tinytypes.json.TinyTypeDecoders._
-import io.renku.triplesstore.client.http.{ConnectionConfig, RowDecoder, SparqlClient}
+import io.renku.projectauth.util.ProjectAuthDataRow
+import io.renku.triplesstore.client.http.{ConnectionConfig, SparqlClient}
 import io.renku.triplesstore.client.sparql.Fragment
 import io.renku.triplesstore.client.syntax._
 import org.typelevel.log4cats.Logger
@@ -107,16 +106,10 @@ object ProjectAuthService {
         .evalMap(offset => getChunk(filter, chunkSize, offset))
         .takeWhile(_.nonEmpty)
         .flatMap(Stream.emits)
-        .groupAdjacentBy(_._1)
-        .map { case (slug, rest) =>
-          val members = rest.toList.flatMap(_._3)
-          val vis     = rest.head.map(_._2)
-          vis.map(v => ProjectAuthData(slug, members.toSet, v))
-        }
-        .unNone
+        .through(ProjectAuthDataRow.collect)
 
-    private def getChunk(filter: QueryFilter, limit: Int, offset: Int) =
-      sparqlClient.queryDecode[(Slug, Visibility, Option[ProjectMember])](
+    private def getChunk(filter: QueryFilter, limit: Int, offset: Int): F[List[ProjectAuthDataRow]] =
+      sparqlClient.queryDecode[ProjectAuthDataRow](
         sparql"""PREFIX schema: <http://schema.org/>
                 |PREFIX renku: <https://swissdatasciencecenter.github.io/renku-ontology#>
                 |
@@ -154,13 +147,5 @@ object ProjectAuthService {
                   |}.
                   |""".stripMargin
       }
-
-    private implicit val projectMemberDecoder: Decoder[ProjectMember] =
-      Decoder.decodeString.emap(ProjectMember.fromEncoded)
-
-    private implicit val tupleRowDecoder: RowDecoder[(Slug, Visibility, Option[ProjectMember])] =
-      RowDecoder.forProduct3("slug", "visibility", "memberRole")(
-        Tuple3.apply[Slug, Visibility, Option[ProjectMember]]
-      )
   }
 }

@@ -19,26 +19,63 @@
 package io.renku.knowledgegraph.datasets
 
 import cats.effect.kernel.Sync
+import fs2.Stream
 import io.renku.graph.http.server.security.Authorizer
 import io.renku.graph.http.server.security.Authorizer.SecurityRecordFinder
 import io.renku.graph.model.datasets
 import io.renku.http.server.security.model
+import io.renku.projectauth.util.ProjectAuthDataRow
 import io.renku.triplesstore.ProjectSparqlClient
-import io.renku.triplesstore.client.http.RowDecoder
 import io.renku.triplesstore.client.syntax._
 
 trait DatasetIdRecordsFinder2[F[_]] extends SecurityRecordFinder[F, datasets.Identifier]
 
 object DatasetIdRecordsFinder2 {
 
+  def apply[F[_]: Sync](projectSparqlClient: ProjectSparqlClient[F]): DatasetIdRecordsFinder2[F] =
+    new Impl[F](projectSparqlClient)
+
   private class Impl[F[_]: Sync](projectSparqlClient: ProjectSparqlClient[F]) extends DatasetIdRecordsFinder2[F] {
     override def apply(id: datasets.Identifier, user: Option[model.AuthUser]): F[List[Authorizer.SecurityRecord]] =
-      projectSparqlClient.queryDecode[Authorizer.SecurityRecord](query(id))
+      Stream
+        .evals(projectSparqlClient.queryDecode[ProjectAuthDataRow](query(id)))
+        .through(ProjectAuthDataRow.collect)
+        .map(p => Authorizer.SecurityRecord(p.visibility, p.slug, p.members.map(_.gitLabId)))
+        .compile
+        .toList
 
     private def query(id: datasets.Identifier) =
-      sparql"""$id
+      sparql"""PREFIX schema: <http://schema.org/>
+              |PREFIX renku: <https://swissdatasciencecenter.github.io/renku-ontology#>
+              |
+              |  select ?slug ?visibility ?memberRole
+              |  where {
+              |    bind (${id.value} as ?dsIdent).
+              |    {
+              |      select distinct ?datasetId where {
+              |        graph ?sampleProjectId {
+              |          ?sampleProjectId a schema:Project;
+              |                           renku:hasDataset ?datasetId.
+              |          ?datasetId a schema:Dataset;
+              |                     schema:identifier ?dsIdent.
+              |        }
+              |      }
+              |    }
+              |    graph schema:Dataset {
+              |      ?topmost renku:datasetProjectLink ?link.
+              |      ?link renku:project ?projectId.
+              |      ?link renku:dataset ?datasetId.
+              |    }
+              |    graph renku:ProjectAuth {
+              |      ?projectId a schema:Project;
+              |                 renku:slug ?slug;
+              |                 renku:visibility ?visibility.
+              |      Optional {
+              |        ?projectId renku:memberRole ?memberRole.
+              |      }
+              |    }
+              |  }
+              |  ORDER BY ?slug
               |""".stripMargin
-
-    implicit def rowDecoder: RowDecoder[Authorizer.SecurityRecord] = ???
   }
 }

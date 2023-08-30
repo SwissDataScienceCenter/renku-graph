@@ -20,6 +20,7 @@ package io.renku.knowledgegraph.datasets
 
 import cats.effect.IO
 import io.renku.generators.Generators.Implicits._
+import io.renku.graph.model.datasets.SameAs
 import io.renku.graph.model.projects.Role
 import io.renku.graph.model.testentities.Person
 import io.renku.graph.model.testentities.generators.EntitiesGenerators
@@ -33,7 +34,7 @@ import org.scalatest.flatspec.AsyncFlatSpec
 import org.scalatest.matchers.should
 import org.typelevel.log4cats.Logger
 
-class DatasetIdRecordsFinder2Spec
+class DatasetSameAsRecordsFinder2Spec
     extends AsyncFlatSpec
     with CustomAsyncIOSpec
     with should.Matchers
@@ -47,7 +48,7 @@ class DatasetIdRecordsFinder2Spec
   implicit val ioLogger:  Logger[IO]                  = TestLogger()
   implicit val sqtr:      SparqlQueryTimeRecorder[IO] = TestSparqlQueryTimeRecorder.createUnsafe
 
-  lazy val finder = ProjectSparqlClient[IO](projectsDSConnectionInfo).map(DatasetIdRecordsFinder2.apply[IO])
+  lazy val finder = ProjectSparqlClient[IO](projectsDSConnectionInfo).map(DatasetSameAsRecordsFinder2.apply[IO])
 
   it should "find security records for a simple project with one dataset" in {
     val project =
@@ -66,11 +67,11 @@ class DatasetIdRecordsFinder2Spec
       case p if p == project.members.head => Role.Owner
     }
 
-    val dsId = project.datasets.head.identification.identifier
+    val dsSameAs = SameAs(project.datasets.head.provenance.topmostSameAs.value)
 
     for {
       _ <- provisionTestProjectAndMembers(project, memberDef)
-      r <- finder.use(_.apply(dsId, None))
+      r <- finder.use(_.apply(dsSameAs, None))
       _ = r.size                shouldBe 1
       _ = r.head.projectSlug    shouldBe project.slug
       _ = r.head.visibility     shouldBe project.visibility
