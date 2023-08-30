@@ -16,7 +16,8 @@
  * limitations under the License.
  */
 
-package io.renku.eventlog.events.consumers.statuschange.rollbacktoawaitingdeletion
+package io.renku.eventlog.events.consumers.statuschange
+package rollbacktoawaitingdeletion
 
 import cats.effect.MonadCancelThrow
 import cats.syntax.all._
@@ -32,13 +33,14 @@ import io.renku.eventlog.metrics.QueriesExecutionTimes
 import io.renku.graph.model.events.EventStatus.{AwaitingDeletion, Deleting}
 import io.renku.graph.model.events.{EventStatus, ExecutionDate}
 import io.renku.graph.model.projects
+import org.typelevel.log4cats.Logger
 import skunk._
 import skunk.data.Completion
 import skunk.implicits._
 
 import java.time.Instant
 
-private[statuschange] class DbUpdater[F[_]: MonadCancelThrow: QueriesExecutionTimes](
+private[statuschange] class DbUpdater[F[_]: MonadCancelThrow: Logger: QueriesExecutionTimes](
     now: () => Instant = () => Instant.now
 ) extends DbClient(Some(QueriesExecutionTimes[F]))
     with statuschange.DBUpdater[F, RollbackToAwaitingDeletion] {
@@ -66,6 +68,10 @@ private[statuschange] class DbUpdater[F[_]: MonadCancelThrow: QueriesExecutionTi
       }
   }
 
-  override def onRollback(event: RollbackToAwaitingDeletion)(implicit sr: SessionResource[F]): RollbackOp[F] =
-    RollbackOp.empty
+  override def onRollback(event: RollbackToAwaitingDeletion)(implicit sr: SessionResource[F]): RollbackOp[F] = {
+    case SqlState.DeadlockDetected(_) =>
+      Logger[F].info(show"$categoryName: Deadlock happened while processing $event; retrying") >>
+        sr.useK(updateDB(event))
+          .handleErrorWith(onRollback(event))
+  }
 }
