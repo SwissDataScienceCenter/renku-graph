@@ -24,29 +24,9 @@ import io.renku.graph.model.datasets.SameAs
 import io.renku.graph.model.projects.Role
 import io.renku.graph.model.testentities.Person
 import io.renku.graph.model.testentities.generators.EntitiesGenerators
-import io.renku.graph.model.{GitLabApiUrl, RenkuUrl}
-import io.renku.interpreters.TestLogger
-import io.renku.knowledgegraph.DatasetProvision
-import io.renku.logging.TestSparqlQueryTimeRecorder
-import io.renku.testtools.CustomAsyncIOSpec
-import io.renku.triplesstore.{InMemoryJenaForSpec, ProjectSparqlClient, ProjectsDataset, SparqlQueryTimeRecorder}
-import org.scalatest.flatspec.AsyncFlatSpec
-import org.scalatest.matchers.should
-import org.typelevel.log4cats.Logger
+import io.renku.triplesstore.ProjectSparqlClient
 
-class DatasetSameAsRecordsFinder2Spec
-    extends AsyncFlatSpec
-    with CustomAsyncIOSpec
-    with should.Matchers
-    with InMemoryJenaForSpec
-    // with ExternalJenaForSpec
-    with ProjectsDataset
-    with DatasetProvision {
-
-  implicit val renkuUrl:  RenkuUrl                    = RenkuUrl("http://u.rl")
-  implicit val gitlabUrl: GitLabApiUrl                = GitLabApiUrl("http://gitl.ab")
-  implicit val ioLogger:  Logger[IO]                  = TestLogger()
-  implicit val sqtr:      SparqlQueryTimeRecorder[IO] = TestSparqlQueryTimeRecorder.createUnsafe
+class DatasetSameAsRecordsFinder2Spec extends SecurityRecordFinderSupport {
 
   lazy val finder = ProjectSparqlClient[IO](projectsDSConnectionInfo).map(DatasetSameAsRecordsFinder2.apply[IO])
 
@@ -72,10 +52,26 @@ class DatasetSameAsRecordsFinder2Spec
     for {
       _ <- provisionTestProjectAndMembers(project, memberDef)
       r <- finder.use(_.apply(dsSameAs, None))
-      _ = r.size                shouldBe 1
-      _ = r.head.projectSlug    shouldBe project.slug
-      _ = r.head.visibility     shouldBe project.visibility
-      _ = r.head.allowedPersons shouldBe project.members.flatMap(_.maybeGitLabId)
+      _ = r shouldBe List(project).map(toSecRecord)
+    } yield ()
+  }
+
+  it should "find security records for a forked project" in {
+    val (dataset, (parentProject, project)) =
+      EntitiesGenerators
+        .renkuProjectEntities(EntitiesGenerators.anyVisibility)
+        .modify(EntitiesGenerators.removeMembers())
+        .addDataset(EntitiesGenerators.datasetEntities(EntitiesGenerators.provenanceNonModified))
+        .forkOnce()
+        .generateOne
+
+    val dsSameAs = SameAs(dataset.provenance.topmostSameAs.value)
+
+    for {
+      _ <- provisionTestProjectAndMembers(project)
+      _ <- provisionTestProject(parentProject)
+      r <- finder.use(_.apply(dsSameAs, None))
+      _ = r shouldBe List(project, parentProject).map(toSecRecord).sortBy(_.projectSlug.value)
     } yield ()
   }
 }
