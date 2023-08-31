@@ -142,7 +142,7 @@ object Dependencies {
       )
 
   val wiremock = Seq(
-    "com.github.tomakehurst" % "wiremock-jre8" % V.wiremock
+    "org.wiremock" % "wiremock" % V.wiremock
   )
 
   val scalamock = Seq(
