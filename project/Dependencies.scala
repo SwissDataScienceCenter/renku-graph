@@ -5,13 +5,14 @@ object Dependencies {
 
   object V {
     val ammonite               = "2.4.1"
-    val catsCore               = "2.9.0"
+    val catsCore               = "2.10.0"
     val catsEffect             = "3.5.1"
     val catsEffectScalaTest    = "1.5.0"
-    val circeCore              = "0.14.5"
+    val circeCore              = "0.14.6"
     val circeGenericExtras     = "0.14.3"
     val circeOptics            = "0.14.1"
     val diffx                  = "0.8.3"
+    val fs2                    = "3.9.1"
     val http4s                 = "0.23.23"
     val http4sEmber            = "0.23.23"
     val http4sPrometheus       = "0.24.4"
@@ -19,24 +20,24 @@ object Dependencies {
     val jsonld4s               = "0.12.0"
     val log4cats               = "2.6.0"
     val log4jCore              = "2.20.0"
-    val logback                = "1.4.8"
+    val logback                = "1.4.11"
     val luceneQueryParser      = "9.7.0"
     val monocle                = "2.1.0"
     val owlapi                 = "5.5.0"
     val pureconfig             = "0.17.4"
-    val rdf4jQueryParserSparql = "4.3.4"
+    val rdf4jQueryParserSparql = "4.3.6"
     val refined                = "0.11.0"
     val refinedPureconfig      = "0.11.0"
     val scalacheck             = "1.17.0"
     val scalamock              = "5.2.0"
     val scalatest              = "3.2.16"
     val scalatestScalacheck    = "3.2.14.0"
-    val sentryLogback          = "6.27.0"
+    val sentryLogback          = "6.28.0"
     val skunk                  = "0.6.0"
     val swaggerParser          = "2.1.16"
-    val testContainersScala    = "0.40.17"
-    val widoco                 = "1.4.19"
-    val wiremock               = "2.35.0"
+    val testContainersScala    = "0.41.0"
+    val widoco                 = "1.4.20"
+    val wiremock               = "3.0.0"
   }
 
   val ip4s = Seq(
@@ -131,13 +132,17 @@ object Dependencies {
     "org.typelevel" %% "log4cats-core" % V.log4cats
   )
 
-  val testContainersPostgres = Seq(
-    "com.dimafeng" %% "testcontainers-scala-scalatest"  % V.testContainersScala,
-    "com.dimafeng" %% "testcontainers-scala-postgresql" % V.testContainersScala
+  val testContainersScalaTest = Seq(
+    "com.dimafeng" %% "testcontainers-scala-scalatest" % V.testContainersScala
   )
+  val testContainersPostgres =
+    testContainersScalaTest ++
+      Seq(
+        "com.dimafeng" %% "testcontainers-scala-postgresql" % V.testContainersScala
+      )
 
   val wiremock = Seq(
-    "com.github.tomakehurst" % "wiremock-jre8" % V.wiremock
+    "org.wiremock" % "wiremock" % V.wiremock
   )
 
   val scalamock = Seq(
@@ -176,6 +181,10 @@ object Dependencies {
     "io.renku" %% "jsonld4s" % V.jsonld4s
   )
 
+  val fs2Core = Seq(
+    "co.fs2" %% "fs2-core" % V.fs2
+  )
+
   val catsCore = Seq(
     "org.typelevel" %% "cats-core" % V.catsCore
   )
@@ -187,5 +196,4 @@ object Dependencies {
   val scalacheck = Seq(
     "org.scalacheck" %% "scalacheck" % V.scalacheck
   )
-
 }

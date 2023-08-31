@@ -18,7 +18,6 @@
 
 package io.renku.tokenrepository.repository.creation
 
-import cats.Id
 import cats.effect.MonadCancelThrow
 import io.renku.db.DbClient
 import io.renku.graph.model.projects
@@ -27,7 +26,7 @@ import io.renku.tokenrepository.repository.TokenRepositoryTypeSerializers
 import io.renku.tokenrepository.repository.metrics.QueriesExecutionTimes
 
 private trait PersistedSlugFinder[F[_]] {
-  def findPersistedProjectSlug(projectId: projects.GitLabId): F[projects.Slug]
+  def findPersistedProjectSlug(projectId: projects.GitLabId): F[Option[projects.Slug]]
 }
 
 private object PersistedSlugFinder {
@@ -43,7 +42,7 @@ private class PersistedSlugFinderImpl[F[_]: MonadCancelThrow: SessionResource: Q
   import io.renku.db.SqlStatement
   import skunk.implicits._
 
-  override def findPersistedProjectSlug(projectId: projects.GitLabId): F[projects.Slug] =
+  override def findPersistedProjectSlug(projectId: projects.GitLabId): F[Option[projects.Slug]] =
     SessionResource[F].useK(measureExecutionTime(query(projectId)))
 
   private def query(projectId: projects.GitLabId) =
@@ -56,5 +55,5 @@ private class PersistedSlugFinderImpl[F[_]: MonadCancelThrow: SessionResource: Q
           .query(projectSlugDecoder)
       )
       .arguments(projectId)
-      .build[Id](_.unique)
+      .build(_.option)
 }

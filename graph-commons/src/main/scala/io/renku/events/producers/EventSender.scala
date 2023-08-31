@@ -57,12 +57,32 @@ object EventSender {
   ): F[EventSender[F]] = for {
     consumerUrl     <- consumerUrlFactory(config)
     sentEventsGauge <- SentEventsGauge[F]
-  } yield new EventSenderImpl(consumerUrl, sentEventsGauge, onBusySleep = 2 seconds, onErrorSleep = 15 seconds)
+  } yield new EventSenderImpl(consumerUrl, sentEventsGauge, onBusySleep = 15 seconds, onErrorSleep = 30 seconds)
 
   def apply[F[_]: Async: Logger: MetricsRegistry](consumerUrlFactory: EventConsumerUrlFactory): F[EventSender[F]] =
     apply(consumerUrlFactory, ConfigFactory.load)
 
-  final case class EventContext(categoryName: CategoryName, errorMessage: String)
+  final case class EventContext(categoryName: CategoryName,
+                                errorMessage: String,
+                                retries:      Option[EventContext.Retries]
+  ) {
+    def nextAttempt():        EventContext = copy(retries = retries.map(_.nextAttempt()))
+    lazy val hasAttemptsLeft: Boolean      = retries.forall(_.hasAttemptsLeft)
+  }
+
+  object EventContext {
+
+    final case class Retries(max: Int, left: Int) {
+      def nextAttempt():        Retries = copy(left = left - 1)
+      lazy val hasAttemptsLeft: Boolean = left > 0
+    }
+
+    def apply(categoryName: CategoryName, errorMessage: String): EventContext =
+      EventContext(categoryName, errorMessage, retries = None)
+
+    def apply(categoryName: CategoryName, errorMessage: String, maxRetriesNumber: Int): EventContext =
+      EventContext(categoryName, errorMessage, Retries(maxRetriesNumber, maxRetriesNumber).some)
+  }
 }
 
 class EventSenderImpl[F[_]: Async: Logger](
@@ -113,11 +133,17 @@ class EventSenderImpl[F[_]: Async: Logger](
 
   private def sendWithRetry(request: Request[F], context: EventContext): F[Status] =
     send(request)(responseMapping)
-      .recoverWith(retryOnServerError(Eval.always(sendWithRetry(request, context)), context))
+      .recoverWith { ex =>
+        val updatedContext = context.nextAttempt()
+        retryOnServerError(Eval.always(sendWithRetry(request, updatedContext)), updatedContext)(ex)
+      }
 
   private def retryOnServerError(retry:   Eval[F[Status]],
                                  context: EventContext
   ): PartialFunction[Throwable, F[Status]] = {
+    case exception if !context.hasAttemptsLeft =>
+      val message = s"${context.errorMessage} - no more attempts left"
+      Logger[F].error(exception)(message) >> new Exception(message, exception).raiseError[F, Status]
     case UnexpectedResponseException(TooManyRequests, _) =>
       waitAndRetry(retry, context.errorMessage)
     case exception @ UnexpectedResponseException(ServiceUnavailable | GatewayTimeout | BadGateway, _) =>

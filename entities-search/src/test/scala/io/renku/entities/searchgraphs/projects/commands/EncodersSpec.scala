@@ -20,16 +20,13 @@ package io.renku.entities.searchgraphs.projects
 package commands
 
 import Generators._
-import io.renku.entities.searchgraphs.Generators.personInfos
-import io.renku.entities.searchgraphs.PersonInfo
 import io.renku.generators.Generators.Implicits._
 import io.renku.generators.Generators.positiveInts
 import io.renku.generators.jsonld.JsonLDGenerators.entityIds
 import io.renku.graph.model.GraphModelGenerators.imageUris
 import io.renku.graph.model.Schemas.{rdf, renku, schema}
-import io.renku.graph.model.entities.Person
 import io.renku.graph.model.images.{Image, ImagePosition, ImageResourceId}
-import io.renku.graph.model.projects
+import io.renku.graph.model.{persons, projects}
 import io.renku.jsonld.syntax._
 import io.renku.triplesstore.client.model.Quad
 import io.renku.triplesstore.client.syntax._
@@ -39,19 +36,6 @@ import org.scalatest.wordspec.AnyWordSpec
 class EncodersSpec extends AnyWordSpec with should.Matchers {
 
   import Encoders._
-
-  "personInfoEncoder" should {
-
-    "turn a PersonInfo object into a Set of relevant Quads" in {
-
-      val personInfo = personInfos.generateOne
-
-      personInfo.asQuads shouldBe Set(
-        ProjectsQuad(personInfo.resourceId, rdf / "type", Person.Ontology.typeClass.id),
-        ProjectsQuad(personInfo.resourceId, Person.Ontology.nameProperty.id, personInfo.name.asObject)
-      )
-    }
-  }
 
   "imageEncoder" should {
 
@@ -96,9 +80,9 @@ class EncodersSpec extends AnyWordSpec with should.Matchers {
   }
 
   private def creatorToQuads(searchInfo: ProjectSearchInfo): Set[Quad] =
-    searchInfo.maybeCreator.toSet.flatMap((pi: PersonInfo) =>
-      pi.asQuads + ProjectsQuad(searchInfo.id, ProjectSearchInfoOntology.creatorProperty, pi.resourceId.asEntityId)
-    )
+    searchInfo.maybeCreator.toSet.map { (resourceId: persons.ResourceId) =>
+      ProjectsQuad(searchInfo.id, ProjectSearchInfoOntology.creatorProperty, resourceId.asEntityId)
+    }
 
   private def keywordsToQuads(searchInfo: ProjectSearchInfo): Set[Quad] =
     searchInfo.keywords

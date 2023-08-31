@@ -20,7 +20,6 @@ package io.renku.entities.searchgraphs.datasets
 
 import cats.data.NonEmptyList
 import cats.syntax.all._
-import io.renku.entities.searchgraphs.PersonInfo._
 import io.renku.generators.Generators.Implicits._
 import io.renku.generators.Generators._
 import io.renku.graph.model.testentities._
@@ -51,7 +50,7 @@ class SearchInfoExtractorSpec extends AnyWordSpec with should.Matchers {
             project.visibility,
             ds.provenance.date,
             maybeDateModified = None,
-            ds.provenance.creators.map(toPersonInfo),
+            ds.provenance.creators.map(_.resourceId),
             ds.additionalInfo.keywords,
             ds.additionalInfo.maybeDescription,
             ds.additionalInfo.images,
@@ -80,7 +79,7 @@ class SearchInfoExtractorSpec extends AnyWordSpec with should.Matchers {
           project.visibility,
           originalDataset.provenance.date,
           datasets.DateModified(lastModification.provenance.date).some,
-          lastModification.provenance.creators.map(toPersonInfo),
+          lastModification.provenance.creators.map(_.resourceId),
           lastModification.additionalInfo.keywords,
           lastModification.additionalInfo.maybeDescription,
           lastModification.additionalInfo.images,

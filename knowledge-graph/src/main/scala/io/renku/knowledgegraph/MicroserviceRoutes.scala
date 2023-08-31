@@ -186,13 +186,13 @@ private class MicroserviceRoutes[F[_]: Async](
           .merge
       }
 
-    case authReq @ PUT -> "knowledge-graph" /: "projects" /: path as maybeUser =>
+    case authReq @ (PATCH | PUT) -> "knowledge-graph" /: "projects" /: path as maybeUser =>
       maybeUser.withUserOrNotFound { user =>
         path.segments.toList
           .map(_.toString)
           .toProjectSlug
           .flatTap(authorizeSlug(_, user.some).leftMap(_.toHttpResponse))
-          .semiflatMap(`PUT /projects/:slug`(_, authReq.req, user))
+          .semiflatMap(`PATCH /projects/:slug`(_, authReq.req, user))
           .merge
       }
   }

@@ -22,6 +22,7 @@ import cats.effect.MonadCancelThrow
 import cats.syntax.all._
 import eu.timepit.refined.auto._
 import io.renku.db.{DbClient, SqlStatement}
+import io.renku.eventlog.EventLogDB.SessionResource
 import io.renku.eventlog.TypeSerializers._
 import io.renku.eventlog.api.events.StatusChangeEvent.RollbackToTriplesGenerated
 import io.renku.eventlog.events.consumers.statuschange
@@ -67,5 +68,6 @@ private[statuschange] class DbUpdater[F[_]: MonadCancelThrow: QueriesExecutionTi
       }
   }
 
-  override def onRollback(event: RollbackToTriplesGenerated): RollbackOp[F] = RollbackOp.empty
+  override def onRollback(event: RollbackToTriplesGenerated)(implicit sr: SessionResource[F]): RollbackOp[F] =
+    RollbackOp.empty
 }

@@ -27,7 +27,8 @@ import io.renku.generators.Generators.Implicits._
 import io.renku.http.client.RestClient.ResponseMappingF
 import io.renku.http.client.{AccessToken, GitLabClient}
 import org.http4s.Method.{DELETE, GET, HEAD, POST, PUT}
-import org.http4s.{Method, Uri, UrlForm}
+import org.http4s.multipart.Multipart
+import org.http4s.{Method, Uri}
 import org.scalacheck.Gen
 import org.scalamock.clazz.Mock
 import org.scalamock.function.MockFunctions
@@ -73,7 +74,7 @@ trait GitLabClientTools[F[_]] {
           .repeat(expectedNumberOfCalls)
       case PUT =>
         (gitLabClient
-          .put(_: Uri, _: String Refined NonEmpty, _: UrlForm)(_: ResponseMappingF[F, ResultType])(
+          .put(_: Uri, _: String Refined NonEmpty, _: Multipart[F])(_: ResponseMappingF[F, ResultType])(
             _: Option[AccessToken]
           ))
           .expects(*, maybeEndpointName.map(new MockParameter(_)).getOrElse(*), *, capture(responseMapping), *)

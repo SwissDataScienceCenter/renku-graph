@@ -35,7 +35,8 @@ import io.renku.http.rest.paging.model.{Page, Total}
 import io.renku.metrics.{GitLabApiCallRecorder, MetricsRegistry}
 import org.http4s.Method.{DELETE, GET, HEAD, POST, PUT}
 import org.http4s.circe.{jsonEncoder, jsonEncoderOf}
-import org.http4s.{EntityEncoder, Method, Response, Uri, UrlForm}
+import org.http4s.multipart.Multipart
+import org.http4s.{EntityEncoder, Method, Response, Uri}
 import org.typelevel.ci._
 import org.typelevel.log4cats.Logger
 
@@ -55,7 +56,7 @@ trait GitLabClient[F[_]] {
       mapResponse: ResponseMappingF[F, ResultType]
   )(implicit maybeAccessToken: Option[AccessToken]): F[ResultType]
 
-  def put[ResultType](path: Uri, endpointName: String Refined NonEmpty, payload: UrlForm)(
+  def put[ResultType](path: Uri, endpointName: String Refined NonEmpty, payload: Multipart[F])(
       mapResponse: ResponseMappingF[F, ResultType]
   )(implicit maybeAccessToken: Option[AccessToken]): F[ResultType]
 
@@ -104,13 +105,17 @@ final class GitLabClientImpl[F[_]: Async: Logger](
     result  <- super.send(request)(mapResponse)
   } yield result
 
-  override def put[ResultType](path: Uri, endpointName: String Refined NonEmpty, payload: UrlForm)(
+  override def put[ResultType](path: Uri, endpointName: String Refined NonEmpty, payload: Multipart[F])(
       mapResponse: ResponseMappingF[F, ResultType]
-  )(implicit maybeAccessToken: Option[AccessToken]): F[ResultType] = for {
-    uri     <- validateUri(show"$gitLabApiUrl/$path")
-    request <- secureNamedRequest(PUT, uri, endpointName, payload)
-    result  <- super.send(request)(mapResponse)
-  } yield result
+  )(implicit maybeAccessToken: Option[AccessToken]): F[ResultType] =
+    validateUri(show"$gitLabApiUrl/$path")
+      .flatMap(
+        secureNamedRequest(PUT, _, endpointName)
+          .map(req => req.copy(request = req.request.withEntity(payload).putHeaders(payload.headers)))
+      )
+      .flatMap(
+        send(_: NamedRequest[F])(mapResponse)
+      )
 
   override def delete[ResultType](path: Uri, endpointName: Refined[String, NonEmpty])(
       mapResponse: ResponseMappingF[F, ResultType]

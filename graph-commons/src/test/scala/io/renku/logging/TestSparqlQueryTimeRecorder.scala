@@ -26,6 +26,6 @@ import org.typelevel.log4cats.Logger
 object TestSparqlQueryTimeRecorder {
   def apply[F[_]: Sync: Logger]: F[SparqlQueryTimeRecorder[F]] = {
     implicit val metricsRegistry: MetricsRegistry[F] = TestMetricsRegistry[F]
-    SparqlQueryTimeRecorder[F]()
+    SparqlQueryTimeRecorder.create[F]()
   }
 }

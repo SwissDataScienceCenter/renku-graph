@@ -18,15 +18,18 @@
 
 package io.renku.generators
 
+import cats.arrow.FunctionK
 import cats.data.NonEmptyList
+import cats.effect.IO
 import cats.syntax.all._
-import cats.{Applicative, Functor, Monad, Semigroupal}
+import cats.{Applicative, Functor, Monad, Semigroupal, ~>}
 import com.comcast.ip4s.Port
 import eu.timepit.refined.api.Refined
 import eu.timepit.refined.auto._
 import eu.timepit.refined.collection.NonEmpty
 import eu.timepit.refined.numeric.{Negative, NonNegative, NonPositive, Positive}
 import eu.timepit.refined.string.Url
+import fs2.Stream
 import io.circe.{Encoder, Json}
 import org.scalacheck.Gen._
 import org.scalacheck.{Arbitrary, Gen}
@@ -191,15 +194,18 @@ object Generators {
 
   val httpPorts: Gen[Port] = choose(2000, 10000).map(Port.fromInt).map(_.getOrElse(sys.error("Invalid generated port")))
 
-  def httpUrls(hostGenerator: Gen[String] = nonEmptyStrings(),
-               pathGenerator: Gen[String] = relativePaths(minSegments = 0, maxSegments = 2)
+  def httpUrls(protocolGenerator: Gen[String] = Gen.oneOf("http", "https"),
+               hostGenerator:     Gen[String] = nonEmptyStrings(),
+               portGenerator:     Gen[Option[Port]] = Gen.some(httpPorts),
+               pathGenerator:     Gen[String] = relativePaths(minSegments = 0, maxSegments = 2)
   ): Gen[String] = for {
-    protocol <- Gen.oneOf("http", "https")
-    port     <- httpPorts
-    host     <- hostGenerator
-    path     <- pathGenerator
+    protocol  <- protocolGenerator
+    host      <- hostGenerator
+    maybePort <- portGenerator
+    path      <- pathGenerator
+    portValidated = maybePort.map(p => s":$p").getOrElse("")
     pathValidated = if (path.isEmpty) "" else s"/$path"
-  } yield s"$protocol://$host:$port$pathValidated"
+  } yield s"$protocol://$host$portValidated$pathValidated"
 
   val localHttpUrls: Gen[String] = for {
     protocol <- Gen.oneOf("http", "https")
@@ -354,6 +360,9 @@ object Generators {
       def generateNonEmptyList(min: Int = 1, max: Int = 5): NonEmptyList[T] =
         generateExample(nonEmptyList(generator, min, max))
 
+      def asStream: Stream[Gen, T] =
+        Stream.eval(generator) ++ asStream
+
       def generateOption: Option[T] = Gen.option(generator).sample getOrElse generateOption
 
       def generateSome: Option[T] = Option(generator.generateOne)
@@ -408,6 +417,15 @@ object Generators {
           case Some(value) => value.map(Gen.const)
           case None        => sequence
         }
+    }
+
+    private def runGen[A](ga: Gen[A]): IO[A] = IO(ga.generateOne)
+
+    private val genToIO: Gen ~> IO =
+      FunctionK.lift[Gen, IO](runGen)
+
+    implicit class GenStreamOps[A](gens: Stream[Gen, A]) {
+      def toIO: Stream[IO, A] = gens.translate(genToIO)
     }
 
     implicit def asArbitrary[T](implicit generator: Gen[T]): Arbitrary[T] = Arbitrary(generator)

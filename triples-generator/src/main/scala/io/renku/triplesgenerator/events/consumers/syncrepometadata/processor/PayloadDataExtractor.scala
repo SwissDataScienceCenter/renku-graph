@@ -26,7 +26,6 @@ import io.renku.cli.model.Ontologies.{Schema => CliSchema}
 import io.renku.eventlog.api.EventLogClient.EventPayload
 import io.renku.graph.model.images.Image
 import io.renku.graph.model.projects
-import io.renku.jsonld.{Cursor, Property}
 import org.typelevel.log4cats.Logger
 
 private trait PayloadDataExtractor[F[_]] {
@@ -56,29 +55,19 @@ private class PayloadDataExtractorImpl[F[_]: MonadThrow: Logger] extends Payload
       Option.empty[DataExtract.Payload].pure[F]
     case Some(jsonLD) =>
       jsonLD.cursor
-        .as(decodeList(dataExtract(slug)))
+        .as[List[DataExtract.Payload]]
         .map(_.headOption)
         .fold(logWarn(slug), _.pure[F])
   }
 
-  private def dataExtract(slug: projects.Slug): JsonLDDecoder[DataExtract.Payload] =
+  private implicit lazy val dataExtract: JsonLDDecoder[DataExtract.Payload] =
     JsonLDDecoder.entity(CliProject.entityTypes) { cur =>
       for {
-        name <- cur.downField(CliSchema.name).as[Option[projects.Name]] >>= {
-                  case None    => decodingFailure(CliSchema.name, cur).asLeft
-                  case Some(v) => v.asRight
-                }
         maybeDesc <- cur.downField(CliSchema.description).as[Option[projects.Description]]
         keywords  <- cur.downField(CliSchema.keywords).as[Set[Option[projects.Keyword]]].map(_.flatten)
         images    <- cur.downField(CliSchema.image).as[List[Image]].map(_.sortBy(_.position).map(_.uri))
-      } yield DataExtract.Payload(slug, name, maybeDesc, keywords, images)
+      } yield DataExtract.Payload(maybeDesc, keywords, images)
     }
-
-  private def decodingFailure(propName: Property, cur: Cursor) =
-    DecodingFailure(
-      DecodingFailure.Reason.CustomReason(show"no '$propName' property in the payload"),
-      cur.jsonLD.toJson.hcursor
-    )
 
   private def logError(slug: projects.Slug): Throwable => F[Option[JsonLD]] =
     Logger[F]

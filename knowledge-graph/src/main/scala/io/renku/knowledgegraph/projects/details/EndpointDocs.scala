@@ -33,7 +33,7 @@ import model.Forking.ForksCount
 import model.Permissions.{AccessLevel, GroupAccessLevel}
 import model.Project.StarsCount
 import model.Statistics.{CommitsCount, JobArtifactsSize, LsfObjectsSize, RepositorySize, StorageSize}
-import model.Urls.{HttpUrl, ReadmeUrl, SshUrl, WebUrl}
+import model.Urls.{ReadmeUrl, SshUrl, WebUrl}
 import model._
 
 import java.time.Instant
@@ -104,7 +104,7 @@ private class EndpointDocsImpl(projectJsonEncoder: ProjectJsonEncoder, projectJs
     projects.DateModified(Instant.parse("2012-11-16T10:00:00.000Z")),
     Urls(
       SshUrl("git@github.com:namespace/name.git"),
-      HttpUrl("https://github.com/namespace/name.git"),
+      projects.GitHttpUrl("https://github.com/namespace/name.git"),
       WebUrl("https://github.com/namespace/name"),
       ReadmeUrl("https://github.com/namespace/name/README.md").some
     ),

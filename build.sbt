@@ -50,7 +50,9 @@ lazy val root = project
     triplesGeneratorApi,
     entitiesSearch,
     entitiesViewingsCollector,
+    projectAuth,
     triplesGenerator,
+    renkuCoreClient,
     knowledgeGraph
   )
 
@@ -159,6 +161,15 @@ lazy val entitiesSearch = project
   .dependsOn(graphCommons % "compile->compile; test->test")
   .enablePlugins(AutomateHeaderPlugin)
 
+lazy val projectAuth = project
+  .in(file("project-auth"))
+  .settings(commonSettings)
+  .dependsOn(
+    renkuModelTinyTypes % "compile->compile; test->test",
+    triplesStoreClient  % "compile->compile; test->test"
+  )
+  .enablePlugins(AutomateHeaderPlugin)
+
 lazy val triplesGeneratorApi = project
   .in(file("triples-generator-api"))
   .withId("triples-generator-api")
@@ -187,7 +198,8 @@ lazy val triplesGenerator = project
   .dependsOn(
     triplesGeneratorApi % "compile->compile; test->test",
     entitiesSearch,
-    entitiesViewingsCollector % "compile->compile; test->test"
+    entitiesViewingsCollector % "compile->compile; test->test",
+    projectAuth               % "compile->compile; test->test"
   )
   .enablePlugins(
     JavaAppPackaging,
@@ -203,6 +215,13 @@ lazy val tokenRepository = project
     JavaAppPackaging,
     AutomateHeaderPlugin
   )
+
+lazy val renkuCoreClient = project
+  .in(file("renku-core-client"))
+  .withId("renku-core-client")
+  .settings(commonSettings)
+  .dependsOn(graphCommons % "compile->compile; test->test")
+  .enablePlugins(AutomateHeaderPlugin)
 
 lazy val knowledgeGraph = project
   .in(file("knowledge-graph"))
@@ -220,6 +239,7 @@ lazy val knowledgeGraph = project
     graphCommons        % "compile->compile; test->test",
     entitiesSearch      % "compile->compile; test->test",
     triplesGeneratorApi % "compile->compile; test->test",
+    renkuCoreClient     % "compile->compile; test->test",
     entitiesViewingsCollector
   )
   .enablePlugins(

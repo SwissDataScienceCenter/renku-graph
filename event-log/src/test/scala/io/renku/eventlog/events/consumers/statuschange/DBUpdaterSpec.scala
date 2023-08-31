@@ -27,7 +27,7 @@ class DBUpdaterSpec extends AnyWordSpec with should.Matchers {
 
   "RollbackOp.empty" should {
     "be an empty PartialFunction" in {
-      DBUpdater.RollbackOp.empty[Try] shouldBe PartialFunction.empty[Throwable, DBUpdater.UpdateOp[Try]]
+      DBUpdater.RollbackOp.empty[Try] shouldBe PartialFunction.empty[Throwable, Try[DBUpdateResults]]
     }
   }
 }

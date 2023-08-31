@@ -19,6 +19,8 @@
 package io.renku.eventlog
 
 import cats.data.Kleisli
+import cats.effect.IO
+import cats.syntax.all._
 import io.circe.Json
 import io.renku.eventlog.events.producers.eventdelivery._
 import io.renku.events.Generators.{subscriberIds, subscriberUrls}
@@ -84,6 +86,29 @@ trait EventLogDataProvisioning {
     (eventId.id, status, maybeMessage, maybePayload, processingTimes)
   }
 
+  protected def storeEventIO(compoundEventId:   CompoundEventId,
+                             eventStatus:       EventStatus,
+                             executionDate:     ExecutionDate,
+                             eventDate:         EventDate,
+                             eventBody:         EventBody,
+                             createdDate:       CreatedDate = CreatedDate(Instant.now),
+                             batchDate:         BatchDate = BatchDate(Instant.now),
+                             projectSlug:       Slug = projectSlugs.generateOne,
+                             maybeMessage:      Option[EventMessage] = None,
+                             maybeEventPayload: Option[ZippedEventPayload] = None
+  ): IO[Unit] =
+    upsertProjectIO(compoundEventId.projectId, projectSlug, eventDate) >>
+      insertEventIO(compoundEventId,
+                    eventStatus,
+                    executionDate,
+                    eventDate,
+                    eventBody,
+                    createdDate,
+                    batchDate,
+                    maybeMessage
+      ) >>
+      upsertEventPayloadIO(compoundEventId, eventStatus, maybeEventPayload)
+
   protected def storeEvent(compoundEventId:   CompoundEventId,
                            eventStatus:       EventStatus,
                            executionDate:     ExecutionDate,
@@ -94,21 +119,27 @@ trait EventLogDataProvisioning {
                            projectSlug:       Slug = projectSlugs.generateOne,
                            maybeMessage:      Option[EventMessage] = None,
                            maybeEventPayload: Option[ZippedEventPayload] = None
-  ): Unit = {
-    upsertProject(compoundEventId, projectSlug, eventDate)
-    insertEvent(compoundEventId, eventStatus, executionDate, eventDate, eventBody, createdDate, batchDate, maybeMessage)
-    upsertEventPayload(compoundEventId, eventStatus, maybeEventPayload)
-  }
+  ): Unit = storeEventIO(compoundEventId,
+                         eventStatus,
+                         executionDate,
+                         eventDate,
+                         eventBody,
+                         createdDate,
+                         batchDate,
+                         projectSlug,
+                         maybeMessage,
+                         maybeEventPayload
+  ).unsafeRunSync()
 
-  protected def insertEvent(compoundEventId: CompoundEventId,
-                            eventStatus:     EventStatus,
-                            executionDate:   ExecutionDate,
-                            eventDate:       EventDate,
-                            eventBody:       EventBody,
-                            createdDate:     CreatedDate,
-                            batchDate:       BatchDate,
-                            maybeMessage:    Option[EventMessage]
-  ): Unit = execute {
+  protected def insertEventIO(compoundEventId: CompoundEventId,
+                              eventStatus:     EventStatus,
+                              executionDate:   ExecutionDate,
+                              eventDate:       EventDate,
+                              eventBody:       EventBody,
+                              createdDate:     CreatedDate,
+                              batchDate:       BatchDate,
+                              maybeMessage:    Option[EventMessage]
+  ): IO[Unit] = executeIO {
     Kleisli { session =>
       maybeMessage match {
         case None =>
@@ -147,6 +178,24 @@ trait EventLogDataProvisioning {
     }
   }
 
+  protected def insertEvent(compoundEventId: CompoundEventId,
+                            eventStatus:     EventStatus,
+                            executionDate:   ExecutionDate,
+                            eventDate:       EventDate,
+                            eventBody:       EventBody,
+                            createdDate:     CreatedDate,
+                            batchDate:       BatchDate,
+                            maybeMessage:    Option[EventMessage]
+  ): Unit = insertEventIO(compoundEventId,
+                          eventStatus,
+                          executionDate,
+                          eventDate,
+                          eventBody,
+                          createdDate,
+                          batchDate,
+                          maybeMessage
+  ).unsafeRunSync()
+
   protected def upsertProject(compoundEventId: CompoundEventId,
                               projectSlug:     projects.Slug,
                               eventDate:       EventDate
@@ -155,28 +204,33 @@ trait EventLogDataProvisioning {
   protected def upsertProject(project: consumers.Project, eventDate: EventDate): Unit =
     upsertProject(project.id, project.slug, eventDate)
 
-  protected def upsertProject(projectId: projects.GitLabId, projectSlug: projects.Slug, eventDate: EventDate): Unit =
-    execute {
-      Kleisli { session =>
-        val query: Command[projects.GitLabId *: projects.Slug *: EventDate *: EmptyTuple] =
-          sql"""INSERT INTO project (project_id, project_slug, latest_event_date)
+  protected def upsertProjectIO(projectId:   projects.GitLabId,
+                                projectSlug: projects.Slug,
+                                eventDate:   EventDate
+  ): IO[Unit] = executeIO {
+    Kleisli { session =>
+      val query: Command[projects.GitLabId *: projects.Slug *: EventDate *: EmptyTuple] =
+        sql"""INSERT INTO project (project_id, project_slug, latest_event_date)
               VALUES ($projectIdEncoder, $projectSlugEncoder, $eventDateEncoder)
               ON CONFLICT (project_id)
               DO UPDATE SET latest_event_date = excluded.latest_event_date WHERE excluded.latest_event_date > project.latest_event_date
           """.command
-        session.prepare(query).flatMap(_.execute(projectId *: projectSlug *: eventDate *: EmptyTuple)).void
-      }
+      session.prepare(query).flatMap(_.execute(projectId *: projectSlug *: eventDate *: EmptyTuple)).void
     }
+  }
 
-  protected def upsertEventPayload(compoundEventId: CompoundEventId,
-                                   eventStatus:     EventStatus,
-                                   maybePayload:    Option[ZippedEventPayload]
-  ): Unit = eventStatus match {
+  protected def upsertProject(projectId: projects.GitLabId, projectSlug: projects.Slug, eventDate: EventDate): Unit =
+    upsertProjectIO(projectId, projectSlug, eventDate).unsafeRunSync()
+
+  protected def upsertEventPayloadIO(compoundEventId: CompoundEventId,
+                                     eventStatus:     EventStatus,
+                                     maybePayload:    Option[ZippedEventPayload]
+  ): IO[Unit] = eventStatus match {
     case TriplesGenerated | TransformingTriples | TransformationRecoverableFailure |
         TransformationNonRecoverableFailure | TriplesStore | AwaitingDeletion =>
       maybePayload
         .map { payload =>
-          execute[Unit] {
+          executeIO {
             Kleisli { session =>
               val query: Command[EventId *: projects.GitLabId *: ZippedEventPayload *: EmptyTuple] = sql"""
                 INSERT INTO event_payload (event_id, project_id, payload)
@@ -191,9 +245,14 @@ trait EventLogDataProvisioning {
             }
           }
         }
-        .getOrElse(())
-    case _ => ()
+        .getOrElse(().pure[IO])
+    case _ => ().pure[IO]
   }
+
+  protected def upsertEventPayload(compoundEventId: CompoundEventId,
+                                   eventStatus:     EventStatus,
+                                   maybePayload:    Option[ZippedEventPayload]
+  ): Unit = upsertEventPayloadIO(compoundEventId, eventStatus, maybePayload).unsafeRunSync()
 
   protected def upsertProcessingTime(compoundEventId: CompoundEventId,
                                      eventStatus:     EventStatus,

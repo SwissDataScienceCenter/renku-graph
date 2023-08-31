@@ -19,8 +19,9 @@
 package io.renku.triplesstore.client.sparql
 
 import cats.{Monoid, Show}
+import io.renku.triplesstore.client.http.{SparqlQuery, SparqlUpdate}
 
-final case class Fragment(sparql: String) {
+final case class Fragment(sparql: String) extends SparqlUpdate with SparqlQuery {
   def isEmpty:  Boolean = sparql.isBlank
   def nonEmpty: Boolean = !isEmpty
 
@@ -33,6 +34,8 @@ final case class Fragment(sparql: String) {
 
   def stripMargin: Fragment =
     Fragment(sparql.stripMargin)
+
+  override def render = sparql
 }
 
 object Fragment {

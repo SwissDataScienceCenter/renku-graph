@@ -23,6 +23,7 @@ import cats.effect.{Async, Temporal}
 import cats.syntax.all._
 import io.renku.db.implicits._
 import io.renku.db.{DbClient, SqlStatement}
+import io.renku.eventlog.EventLogDB.SessionResource
 import io.renku.eventlog.TypeSerializers._
 import io.renku.eventlog.api.events.StatusChangeEvent.ToFailure
 import io.renku.eventlog.events.consumers.statuschange
@@ -49,14 +50,13 @@ private[statuschange] class DbUpdater[F[_]: Async: Logger: QueriesExecutionTimes
 
   import deliveryInfoRemover._
 
-  override def onRollback(event: ToFailure): RollbackOp[F] = {
+  override def onRollback(event: ToFailure)(implicit sr: SessionResource[F]): RollbackOp[F] = {
     case DeadlockDetected(_) =>
-      Kleisli.liftF[F, Session[F], Unit] {
-        Logger[F].warn(show"Deadlock while updating event ${event.eventId} to ${event.newStatus}") >>
-          Temporal[F].sleep(1 second)
-      } >> updateDB(event).map(_.widen)
+      Logger[F].warn(show"Deadlock while updating event ${event.eventId} to ${event.newStatus}") >>
+        Temporal[F].sleep(1 second) >>
+        sr.useK(updateDB(event).map(_.widen)).handleErrorWith(onRollback(event))
     case ex =>
-      deleteDelivery(event.eventId).flatMapF(_ => ex.raiseError[F, DBUpdateResults])
+      sr.useK(deleteDelivery(event.eventId)) >> ex.raiseError[F, DBUpdateResults]
   }
 
   override def updateDB(event: ToFailure): UpdateOp[F] = for {
