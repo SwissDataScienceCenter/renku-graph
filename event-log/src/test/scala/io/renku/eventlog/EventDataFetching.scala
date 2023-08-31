@@ -19,6 +19,7 @@
 package io.renku.eventlog
 
 import cats.data.Kleisli
+import cats.effect.IO
 import io.renku.graph.model.events._
 import io.renku.graph.model.projects
 import skunk._
@@ -105,8 +106,8 @@ trait EventDataFetching {
   protected def findEventMessage(eventId: CompoundEventId): Option[EventMessage] =
     findEvent(eventId).flatMap(_._3)
 
-  protected def findEvent(eventId: CompoundEventId): Option[(ExecutionDate, EventStatus, Option[EventMessage])] =
-    execute {
+  protected def findEventIO(eventId: CompoundEventId): IO[Option[(ExecutionDate, EventStatus, Option[EventMessage])]] =
+    executeIO {
       Kleisli { session =>
         val query
             : Query[EventId *: projects.GitLabId *: EmptyTuple, (ExecutionDate, EventStatus, Option[EventMessage])] =
@@ -120,6 +121,9 @@ trait EventDataFetching {
         session.prepare(query).flatMap(_.option(eventId.id *: eventId.projectId *: EmptyTuple))
       }
     }
+
+  protected def findEvent(eventId: CompoundEventId): Option[(ExecutionDate, EventStatus, Option[EventMessage])] =
+    findEventIO(eventId).unsafeRunSync()
 
   protected def findProcessingTime(eventId: CompoundEventId): List[(CompoundEventId, EventProcessingTime)] =
     execute {
