@@ -126,7 +126,7 @@ object Microservice extends IOMicroservice {
                                 viewingDeletionSubscription
                               )
     serviceReadinessChecker <- ServiceReadinessChecker[IO](ServicePort)
-    microserviceRoutes      <- MicroserviceRoutes[IO](eventConsumersRegistry, config).map(_.routes)
+    microserviceRoutes      <- MicroserviceRoutes[IO](eventConsumersRegistry, tsWriteLock, config).map(_.routes)
     termSignal              <- SignallingRef.of[IO, Boolean](false)
     exitCode <- microserviceRoutes.use { routes =>
                   new MicroserviceRunner[IO](
