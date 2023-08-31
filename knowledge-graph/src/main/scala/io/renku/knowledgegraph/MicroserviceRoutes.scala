@@ -42,7 +42,7 @@ import io.renku.http.server.QueryParameterTools._
 import io.renku.http.server.security.Authentication
 import io.renku.http.server.security.model.{AuthUser, MaybeAuthUser}
 import io.renku.http.server.version
-import io.renku.knowledgegraph.datasets.{DatasetIdRecordsFinder2, DatasetSameAsRecordsFinder}
+import io.renku.knowledgegraph.datasets.{DatasetIdRecordsFinder, DatasetSameAsRecordsFinder}
 import io.renku.knowledgegraph.datasets.details.RequestedDataset
 import io.renku.metrics.{MetricsRegistry, RoutesMetrics}
 import io.renku.triplesstore.{ProjectSparqlClient, ProjectsConnectionConfig, SparqlQueryTimeRecorder}
@@ -363,7 +363,7 @@ private object MicroserviceRoutes {
     authenticator              <- GitLabAuthenticator[F]
     authMiddleware             <- Authentication.middlewareAuthenticatingIfNeeded(authenticator)
     projectSlugAuthorizer      <- ProjectSlugRecordsFinder[F](projectSparqlClient, ru).map(_.asAuthorizer)
-    datasetIdAuthorizer     = DatasetIdRecordsFinder2[F](projectSparqlClient).asAuthorizer
+    datasetIdAuthorizer     = DatasetIdRecordsFinder[F](projectSparqlClient).asAuthorizer
     datasetSameAsAuthorizer = DatasetSameAsRecordsFinder[F](projectSparqlClient).asAuthorizer
     versionRoutes <- version.Routes[F]
   } yield new MicroserviceRoutes(
