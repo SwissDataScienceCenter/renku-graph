@@ -37,7 +37,7 @@ object Dependencies {
     val swaggerParser          = "2.1.16"
     val testContainersScala    = "0.41.0"
     val widoco                 = "1.4.20"
-    val wiremock               = "2.35.0"
+    val wiremock               = "3.0.0"
   }
 
   val ip4s = Seq(
@@ -142,7 +142,7 @@ object Dependencies {
       )
 
   val wiremock = Seq(
-    "com.github.tomakehurst" % "wiremock-jre8" % V.wiremock
+    "org.wiremock" % "wiremock" % V.wiremock
   )
 
   val scalamock = Seq(
