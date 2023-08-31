@@ -8,11 +8,11 @@ object Dependencies {
     val catsCore               = "2.10.0"
     val catsEffect             = "3.5.1"
     val catsEffectScalaTest    = "1.5.0"
-    val circeCore              = "0.14.5"
+    val circeCore              = "0.14.6"
     val circeGenericExtras     = "0.14.3"
     val circeOptics            = "0.14.1"
     val diffx                  = "0.8.3"
-    val fs2                    = "3.9.0"
+    val fs2                    = "3.9.1"
     val http4s                 = "0.23.23"
     val http4sEmber            = "0.23.23"
     val http4sPrometheus       = "0.24.4"
@@ -36,7 +36,7 @@ object Dependencies {
     val skunk                  = "0.6.0"
     val swaggerParser          = "2.1.16"
     val testContainersScala    = "0.41.0"
-    val widoco                 = "1.4.19"
+    val widoco                 = "1.4.20"
     val wiremock               = "3.0.0"
   }
 
