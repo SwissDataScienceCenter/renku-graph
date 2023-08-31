@@ -48,11 +48,12 @@ object DatasetIdRecordsFinder2 {
       sparql"""PREFIX schema: <http://schema.org/>
               |PREFIX renku: <https://swissdatasciencecenter.github.io/renku-ontology#>
               |
-              |  select ?slug ?visibility ?memberRole
+              |  select distinct ?slug ?visibility ?memberRole
               |  where {
               |    bind (${id.value} as ?dsIdent).
               |    {
               |      select distinct ?datasetId where {
+              |        bind (${id.value} as ?dsIdent).
               |        graph ?sampleProjectId {
               |          ?sampleProjectId a schema:Project;
               |                           renku:hasDataset ?datasetId.
