@@ -20,29 +20,41 @@ package io.renku.knowledgegraph.datasets
 
 import cats.effect.kernel.Sync
 import fs2.Stream
+import eu.timepit.refined.auto._
 import io.renku.graph.http.server.security.Authorizer
 import io.renku.graph.http.server.security.Authorizer.SecurityRecordFinder
 import io.renku.graph.model.datasets
 import io.renku.http.server.security.model
 import io.renku.projectauth.util.ProjectAuthDataRow
-import io.renku.triplesstore.ProjectSparqlClient
+import io.renku.triplesstore.{ProjectSparqlClient, SparqlQueryTimeRecorder}
 import io.renku.triplesstore.client.syntax._
+import org.typelevel.log4cats.Logger
 
 trait DatasetIdRecordsFinder2[F[_]] extends SecurityRecordFinder[F, datasets.Identifier]
 
 object DatasetIdRecordsFinder2 {
 
-  def apply[F[_]: Sync](projectSparqlClient: ProjectSparqlClient[F]): DatasetIdRecordsFinder2[F] =
+  def apply[F[_]: Sync: Logger: SparqlQueryTimeRecorder](
+      projectSparqlClient: ProjectSparqlClient[F]
+  ): DatasetIdRecordsFinder2[F] =
     new Impl[F](projectSparqlClient)
 
-  private class Impl[F[_]: Sync](projectSparqlClient: ProjectSparqlClient[F]) extends DatasetIdRecordsFinder2[F] {
+  private class Impl[F[_]: Sync: Logger: SparqlQueryTimeRecorder](projectSparqlClient: ProjectSparqlClient[F])
+      extends DatasetIdRecordsFinder2[F] {
+    private[this] val timeRecorder = SparqlQueryTimeRecorder[F]
+
     override def apply(id: datasets.Identifier, user: Option[model.AuthUser]): F[List[Authorizer.SecurityRecord]] =
       Stream
-        .evals(projectSparqlClient.queryDecode[ProjectAuthDataRow](query(id)))
+        .evals(runQuery(id))
         .through(ProjectAuthDataRow.collect)
         .map(p => Authorizer.SecurityRecord(p.visibility, p.slug, p.members.map(_.gitLabId)))
         .compile
         .toList
+
+    private def runQuery(id: datasets.Identifier) =
+      timeRecorder.reportTime("security-dataset-id")(
+        projectSparqlClient.queryDecode[ProjectAuthDataRow](query(id))
+      )
 
     private def query(id: datasets.Identifier) =
       sparql"""PREFIX schema: <http://schema.org/>

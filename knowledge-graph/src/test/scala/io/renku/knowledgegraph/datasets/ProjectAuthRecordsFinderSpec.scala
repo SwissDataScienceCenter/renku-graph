@@ -16,7 +16,7 @@
  * limitations under the License.
  */
 
-package io.renku.graph.http.server.security
+package io.renku.knowledgegraph.datasets
 
 import cats.effect._
 import cats.effect.testing.scalatest.AsyncIOSpec
