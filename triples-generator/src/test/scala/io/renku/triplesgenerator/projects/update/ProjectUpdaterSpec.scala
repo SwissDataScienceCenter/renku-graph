@@ -18,58 +18,61 @@
 
 package io.renku.triplesgenerator.projects.update
 
+import cats.effect.IO
+import cats.effect.testing.scalatest.AsyncIOSpec
 import cats.syntax.all._
 import io.renku.generators.CommonGraphGenerators.sparqlQueries
 import io.renku.generators.Generators.Implicits._
 import io.renku.graph.model.RenkuTinyTypeGenerators.projectSlugs
 import io.renku.graph.model.projects
+import io.renku.lock.Lock
+import io.renku.triplesgenerator.TgLockDB.TsWriteLock
 import io.renku.triplesgenerator.api.Generators.projectUpdatesGen
 import io.renku.triplesgenerator.api.ProjectUpdates
 import io.renku.triplesstore.{SparqlQuery, TSClient}
-import org.scalamock.scalatest.MockFactory
-import org.scalatest.TryValues
-import org.scalatest.flatspec.AnyFlatSpec
+import org.scalamock.scalatest.AsyncMockFactory
+import org.scalatest.flatspec.AsyncFlatSpec
 import org.scalatest.matchers.should
 
-import scala.util.Try
-
-class ProjectUpdaterSpec extends AnyFlatSpec with should.Matchers with TryValues with MockFactory {
+class ProjectUpdaterSpec extends AsyncFlatSpec with AsyncIOSpec with should.Matchers with AsyncMockFactory {
 
   it should "check if project exists and if not return NotExists" in {
 
     val slug = projectSlugs.generateOne
-    givenProjectExistenceChecking(slug, returning = false.pure[Try])
+    givenProjectExistenceChecking(slug, returning = false.pure[IO])
 
     val updates = projectUpdatesGen.generateOne
 
-    updater.updateProject(slug, updates).success.value shouldBe ProjectUpdater.Result.NotExists
+    updater.updateProject(slug, updates).asserting(_ shouldBe ProjectUpdater.Result.NotExists)
   }
 
   it should "check if project exists, prepare update queries, execute them and return Updated" in {
 
     val slug = projectSlugs.generateOne
-    givenProjectExistenceChecking(slug, returning = true.pure[Try])
+    givenProjectExistenceChecking(slug, returning = true.pure[IO])
 
     val updates = projectUpdatesGen.generateOne
     val queries = sparqlQueries.generateList()
-    givenUpdatesCalculation(slug, updates, returning = queries.pure[Try])
+    givenUpdatesCalculation(slug, updates, returning = queries.pure[IO])
 
     queries foreach givenRunningQuerySucceeds
 
-    updater.updateProject(slug, updates).success.value shouldBe ProjectUpdater.Result.Updated
+    updater.updateProject(slug, updates).asserting(_ shouldBe ProjectUpdater.Result.Updated)
   }
 
-  private lazy val projectExistenceChecker = mock[ProjectExistenceChecker[Try]]
-  private lazy val updateQueriesCalculator = mock[UpdateQueriesCalculator[Try]]
-  private lazy val tsClient                = mock[TSClient[Try]]
-  private lazy val updater = new ProjectUpdaterImpl[Try](projectExistenceChecker, updateQueriesCalculator, tsClient)
+  private val projectExistenceChecker = mock[ProjectExistenceChecker[IO]]
+  private val updateQueriesCalculator = mock[UpdateQueriesCalculator[IO]]
+  private val tsClient                = mock[TSClient[IO]]
+  private val tsWriteLock: TsWriteLock[IO] = Lock.none[IO, projects.Slug]
+  private lazy val updater =
+    new ProjectUpdaterImpl[IO](projectExistenceChecker, updateQueriesCalculator, tsClient, tsWriteLock)
 
-  private def givenProjectExistenceChecking(slug: projects.Slug, returning: Try[Boolean]) =
+  private def givenProjectExistenceChecking(slug: projects.Slug, returning: IO[Boolean]) =
     (projectExistenceChecker.checkExists _)
       .expects(slug)
       .returning(returning)
 
-  private def givenUpdatesCalculation(slug: projects.Slug, updates: ProjectUpdates, returning: Try[List[SparqlQuery]]) =
+  private def givenUpdatesCalculation(slug: projects.Slug, updates: ProjectUpdates, returning: IO[List[SparqlQuery]]) =
     (updateQueriesCalculator.calculateUpdateQueries _)
       .expects(slug, updates)
       .returning(returning)
@@ -77,5 +80,5 @@ class ProjectUpdaterSpec extends AnyFlatSpec with should.Matchers with TryValues
   private def givenRunningQuerySucceeds(query: SparqlQuery) =
     (tsClient.updateWithNoResult _)
       .expects(query)
-      .returning(().pure[Try])
+      .returning(().pure[IO])
 }

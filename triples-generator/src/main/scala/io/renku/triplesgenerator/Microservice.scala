@@ -36,6 +36,7 @@ import io.renku.http.server.HttpServer
 import io.renku.logging.ApplicationLogger
 import io.renku.metrics.MetricsRegistry
 import io.renku.microservices.{IOMicroservice, ResourceUse, ServiceReadinessChecker}
+import io.renku.triplesgenerator.TgLockDB.TsWriteLock
 import io.renku.triplesgenerator.config.certificates.GitCertificateInstaller
 import io.renku.triplesgenerator.events.consumers._
 import io.renku.triplesgenerator.events.consumers.tsmigrationrequest.migrations.reprovisioning.ReProvisioningStatus
@@ -126,7 +127,7 @@ object Microservice extends IOMicroservice {
                                 viewingDeletionSubscription
                               )
     serviceReadinessChecker <- ServiceReadinessChecker[IO](ServicePort)
-    microserviceRoutes      <- MicroserviceRoutes[IO](eventConsumersRegistry, config).map(_.routes)
+    microserviceRoutes      <- MicroserviceRoutes[IO](eventConsumersRegistry, tsWriteLock, config).map(_.routes)
     termSignal              <- SignallingRef.of[IO, Boolean](false)
     exitCode <- microserviceRoutes.use { routes =>
                   new MicroserviceRunner[IO](

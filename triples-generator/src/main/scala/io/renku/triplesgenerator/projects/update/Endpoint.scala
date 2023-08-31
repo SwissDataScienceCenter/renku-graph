@@ -24,6 +24,7 @@ import cats.syntax.all._
 import eu.timepit.refined.auto._
 import io.renku.data.Message
 import io.renku.graph.model.projects
+import io.renku.triplesgenerator.TgLockDB.TsWriteLock
 import io.renku.triplesgenerator.api.ProjectUpdates
 import io.renku.triplesstore.SparqlQueryTimeRecorder
 import org.http4s.circe._
@@ -36,8 +37,8 @@ trait Endpoint[F[_]] {
 }
 
 object Endpoint {
-  def apply[F[_]: Async: Logger: SparqlQueryTimeRecorder]: F[Endpoint[F]] = for {
-    projectUpdater <- ProjectUpdater[F]
+  def apply[F[_]: Async: Logger: SparqlQueryTimeRecorder](tsWriteLock: TsWriteLock[F]): F[Endpoint[F]] = for {
+    projectUpdater <- ProjectUpdater[F](tsWriteLock)
   } yield new EndpointImpl[F](projectUpdater)
 }
 
