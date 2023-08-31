@@ -30,6 +30,7 @@ import io.renku.triplesstore.{ProjectsConnectionConfig, SparqlQueryTimeRecorder,
 import org.typelevel.log4cats.Logger
 
 object DatasetSameAsRecordsFinder {
+  @deprecated
   def apply[F[_]: Async: Logger: SparqlQueryTimeRecorder]: F[SecurityRecordFinder[F, datasets.SameAs]] =
     ProjectsConnectionConfig[F]().map(TSClient[F](_)).map(new DatasetSameAsRecordsFinderImpl(_))
 }

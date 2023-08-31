@@ -29,6 +29,7 @@ import io.renku.triplesstore.SparqlQueryTimeRecorder
 import org.typelevel.log4cats.Logger
 
 object ProjectSlugRecordsFinder {
+  @deprecated
   def apply[F[_]: Async: Parallel: Logger: SparqlQueryTimeRecorder: GitLabClient]
       : F[SecurityRecordFinder[F, projects.Slug]] =
     (TSSlugRecordsFinder[F] -> GLSlugRecordsFinder[F])

@@ -33,6 +33,7 @@ import io.renku.triplesstore.SparqlQuery.Prefixes
 import org.typelevel.log4cats.Logger
 
 object DatasetIdRecordsFinder {
+  @deprecated
   def apply[F[_]: Async: Logger: SparqlQueryTimeRecorder]: F[SecurityRecordFinder[F, datasets.Identifier]] =
     ProjectsConnectionConfig[F]().map(new DatasetIdRecordsFinderImpl(_))
 }
