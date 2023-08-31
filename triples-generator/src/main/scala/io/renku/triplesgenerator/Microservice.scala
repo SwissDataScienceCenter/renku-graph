@@ -36,7 +36,6 @@ import io.renku.http.server.HttpServer
 import io.renku.logging.ApplicationLogger
 import io.renku.metrics.MetricsRegistry
 import io.renku.microservices.{IOMicroservice, ResourceUse, ServiceReadinessChecker}
-import io.renku.triplesgenerator.TgLockDB.TsWriteLock
 import io.renku.triplesgenerator.config.certificates.GitCertificateInstaller
 import io.renku.triplesgenerator.events.consumers._
 import io.renku.triplesgenerator.events.consumers.tsmigrationrequest.migrations.reprovisioning.ReProvisioningStatus
