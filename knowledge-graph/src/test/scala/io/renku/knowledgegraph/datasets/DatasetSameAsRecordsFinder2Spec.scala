@@ -23,6 +23,7 @@ import io.renku.generators.Generators.Implicits._
 import io.renku.graph.model.datasets.SameAs
 import io.renku.graph.model.projects.Role
 import io.renku.graph.model.testentities.Person
+import io.renku.graph.model.testentities.generators.EntitiesGenerators
 import io.renku.triplesstore.ProjectSparqlClient
 
 class DatasetSameAsRecordsFinder2Spec extends SecurityRecordFinderSupport {
@@ -40,6 +41,16 @@ class DatasetSameAsRecordsFinder2Spec extends SecurityRecordFinderSupport {
 
     for {
       _ <- provisionTestProjectAndMembers(project, memberDef)
+      r <- finder.use(_.apply(dsSameAs, None))
+      _ = r shouldBe List(project).map(toSecRecord)
+    } yield ()
+  }
+
+  it should "find security records without members if there are none" in {
+    val project  = projectWithDatasetAndNoMembers.generateOne
+    val dsSameAs = SameAs(project.datasets.head.provenance.topmostSameAs.value)
+    for {
+      _ <- provisionTestProjectAndMembers(project)
       r <- finder.use(_.apply(dsSameAs, None))
       _ = r shouldBe List(project).map(toSecRecord)
     } yield ()
@@ -70,6 +81,19 @@ class DatasetSameAsRecordsFinder2Spec extends SecurityRecordFinderSupport {
       dsSameAs = projects.head.datasets.head.provenance.topmostSameAs
       r <- finder.use(_.apply(SameAs(dsSameAs.value), None))
       _ = r shouldBe projects.take(1).map(toSecRecord)
+    } yield ()
+  }
+
+  it should "find nothing if there is no project using the dataset" in {
+    val project = projectWithDatasetAndMembers.generateOne
+    val dsSameAs = EntitiesGenerators.datasetSameAs
+      .suchThat(_.value != project.datasets.head.provenance.topmostSameAs.value)
+      .generateOne
+
+    for {
+      _ <- provisionTestProjectAndMembers(project)
+      r <- finder.use(_.apply(dsSameAs, None))
+      _ = r shouldBe Nil
     } yield ()
   }
 }

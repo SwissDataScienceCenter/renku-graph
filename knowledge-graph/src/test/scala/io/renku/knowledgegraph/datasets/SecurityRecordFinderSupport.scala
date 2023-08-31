@@ -59,10 +59,20 @@ abstract class SecurityRecordFinderSupport
       )
       .suchThat(_.members.nonEmpty)
 
+  def projectWithDatasetAndNoMembers =
+    EntitiesGenerators
+      .renkuProjectEntities(
+        visibilityGen = EntitiesGenerators.anyVisibility,
+        creatorGen = EntitiesGenerators.personEntities(EntitiesGenerators.withGitLabId)
+      )
+      .modify(EntitiesGenerators.removeMembers())
+      .withDatasets(
+        EntitiesGenerators.datasetEntities(EntitiesGenerators.provenanceInternal())
+      )
+
   def projectAndFork =
     EntitiesGenerators
       .renkuProjectEntities(EntitiesGenerators.anyVisibility)
-      .modify(EntitiesGenerators.removeMembers())
       .addDataset(EntitiesGenerators.datasetEntities(EntitiesGenerators.provenanceNonModified))
       .forkOnce()
 }

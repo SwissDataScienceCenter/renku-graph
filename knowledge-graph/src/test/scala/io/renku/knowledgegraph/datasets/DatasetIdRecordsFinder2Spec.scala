@@ -22,6 +22,7 @@ import cats.effect.IO
 import io.renku.generators.Generators.Implicits._
 import io.renku.graph.model.projects.Role
 import io.renku.graph.model.testentities.Person
+import io.renku.graph.model.testentities.generators.EntitiesGenerators
 import io.renku.triplesstore.ProjectSparqlClient
 
 class DatasetIdRecordsFinder2Spec extends SecurityRecordFinderSupport {
@@ -38,6 +39,16 @@ class DatasetIdRecordsFinder2Spec extends SecurityRecordFinderSupport {
 
     for {
       _ <- provisionTestProjectAndMembers(project, memberDef)
+      r <- finder.use(_.apply(dsId, None))
+      _ = r shouldBe List(project).map(toSecRecord)
+    } yield ()
+  }
+
+  it should "find security records without members if there are none" in {
+    val project = projectWithDatasetAndNoMembers.generateOne
+    val dsId    = project.datasets.head.identification.identifier
+    for {
+      _ <- provisionTestProjectAndMembers(project)
       r <- finder.use(_.apply(dsId, None))
       _ = r shouldBe List(project).map(toSecRecord)
     } yield ()
@@ -68,6 +79,19 @@ class DatasetIdRecordsFinder2Spec extends SecurityRecordFinderSupport {
       dsId = projects.head.datasets.head.identification.identifier
       r <- finder.use(_.apply(dsId, None))
       _ = r shouldBe projects.take(1).map(toSecRecord)
+    } yield ()
+  }
+
+  it should "find nothing if there is no project using the dataset" in {
+    val project = projectWithDatasetAndMembers.generateOne
+    val dsId = EntitiesGenerators.datasetIdentifiers
+      .suchThat(_ != project.datasets.head.identification.identifier)
+      .generateOne
+
+    for {
+      _ <- provisionTestProjectAndMembers(project)
+      r <- finder.use(_.apply(dsId, None))
+      _ = r shouldBe Nil
     } yield ()
   }
 }
