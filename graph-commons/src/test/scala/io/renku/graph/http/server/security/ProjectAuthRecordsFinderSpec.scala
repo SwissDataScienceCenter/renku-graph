@@ -16,16 +16,16 @@
  * limitations under the License.
  */
 
-package io.renku.knowledgegraph.datasets
+package io.renku.graph.http.server.security
 
 import cats.effect._
-import cats.effect.testing.scalatest.AsyncIOSpec
 import io.renku.graph.http.server.security.Authorizer.SecurityRecord
 import io.renku.graph.model.RenkuUrl
 import io.renku.graph.model.projects.Slug
 import io.renku.interpreters.TestLogger
 import io.renku.logging.TestSparqlQueryTimeRecorder
 import io.renku.projectauth.{Generators, ProjectAuthServiceSupport}
+import io.renku.testtools.CustomAsyncIOSpec
 import io.renku.triplesstore.SparqlQueryTimeRecorder
 import org.scalatest.flatspec.AsyncFlatSpec
 import org.scalatest.matchers.should
@@ -33,7 +33,7 @@ import org.typelevel.log4cats.Logger
 
 class ProjectAuthRecordsFinderSpec
     extends AsyncFlatSpec
-    with AsyncIOSpec
+    with CustomAsyncIOSpec
     with ProjectAuthServiceSupport
     with should.Matchers {
   implicit val logger:   Logger[IO]                  = TestLogger[IO]()

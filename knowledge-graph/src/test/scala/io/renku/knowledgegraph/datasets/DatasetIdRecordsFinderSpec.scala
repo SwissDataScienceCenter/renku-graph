@@ -25,7 +25,7 @@ import io.renku.graph.model.testentities.Person
 import io.renku.graph.model.testentities.generators.EntitiesGenerators
 import io.renku.triplesstore.ProjectSparqlClient
 
-class DatasetIdRecordsFinder2Spec extends SecurityRecordFinderSupport {
+class DatasetIdRecordsFinderSpec extends SecurityRecordFinderSupport {
   lazy val finder = ProjectSparqlClient[IO](projectsDSConnectionInfo).map(DatasetIdRecordsFinder2.apply[IO])
 
   it should "find security records for a simple project with one dataset" in {

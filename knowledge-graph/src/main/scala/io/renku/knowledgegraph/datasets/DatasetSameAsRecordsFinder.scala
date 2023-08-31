@@ -30,17 +30,17 @@ import io.renku.triplesstore.{ProjectSparqlClient, SparqlQueryTimeRecorder}
 import io.renku.triplesstore.client.syntax._
 import org.typelevel.log4cats.Logger
 
-trait DatasetSameAsRecordsFinder2[F[_]] extends Authorizer.SecurityRecordFinder[F, datasets.SameAs]
+trait DatasetSameAsRecordsFinder[F[_]] extends Authorizer.SecurityRecordFinder[F, datasets.SameAs]
 
-object DatasetSameAsRecordsFinder2 {
+object DatasetSameAsRecordsFinder {
 
   def apply[F[_]: Sync: Logger: SparqlQueryTimeRecorder](
       projectSparqlClient: ProjectSparqlClient[F]
-  ): DatasetSameAsRecordsFinder2[F] =
+  ): DatasetSameAsRecordsFinder[F] =
     new Impl[F](projectSparqlClient)
 
   private class Impl[F[_]: Sync: Logger: SparqlQueryTimeRecorder](projectSparqlClient: ProjectSparqlClient[F])
-      extends DatasetSameAsRecordsFinder2[F] {
+      extends DatasetSameAsRecordsFinder[F] {
     private[this] val timeRecorder = SparqlQueryTimeRecorder[F]
 
     override def apply(sameAs: datasets.SameAs, user: Option[model.AuthUser]): F[List[Authorizer.SecurityRecord]] =

@@ -16,14 +16,13 @@
  * limitations under the License.
  */
 
-package io.renku.knowledgegraph.datasets
+package io.renku.graph.http.server.security
 
 import cats.effect.kernel.Resource
 import cats.effect.{Async, Sync}
 import cats.syntax.all._
 import eu.timepit.refined.auto._
 import fs2.io.net.Network
-import io.renku.graph.http.server.security.Authorizer
 import io.renku.graph.http.server.security.Authorizer.SecurityRecordFinder
 import io.renku.graph.model.{RenkuUrl, projects}
 import io.renku.http.server.security.model
