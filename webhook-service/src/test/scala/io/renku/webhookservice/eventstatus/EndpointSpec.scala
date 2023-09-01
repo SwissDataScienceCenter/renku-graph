@@ -75,7 +75,7 @@ class EndpointSpec
         givenStatusInfoFinding(projectId, returning = statusInfo.some.pure[IO])
 
         val project = consumerProjects.generateOne.copy(id = projectId)
-        givenProjectInfoFinding(projectId, authUser, returning = project.pure[IO])
+        givenProjectInfoFinding(projectId, authUser, returning = project.some.pure[IO])
         givenProjectViewedEventSent
 
         val response = endpoint.fetchProcessingStatus(projectId, authUser).unsafeRunSync()
@@ -100,7 +100,7 @@ class EndpointSpec
         givenStatusInfoFinding(projectId, returning = None.pure[IO])
 
         val project = consumerProjects.generateOne.copy(id = projectId)
-        givenProjectInfoFinding(projectId, authUser, returning = project.pure[IO])
+        givenProjectInfoFinding(projectId, authUser, returning = project.some.pure[IO])
         givenCommitSyncRequestSent
 
         val response = endpoint.fetchProcessingStatus(projectId, authUser).unsafeRunSync()
@@ -143,7 +143,7 @@ class EndpointSpec
         givenStatusInfoFinding(projectId, returning = statusInfo.some.pure[IO])
 
         val project = consumerProjects.generateOne.copy(id = projectId)
-        givenProjectInfoFinding(projectId, authUser, returning = project.pure[IO])
+        givenProjectInfoFinding(projectId, authUser, returning = project.some.pure[IO])
         givenProjectViewedEventSent
 
         val response = endpoint.fetchProcessingStatus(projectId, authUser).unsafeRunSync()
@@ -235,11 +235,13 @@ class EndpointSpec
         .expects(projectId)
         .returning(returning)
 
-    def givenProjectInfoFinding(projectId: projects.GitLabId, authUser: Option[AuthUser], returning: IO[Project]) =
-      (projectInfoFinder
-        .findProjectInfo(_: projects.GitLabId)(_: Option[AccessToken]))
-        .expects(projectId, authUser.map(_.accessToken))
-        .returning(returning)
+    def givenProjectInfoFinding(projectId: projects.GitLabId,
+                                authUser:  Option[AuthUser],
+                                returning: IO[Option[Project]]
+    ) = (projectInfoFinder
+      .findProjectInfo(_: projects.GitLabId)(_: Option[AccessToken]))
+      .expects(projectId, authUser.map(_.accessToken))
+      .returning(returning)
 
     private val sentEvents: Ref[IO, List[AnyRef]] = Ref.unsafe(Nil)
 

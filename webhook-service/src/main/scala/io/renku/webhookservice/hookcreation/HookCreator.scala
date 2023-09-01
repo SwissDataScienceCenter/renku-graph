@@ -62,21 +62,11 @@ private class HookCreatorImpl[F[_]: Spawn: Logger](
 
     val accessToken = authUser.accessToken
 
-    val createIfMissing: HookValidationResult => F[CreationResult] = {
-      case HookValidationResult.HookMissing =>
-        tokenAssociator.associate(projectId, accessToken) >>
-          encrypt(HookToken(projectId))
-            .flatMap(t => create(ProjectHook(projectId, projectHookUrl, t), accessToken))
-            .as(HookCreated.widen)
-      case HookValidationResult.HookExists =>
-        HookExisted.widen.pure[F]
-    }
-
     validateHook(projectId, accessToken.some)
       .flatMap {
         case Some(validationResult) =>
           for {
-            creationResult <- createIfMissing(validationResult)
+            creationResult <- createIfMissing(projectId, accessToken)(validationResult)
             _              <- Logger[F].info(show"Hook $creationResult for projectId $projectId")
             _              <- Spawn[F].start(sendCommitSyncReq(projectId, accessToken))
           } yield creationResult.some
@@ -88,15 +78,25 @@ private class HookCreatorImpl[F[_]: Spawn: Logger](
       .onError(loggingError(projectId))
   }
 
+  private def createIfMissing(projectId:   projects.GitLabId,
+                              accessToken: AccessToken
+  ): HookValidationResult => F[CreationResult] = {
+    case HookValidationResult.HookMissing =>
+      tokenAssociator.associate(projectId, accessToken) >>
+        encrypt(HookToken(projectId))
+          .flatMap(t => create(ProjectHook(projectId, projectHookUrl, t), accessToken))
+          .as(HookCreated.widen)
+    case HookValidationResult.HookExists =>
+      HookExisted.widen.pure[F]
+  }
+
   private def sendCommitSyncReq(projectId: projects.GitLabId, accessToken: AccessToken) =
     findProjectInfo(projectId)(accessToken.some)
-      .onError(
-        Logger[F].error(_)(
-          s"Hook creation - sending COMMIT_SYNC_REQUEST failure; finding project info for projectId $projectId failed"
-        )
-      )
-      .map(CommitSyncRequest(_))
-      .flatMap(elClient.send)
+      .onError(Logger[F].error(_)(s"Hook creation - COMMIT_SYNC_REQUEST not sent as finding project $projectId failed"))
+      .flatMap {
+        case Some(project) => elClient.send(CommitSyncRequest(project))
+        case None => Logger[F].warn(s"Hook creation - COMMIT_SYNC_REQUEST not sent as no project $projectId found")
+      }
 
   private def loggingError(projectId: GitLabId): PartialFunction[Throwable, F[Unit]] = { case exception =>
     Logger[F].error(exception)(s"Hook creation failed for project with id $projectId")

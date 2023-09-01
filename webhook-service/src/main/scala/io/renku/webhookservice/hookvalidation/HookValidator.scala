@@ -103,7 +103,7 @@ private class HookValidatorImpl[F[_]: MonadThrow: Logger](
                                     maybeAccessToken: Option[AccessToken]
   ): F[Option[HookValidationResult]] =
     fetchToken(projectId)
-      .flatMapF(at => checkHookPresence(HookIdentifier(projectId, projectHookUrl), at))
+      .flatMapF(checkHookPresence(HookIdentifier(projectId, projectHookUrl), _))
       .cataF(
         default = Option.empty[HookValidationResult].pure[F],
         hookPresent =>

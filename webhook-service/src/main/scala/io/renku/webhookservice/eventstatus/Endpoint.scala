@@ -82,16 +82,22 @@ private class EndpointImpl[F[_]: Async: NonEmptyParallel: Logger: ExecutionTimeR
     }
 
   private def sendCommitSyncRequest(projectId: GitLabId, authUser: Option[AuthUser]): F[Unit] = Spawn[F].start {
-    findProjectInfo(projectId)(authUser.map(_.accessToken)) >>= { project =>
-      (elClient send CommitSyncRequest(project))
-        .handleErrorWith(Logger[F].warn(_)("Sending CommitSyncRequest failed"))
+    findProjectInfo(projectId)(authUser.map(_.accessToken)) >>= {
+      case Some(project) =>
+        (elClient send CommitSyncRequest(project))
+          .handleErrorWith(Logger[F].warn(_)("Event Status - sending CommitSyncRequest failed"))
+      case None =>
+        Logger[F].info(s"Event Status - COMMIT_SYNC_REQUEST not sent as no project $projectId found")
     }
   }.void
 
   private def sendProjectViewed(projectId: GitLabId, authUser: Option[AuthUser]): F[Unit] = Spawn[F].start {
-    findProjectInfo(projectId)(authUser.map(_.accessToken)) >>= { project =>
-      (tgClient send ProjectViewedEvent.forProjectAndUserId(project.slug, authUser.map(_.id)))
-        .handleErrorWith(Logger[F].warn(_)("Sending ProjectViewedEvent failed"))
+    findProjectInfo(projectId)(authUser.map(_.accessToken)) >>= {
+      case Some(project) =>
+        (tgClient send ProjectViewedEvent.forProjectAndUserId(project.slug, authUser.map(_.id)))
+          .handleErrorWith(Logger[F].warn(_)("Event Status - sending ProjectViewedEvent failed"))
+      case None =>
+        Logger[F].info(s"Event Status - PROJECT_VIEWED not sent as no project $projectId found")
     }
   }.void
 
