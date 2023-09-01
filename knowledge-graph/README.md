@@ -839,7 +839,7 @@ The endpoint requires an authorization token to be passed. Supported headers are
 
 * Multipart request (preferred) 
 ```
-PATCH /knowledge-graph/projects/jakub.chrobasik/create-test-10 HTTP/1.1
+PATCH /knowledge-graph/projects/namespace/path HTTP/1.1
 Host: dev.renku.ch
 Authorization: Bearer <XXX>
 Content-Length: 575
@@ -890,6 +890,7 @@ Content-Type: image/png
 | CONFLICT (409)              | If updating the data is not possible, e.g. the user cannot push to the default branch                      |
 | INTERNAL SERVER ERROR (500) | Otherwise                                                                                                  |
 
+
 #### POST /knowledge-graph/projects/:namespace/:name
 
 API to create a new project from the given payload in both the Triples Store and GitLab
@@ -901,25 +902,66 @@ The endpoint requires an authorization token to be passed. Supported headers are
 
 **Request**
 
-```json
-{
-  "name":        "project name",
-  "namespace":   "group",
-  "description": "project description",
-  "visibility":  "public|internal|private",
-  "images":      ["image.png", "http://image.com/image.png"],
-  "templateId":  "id1cb2f6f12ae50c46"
-}
+```
+POST /knowledge-graph/projects/namespace/path HTTP/1.1
+Host: dev.renku.ch
+Authorization: Bearer <XXX>
+Content-Length: 575
+Content-Type: multipart/form-data; boundary=----WebKitFormBoundary7MA4YWxkTrZu0gW
+
+------WebKitFormBoundary7MA4YWxkTrZu0gW
+Content-Disposition: form-data; name="name"
+
+project name
+------WebKitFormBoundary7MA4YWxkTrZu0gW
+Content-Disposition: form-data; name="namespace"
+
+namespace
+------WebKitFormBoundary7MA4YWxkTrZu0gW
+Content-Disposition: form-data; name="slug"
+
+namespace/project-name
+------WebKitFormBoundary7MA4YWxkTrZu0gW
+Content-Disposition: form-data; name="description"
+
+project description
+------WebKitFormBoundary7MA4YWxkTrZu0gW
+Content-Disposition: form-data; name="keywords[]"
+
+key1
+------WebKitFormBoundary7MA4YWxkTrZu0gW
+Content-Disposition: form-data; name="keywords[]"
+
+key2
+------WebKitFormBoundary7MA4YWxkTrZu0gW
+Content-Disposition: form-data; name="visibility"
+
+public
+------WebKitFormBoundary7MA4YWxkTrZu0gW
+Content-Disposition: form-data; name="templateRepositoryUrl"
+
+https://github.com/SwissDataScienceCenter/renku-project-template
+------WebKitFormBoundary7MA4YWxkTrZu0gW
+Content-Disposition: form-data; name="templateId"
+
+python-minimal
+------WebKitFormBoundary7MA4YWxkTrZu0gW
+Content-Disposition: form-data; name="image"; filename="image.png"
+Content-Type: image/png
+
+(data)
+------WebKitFormBoundary7MA4YWxkTrZu0gW--
 ```
 
 **Response**
 
 | Status                      | Description                                                                                |
 |-----------------------------|--------------------------------------------------------------------------------------------|
-| ACCEPTED (202)              | If the creation process was successfully scheduled                                         |
+| OK (200)                    | If the creation process was successful                                                     |
 | BAD_REQUEST (400)           | If the given payload is empty or malformed or a project with the given slug already exists |
 | UNAUTHORIZED (401)          | If given auth header cannot be authenticated                                               |
 | INTERNAL_SERVER_ERROR (500) | Otherwise                                                                                  |
+
 
 #### GET /knowledge-graph/projects/:namespace/:name/datasets
 
