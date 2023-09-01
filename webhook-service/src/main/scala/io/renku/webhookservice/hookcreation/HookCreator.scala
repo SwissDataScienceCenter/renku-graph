@@ -94,7 +94,7 @@ private class HookCreatorImpl[F[_]: Spawn: Logger](
     findProjectInfo(projectId)(accessToken.some)
       .flatMap {
         case Some(project) => elClient.send(CommitSyncRequest(project))
-        case None => Logger[F].warn(s"Hook creation - COMMIT_SYNC_REQUEST not sent as no project $projectId found")
+        case None => Logger[F].error(s"Hook creation - COMMIT_SYNC_REQUEST not sent as no project $projectId found")
       }
       .handleErrorWith(
         Logger[F].error(_)(s"Hook creation - COMMIT_SYNC_REQUEST not sent as finding project $projectId failed")
