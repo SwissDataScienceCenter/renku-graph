@@ -24,7 +24,7 @@ import eu.timepit.refined.auto._
 import io.renku.data.Message
 import io.renku.graph.model.{persons, projects}
 import org.http4s.Status
-import org.http4s.Status.{BadRequest, Conflict, InternalServerError}
+import org.http4s.Status.{BadRequest, Conflict, Forbidden, InternalServerError}
 
 private sealed trait Failure extends Exception {
   val status:  Status
@@ -46,6 +46,9 @@ private object Failure {
 
   def badRequestOnGLUpdate(message: Message): Failure =
     Failure(BadRequest, message)
+
+  def forbiddenOnGLUpdate(message: Message): Failure =
+    Failure(Forbidden, message)
 
   def onGLUpdate(slug: projects.Slug, cause: Throwable): Failure =
     Failure(InternalServerError, Message.Error.unsafeApply(show"Updating project $slug in GitLab failed"), cause)

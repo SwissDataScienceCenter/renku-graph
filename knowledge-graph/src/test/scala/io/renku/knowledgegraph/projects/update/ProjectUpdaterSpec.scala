@@ -294,12 +294,10 @@ class ProjectUpdaterSpec extends AsyncFlatSpec with CustomAsyncIOSpec with shoul
       .suchThat(_.onlyGLUpdateNeeded)
       .generateOne
 
-    val error = Message.Error.fromJsonUnsafe(jsons.generateOne)
-    givenUpdatingProjectInGL(slug, updates, authUser.accessToken, returning = error.asLeft.pure[IO])
+    val failure = Failure.badRequestOnGLUpdate(Message.Error.fromJsonUnsafe(jsons.generateOne))
+    givenUpdatingProjectInGL(slug, updates, authUser.accessToken, returning = failure.asLeft.pure[IO])
 
-    updater
-      .updateProject(slug, updates, authUser)
-      .assertThrowsError[Exception](_ shouldBe Failure.badRequestOnGLUpdate(error))
+    updater.updateProject(slug, updates, authUser).assertThrowsError[Exception](_ shouldBe failure)
   }
 
   it should "fail if updating GL fails" in {
@@ -315,7 +313,7 @@ class ProjectUpdaterSpec extends AsyncFlatSpec with CustomAsyncIOSpec with shoul
     givenUpdatingProjectInGL(slug,
                              updates,
                              authUser.accessToken,
-                             returning = exception.raiseError[IO, Either[Message, Option[GLUpdatedProject]]]
+                             returning = exception.raiseError[IO, Either[Failure, Option[GLUpdatedProject]]]
     )
 
     updater
@@ -413,7 +411,7 @@ class ProjectUpdaterSpec extends AsyncFlatSpec with CustomAsyncIOSpec with shoul
   private def givenUpdatingProjectInGL(slug:      projects.Slug,
                                        updates:   ProjectUpdates,
                                        at:        UserAccessToken,
-                                       returning: IO[Either[Message, Option[GLUpdatedProject]]]
+                                       returning: IO[Either[Failure, Option[GLUpdatedProject]]]
   ) = (glProjectUpdater.updateProject _)
     .expects(slug, updates, at)
     .returning(returning)

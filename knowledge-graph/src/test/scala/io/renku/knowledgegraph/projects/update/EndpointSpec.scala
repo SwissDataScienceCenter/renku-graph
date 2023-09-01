@@ -94,6 +94,7 @@ class EndpointSpec extends AsyncFlatSpec with CustomAsyncIOSpec with should.Matc
     val failure = Gen
       .oneOf(
         Failure.badRequestOnGLUpdate(Message.Error(nonBlankStrings().generateOne)),
+        Failure.forbiddenOnGLUpdate(Message.Error(nonBlankStrings().generateOne)),
         Failure.onGLUpdate(slug, exceptions.generateOne),
         Failure.cannotPushToBranch
       )

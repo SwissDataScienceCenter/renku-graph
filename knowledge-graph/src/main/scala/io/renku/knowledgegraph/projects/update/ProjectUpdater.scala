@@ -82,7 +82,7 @@ private class ProjectUpdaterImpl[F[_]: Async: NonEmptyParallel: Logger](
     glProjectUpdater
       .updateProject(slug, updates, authUser.accessToken)
       .adaptError(Failure.onGLUpdate(slug, _))
-      .flatMap(_.fold(err => Failure.badRequestOnGLUpdate(err).raiseError[F, Option[GLUpdatedProject]], _.pure[F]))
+      .flatMap(_.fold(_.raiseError[F, Option[GLUpdatedProject]], _.pure[F]))
 
   private def findTGUpdates(slug:                  projects.Slug,
                             updates:               ProjectUpdates,
