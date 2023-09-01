@@ -55,25 +55,26 @@ class DatasetsResourcesSpec
   private val creator = authUsers.generateOne
   private val user    = authUsers.generateOne
 
+  import scala.concurrent.duration._
+
   Feature("GET knowledge-graph/projects/<namespace>/<name>/datasets to find project's datasets") {
 
-    val (dataset1 -> dataset2 -> dataset2Modified, testProject) =
-      renkuProjectEntities(visibilityPublic, creatorGen = cliShapedPersons)
-        .modify(removeMembers())
-        .addDataset(datasetEntities(provenanceInternal(cliShapedPersons)))
-        .addDatasetAndModification(
-          datasetEntities(provenanceInternal(cliShapedPersons)),
-          creatorGen = cliShapedPersons
-        )
-        .generateOne
-    val creatorPerson = cliShapedPersons.generateOne
-    val project =
-      dataProjects(testProject)
-        .map(replaceCreatorFrom(creatorPerson, creator.id))
-        .map(addMemberFrom(creatorPerson, creator.id) >>> addMemberWithId(user.id))
-        .generateOne
-
     Scenario("As a user I would like to find project's datasets by calling a REST endpoint") {
+      val (dataset1 -> dataset2 -> dataset2Modified, testProject) =
+        renkuProjectEntities(visibilityPublic, creatorGen = cliShapedPersons)
+          .modify(removeMembers())
+          .addDataset(datasetEntities(provenanceInternal(cliShapedPersons)))
+          .addDatasetAndModification(
+            datasetEntities(provenanceInternal(cliShapedPersons)),
+            creatorGen = cliShapedPersons
+          )
+          .generateOne
+      val creatorPerson = cliShapedPersons.generateOne
+      val project =
+        dataProjects(testProject)
+          .map(replaceCreatorFrom(creatorPerson, creator.id))
+          .map(addMemberFrom(creatorPerson, creator.id) >>> addMemberWithId(user.id))
+          .generateOne
 
       Given("some data in the Triples Store")
       gitLabStub.addAuthenticated(creator)
@@ -82,6 +83,7 @@ class DatasetsResourcesSpec
       gitLabStub.setupProject(project, commitId)
       mockCommitDataOnTripleGenerator(project, toPayloadJsonLD(project), commitId)
       `data in the Triples Store`(project, commitId, creator.accessToken)
+      cats.effect.IO.sleep(15.seconds).unsafeRunSync()
 
       When("user fetches project's datasets with GET knowledge-graph/projects/<project-name>/datasets")
       val projectDatasetsResponse = knowledgeGraphClient GET s"knowledge-graph/projects/${project.slug}/datasets"

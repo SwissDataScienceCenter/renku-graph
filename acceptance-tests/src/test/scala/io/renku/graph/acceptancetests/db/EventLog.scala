@@ -60,15 +60,19 @@ object EventLog extends TypeSerializers {
       session.prepare(query).flatMap(_.stream(projectId, 32).compile.toList)
   }
 
-  def findSyncEvents(projectId: GitLabId)(implicit ioRuntime: IORuntime): List[CategoryName] = execute { session =>
-    val query: Query[projects.GitLabId, CategoryName] = sql"""
+  def findSyncEventsIO(projectId: GitLabId): IO[List[CategoryName]] =
+    sessionResource.flatMap(_.session).use { session =>
+      val query: Query[projects.GitLabId, CategoryName] = sql"""
           SELECT category_name
           FROM subscription_category_sync_time
           WHERE project_id = $projectIdEncoder"""
-      .query(varchar)
-      .map(category => CategoryName(category))
-    session.prepare(query).flatMap(_.stream(projectId, 32).compile.toList)
-  }
+        .query(varchar)
+        .map(category => CategoryName(category))
+      session.prepare(query).flatMap(_.stream(projectId, 32).compile.toList)
+    }
+
+  def findSyncEvents(projectId: GitLabId)(implicit ioRuntime: IORuntime): List[CategoryName] =
+    findSyncEventsIO(projectId).unsafeRunSync()
 
   def forceCategoryEventTriggering(categoryName: CategoryName, projectId: projects.GitLabId)(implicit
       ioRuntime: IORuntime

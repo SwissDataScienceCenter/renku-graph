@@ -64,20 +64,15 @@ object DatasetIdRecordsFinder {
               |  where {
               |    bind (${id.value} as ?dsIdent).
               |    {
-              |      select distinct ?datasetId where {
+              |      select distinct ?projectId where {
               |        bind (${id.value} as ?dsIdent).
-              |        graph ?sampleProjectId {
-              |          ?sampleProjectId a schema:Project;
+              |        graph ?projectId {
+              |          ?projectId a schema:Project;
               |                           renku:hasDataset ?datasetId.
               |          ?datasetId a schema:Dataset;
               |                     schema:identifier ?dsIdent.
               |        }
               |      }
-              |    }
-              |    graph schema:Dataset {
-              |      ?topmost renku:datasetProjectLink ?link.
-              |      ?link renku:project ?projectId.
-              |      ?link renku:dataset ?datasetId.
               |    }
               |    graph renku:ProjectAuth {
               |      ?projectId a schema:Project;
