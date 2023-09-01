@@ -90,8 +90,8 @@ private class HookValidatorImpl[F[_]: MonadThrow: Logger](
   def validateHook(projectId: GitLabId, maybeAccessToken: Option[AccessToken]): F[Option[HookValidationResult]] =
     validationCache.withCache(pId => validateHook0(pId, maybeAccessToken))(projectId)
 
-  def validateHook0(projectId: GitLabId, maybeAccessToken: Option[AccessToken]): F[Option[HookValidationResult]] = {
-    persistGivenToken(projectId, maybeAccessToken) >> validateHookExistence(projectId, maybeAccessToken)
+  private def validateHook0(projectId: GitLabId, mat: Option[AccessToken]): F[Option[HookValidationResult]] = {
+    persistGivenToken(projectId, mat) >> validateHookExistence(projectId, mat)
   }.onError(logError(projectId))
 
   private def persistGivenToken(projectId: GitLabId, maybeAccessToken: Option[AccessToken]): F[Unit] =
@@ -99,15 +99,16 @@ private class HookValidatorImpl[F[_]: MonadThrow: Logger](
       .map(associate(projectId, _))
       .getOrElse(().pure[F])
 
-  private def validateHookExistence(projectId:        GitLabId,
-                                    maybeAccessToken: Option[AccessToken]
-  ): F[Option[HookValidationResult]] =
+  private def validateHookExistence(projectId: GitLabId, mat: Option[AccessToken]): F[Option[HookValidationResult]] =
     fetchToken(projectId)
       .flatMapF(checkHookPresence(HookIdentifier(projectId, projectHookUrl), _))
       .cataF(
         default = Option.empty[HookValidationResult].pure[F],
         hookPresent =>
-          whenA(!hookPresent)(removeAccessToken(projectId, maybeAccessToken)).as(toValidationResult(hookPresent).some)
+          whenA(!hookPresent)(
+            removeAccessToken(projectId, mat) >>
+              Logger[F].info(show"Token removed for projectId = $projectId as hook doesn't exist")
+          ).as(toValidationResult(hookPresent).some)
       )
 
   private def fetchToken(projectId: GitLabId): OptionT[F, AccessToken] = OptionT {
@@ -115,8 +116,8 @@ private class HookValidatorImpl[F[_]: MonadThrow: Logger](
       .adaptError(storedAccessTokenError(projectId))
   }
 
-  private def storedAccessTokenError(projectId: GitLabId): PartialFunction[Throwable, Throwable] = exception =>
-    new Exception(s"Finding stored access token for $projectId failed", exception)
+  private def storedAccessTokenError(projectId: GitLabId): PartialFunction[Throwable, Throwable] =
+    new Exception(s"Finding stored access token for $projectId failed", _)
 
   private def toValidationResult(projectHookPresent: Boolean): HookValidationResult =
     if (projectHookPresent) HookExists else HookMissing

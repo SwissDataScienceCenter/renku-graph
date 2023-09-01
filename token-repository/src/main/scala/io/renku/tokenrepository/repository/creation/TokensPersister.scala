@@ -48,10 +48,8 @@ private class TokensPersisterImpl[F[_]: MonadCancelThrow: SessionResource: Queri
     with TokensPersister[F]
     with TokenRepositoryTypeSerializers {
 
-  override def persistToken(storingInfo: TokenStoringInfo): F[Unit] = SessionResource[F].useWithTransactionK {
-    Kleisli { case (_, session) =>
-      (deleteAssociation(storingInfo.project) >> insert(storingInfo)).run(session)
-    }
+  override def persistToken(storingInfo: TokenStoringInfo): F[Unit] = SessionResource[F].useK {
+    deleteAssociation(storingInfo.project) >> insert(storingInfo)
   }
 
   override def updateSlug(project: Project): F[Unit] = SessionResource[F].useK(

@@ -81,9 +81,9 @@ private class TokensCreatorImpl[F[_]: MonadThrow: Logger](
                                 userToken: AccessToken
   ): Option[AccessToken] => F[Option[AccessToken]] = {
     case None => Option.empty[AccessToken].pure[F]
-    case Some(token) =>
-      checkValid(projectId, token) >>= {
-        case true => token.some.pure[F]
+    case Some(storedToken) =>
+      checkValid(projectId, storedToken) >>= {
+        case true => storedToken.some.pure[F]
         case false =>
           deleteAndLogSuccess(projectId, userToken, show"Token removed for $projectId as got invalidated in GL")
             .as(Option.empty)
@@ -101,9 +101,9 @@ private class TokensCreatorImpl[F[_]: MonadThrow: Logger](
       userToken: AccessToken
   ): Option[AccessToken] => F[Option[AccessToken]] = {
     case None => Option.empty[AccessToken].pure[F]
-    case Some(token) =>
+    case Some(storeToken) =>
       projectSlugFinder
-        .findProjectSlug(projectId, token)
+        .findProjectSlug(projectId, storeToken)
         .flatMap {
           case None =>
             deleteAndLogSuccess(projectId,
@@ -112,16 +112,16 @@ private class TokensCreatorImpl[F[_]: MonadThrow: Logger](
             ).as(Option.empty)
           case Some(actualGLSlug) =>
             findPersistedProjectSlug(projectId) >>= {
-              case Some(`actualGLSlug`) => token.some.pure[F]
-              case Some(_)              => updateSlug(Project(projectId, actualGLSlug)).as(token.some)
+              case Some(`actualGLSlug`) => storeToken.some.pure[F]
+              case Some(_)              => updateSlug(Project(projectId, actualGLSlug)).as(storeToken.some)
               case _                    => Option.empty[AccessToken].pure[F]
             }
         }
   }
 
   private def checkIfDue(projectId: projects.GitLabId): Option[AccessToken] => F[Option[AccessToken]] = {
-    case Some(token) => checkTokenDue(projectId).map(Option.unless(_)(token))
-    case _           => Option.empty[AccessToken].pure[F]
+    case Some(storedToken) => checkTokenDue(projectId).map(Option.unless(_)(storedToken))
+    case _                 => Option.empty[AccessToken].pure[F]
   }
 
   private def createNew(projectId: projects.GitLabId, userToken: AccessToken) =

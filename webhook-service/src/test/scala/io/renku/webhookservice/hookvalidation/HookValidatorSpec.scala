@@ -29,7 +29,7 @@ import io.renku.graph.model.projects.GitLabId
 import io.renku.graph.tokenrepository.AccessTokenFinder
 import io.renku.http.client.AccessToken
 import io.renku.interpreters.TestLogger
-import io.renku.interpreters.TestLogger.Level.Error
+import io.renku.interpreters.TestLogger.Level.{Error, Info}
 import io.renku.testtools.IOSpec
 import io.renku.webhookservice.WebhookServiceGenerators._
 import io.renku.webhookservice.hookvalidation.HookValidator.HookValidationResult
@@ -106,7 +106,7 @@ class HookValidatorSpec extends AnyWordSpec with MockFactory with should.Matcher
 
       validator.validateHook(projectId, givenAccessToken.some).unsafeRunSync() shouldBe HookMissing.some
 
-      logger.expectNoLogs()
+      logger.loggedOnly(Info(show"Token removed for projectId = $projectId as hook doesn't exist"))
     }
 
     "return None if hook verification cannot determine hook existence" in new TestCase {
@@ -203,7 +203,7 @@ class HookValidatorSpec extends AnyWordSpec with MockFactory with should.Matcher
 
       validator.validateHook(projectId, maybeAccessToken = None).unsafeRunSync() shouldBe HookMissing.some
 
-      logger.expectNoLogs()
+      logger.loggedOnly(Info(show"Token removed for projectId = $projectId as hook doesn't exist"))
     }
 
     "return None if hook verification cannot determine hook existence" in new TestCase {
