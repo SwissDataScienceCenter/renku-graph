@@ -69,12 +69,12 @@ private class EndpointImpl[F[_]: Async: NonEmptyParallel: Logger: ExecutionTimeR
         .parFlatMapN {
           case (Some(HookMissing), _) =>
             Ok(StatusInfo.NotActivated.asJson)
-          case (Some(HookExists), Some(si)) =>
-            sendProjectViewed(projectId, authUser) >> Ok(si.asJson)
+          case (Some(HookExists), Some(status)) =>
+            sendProjectViewed(projectId, authUser) >> Ok(status.asJson)
           case (Some(HookExists), None) =>
             sendCommitSyncRequest(projectId, authUser) >> Ok(StatusInfo.webhookReady.widen.asJson)
-          case (None, Some(si)) =>
-            sendProjectViewed(projectId, authUser) >> Ok(si.asJson)
+          case (None, Some(status)) =>
+            sendProjectViewed(projectId, authUser) >> Ok(status.asJson)
           case (None, None) =>
             NotFound(Message.Info("Info about project cannot be found"))
         }
