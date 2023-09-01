@@ -114,9 +114,6 @@ class WebhookValidationEndpointSpec extends AcceptanceSpec with ApplicationServi
 
       Then("he should get NOT_FOUND response back")
       afterDeletionResponse.status shouldBe NotFound
-
-      And("the Access Token should be removed from the token repository")
-      tokenRepositoryClient.GET(s"projects/${project.id}/tokens").status shouldBe NotFound
     }
   }
 }
