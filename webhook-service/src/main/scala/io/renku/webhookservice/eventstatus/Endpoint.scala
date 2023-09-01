@@ -82,23 +82,27 @@ private class EndpointImpl[F[_]: Async: NonEmptyParallel: Logger: ExecutionTimeR
     }
 
   private def sendCommitSyncRequest(projectId: GitLabId, authUser: Option[AuthUser]): F[Unit] = Spawn[F].start {
-    findProjectInfo(projectId)(authUser.map(_.accessToken)) >>= {
-      case Some(project) =>
-        (elClient send CommitSyncRequest(project))
-          .handleErrorWith(Logger[F].warn(_)("Event Status - sending CommitSyncRequest failed"))
-      case None =>
-        Logger[F].info(s"Event Status - COMMIT_SYNC_REQUEST not sent as no project $projectId found")
-    }
+    findProjectInfo(projectId)(authUser.map(_.accessToken))
+      .flatMap {
+        case Some(project) =>
+          (elClient send CommitSyncRequest(project))
+            .handleErrorWith(Logger[F].warn(_)("Event Status - sending COMMIT_SYNC_REQUEST failed"))
+        case None =>
+          Logger[F].info(s"Event Status - COMMIT_SYNC_REQUEST not sent as no project $projectId found")
+      }
+      .handleErrorWith(Logger[F].error(_)("Event Status - finding project details failed"))
   }.void
 
   private def sendProjectViewed(projectId: GitLabId, authUser: Option[AuthUser]): F[Unit] = Spawn[F].start {
-    findProjectInfo(projectId)(authUser.map(_.accessToken)) >>= {
-      case Some(project) =>
-        (tgClient send ProjectViewedEvent.forProjectAndUserId(project.slug, authUser.map(_.id)))
-          .handleErrorWith(Logger[F].warn(_)("Event Status - sending ProjectViewedEvent failed"))
-      case None =>
-        Logger[F].info(s"Event Status - PROJECT_VIEWED not sent as no project $projectId found")
-    }
+    findProjectInfo(projectId)(authUser.map(_.accessToken))
+      .flatMap {
+        case Some(project) =>
+          (tgClient send ProjectViewedEvent.forProjectAndUserId(project.slug, authUser.map(_.id)))
+            .handleErrorWith(Logger[F].warn(_)("Event Status - sending PROJECT_VIEWED failed"))
+        case None =>
+          Logger[F].info(s"Event Status - PROJECT_VIEWED not sent as no project $projectId found")
+      }
+      .handleErrorWith(Logger[F].error(_)("Event Status - finding project details failed"))
   }.void
 
   private def internalServerError(projectId: projects.GitLabId): Throwable => F[Response[F]] = { exception =>

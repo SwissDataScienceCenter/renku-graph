@@ -92,11 +92,13 @@ private class HookCreatorImpl[F[_]: Spawn: Logger](
 
   private def sendCommitSyncReq(projectId: projects.GitLabId, accessToken: AccessToken) =
     findProjectInfo(projectId)(accessToken.some)
-      .onError(Logger[F].error(_)(s"Hook creation - COMMIT_SYNC_REQUEST not sent as finding project $projectId failed"))
       .flatMap {
         case Some(project) => elClient.send(CommitSyncRequest(project))
         case None => Logger[F].warn(s"Hook creation - COMMIT_SYNC_REQUEST not sent as no project $projectId found")
       }
+      .handleErrorWith(
+        Logger[F].error(_)(s"Hook creation - COMMIT_SYNC_REQUEST not sent as finding project $projectId failed")
+      )
 
   private def loggingError(projectId: GitLabId): PartialFunction[Throwable, F[Unit]] = { case exception =>
     Logger[F].error(exception)(s"Hook creation failed for project with id $projectId")
