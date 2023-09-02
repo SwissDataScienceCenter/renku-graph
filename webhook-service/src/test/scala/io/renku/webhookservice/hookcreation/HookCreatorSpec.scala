@@ -71,7 +71,7 @@ class HookCreatorSpec
 
       givenHookCreation(returning = IO.unit)
 
-      givenProjectInfoFinding(returning = projectInfo.pure[IO])
+      givenProjectInfoFinding(returning = projectInfo.some.pure[IO])
 
       givenCommitSyncRequestSending(returning = IO.unit)
 
@@ -86,7 +86,7 @@ class HookCreatorSpec
 
       givenHookValidation(returning = HookExists.some.pure[IO])
 
-      givenProjectInfoFinding(returning = projectInfo.pure[IO])
+      givenProjectInfoFinding(returning = projectInfo.some.pure[IO])
 
       givenCommitSyncRequestSending(returning = ().pure[IO])
 
@@ -171,17 +171,14 @@ class HookCreatorSpec
       givenHookValidation(returning = HookExists.some.pure[IO])
 
       val exception = exceptions.generateOne
-      givenProjectInfoFinding(returning = exception.raiseError[IO, Project])
+      givenProjectInfoFinding(returning = exception.raiseError[IO, Option[Project]])
 
       hookCreation.createHook(projectId, authUser).unsafeRunSync().value shouldBe HookExisted
 
       eventually {
         logger.loggedOnly(
           Info(show"Hook existed for projectId $projectId"),
-          Error(
-            s"Hook creation - sending COMMIT_SYNC_REQUEST failure; finding project info for projectId $projectId failed",
-            exception
-          )
+          Error(s"Hook creation - COMMIT_SYNC_REQUEST not sent as finding project $projectId failed", exception)
         )
       }
     }
@@ -200,9 +197,9 @@ class HookCreatorSpec
     private val tokenAssociator           = mock[AccessTokenAssociator[IO]]
     private val projectHookCreator        = mock[ProjectHookCreator[IO]]
     private val hookTokenCrypto           = mock[HookTokenCrypto[IO]]
-    private val projectInfoFinderResponse = Queue.bounded[IO, IO[Project]](1).unsafeRunSync()
+    private val projectInfoFinderResponse = Queue.bounded[IO, IO[Option[Project]]](1).unsafeRunSync()
     private val projectInfoFinder = new ProjectInfoFinder[IO] {
-      override def findProjectInfo(projectId: GitLabId)(implicit maybeAccessToken: Option[AccessToken]): IO[Project] =
+      override def findProjectInfo(projectId: GitLabId)(implicit mat: Option[AccessToken]): IO[Option[Project]] =
         projectInfoFinderResponse.take.flatten
     }
     private val commitSyncRequestSenderResponse = Queue.bounded[IO, IO[Unit]](1).unsafeRunSync()
@@ -246,7 +243,7 @@ class HookCreatorSpec
         .expects(ProjectHook(projectId, projectHookUrl, serializedHookToken), accessToken)
         .returning(returning)
 
-    def givenProjectInfoFinding(returning: IO[Project]): Unit =
+    def givenProjectInfoFinding(returning: IO[Option[Project]]): Unit =
       projectInfoFinderResponse.offer(returning).unsafeRunSync()
 
     def givenCommitSyncRequestSending(returning: IO[Unit]): Unit =

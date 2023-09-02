@@ -81,11 +81,11 @@ private class TokensCreatorImpl[F[_]: MonadThrow: Logger](
                                 userToken: AccessToken
   ): Option[AccessToken] => F[Option[AccessToken]] = {
     case None => Option.empty[AccessToken].pure[F]
-    case Some(token) =>
-      checkValid(projectId, token) >>= {
-        case true => token.some.pure[F]
+    case Some(storedToken) =>
+      checkValid(projectId, storedToken) >>= {
+        case true => storedToken.some.pure[F]
         case false =>
-          deleteAndLogSuccess(projectId, userToken, show"Token removed for $projectId as got invalidated in GL")
+          deleteAndLogSuccess(projectId, userToken, show"token removed for $projectId as got invalidated in GL")
             .as(Option.empty)
       }
   }
@@ -101,27 +101,27 @@ private class TokensCreatorImpl[F[_]: MonadThrow: Logger](
       userToken: AccessToken
   ): Option[AccessToken] => F[Option[AccessToken]] = {
     case None => Option.empty[AccessToken].pure[F]
-    case Some(token) =>
+    case Some(storeToken) =>
       projectSlugFinder
-        .findProjectSlug(projectId, token)
+        .findProjectSlug(projectId, storeToken)
         .flatMap {
           case None =>
             deleteAndLogSuccess(projectId,
                                 userToken,
-                                show"Token removed for $projectId as project does not exist in GL"
+                                show"token removed for $projectId as project does not exist in GL"
             ).as(Option.empty)
           case Some(actualGLSlug) =>
             findPersistedProjectSlug(projectId) >>= {
-              case Some(`actualGLSlug`) => token.some.pure[F]
-              case Some(_)              => updateSlug(Project(projectId, actualGLSlug)).as(token.some)
+              case Some(`actualGLSlug`) => storeToken.some.pure[F]
+              case Some(_)              => updateSlug(Project(projectId, actualGLSlug)).as(storeToken.some)
               case _                    => Option.empty[AccessToken].pure[F]
             }
         }
   }
 
   private def checkIfDue(projectId: projects.GitLabId): Option[AccessToken] => F[Option[AccessToken]] = {
-    case Some(token) => checkTokenDue(projectId).map(Option.unless(_)(token))
-    case _           => Option.empty[AccessToken].pure[F]
+    case Some(storedToken) => checkTokenDue(projectId).map(Option.unless(_)(storedToken))
+    case _                 => Option.empty[AccessToken].pure[F]
   }
 
   private def createNew(projectId: projects.GitLabId, userToken: AccessToken) =
@@ -171,12 +171,12 @@ private class TokensCreatorImpl[F[_]: MonadThrow: Logger](
   private def verifyTokenIntegrity(projectId: projects.GitLabId, token: ProjectAccessToken) =
     findStoredToken(projectId)
       .cataF(
-        new Exception(show"Token associator - just saved token cannot be found for project: $projectId")
+        new Exception(show"token for project: $projectId that has been just saved cannot be found")
           .raiseError[F, Unit],
         accessTokenCrypto.decrypt(_) >>= {
           case `token` => ().pure[F]
           case _ =>
-            new Exception(show"Token associator - just saved token integrity check failed for project: $projectId")
+            new Exception(show"token for project: $projectId that has been just saved failed the integrity check")
               .raiseError[F, Unit]
         }
       )

@@ -301,9 +301,7 @@ class TokensCreatorSpec extends AsyncFlatSpec with CustomAsyncIOSpec with AsyncM
 
     tokensCreator
       .create(projectId, userAccessToken)
-      .assertThrowsWithMessage[Exception](
-        show"Token associator - just saved token cannot be found for project: $projectId"
-      )
+      .assertThrowsWithMessage[Exception](show"token for project: $projectId that has been just saved cannot be found")
   }
 
   private lazy val projectId       = projectIds.generateOne
