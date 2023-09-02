@@ -85,7 +85,7 @@ private class TokensCreatorImpl[F[_]: MonadThrow: Logger](
       checkValid(projectId, storedToken) >>= {
         case true => storedToken.some.pure[F]
         case false =>
-          deleteAndLogSuccess(projectId, userToken, show"Token removed for $projectId as got invalidated in GL")
+          deleteAndLogSuccess(projectId, userToken, show"token removed for $projectId as got invalidated in GL")
             .as(Option.empty)
       }
   }
@@ -108,7 +108,7 @@ private class TokensCreatorImpl[F[_]: MonadThrow: Logger](
           case None =>
             deleteAndLogSuccess(projectId,
                                 userToken,
-                                show"Token removed for $projectId as project does not exist in GL"
+                                show"token removed for $projectId as project does not exist in GL"
             ).as(Option.empty)
           case Some(actualGLSlug) =>
             findPersistedProjectSlug(projectId) >>= {
@@ -171,12 +171,12 @@ private class TokensCreatorImpl[F[_]: MonadThrow: Logger](
   private def verifyTokenIntegrity(projectId: projects.GitLabId, token: ProjectAccessToken) =
     findStoredToken(projectId)
       .cataF(
-        new Exception(show"Token associator - just saved token cannot be found for project: $projectId")
+        new Exception(show"token for project: $projectId that has been just saved cannot be found")
           .raiseError[F, Unit],
         accessTokenCrypto.decrypt(_) >>= {
           case `token` => ().pure[F]
           case _ =>
-            new Exception(show"Token associator - just saved token integrity check failed for project: $projectId")
+            new Exception(show"token for project: $projectId that has been just saved failed the integrity check")
               .raiseError[F, Unit]
         }
       )
