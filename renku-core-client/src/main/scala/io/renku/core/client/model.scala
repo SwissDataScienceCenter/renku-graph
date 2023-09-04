@@ -34,3 +34,8 @@ object MigrationRequired extends TinyTypeFactory[MigrationRequired](new Migratio
   lazy val no:          MigrationRequired          = MigrationRequired(false)
   implicit val decoder: Decoder[MigrationRequired] = TinyTypeDecoders.booleanDecoder(MigrationRequired)
 }
+
+final class Branch private (val value: String) extends AnyVal with StringTinyType
+object Branch extends TinyTypeFactory[Branch](new Branch(_)) with NonBlank[Branch] {
+  implicit val decoder: Decoder[Branch] = TinyTypeDecoders.stringDecoder(Branch)
+}
