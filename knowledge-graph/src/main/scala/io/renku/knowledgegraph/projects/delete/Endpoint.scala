@@ -67,6 +67,7 @@ private class EndpointImpl[F[_]: Async: Logger](glProjectFinder: GLProjectFinder
       case Some(project) =>
         deleteProject(project.id) >>
           Spawn[F].start(waitForDeletion(project.slug) >> sendEvents(project)) >>
+          Logger[F].info(show"Project $slug deleted") >>
           Accepted(Message.Info("Project deleted"))
     }
   }.handleErrorWith(httpResult(slug))

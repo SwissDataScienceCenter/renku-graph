@@ -18,7 +18,7 @@
 
 package io.renku.triplesstore.client.sparql
 
-import io.renku.jsonld.{EntityId, Property}
+import io.renku.jsonld.{EntityId, Property, Schema}
 import io.renku.triplesstore.client.model.{Quad, Triple, TripleObject}
 import io.renku.triplesstore.client.syntax._
 
@@ -36,26 +36,27 @@ class StringInterpolator(private val sc: StringContext) {
   }
 
   private lazy val makeValue: ((Any, Int)) => String = {
-    case (a: LuceneQuery, _)      => a.asSparql.sparql
-    case (a: String, _)           => a.asTripleObject.asSparql.sparql
-    case (a: Char, _)             => a.toString.asTripleObject.asSparql.sparql
-    case (a: Float, _)            => a.asTripleObject.asSparql.sparql
-    case (a: Int, _)              => a.asTripleObject.asSparql.sparql
-    case (a: Long, _)             => a.asTripleObject.asSparql.sparql
-    case (a: Double, _)           => a.asTripleObject.asSparql.sparql
-    case (a: Boolean, _)          => a.asTripleObject.asSparql.sparql
-    case (a: Instant, _)          => a.asTripleObject.asSparql.sparql
-    case (a: LocalDate, _)        => a.asTripleObject.asSparql.sparql
-    case (a: EntityId, _)         => a.asSparql.sparql
-    case (a: Triple, _)           => a.asSparql.sparql
-    case (a: Quad, _)             => a.asSparql.sparql
-    case (a: TripleObject, _)     => a.asSparql.sparql
-    case (a: Property, _)         => a.asSparql.sparql
-    case (a: Fragment, _)         => a.sparql
-    case (a: VarName, _)          => a.name
-    case (it: Iterable[Any], idx) => resolveIterable(it, idx)
-    case (opt: Option[Any], idx)  => opt.map(makeValue(_, idx)).getOrElse("")
-    case (arg, _)                 => sys.error(s"Unsupported value type '${arg.getClass}: $arg'")
+    case (a: LuceneQuery, _)         => a.asSparql.sparql
+    case (a: String, _)              => a.asTripleObject.asSparql.sparql
+    case (a: Char, _)                => a.toString.asTripleObject.asSparql.sparql
+    case (a: Float, _)               => a.asTripleObject.asSparql.sparql
+    case (a: Int, _)                 => a.asTripleObject.asSparql.sparql
+    case (a: Long, _)                => a.asTripleObject.asSparql.sparql
+    case (a: Double, _)              => a.asTripleObject.asSparql.sparql
+    case (a: Boolean, _)             => a.asTripleObject.asSparql.sparql
+    case (a: Instant, _)             => a.asTripleObject.asSparql.sparql
+    case (a: LocalDate, _)           => a.asTripleObject.asSparql.sparql
+    case (a: EntityId, _)            => a.asSparql.sparql
+    case (a: Triple, _)              => a.asSparql.sparql
+    case (a: Quad, _)                => a.asSparql.sparql
+    case (a: TripleObject, _)        => a.asSparql.sparql
+    case (a: Property, _)            => a.asSparql.sparql
+    case (a: Fragment, _)            => a.sparql
+    case (a: VarName, _)             => a.name
+    case ((n: String, s: Schema), _) => s.asPrefix(n)
+    case (it: Iterable[Any], idx)    => resolveIterable(it, idx)
+    case (opt: Option[Any], idx)     => opt.map(makeValue(_, idx)).getOrElse("")
+    case (arg, _)                    => sys.error(s"Unsupported value type '${arg.getClass}: $arg'")
   }
 
   private def resolveIterable(it: Iterable[Any], idx: Int) = {

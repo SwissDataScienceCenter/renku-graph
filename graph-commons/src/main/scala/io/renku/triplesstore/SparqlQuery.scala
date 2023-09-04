@@ -27,16 +27,21 @@ import io.renku.jsonld.Schema
 import io.renku.tinytypes.StringTinyType
 import io.renku.triplesstore.SparqlQuery.Prefix
 import io.renku.triplesstore.client.sparql.Fragment
+import io.renku.triplesstore.client.http.{SparqlQuery => ClientSparqlQuery, SparqlUpdate => ClientSparqlUpdate}
 
 final case class SparqlQuery(name:               String Refined NonEmpty,
                              prefixes:           Set[Prefix],
                              body:               String,
                              maybePagingRequest: Option[PagingRequest]
-) {
+) extends ClientSparqlQuery
+    with ClientSparqlUpdate {
+
   override lazy val toString: String =
     s"""|${prefixes.mkString("", "\n", "")}
         |$body
         |$pagingRequest""".stripMargin.trim
+
+  override lazy val render: String = toString
 
   private lazy val pagingRequest =
     maybePagingRequest

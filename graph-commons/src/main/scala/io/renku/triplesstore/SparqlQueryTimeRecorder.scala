@@ -18,22 +18,28 @@
 
 package io.renku.triplesstore
 
+import cats.Monad
 import cats.effect.Sync
 import cats.syntax.all._
+import eu.timepit.refined.api.Refined
 import eu.timepit.refined.auto._
+import eu.timepit.refined.collection.NonEmpty
 import io.renku.logging.ExecutionTimeRecorder
 import io.renku.metrics.LabeledHistogramImpl
 import org.typelevel.log4cats.Logger
 
 import scala.concurrent.duration._
 
-class SparqlQueryTimeRecorder[F[_]](val instance: ExecutionTimeRecorder[F])
+final class SparqlQueryTimeRecorder[F[_]](val instance: ExecutionTimeRecorder[F]) {
+  def reportTime[A](label: String Refined NonEmpty)(work: F[A])(implicit L: Logger[F], M: Monad[F]): F[A] =
+    instance.measureExecutionTime(work, label.some).flatMap(instance.logExecutionTime(s"Executed $label"))
+}
 
 object SparqlQueryTimeRecorder {
 
   import io.renku.metrics.MetricsRegistry
 
-  def apply[F[_]: Sync: Logger: MetricsRegistry](): F[SparqlQueryTimeRecorder[F]] = MetricsRegistry[F]
+  def create[F[_]: Sync: Logger: MetricsRegistry](): F[SparqlQueryTimeRecorder[F]] = MetricsRegistry[F]
     .register {
       new LabeledHistogramImpl[F](
         name = "sparql_execution_times",

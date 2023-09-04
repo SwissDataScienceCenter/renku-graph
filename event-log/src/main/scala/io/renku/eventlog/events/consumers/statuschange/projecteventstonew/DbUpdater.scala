@@ -20,6 +20,7 @@ package io.renku.eventlog.events.consumers.statuschange.projecteventstonew
 
 import cats.MonadThrow
 import io.circe.Encoder
+import io.renku.eventlog.EventLogDB.SessionResource
 import io.renku.eventlog.api.events.StatusChangeEvent
 import io.renku.eventlog.api.events.StatusChangeEvent.ProjectEventsToNew
 import io.renku.eventlog.events.consumers.statuschange
@@ -35,5 +36,6 @@ private[statuschange] class DbUpdater[F[_]: MonadThrow](eventsQueue: StatusChang
   override def updateDB(event: ProjectEventsToNew): UpdateOp[F] =
     eventsQueue.offer[ProjectEventsToNew](event).map(_ => DBUpdateResults.ForProjects.empty)
 
-  override def onRollback(event: ProjectEventsToNew): RollbackOp[F] = RollbackOp.empty[F]
+  override def onRollback(event: ProjectEventsToNew)(implicit sr: SessionResource[F]): RollbackOp[F] =
+    RollbackOp.empty[F]
 }

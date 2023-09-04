@@ -47,7 +47,7 @@ import io.renku.interpreters.TestRoutesMetrics
 import io.renku.knowledgegraph.datasets.details.RequestedDataset
 import io.renku.testtools.IOSpec
 import org.http4s.MediaType.application
-import org.http4s.Method.{DELETE, GET, PUT}
+import org.http4s.Method.{DELETE, GET, PATCH, PUT}
 import org.http4s.Status._
 import org.http4s._
 import org.http4s.headers.`Content-Type`
@@ -563,53 +563,57 @@ class MicroserviceRoutesSpec
     }
   }
 
-  "PUT /knowledge-graph/projects/:namespace/../:name" should {
+  "PATCH and PUT /knowledge-graph/projects/:namespace/../:name" should {
 
     val projectSlug = projectSlugs.generateOne
-    val request     = Request[IO](PUT, Uri.unsafeFromString(s"knowledge-graph/projects/$projectSlug"))
 
-    s"return $Accepted for valid path parameters, user and payload" in new TestCase {
+    Request[IO](PATCH, Uri.unsafeFromString(s"knowledge-graph/projects/$projectSlug")) ::
+      Request[IO](PUT, Uri.unsafeFromString(s"knowledge-graph/projects/$projectSlug")) :: Nil foreach { request =>
+        s"return $Accepted for valid path parameters, user and payload - case ${request.method}" in new TestCase {
 
-      val authUser = MaybeAuthUser(authUsers.generateOne)
+          val authUser = MaybeAuthUser(authUsers.generateOne)
 
-      (projectSlugAuthorizer.authorize _)
-        .expects(projectSlug, authUser.option)
-        .returning(rightT[IO, EndpointSecurityException](AuthContext(authUser.option, projectSlug, Set(projectSlug))))
+          (projectSlugAuthorizer.authorize _)
+            .expects(projectSlug, authUser.option)
+            .returning(
+              rightT[IO, EndpointSecurityException](AuthContext(authUser.option, projectSlug, Set(projectSlug)))
+            )
 
-      (projectUpdateEndpoint
-        .`PUT /projects/:slug`(_: model.projects.Slug, _: Request[IO], _: AuthUser))
-        .expects(projectSlug, request, authUser.option.get)
-        .returning(Response[IO](Accepted).pure[IO])
+          (projectUpdateEndpoint
+            .`PATCH /projects/:slug`(_: model.projects.Slug, _: Request[IO], _: AuthUser))
+            .expects(projectSlug, request, authUser.option.get)
+            .returning(Response[IO](Accepted).pure[IO])
 
-      routes(authUser).call(request).status shouldBe Accepted
+          routes(authUser).call(request).status shouldBe Accepted
 
-      routesMetrics.clearRegistry()
-    }
+          routesMetrics.clearRegistry()
+        }
 
-    s"return $Unauthorized when authentication fails" in new TestCase {
-      routes(givenAuthAsUnauthorized)
-        .call(request)
-        .status shouldBe Unauthorized
-    }
+        s"return $Unauthorized when authentication fails - case ${request.method}" in new TestCase {
+          routes(givenAuthAsUnauthorized)
+            .call(request)
+            .status shouldBe Unauthorized
+        }
 
-    s"return $NotFound when no auth header" in new TestCase {
-      routes(maybeAuthUser = MaybeAuthUser.noUser).call(request).status shouldBe NotFound
-    }
+        s"return $NotFound when no auth header - case ${request.method}" in new TestCase {
+          routes(maybeAuthUser = MaybeAuthUser.noUser).call(request).status shouldBe NotFound
+        }
 
-    s"return $NotFound when the user has no rights to the project" in new TestCase {
+        s"return $NotFound when the user has no rights to the project - case ${request.method}" in new TestCase {
 
-      val authUser = MaybeAuthUser(authUsers.generateOne)
+          val authUser = MaybeAuthUser(authUsers.generateOne)
 
-      (projectSlugAuthorizer.authorize _)
-        .expects(projectSlug, authUser.option)
-        .returning(leftT[IO, AuthContext[model.projects.Slug]](AuthorizationFailure))
+          (projectSlugAuthorizer.authorize _)
+            .expects(projectSlug, authUser.option)
+            .returning(leftT[IO, AuthContext[model.projects.Slug]](AuthorizationFailure))
 
-      val response = routes(authUser).call(request)
+          val response = routes(authUser).call(request)
 
-      response.status        shouldBe NotFound
-      response.contentType   shouldBe Some(`Content-Type`(application.json))
-      response.body[Message] shouldBe Message.Error.unsafeApply(AuthorizationFailure.getMessage)
-    }
+          response.status        shouldBe NotFound
+          response.contentType   shouldBe Some(`Content-Type`(application.json))
+          response.body[Message] shouldBe Message.Error.unsafeApply(AuthorizationFailure.getMessage)
+        }
+      }
   }
 
   "GET /knowledge-graph/projects/:namespace/../:name/datasets" should {

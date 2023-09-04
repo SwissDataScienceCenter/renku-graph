@@ -23,7 +23,7 @@ import cats.effect.kernel.Async
 import cats.syntax.all._
 import eu.timepit.refined.auto._
 import io.renku.graph.model.projects
-import io.renku.graph.model.projects.{GitLabId, Visibility}
+import io.renku.graph.model.projects.Visibility
 import io.renku.http.client.{AccessToken, GitLabClient}
 import model.Forking.ForksCount
 import model.Project.StarsCount
@@ -103,9 +103,9 @@ private class GitLabProjectFinderImpl[F[_]: Async: GitLabClient: Logger] extends
 
     implicit val decoder: Decoder[GitLabProject] = cursor =>
       for {
-        id             <- cursor.downField("id").as[GitLabId]
+        id             <- cursor.downField("id").as[projects.GitLabId]
         sshUrl         <- cursor.downField("ssh_url_to_repo").as[SshUrl]
-        httpUrl        <- cursor.downField("http_url_to_repo").as[HttpUrl]
+        httpUrl        <- cursor.downField("http_url_to_repo").as[projects.GitHttpUrl]
         webUrl         <- cursor.downField("web_url").as[WebUrl]
         maybeReadmeUrl <- cursor.downField("readme_url").as[Option[ReadmeUrl]]
         forksCount     <- cursor.downField("forks_count").as[ForksCount]
@@ -130,7 +130,7 @@ private class GitLabProjectFinderImpl[F[_]: Async: GitLabClient: Logger] extends
 private object GitLabProjectFinder {
 
   final case class GitLabProject(
-      id:          GitLabId,
+      id:          projects.GitLabId,
       visibility:  Visibility,
       urls:        Urls,
       forksCount:  ForksCount,

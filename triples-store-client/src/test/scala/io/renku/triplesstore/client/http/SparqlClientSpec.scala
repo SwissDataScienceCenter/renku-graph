@@ -27,11 +27,11 @@ import org.scalatest.matchers.should
 import org.typelevel.log4cats.Logger
 import org.typelevel.log4cats.slf4j.Slf4jLogger
 import io.renku.triplesstore.client.syntax._
-import io.renku.triplesstore.client.util.JenaContainerSpec
+import io.renku.triplesstore.client.util.JenaContainerSupport
 
 import java.time.Instant
 
-class SparqlClientSpec extends AsyncFlatSpec with AsyncIOSpec with JenaContainerSpec with should.Matchers {
+class SparqlClientSpec extends AsyncFlatSpec with AsyncIOSpec with JenaContainerSupport with should.Matchers {
   implicit val logger: Logger[IO] = Slf4jLogger.getLogger[IO]
   val dataset = "projects"
 

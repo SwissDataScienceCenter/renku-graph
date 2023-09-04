@@ -22,16 +22,18 @@ import cats.syntax.all._
 import io.renku.generators.Generators.Implicits._
 import io.renku.generators.Generators._
 import org.scalacheck.Gen
+import org.scalatest.TryValues
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
 import org.scalatestplus.scalacheck.ScalaCheckPropertyChecks
 
-import scala.util.{Failure, Try}
+import scala.util.Try
 
 class ResourceIdSpec
     extends AnyWordSpec
     with ScalaCheckPropertyChecks
     with should.Matchers
+    with TryValues
     with RenkuTinyTypeGenerators {
 
   implicit val renkuUrl: RenkuUrl = RenkuTinyTypeGenerators.renkuUrls.generateOne
@@ -41,18 +43,19 @@ class ResourceIdSpec
     "be successful for valid ResourceIds" in {
       forAll(planIdentifiers) { id =>
         val resourceId = plans.ResourceId(id)
-        resourceId.as[Try, plans.Identifier] shouldBe id.pure[Try]
+        resourceId.as[Try, plans.Identifier].success.value shouldBe id
       }
     }
 
     "fail for an unknown resourceIds" in {
       val resourceId = plans.ResourceId {
         httpUrls(
-          relativePaths(partsGenerator = Gen.frequency(9 -> planIdentifiers.generateOne.show, 1 -> nonEmptyStrings()))
+          pathGenerator =
+            relativePaths(partsGenerator = Gen.frequency(9 -> planIdentifiers.generateOne.show, 1 -> nonEmptyStrings()))
         ).generateOne
       }
 
-      val Failure(exception) = resourceId.as[Try, plans.Identifier]
+      val exception = resourceId.as[Try, plans.Identifier].failure.exception
 
       exception            shouldBe an[IllegalArgumentException]
       exception.getMessage shouldBe s"'${resourceId.value}' cannot be converted to a plans.Identifier"

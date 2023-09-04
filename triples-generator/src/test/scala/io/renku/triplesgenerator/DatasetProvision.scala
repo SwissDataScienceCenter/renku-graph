@@ -23,9 +23,10 @@ import io.renku.entities.searchgraphs.SearchInfoDatasets
 import io.renku.graph.model.entities.EntityFunctions
 import io.renku.graph.model.projects.Role
 import io.renku.graph.model.{RenkuUrl, entities}
-import io.renku.projectauth.ProjectMember
-import io.renku.triplesgenerator.events.consumers.{ProjectAuthSync, ProjectSparqlClient}
-import io.renku.triplesstore.{GraphsProducer, InMemoryJena, ProjectsDataset}
+import io.renku.logging.{ExecutionTimeRecorder, TestExecutionTimeRecorder}
+import io.renku.projectauth.{ProjectAuthData, ProjectMember}
+import io.renku.triplesgenerator.events.consumers.membersync.ProjectAuthSync
+import io.renku.triplesstore._
 
 trait DatasetProvision extends SearchInfoDatasets { self: ProjectsDataset with InMemoryJena =>
 
@@ -36,8 +37,11 @@ trait DatasetProvision extends SearchInfoDatasets { self: ProjectsDataset with I
       graphsProducer:  GraphsProducer[entities.Project],
       renkuUrl:        RenkuUrl
   ): IO[Unit] = {
+    val execTimeRecorder: ExecutionTimeRecorder[IO] = TestExecutionTimeRecorder[IO]()
+    implicit val sparqlQueryTimeRecorder: SparqlQueryTimeRecorder[IO] =
+      new SparqlQueryTimeRecorder[IO](execTimeRecorder)
     val ps      = ProjectSparqlClient[IO](projectsDSConnectionInfo).map(ProjectAuthSync[IO](_))
     val members = project.members.flatMap(p => p.maybeGitLabId.map(id => ProjectMember(id, Role.Reader)))
-    super.provisionProject(project) *> ps.use(_.syncProject(project.slug, members))
+    super.provisionProject(project) *> ps.use(_.syncProject(ProjectAuthData(project.slug, members, project.visibility)))
   }
 }

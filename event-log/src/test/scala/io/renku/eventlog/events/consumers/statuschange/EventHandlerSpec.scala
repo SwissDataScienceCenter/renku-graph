@@ -22,16 +22,17 @@ package statuschange
 import cats.effect.IO
 import cats.syntax.all._
 import io.circe.syntax._
-import io.renku.eventlog.api.events.{StatusChangeEvent, StatusChangeGenerators}
+import io.renku.eventlog.InMemoryEventLogDbSpec
 import io.renku.eventlog.api.events.StatusChangeEvent._
+import io.renku.eventlog.api.events.{StatusChangeEvent, StatusChangeGenerators}
 import io.renku.eventlog.metrics.QueriesExecutionTimes
 import io.renku.events.EventRequestContent
 import io.renku.events.consumers.{EventSchedulingResult, ProcessExecutor}
 import io.renku.events.producers.EventSender
+import io.renku.generators.Generators.Implicits._
 import io.renku.interpreters.TestLogger
 import io.renku.metrics.{MetricsRegistry, TestMetricsRegistry}
 import io.renku.testtools.IOSpec
-import io.renku.generators.Generators.Implicits._
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.EitherValues
 import org.scalatest.matchers.should
@@ -41,6 +42,7 @@ import org.scalatestplus.scalacheck.ScalaCheckPropertyChecks
 class EventHandlerSpec
     extends AnyWordSpec
     with IOSpec
+    with InMemoryEventLogDbSpec
     with MockFactory
     with EitherValues
     with should.Matchers

@@ -239,8 +239,8 @@ class DbUpdaterSpec
       givenDeliveryInfoRemoved(statusChangeEvent.eventId)
 
       val deadlockException = postgresErrors(SqlState.DeadlockDetected).generateOne
-      sessionResource
-        .useK((dbUpdater onRollback statusChangeEvent)(deadlockException))
+      (dbUpdater onRollback statusChangeEvent)
+        .apply(deadlockException)
         .unsafeRunSync() shouldBe DBUpdateResults.ForProjects(
         project.slug,
         Map(statusChangeEvent.currentStatus -> -1, statusChangeEvent.newStatus -> 1)
@@ -267,8 +267,8 @@ class DbUpdaterSpec
 
         val exception = exceptions.generateOne
         intercept[Exception] {
-          sessionResource
-            .useK((dbUpdater onRollback event)(exception))
+          (dbUpdater onRollback event)
+            .apply(exception)
             .unsafeRunSync() shouldBe DBUpdateResults.ForProjects.empty
         } shouldBe exception
       }

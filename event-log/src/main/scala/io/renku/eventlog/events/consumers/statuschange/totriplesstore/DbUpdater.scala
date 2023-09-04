@@ -25,6 +25,7 @@ import cats.syntax.all._
 import eu.timepit.refined.auto._
 import io.renku.db.implicits._
 import io.renku.db.{DbClient, SqlStatement}
+import io.renku.eventlog.EventLogDB.SessionResource
 import io.renku.eventlog.TypeSerializers._
 import io.renku.eventlog.api.events.StatusChangeEvent.ToTriplesStore
 import io.renku.eventlog.events.consumers.statuschange
@@ -49,11 +50,11 @@ private[statuschange] class DbUpdater[F[_]: Async: QueriesExecutionTimes](
 
   import deliveryInfoRemover._
 
-  override def onRollback(event: ToTriplesStore): RollbackOp[F] = {
+  override def onRollback(event: ToTriplesStore)(implicit sr: SessionResource[F]): RollbackOp[F] = {
     case DeadlockDetected(_) =>
-      updateDB(event).map(_.widen)
+      sr.useK(updateDB(event).map(_.widen)).handleErrorWith(onRollback(event))
     case ex =>
-      deleteDelivery(event.eventId).flatMapF(_ => ex.raiseError[F, DBUpdateResults])
+      sr.useK(deleteDelivery(event.eventId)) >> ex.raiseError[F, DBUpdateResults]
   }
 
   override def updateDB(event: ToTriplesStore): UpdateOp[F] = for {

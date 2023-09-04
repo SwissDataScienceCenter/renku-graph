@@ -21,20 +21,21 @@ package io.renku.eventlog.events.consumers.statuschange
 import DBUpdater._
 import cats.ApplicativeThrow
 import cats.data.Kleisli
+import io.renku.eventlog.EventLogDB.SessionResource
 import io.renku.eventlog.api.events.StatusChangeEvent
 import skunk.Session
 
-private[statuschange] trait DBUpdater[F[_], E <: StatusChangeEvent] {
+private trait DBUpdater[F[_], E <: StatusChangeEvent] {
   def updateDB(event:   E): UpdateOp[F]
-  def onRollback(event: E): RollbackOp[F]
+  def onRollback(event: E)(implicit sr: SessionResource[F]): RollbackOp[F]
 }
 
-private[statuschange] object DBUpdater {
+private object DBUpdater {
 
   type UpdateOp[F[_]]   = Kleisli[F, Session[F], DBUpdateResults]
-  type RollbackOp[F[_]] = PartialFunction[Throwable, UpdateOp[F]]
+  type RollbackOp[F[_]] = PartialFunction[Throwable, F[DBUpdateResults]]
 
   object RollbackOp {
-    def empty[F[_]: ApplicativeThrow]: RollbackOp[F] = PartialFunction.empty[Throwable, UpdateOp[F]]
+    def empty[F[_]: ApplicativeThrow]: RollbackOp[F] = PartialFunction.empty[Throwable, F[DBUpdateResults]]
   }
 }

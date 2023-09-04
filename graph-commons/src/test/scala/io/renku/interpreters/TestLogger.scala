@@ -19,27 +19,33 @@
 package io.renku.interpreters
 
 import cats.Show
-import cats.effect.kernel.Sync
+import cats.effect.Async
 import cats.syntax.all._
+import fs2.Stream
 import io.renku.interpreters.TestLogger.LogMessage._
 import org.scalatest.matchers.should
-import org.scalatest.{Assertion, Succeeded}
+import org.scalatest.{Assertion, Failed, Outcome, Succeeded}
 import org.typelevel.log4cats.Logger
 
 import java.util.concurrent.ConcurrentLinkedQueue
+import scala.concurrent.duration._
 import scala.jdk.CollectionConverters._
 
-class TestLogger[F[_]: Sync] extends Logger[F] with should.Matchers {
+class TestLogger[F[_]: Async] extends Logger[F] with should.Matchers {
 
   import TestLogger.Level._
   import TestLogger._
   import LogMessage._
 
-  private[this] val F           = Sync[F]
+  private[this] val F           = Async[F]
   private[this] val invocations = new ConcurrentLinkedQueue[LogEntry]()
 
   def getMessages(severity: Level): List[LogMessage] =
     invocations(of = severity).toList.map(_.message)
+
+  def getMessagesF(severity: Level): F[List[LogMessage]] = F.delay {
+    invocations(of = severity).toList.map(_.message)
+  }
 
   private def invocations(of: Level): Iterable[LogEntry] =
     invocations.asScala.filter(_.level === of)
@@ -53,6 +59,10 @@ class TestLogger[F[_]: Sync] extends Logger[F] with should.Matchers {
   def loggedOnly(expected: LogEntry*): Assertion =
     loggedOnly(expected.toList)
 
+  def loggedOnlyF(expected: LogEntry*): F[Assertion] = F.delay {
+    loggedOnly(expected.toList)
+  }
+
   def loggedOnly(expected: LogEntry, times: Int): Assertion =
     loggedOnly(List.fill(times)(expected))
 
@@ -63,12 +73,38 @@ class TestLogger[F[_]: Sync] extends Logger[F] with should.Matchers {
     if (invocations.isEmpty) Succeeded
     else fail(s"No logs expected but got $invocationsPrettyPrint")
 
+  def expectNoLogsF(): F[Assertion] = F.delay {
+    if (invocations.isEmpty) Succeeded
+    else fail(s"No logs expected but got $invocationsPrettyPrint")
+  }
+
   def expectNoLogs(severity: Level): Assertion = invocations(of = severity).toList match {
     case Nil         => Succeeded
     case invocations => fail(s"No $severity logs expected but got ${prettyPrint(invocations)}")
   }
 
   def reset(): Unit = invocations.clear()
+
+  def waitFor(expected: LogEntry*): F[Assertion] = {
+
+    val interval = 100 millis
+    val attempts = 20
+
+    val logCheck =
+      F.delay(loggedOnly(expected.toList))
+        .as(Succeeded)
+        .widen[Outcome]
+        .handleError(Failed(_))
+
+    val stream = Stream.eval(logCheck) ++
+      Stream
+        .awakeDelay[F](interval)
+        .void
+        .evalMap(_ => logCheck)
+        .take(attempts)
+        .takeThrough(_ != Succeeded)
+    stream.covary[F].compile.lastOrError.map(_ shouldBe Succeeded)
+  }
 
   private def add(entry: LogEntry): F[Unit] = F.delay {
     invocations.add(entry)
@@ -119,7 +155,7 @@ class TestLogger[F[_]: Sync] extends Logger[F] with should.Matchers {
 
 object TestLogger {
 
-  def apply[F[_]: Sync](): TestLogger[F] = new TestLogger[F]
+  def apply[F[_]: Async](): TestLogger[F] = new TestLogger[F]
 
   private[TestLogger] case class LogEntry(level: Level, message: LogMessage) {
     override lazy val toString = show"\n\t$level: $message"

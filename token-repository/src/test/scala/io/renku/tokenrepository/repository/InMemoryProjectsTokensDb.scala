@@ -20,9 +20,9 @@ package io.renku.tokenrepository.repository
 
 import cats.data.Kleisli
 import cats.effect.IO
+import cats.effect.unsafe.IORuntime
 import com.dimafeng.testcontainers._
 import io.renku.db.PostgresContainer
-import io.renku.testtools.IOSpec
 import io.renku.tokenrepository.repository.ProjectsTokensDB.SessionResource
 import natchez.Trace.Implicits.noop
 import org.scalatest.Suite
@@ -31,13 +31,15 @@ import skunk.codec.all._
 import skunk.implicits._
 
 trait InMemoryProjectsTokensDb extends ForAllTestContainer with TokenRepositoryTypeSerializers {
-  self: Suite with IOSpec =>
+  self: Suite =>
+
+  implicit val ioRuntime: IORuntime
 
   private val dbConfig = new ProjectsTokensDbConfigProvider[IO].get().unsafeRunSync()
 
   override val container: PostgreSQLContainer = PostgresContainer.container(dbConfig)
 
-  implicit lazy val sessionResource: SessionResource[IO] = new io.renku.db.SessionResource[IO, ProjectsTokensDB](
+  implicit lazy val sessionResource: SessionResource[IO] = io.renku.db.SessionResource[IO, ProjectsTokensDB](
     Session.single(
       host = container.host,
       database = dbConfig.name.value,

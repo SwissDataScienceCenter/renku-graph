@@ -9,7 +9,7 @@ This microservice deals with all Triples Store administrative and provisioning e
 | POST   | ```/events```         | To send an event for processing      |
 | GET    | ```/metrics```        | Serves Prometheus metrics            |
 | GET    | ```/ping```           | To check if service is healthy       |
-| PUT    | ```/projects/:slug``` | API to update project data in the TS |
+| PATCH  | ```/projects/:slug``` | API to update project data in the TS |
 | GET    | ```/version```        | Returns info about service version   |
 
 #### POST /events
@@ -279,7 +279,7 @@ Verifies service health.
 | OK (200)                   | If service is healthy   |
 | INTERNAL SERVER ERROR (500)| Otherwise               |
 
-#### PUT /knowledge-graph/projects/:slug
+#### PATCH /knowledge-graph/projects/:slug
 
 API to update project data in the Triples Store.
 

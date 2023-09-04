@@ -19,10 +19,12 @@
 package io.renku.triplesgenerator.projects.update
 
 import ProjectUpdater.Result
-import cats.MonadThrow
-import cats.effect.Async
+import cats.effect.{Async, MonadCancelThrow}
 import cats.syntax.all._
 import io.renku.graph.model.projects
+import io.renku.lock.Lock
+import io.renku.lock.syntax._
+import io.renku.triplesgenerator.TgLockDB.TsWriteLock
 import io.renku.triplesgenerator.api.ProjectUpdates
 import io.renku.triplesstore.{ProjectsConnectionConfig, SparqlQueryTimeRecorder, TSClient}
 import org.typelevel.log4cats.Logger
@@ -41,21 +43,29 @@ private object ProjectUpdater {
     final case object NotExists extends Result
   }
 
-  def apply[F[_]: Async: Logger: SparqlQueryTimeRecorder]: F[ProjectUpdater[F]] = for {
+  def apply[F[_]: Async: Logger: SparqlQueryTimeRecorder](tsWriteLock: TsWriteLock[F]): F[ProjectUpdater[F]] = for {
     connectionConfig <- ProjectsConnectionConfig[F]()
     projectExistenceChecker = ProjectExistenceChecker[F](connectionConfig)
     updateQueriesCalculator <- UpdateQueriesCalculator[F]()
-  } yield new ProjectUpdaterImpl[F](projectExistenceChecker, updateQueriesCalculator, TSClient(connectionConfig))
+  } yield new ProjectUpdaterImpl[F](projectExistenceChecker,
+                                    updateQueriesCalculator,
+                                    TSClient(connectionConfig),
+                                    tsWriteLock
+  )
 }
 
-private class ProjectUpdaterImpl[F[_]: MonadThrow](projectExistenceChecker: ProjectExistenceChecker[F],
-                                                   updateQueriesCalculator: UpdateQueriesCalculator[F],
-                                                   tsClient:                TSClient[F]
+private class ProjectUpdaterImpl[F[_]: MonadCancelThrow](projectExistenceChecker: ProjectExistenceChecker[F],
+                                                         updateQueriesCalculator: UpdateQueriesCalculator[F],
+                                                         tsClient:                TSClient[F],
+                                                         tsWriteLock:             TsWriteLock[F]
 ) extends ProjectUpdater[F] {
 
   import updateQueriesCalculator.calculateUpdateQueries
 
   override def updateProject(slug: projects.Slug, updates: ProjectUpdates): F[Result] =
+    (tsWriteLock: Lock[F, projects.Slug]).surround(update(updates)).apply(slug)
+
+  private def update(updates: ProjectUpdates): projects.Slug => F[Result] = { slug =>
     projectExistenceChecker.checkExists(slug) >>= {
       case false =>
         Result.NotExists.widen.pure[F]
@@ -64,4 +74,5 @@ private class ProjectUpdaterImpl[F[_]: MonadThrow](projectExistenceChecker: Proj
           .flatMap(_.traverse_(tsClient.updateWithNoResult))
           .as(Result.Updated.widen)
     }
+  }
 }

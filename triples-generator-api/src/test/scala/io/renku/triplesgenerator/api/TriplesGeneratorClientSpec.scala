@@ -51,7 +51,7 @@ class TriplesGeneratorClientSpec
       val updates = projectUpdatesGen.generateOne
 
       stubFor {
-        put(s"/projects/${urlEncode(slug.value)}")
+        patch(urlEqualTo(s"/projects/${urlEncode(slug.value)}"))
           .withRequestBody(equalToJson(updates.asJson.spaces2))
           .willReturn(ok())
       }
@@ -65,7 +65,7 @@ class TriplesGeneratorClientSpec
       val updates = projectUpdatesGen.generateOne
 
       stubFor {
-        put(s"/projects/${urlEncode(slug.value)}")
+        patch(urlEqualTo(s"/projects/${urlEncode(slug.value)}"))
           .willReturn(aResponse.withStatus(NotFound.code))
       }
 

@@ -38,7 +38,7 @@ import model.Forking.ForksCount
 import model.Permissions.{AccessLevel, GroupAccessLevel, ProjectAccessLevel}
 import model.Project.{ImageLinks, StarsCount}
 import model.Statistics.{CommitsCount, JobArtifactsSize, LsfObjectsSize, RepositorySize, StorageSize}
-import model.Urls.{HttpUrl, ReadmeUrl, SshUrl, WebUrl}
+import model.Urls.{ReadmeUrl, SshUrl, WebUrl}
 import model._
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
@@ -139,7 +139,7 @@ class ProjectJsonEncoderSpec extends AnyWordSpec with should.Matchers with Scala
   private implicit lazy val urlsDecoder: Decoder[Urls] = cursor =>
     for {
       ssh         <- cursor.downField("ssh").as[SshUrl]
-      http        <- cursor.downField("http").as[HttpUrl]
+      http        <- cursor.downField("http").as[GitHttpUrl]
       web         <- cursor.downField("web").as[WebUrl]
       maybeReadme <- cursor.downField("readme").as[Option[ReadmeUrl]]
     } yield Urls(ssh, http, web, maybeReadme)
