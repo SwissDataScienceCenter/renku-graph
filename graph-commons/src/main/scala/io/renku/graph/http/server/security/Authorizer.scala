@@ -40,7 +40,10 @@ object Authorizer {
                                   projectSlug:    projects.Slug,
                                   allowedPersons: Set[persons.GitLabId]
   )
-  trait SecurityRecordFinder[F[_], Key] extends ((Key, Option[AuthUser]) => F[List[SecurityRecord]])
+  trait SecurityRecordFinder[F[_], Key] extends ((Key, Option[AuthUser]) => F[List[SecurityRecord]]) {
+    def asAuthorizer(implicit F: MonadThrow[F]): Authorizer[F, Key] =
+      Authorizer.of(this)
+  }
 
   final case class AuthContext[Key](maybeAuthUser: Option[AuthUser], key: Key, allowedProjects: Set[projects.Slug]) {
     def addAllowedProject(slug: projects.Slug): AuthContext[Key] = copy(allowedProjects = allowedProjects + slug)
@@ -51,6 +54,9 @@ object Authorizer {
     def forUnknownUser[Key](key: Key, allowedProjects: Set[projects.Slug]): AuthContext[Key] =
       AuthContext(None, key, allowedProjects)
   }
+
+  def of[F[_]: MonadThrow, K](securityRecordFinder: SecurityRecordFinder[F, K]): Authorizer[F, K] =
+    new AuthorizerImpl[F, K](securityRecordFinder)
 
   def using[F[_]: Async: Logger, Key](
       securityRecordsFinderFactory: F[SecurityRecordFinder[F, Key]]

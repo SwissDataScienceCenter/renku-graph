@@ -16,31 +16,35 @@
  * limitations under the License.
  */
 
-package io.renku.graph.acceptancetests.flows
+package io.renku.graph.acceptancetests
+package flows
 
 import cats.data.NonEmptyList
 import cats.effect.IO
 import cats.effect.unsafe.IORuntime
+import cats.syntax.all._
 import fs2.Stream
+import io.renku.eventlog.events.producers.membersync.{categoryName => memberSyncCategory}
+import io.renku.eventlog.events.producers.minprojectinfo.{categoryName => minProjectInfoCategory}
 import io.renku.events.CategoryName
 import io.renku.graph.acceptancetests.data
-import io.renku.graph.acceptancetests.db.EventLog
+import io.renku.graph.acceptancetests.db.{EventLog, TriplesStore}
 import io.renku.graph.acceptancetests.testing.AcceptanceTestPatience
-import io.renku.graph.acceptancetests.tooling.EventLogClient.ProjectEvent
-import io.renku.graph.acceptancetests.tooling.{AcceptanceSpec, ApplicationServices, ModelImplicits}
 import io.renku.graph.model.events.{CommitId, EventId, EventStatus, EventStatusProgress}
 import io.renku.graph.model.projects
 import io.renku.http.client.AccessToken
+import io.renku.logging.TestSparqlQueryTimeRecorder
 import io.renku.testtools.IOSpec
+import io.renku.triplesstore.SparqlQueryTimeRecorder
 import io.renku.webhookservice.model.HookToken
 import org.http4s.Status._
 import org.scalatest.concurrent.Eventually
 import org.scalatest.matchers.should
 import org.scalatest.{Assertion, EitherValues}
 import org.typelevel.log4cats.Logger
+import tooling.EventLogClient.ProjectEvent
+import tooling.{AcceptanceSpec, ApplicationServices, ModelImplicits}
 
-import java.lang.Thread.sleep
-import scala.annotation.tailrec
 import scala.concurrent.duration._
 
 trait TSProvisioning
@@ -77,6 +81,8 @@ trait TSProvisioning
     // commitId is the eventId
     val condition = commitIds.map(e => EventId(e.value)).toList.map(_ -> EventStatus.TriplesStore)
     waitForAllEvents(project.id, condition: _*)
+    waitForSyncEvents(project.id, memberSyncCategory)
+    waitForProjectAuthData(project.slug)
   }
 
   private def projectEvents(projectId: projects.GitLabId): Stream[IO, List[ProjectEvent]] = {
@@ -119,24 +125,57 @@ trait TSProvisioning
     lastValue.forall(_ == EventStatusProgress.Stage.Final) shouldBe true
   }
 
+  def getSyncEvents(projectId: projects.GitLabId) = {
+    val getSyncEvents = EventLog.findSyncEventsIO(projectId)
+
+    val waitTimes = Stream.iterate(1d)(_ * 1.5).map(_.seconds).covary[IO].evalMap(IO.sleep)
+    Stream
+      .repeatEval(getSyncEvents)
+      .zip(waitTimes)
+      .map(_._1)
+  }
+
+  def waitForSyncEvents(projectId: projects.GitLabId, category1: CategoryName, categoryN: CategoryName*) = {
+    val expected = categoryN.toSet + category1
+
+    val tries =
+      getSyncEvents(projectId)
+        .evalTap(l => Logger[IO].info(s"Sync events for project $projectId: ${l.mkString(", ")}"))
+        .takeThrough(evs => expected.intersect(evs.toSet) != expected)
+        .take(13)
+
+    val lastValue = tries.compile.lastOrError.unsafeRunSync()
+    expected.intersect(lastValue.toSet) shouldBe expected
+  }
+
+  def getProjectAuthData(slug: projects.Slug) = {
+    implicit val sqtr: SparqlQueryTimeRecorder[IO] = TestSparqlQueryTimeRecorder.createUnsafe
+    val waitTimes = Stream.iterate(1d)(_ * 1.5).map(_.seconds).covary[IO].evalMap(IO.sleep)
+
+    Stream
+      .repeatEval(TriplesStore.findProjectAuth(slug))
+      .zip(waitTimes)
+      .map(_._1)
+  }
+
+  def waitForProjectAuthData(slug: projects.Slug) = {
+    val tries =
+      getProjectAuthData(slug)
+        .evalTap {
+          case None           => Logger[IO].info(show"auth data not ready for $slug")
+          case Some(authData) => Logger[IO].info(show"auth data ready $authData")
+        }
+        .takeThrough(_.isEmpty)
+        .take(15)
+
+    val lastValue = tries.compile.lastOrError.unsafeRunSync()
+    lastValue.isDefined shouldBe true
+  }
+
   def `check hook cannot be found`(projectId: projects.GitLabId, accessToken: AccessToken): Assertion = eventually {
     webhookServiceClient.`GET projects/:id/events/status`(projectId, accessToken).status shouldBe NotFound
   }
 
-  def `wait for the Fast Tract event`(projectId: projects.GitLabId)(implicit ioRuntime: IORuntime): Unit = eventually {
-
-    val sleepTime = 1 second
-
-    @tailrec
-    def checkIfWasSent(categoryName: CategoryName, attempt: Int = 1): Unit = {
-      if (attempt > 20) fail(s"'$categoryName' event wasn't sent after ${(sleepTime * attempt).toSeconds}")
-
-      if (!EventLog.findSyncEvents(projectId).contains(categoryName)) {
-        sleep(sleepTime.toMillis)
-        checkIfWasSent(categoryName)
-      }
-    }
-
-    checkIfWasSent(CategoryName("ADD_MIN_PROJECT_INFO"))
-  }
+  def `wait for the Fast Tract event`(projectId: projects.GitLabId) =
+    waitForSyncEvents(projectId, minProjectInfoCategory)
 }

@@ -22,20 +22,23 @@ import cats.effect.Async
 import cats.syntax.all._
 import cats.{MonadThrow, Parallel}
 import io.renku.graph.http.server.security.Authorizer.SecurityRecordFinder
-import io.renku.graph.model.projects
+import io.renku.graph.model.{RenkuUrl, projects}
 import io.renku.http.client.GitLabClient
 import io.renku.http.server.security.model.AuthUser
-import io.renku.triplesstore.SparqlQueryTimeRecorder
+import io.renku.triplesstore.{ProjectSparqlClient, SparqlQueryTimeRecorder}
 import org.typelevel.log4cats.Logger
 
 object ProjectSlugRecordsFinder {
-  def apply[F[_]: Async: Parallel: Logger: SparqlQueryTimeRecorder: GitLabClient]
-      : F[SecurityRecordFinder[F, projects.Slug]] =
-    (TSSlugRecordsFinder[F] -> GLSlugRecordsFinder[F])
+
+  def apply[F[_]: Async: Parallel: Logger: SparqlQueryTimeRecorder: GitLabClient](
+      projectSparqlClient: ProjectSparqlClient[F],
+      renkuUrl:            RenkuUrl
+  ): F[SecurityRecordFinder[F, projects.Slug]] =
+    (ProjectAuthRecordsFinder[F](projectSparqlClient, renkuUrl).pure[F] -> GLSlugRecordsFinder[F])
       .mapN(new ProjectSlugRecordsFinderImpl[F](_, _))
 }
 
-private class ProjectSlugRecordsFinderImpl[F[_]: MonadThrow](tsSlugRecordsFinder: TSSlugRecordsFinder[F],
+private class ProjectSlugRecordsFinderImpl[F[_]: MonadThrow](tsSlugRecordsFinder: ProjectAuthRecordsFinder[F],
                                                              glSlugRecordsFinder: GLSlugRecordsFinder[F]
 ) extends SecurityRecordFinder[F, projects.Slug] {
 

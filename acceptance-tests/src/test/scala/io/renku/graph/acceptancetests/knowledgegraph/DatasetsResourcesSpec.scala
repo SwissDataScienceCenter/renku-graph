@@ -23,17 +23,17 @@ import eu.timepit.refined.auto._
 import io.circe.Json
 import io.circe.literal._
 import io.renku.generators.CommonGraphGenerators.authUsers
-import io.renku.generators.Generators._
 import io.renku.generators.Generators.Implicits._
+import io.renku.generators.Generators._
 import io.renku.graph.acceptancetests.data
 import io.renku.graph.acceptancetests.data._
 import io.renku.graph.acceptancetests.flows.TSProvisioning
-import io.renku.graph.acceptancetests.tooling.{AcceptanceSpec, ApplicationServices}
 import io.renku.graph.acceptancetests.tooling.TestReadabilityTools._
-import io.renku.graph.model._
+import io.renku.graph.acceptancetests.tooling.{AcceptanceSpec, ApplicationServices}
 import io.renku.graph.model.EventsGenerators.commitIds
-import io.renku.graph.model.testentities.{::~, creatorUsernameUpdaterInternal}
+import io.renku.graph.model._
 import io.renku.graph.model.testentities.generators.EntitiesGenerators._
+import io.renku.graph.model.testentities.{::~, creatorUsernameUpdaterInternal}
 import io.renku.http.client.UrlEncoder.urlEncode
 import io.renku.http.rest.Links.Rel
 import io.renku.http.server.EndpointTester._
@@ -57,23 +57,22 @@ class DatasetsResourcesSpec
 
   Feature("GET knowledge-graph/projects/<namespace>/<name>/datasets to find project's datasets") {
 
-    val (dataset1 -> dataset2 -> dataset2Modified, testProject) =
-      renkuProjectEntities(visibilityPublic, creatorGen = cliShapedPersons)
-        .modify(removeMembers())
-        .addDataset(datasetEntities(provenanceInternal(cliShapedPersons)))
-        .addDatasetAndModification(
-          datasetEntities(provenanceInternal(cliShapedPersons)),
-          creatorGen = cliShapedPersons
-        )
-        .generateOne
-    val creatorPerson = cliShapedPersons.generateOne
-    val project =
-      dataProjects(testProject)
-        .map(replaceCreatorFrom(creatorPerson, creator.id))
-        .map(addMemberFrom(creatorPerson, creator.id) >>> addMemberWithId(user.id))
-        .generateOne
-
     Scenario("As a user I would like to find project's datasets by calling a REST endpoint") {
+      val (dataset1 -> dataset2 -> dataset2Modified, testProject) =
+        renkuProjectEntities(visibilityPublic, creatorGen = cliShapedPersons)
+          .modify(removeMembers())
+          .addDataset(datasetEntities(provenanceInternal(cliShapedPersons)))
+          .addDatasetAndModification(
+            datasetEntities(provenanceInternal(cliShapedPersons)),
+            creatorGen = cliShapedPersons
+          )
+          .generateOne
+      val creatorPerson = cliShapedPersons.generateOne
+      val project =
+        dataProjects(testProject)
+          .map(replaceCreatorFrom(creatorPerson, creator.id))
+          .map(addMemberFrom(creatorPerson, creator.id) >>> addMemberWithId(user.id))
+          .generateOne
 
       Given("some data in the Triples Store")
       gitLabStub.addAuthenticated(creator)
