@@ -18,10 +18,10 @@
 
 package io.renku.webhookservice.hookvalidation
 
+import cats.MonadThrow
 import cats.data.OptionT
 import cats.effect.Async
 import cats.syntax.all._
-import cats.{Applicative, MonadThrow}
 import com.typesafe.config.ConfigFactory
 import eu.timepit.refined.auto._
 import io.renku.cache.{Cache, CacheBuilder, CacheConfigLoader}
@@ -51,7 +51,6 @@ object HookValidator {
       tokenRepositoryUrl    <- TokenRepositoryUrl[F]()
       projectHookVerifier   <- ProjectHookVerifier[F]
       accessTokenAssociator <- AccessTokenAssociator[F]
-      accessTokenRemover    <- AccessTokenRemover[F]
       cacheConfig           <- CacheConfigLoader.load[F]("services.self.hook-validation-cache", ConfigFactory.load())
       validationCache <- CacheBuilder
                            .default[F, GitLabId, HookValidationResult]
@@ -63,7 +62,6 @@ object HookValidator {
       projectHookVerifier,
       new AccessTokenFinderImpl(tokenRepositoryUrl),
       accessTokenAssociator,
-      accessTokenRemover,
       validationCache
     )
 }
@@ -73,25 +71,20 @@ private class HookValidatorImpl[F[_]: MonadThrow: Logger](
     projectHookVerifier:   ProjectHookVerifier[F],
     accessTokenFinder:     AccessTokenFinder[F],
     accessTokenAssociator: AccessTokenAssociator[F],
-    accessTokenRemover:    AccessTokenRemover[F],
     validationCache:       Cache[F, GitLabId, HookValidationResult]
 ) extends HookValidator[F] {
-
-  private val applicative = Applicative[F]
 
   import HookValidator.HookValidationResult._
   import HookValidator._
   import accessTokenAssociator._
   import accessTokenFinder._
-  import accessTokenRemover._
-  import applicative._
   import projectHookVerifier._
 
   def validateHook(projectId: GitLabId, maybeAccessToken: Option[AccessToken]): F[Option[HookValidationResult]] =
     validationCache.withCache(pId => validateHook0(pId, maybeAccessToken))(projectId)
 
-  def validateHook0(projectId: GitLabId, maybeAccessToken: Option[AccessToken]): F[Option[HookValidationResult]] = {
-    persistGivenToken(projectId, maybeAccessToken) >> validateHookExistence(projectId, maybeAccessToken)
+  private def validateHook0(projectId: GitLabId, mat: Option[AccessToken]): F[Option[HookValidationResult]] = {
+    persistGivenToken(projectId, mat) >> validateHookExistence(projectId)
   }.onError(logError(projectId))
 
   private def persistGivenToken(projectId: GitLabId, maybeAccessToken: Option[AccessToken]): F[Unit] =
@@ -99,15 +92,12 @@ private class HookValidatorImpl[F[_]: MonadThrow: Logger](
       .map(associate(projectId, _))
       .getOrElse(().pure[F])
 
-  private def validateHookExistence(projectId:        GitLabId,
-                                    maybeAccessToken: Option[AccessToken]
-  ): F[Option[HookValidationResult]] =
+  private def validateHookExistence(projectId: GitLabId): F[Option[HookValidationResult]] =
     fetchToken(projectId)
-      .flatMapF(at => checkHookPresence(HookIdentifier(projectId, projectHookUrl), at))
+      .flatMapF(checkHookPresence(HookIdentifier(projectId, projectHookUrl), _))
       .cataF(
         default = Option.empty[HookValidationResult].pure[F],
-        hookPresent =>
-          whenA(!hookPresent)(removeAccessToken(projectId, maybeAccessToken)).as(toValidationResult(hookPresent).some)
+        toValidationResult(_).some.pure[F]
       )
 
   private def fetchToken(projectId: GitLabId): OptionT[F, AccessToken] = OptionT {
@@ -115,11 +105,11 @@ private class HookValidatorImpl[F[_]: MonadThrow: Logger](
       .adaptError(storedAccessTokenError(projectId))
   }
 
-  private def storedAccessTokenError(projectId: GitLabId): PartialFunction[Throwable, Throwable] = exception =>
-    new Exception(s"Finding stored access token for $projectId failed", exception)
+  private def storedAccessTokenError(projectId: GitLabId): PartialFunction[Throwable, Throwable] =
+    new Exception(s"Finding stored access token for $projectId failed", _)
 
-  private def toValidationResult(projectHookPresent: Boolean): HookValidationResult =
-    if (projectHookPresent) HookExists else HookMissing
+  private def toValidationResult(hookPresent: Boolean): HookValidationResult =
+    if (hookPresent) HookExists else HookMissing
 
   private def logError(projectId: GitLabId): PartialFunction[Throwable, F[Unit]] = { case exception =>
     Logger[F].error(exception)(s"Hook validation failed for projectId $projectId")

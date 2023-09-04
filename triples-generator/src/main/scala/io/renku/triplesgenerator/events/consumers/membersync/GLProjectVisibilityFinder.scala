@@ -45,12 +45,12 @@ private class GLProjectVisibilityFinderImpl[F[_]: Async: GitLabClient] extends G
     GitLabClient[F].get(uri"projects" / slug, "single-project")(mapResponse)(mat)
 
   private lazy val mapResponse: PartialFunction[(Status, Request[F], Response[F]), F[Option[projects.Visibility]]] = {
-    case (Ok, _, response)                           => response.as[projects.Visibility].map(Option.apply)
+    case (Ok, _, response)                           => response.as[Option[projects.Visibility]]
     case (Unauthorized | Forbidden | NotFound, _, _) => Option.empty[projects.Visibility].pure[F]
   }
 
-  private implicit lazy val entityDecoder: EntityDecoder[F, projects.Visibility] = {
-    lazy val decoder: Decoder[projects.Visibility] = _.downField("visibility").as[projects.Visibility]
-    jsonOf[F, projects.Visibility](Sync[F], decoder)
+  private implicit lazy val entityDecoder: EntityDecoder[F, Option[projects.Visibility]] = {
+    lazy val decoder: Decoder[Option[projects.Visibility]] = _.downField("visibility").as[Option[projects.Visibility]]
+    jsonOf[F, Option[projects.Visibility]](Sync[F], decoder)
   }
 }
