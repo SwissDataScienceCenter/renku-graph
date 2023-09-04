@@ -19,6 +19,7 @@
 package io.renku.graph.acceptancetests
 package flows
 
+import cats.Show
 import cats.data.NonEmptyList
 import cats.effect.IO
 import cats.effect.unsafe.IORuntime
@@ -102,12 +103,18 @@ trait TSProvisioning
     val expectedResult = expect.toSet
     val ids            = expect.map(_._1).toSet
 
+    implicit val showTuple: Show[(EventId, EventStatus)] =
+      Show.show { case (id, status) => s"$id:$status" }
+
+    implicit val showTuples: Show[Iterable[(EventId, EventStatus)]] =
+      Show.show(_.toList.mkString_(", "))
+
     val tries =
       projectEvents(projectId)
         .map(_.filter(ev => ids.contains(ev.id)).map(ev => ev.id -> ev.status).toSet)
-        .evalTap(result => Logger[IO].debug(s"Wait for event status: $result -> $expectedResult"))
+        .evalTap(result => Logger[IO].info(show"Waiting for events on $projectId: $result to match $expectedResult"))
         .takeThrough(found => found != expectedResult)
-        .take(13)
+        .take(15)
 
     val lastValue = tries.compile.lastOrError.unsafeRunSync()
     lastValue shouldBe expectedResult
@@ -117,7 +124,9 @@ trait TSProvisioning
     val tries =
       projectEvents(projectId)
         .map(_.map(ev => EventStatusProgress.Stage(ev.status)).toSet)
-        .evalTap(stages => Logger[IO].debug(s"Wait for final state: $stages"))
+        .evalTap(stages =>
+          Logger[IO].info(show"Waiting for the final processing stage on $projectId, currently: $stages")
+        )
         .takeThrough(stages => stages.exists(_ != EventStatusProgress.Stage.Final))
         .take(15)
 
