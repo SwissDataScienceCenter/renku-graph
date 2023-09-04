@@ -18,6 +18,7 @@
 
 package io.renku.projectauth
 
+import cats.Show
 import io.renku.graph.model.persons.GitLabId
 import io.renku.graph.model.projects.Role
 
@@ -31,6 +32,7 @@ final case class ProjectMember(
 }
 
 object ProjectMember {
+
   private[projectauth] def fromEncoded(str: String): Either[String, ProjectMember] =
     str.split(':').toList match {
       case idStr :: roleStr :: Nil =>
@@ -45,4 +47,6 @@ object ProjectMember {
 
   def fromGitLabData(gitLabId: GitLabId, accessLevel: Int): ProjectMember =
     ProjectMember(gitLabId, Role.fromGitLabAccessLevel(accessLevel))
+
+  implicit val show: Show[ProjectMember] = Show.show(_.encoded)
 }

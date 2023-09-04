@@ -16,11 +16,13 @@
  * limitations under the License.
  */
 
-package io.renku.graph.acceptancetests.flows
+package io.renku.graph.acceptancetests
+package flows
 
 import cats.data.NonEmptyList
 import cats.effect.IO
 import cats.effect.unsafe.IORuntime
+import cats.syntax.all._
 import fs2.Stream
 import io.renku.eventlog.events.producers.membersync.{categoryName => memberSyncCategory}
 import io.renku.eventlog.events.producers.minprojectinfo.{categoryName => minProjectInfoCategory}
@@ -28,8 +30,6 @@ import io.renku.events.CategoryName
 import io.renku.graph.acceptancetests.data
 import io.renku.graph.acceptancetests.db.{EventLog, TriplesStore}
 import io.renku.graph.acceptancetests.testing.AcceptanceTestPatience
-import io.renku.graph.acceptancetests.tooling.EventLogClient.ProjectEvent
-import io.renku.graph.acceptancetests.tooling.{AcceptanceSpec, ApplicationServices, ModelImplicits}
 import io.renku.graph.model.events.{CommitId, EventId, EventStatus, EventStatusProgress}
 import io.renku.graph.model.projects
 import io.renku.http.client.AccessToken
@@ -42,6 +42,8 @@ import org.scalatest.concurrent.Eventually
 import org.scalatest.matchers.should
 import org.scalatest.{Assertion, EitherValues}
 import org.typelevel.log4cats.Logger
+import tooling.EventLogClient.ProjectEvent
+import tooling.{AcceptanceSpec, ApplicationServices, ModelImplicits}
 
 import scala.concurrent.duration._
 
@@ -138,7 +140,7 @@ trait TSProvisioning
 
     val tries =
       getSyncEvents(projectId)
-        .evalTap(l => IO.println(s"Sync events for project $projectId: $l"))
+        .evalTap(l => Logger[IO].info(s"Sync events for project $projectId: ${l.mkString(", ")}"))
         .takeThrough(evs => expected.intersect(evs.toSet) != expected)
         .take(13)
 
@@ -159,7 +161,10 @@ trait TSProvisioning
   def waitForProjectAuthData(slug: projects.Slug) = {
     val tries =
       getProjectAuthData(slug)
-        .evalTap(r => IO.println(s"project auth data for $slug: $r"))
+        .evalTap {
+          case None           => Logger[IO].info(show"auth data not ready for $slug")
+          case Some(authData) => Logger[IO].info(show"auth data ready $authData")
+        }
         .takeThrough(_.isEmpty)
         .take(15)
 
@@ -173,5 +178,4 @@ trait TSProvisioning
 
   def `wait for the Fast Tract event`(projectId: projects.GitLabId) =
     waitForSyncEvents(projectId, minProjectInfoCategory)
-
 }

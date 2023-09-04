@@ -23,17 +23,17 @@ import eu.timepit.refined.auto._
 import io.circe.Json
 import io.circe.literal._
 import io.renku.generators.CommonGraphGenerators.authUsers
-import io.renku.generators.Generators._
 import io.renku.generators.Generators.Implicits._
+import io.renku.generators.Generators._
 import io.renku.graph.acceptancetests.data
 import io.renku.graph.acceptancetests.data._
 import io.renku.graph.acceptancetests.flows.TSProvisioning
-import io.renku.graph.acceptancetests.tooling.{AcceptanceSpec, ApplicationServices}
 import io.renku.graph.acceptancetests.tooling.TestReadabilityTools._
-import io.renku.graph.model._
+import io.renku.graph.acceptancetests.tooling.{AcceptanceSpec, ApplicationServices}
 import io.renku.graph.model.EventsGenerators.commitIds
-import io.renku.graph.model.testentities.{::~, creatorUsernameUpdaterInternal}
+import io.renku.graph.model._
 import io.renku.graph.model.testentities.generators.EntitiesGenerators._
+import io.renku.graph.model.testentities.{::~, creatorUsernameUpdaterInternal}
 import io.renku.http.client.UrlEncoder.urlEncode
 import io.renku.http.rest.Links.Rel
 import io.renku.http.server.EndpointTester._
@@ -54,8 +54,6 @@ class DatasetsResourcesSpec
 
   private val creator = authUsers.generateOne
   private val user    = authUsers.generateOne
-
-  import scala.concurrent.duration._
 
   Feature("GET knowledge-graph/projects/<namespace>/<name>/datasets to find project's datasets") {
 
@@ -83,7 +81,6 @@ class DatasetsResourcesSpec
       gitLabStub.setupProject(project, commitId)
       mockCommitDataOnTripleGenerator(project, toPayloadJsonLD(project), commitId)
       `data in the Triples Store`(project, commitId, creator.accessToken)
-      cats.effect.IO.sleep(15.seconds).unsafeRunSync()
 
       When("user fetches project's datasets with GET knowledge-graph/projects/<project-name>/datasets")
       val projectDatasetsResponse = knowledgeGraphClient GET s"knowledge-graph/projects/${project.slug}/datasets"
