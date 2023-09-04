@@ -25,25 +25,24 @@ import io.renku.graph.model.projects.GitLabId
 import io.renku.tokenrepository.repository.ProjectsTokensDB.SessionResource
 import io.renku.tokenrepository.repository.TokenRepositoryTypeSerializers
 import io.renku.tokenrepository.repository.metrics.QueriesExecutionTimes
-import org.typelevel.log4cats.Logger
 import skunk.data.Completion
 import skunk.implicits._
 
 private[repository] trait PersistedTokenRemover[F[_]] {
-  def delete(projectId: GitLabId): F[Unit]
+  def delete(projectId: GitLabId): F[DeletionResult]
 }
 
 private[repository] object PersistedTokenRemover {
-  def apply[F[_]: MonadCancelThrow: SessionResource: Logger: QueriesExecutionTimes]: PersistedTokenRemover[F] =
+  def apply[F[_]: MonadCancelThrow: SessionResource: QueriesExecutionTimes]: PersistedTokenRemover[F] =
     new PersistedTokenRemoverImpl[F]
 }
 
-private class PersistedTokenRemoverImpl[F[_]: MonadCancelThrow: SessionResource: Logger: QueriesExecutionTimes]
+private class PersistedTokenRemoverImpl[F[_]: MonadCancelThrow: SessionResource: QueriesExecutionTimes]
     extends DbClient[F](Some(QueriesExecutionTimes[F]))
     with PersistedTokenRemover[F]
     with TokenRepositoryTypeSerializers {
 
-  override def delete(projectId: GitLabId): F[Unit] =
+  override def delete(projectId: GitLabId): F[DeletionResult] =
     SessionResource[F].useK {
       query(projectId)
     }
@@ -58,14 +57,14 @@ private class PersistedTokenRemoverImpl[F[_]: MonadCancelThrow: SessionResource:
       .flatMapResult(failIfMultiUpdate(projectId))
   }
 
-  private def failIfMultiUpdate(projectId: GitLabId): Completion => F[Unit] = {
-    case Completion.Delete(0) => ().pure[F]
-    case Completion.Delete(1) => Logger[F].info(show"token removed for $projectId")
+  private def failIfMultiUpdate(projectId: GitLabId): Completion => F[DeletionResult] = {
+    case Completion.Delete(0) => DeletionResult.NotExisted.pure[F].widen
+    case Completion.Delete(1) => DeletionResult.Deleted.pure[F].widen
     case Completion.Delete(n) =>
       new RuntimeException(s"Deleting token for a projectId: $projectId removed $n records")
-        .raiseError[F, Unit]
+        .raiseError[F, DeletionResult]
     case completion =>
       new RuntimeException(s"Deleting token for a projectId: $projectId failed with completion code $completion")
-        .raiseError[F, Unit]
+        .raiseError[F, DeletionResult]
   }
 }

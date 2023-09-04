@@ -28,7 +28,7 @@ import io.renku.tokenrepository.repository.metrics.QueriesExecutionTimes
 import org.typelevel.log4cats.Logger
 
 private[repository] trait TokenRemover[F[_]] {
-  def delete(projectId: GitLabId, maybeAccessToken: Option[AccessToken]): F[Unit]
+  def delete(projectId: GitLabId, maybeAccessToken: Option[AccessToken]): F[DeletionResult]
 }
 
 private[repository] object TokenRemover {
@@ -36,14 +36,14 @@ private[repository] object TokenRemover {
     TokensRevoker[F].map(new TokenRemoverImpl[F](PersistedTokenRemover[F], _))
 }
 
-private class TokenRemoverImpl[F[_]: MonadThrow: Logger](dbTokenRemover: PersistedTokenRemover[F],
-                                                         tokensRevoker: TokensRevoker[F]
+private class TokenRemoverImpl[F[_]: MonadThrow](dbTokenRemover: PersistedTokenRemover[F],
+                                                 tokensRevoker: TokensRevoker[F]
 ) extends TokenRemover[F] {
 
   import tokensRevoker._
 
-  override def delete(projectId: GitLabId, maybeAccessToken: Option[AccessToken]): F[Unit] =
-    dbTokenRemover.delete(projectId) >> revokeTokens(projectId, maybeAccessToken)
+  override def delete(projectId: GitLabId, maybeAccessToken: Option[AccessToken]): F[DeletionResult] =
+    dbTokenRemover.delete(projectId).flatTap(_ => revokeTokens(projectId, maybeAccessToken))
 
   private def revokeTokens(projectId: GitLabId, maybeAccessToken: Option[AccessToken]) =
     maybeAccessToken match {

@@ -103,7 +103,7 @@ object PostgresDB {
       )
 
   def sessionPoolResource[A](dbCfg: DBConfig[_]): Resource[IO, SessionResource[IO, A]] =
-    sessionPool(dbCfg).map(new SessionResource[IO, A](_))
+    sessionPool(dbCfg).map(SessionResource[IO, A](_))
 
   def initializeDatabase(cfg: DBConfig[_]): IO[Unit] = {
     val session = Session.single[IO](

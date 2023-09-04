@@ -8,11 +8,11 @@ object Dependencies {
     val catsCore               = "2.10.0"
     val catsEffect             = "3.5.1"
     val catsEffectScalaTest    = "1.5.0"
-    val circeCore              = "0.14.5"
+    val circeCore              = "0.14.6"
     val circeGenericExtras     = "0.14.3"
     val circeOptics            = "0.14.1"
     val diffx                  = "0.8.3"
-    val fs2                    = "3.8.0"
+    val fs2                    = "3.9.1"
     val http4s                 = "0.23.23"
     val http4sEmber            = "0.23.23"
     val http4sPrometheus       = "0.24.4"
@@ -25,7 +25,7 @@ object Dependencies {
     val monocle                = "2.1.0"
     val owlapi                 = "5.5.0"
     val pureconfig             = "0.17.4"
-    val rdf4jQueryParserSparql = "4.3.5"
+    val rdf4jQueryParserSparql = "4.3.6"
     val refined                = "0.11.0"
     val refinedPureconfig      = "0.11.0"
     val scalacheck             = "1.17.0"
@@ -35,9 +35,9 @@ object Dependencies {
     val sentryLogback          = "6.28.0"
     val skunk                  = "0.6.0"
     val swaggerParser          = "2.1.16"
-    val testContainersScala    = "0.40.17"
-    val widoco                 = "1.4.19"
-    val wiremock               = "2.35.0"
+    val testContainersScala    = "0.41.0"
+    val widoco                 = "1.4.20"
+    val wiremock               = "3.0.1"
   }
 
   val ip4s = Seq(
@@ -142,7 +142,7 @@ object Dependencies {
       )
 
   val wiremock = Seq(
-    "com.github.tomakehurst" % "wiremock-jre8" % V.wiremock
+    "org.wiremock" % "wiremock" % V.wiremock
   )
 
   val scalamock = Seq(
@@ -196,5 +196,4 @@ object Dependencies {
   val scalacheck = Seq(
     "org.scalacheck" %% "scalacheck" % V.scalacheck
   )
-
 }

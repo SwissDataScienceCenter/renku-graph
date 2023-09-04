@@ -26,6 +26,7 @@ import io.renku.events.consumers.EventConsumersRegistry
 import io.renku.graph.http.server.binders.ProjectSlug
 import io.renku.http.server.version
 import io.renku.metrics.{MetricsRegistry, RoutesMetrics}
+import io.renku.triplesgenerator.TgLockDB.TsWriteLock
 import io.renku.triplesgenerator.events.EventEndpoint
 import io.renku.triplesstore.SparqlQueryTimeRecorder
 import org.http4s.dsl.Http4sDsl
@@ -43,15 +44,15 @@ private class MicroserviceRoutes[F[_]: MonadThrow](
 
   import eventEndpoint._
   import org.http4s.HttpRoutes
-  import projectUpdateEndpoint.`PUT /projects/:slug`
+  import projectUpdateEndpoint.`PATCH /projects/:slug`
   import routesMetrics._
 
   // format: off
   lazy val routes: Resource[F, HttpRoutes[F]] = HttpRoutes.of[F] {
-    case req @ POST -> Root / "events"                       => processEvent(req)
-    case GET        -> Root / "ping"                         => Ok("pong")
-    case req @ PUT  -> Root / "projects" / ProjectSlug(slug) => `PUT /projects/:slug`(slug, req)
-    case GET        -> Root / "config-info"                  => Ok(configInfo)
+    case req @ POST  -> Root / "events"                       => processEvent(req)
+    case GET         -> Root / "ping"                         => Ok("pong")
+    case req @ PATCH -> Root / "projects" / ProjectSlug(slug) => `PATCH /projects/:slug`(slug, req)
+    case GET         -> Root / "config-info"                  => Ok(configInfo)
   }.withMetrics.map(_ <+> versionRoutes())
   // format: on
 
@@ -64,10 +65,11 @@ private class MicroserviceRoutes[F[_]: MonadThrow](
 
 private object MicroserviceRoutes {
   def apply[F[_]: Async: Logger: MetricsRegistry: SparqlQueryTimeRecorder](consumersRegistry: EventConsumersRegistry[F],
+                                                                           tsWriteLock:       TsWriteLock[F],
                                                                            config:            Config
   ): F[MicroserviceRoutes[F]] = for {
     eventEndpoint         <- EventEndpoint(consumersRegistry)
-    projectUpdateEndpoint <- projects.update.Endpoint[F]
+    projectUpdateEndpoint <- projects.update.Endpoint[F](tsWriteLock)
     versionRoutes         <- version.Routes[F]
   } yield new MicroserviceRoutes(eventEndpoint, projectUpdateEndpoint, new RoutesMetrics[F], versionRoutes, config)
 }

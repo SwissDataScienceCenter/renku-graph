@@ -21,45 +21,33 @@ package io.renku.tokenrepository.repository.creation
 import cats.effect.IO
 import io.renku.generators.Generators.Implicits._
 import io.renku.graph.model.GraphModelGenerators._
-import io.renku.metrics.TestMetricsRegistry
 import io.renku.testtools.IOSpec
 import io.renku.tokenrepository.repository.InMemoryProjectsTokensDbSpec
 import io.renku.tokenrepository.repository.RepositoryGenerators.encryptedAccessTokens
-import io.renku.tokenrepository.repository.metrics.QueriesExecutionTimes
 import org.scalamock.scalatest.MockFactory
+import org.scalatest.flatspec.AnyFlatSpec
 import org.scalatest.matchers.should
-import org.scalatest.wordspec.AnyWordSpec
 
 class PersistedSlugFinderSpec
-    extends AnyWordSpec
+    extends AnyFlatSpec
     with IOSpec
     with InMemoryProjectsTokensDbSpec
     with should.Matchers
     with MockFactory {
 
-  "findPersistedProjectSlug" should {
+  it should "return Slug for the given project Id" in {
 
-    "return Slug for the given project Id" in new TestCase {
+    val projectId   = projectIds.generateOne
+    val projectSlug = projectSlugs.generateOne
 
-      val projectSlug = projectSlugs.generateOne
+    insert(projectId, projectSlug, encryptedAccessTokens.generateOne)
 
-      insert(projectId, projectSlug, encryptedAccessTokens.generateOne)
-
-      (finder findPersistedProjectSlug projectId).unsafeRunSync() shouldBe projectSlug
-    }
-
-    "fail if there's no Slug for the given Id" in new TestCase {
-      intercept[Exception] {
-        (finder findPersistedProjectSlug projectId).unsafeRunSync()
-      }
-    }
+    (finder findPersistedProjectSlug projectId).unsafeRunSync() shouldBe Some(projectSlug)
   }
 
-  private trait TestCase {
-    val projectId = projectIds.generateOne
-
-    private implicit val metricsRegistry:  TestMetricsRegistry[IO]   = TestMetricsRegistry[IO]
-    private implicit val queriesExecTimes: QueriesExecutionTimes[IO] = QueriesExecutionTimes[IO]().unsafeRunSync()
-    val finder = new PersistedSlugFinderImpl[IO]
+  it should "return None if there's no Slug with the given Id" in {
+    (finder findPersistedProjectSlug projectIds.generateOne).unsafeRunSync() shouldBe None
   }
+
+  private lazy val finder = new PersistedSlugFinderImpl[IO]
 }

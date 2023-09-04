@@ -59,7 +59,7 @@ class ProjectSlugRecordsFinderSpec extends AnyWordSpec with should.Matchers with
     val projectSlug   = projectSlugs.generateOne
     val maybeAuthUser = authUsers.generateOption
 
-    private val tsSlugRecordsFinder = mock[TSSlugRecordsFinder[Try]]
+    private val tsSlugRecordsFinder = mock[ProjectAuthRecordsFinder[Try]]
     private val glSlugRecordsFinder = mock[GLSlugRecordsFinder[Try]]
     val recordsFinder               = new ProjectSlugRecordsFinderImpl[Try](tsSlugRecordsFinder, glSlugRecordsFinder)
 

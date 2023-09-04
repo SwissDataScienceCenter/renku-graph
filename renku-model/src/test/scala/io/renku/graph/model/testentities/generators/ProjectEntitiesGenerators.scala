@@ -64,9 +64,9 @@ trait ProjectEntitiesGenerators {
   def creatorLens[P <: Project]: Lens[P, Option[Person]] =
     Lens[P, Option[Person]](_.maybeCreator) { maybeCreator =>
       _.fold(_.copy(maybeCreator = maybeCreator),
-             _.copy(maybeCreator = maybeCreator),
-             _.copy(maybeCreator = maybeCreator),
-             _.copy(maybeCreator = maybeCreator)
+        _.copy(maybeCreator = maybeCreator),
+        _.copy(maybeCreator = maybeCreator),
+        _.copy(maybeCreator = maybeCreator)
       ).asInstanceOf[P]
     }
 

@@ -18,6 +18,7 @@
 
 package io.renku.graph.model
 
+import RenkuTinyTypeGenerators.projectSlugs
 import cats.syntax.all._
 import io.circe.{DecodingFailure, Json}
 import io.renku.generators.Generators.Implicits._
@@ -28,6 +29,7 @@ import io.renku.tinytypes.constraints.{RelativePath, Url}
 import org.apache.jena.util.URIref
 import org.scalacheck.Gen
 import org.scalacheck.Gen.{alphaChar, const, frequency, numChar}
+import org.scalatest.EitherValues
 import org.scalatest.matchers.should
 import org.scalatest.prop.TableDrivenPropertyChecks
 import org.scalatest.wordspec.AnyWordSpec
@@ -227,4 +229,27 @@ class ProjectResourceIdSpec
   }
 
   private lazy val pathGenerator = projectSlugs.map(slug => s"projects/$slug")
+}
+
+class GitHttpUrlSpec extends AnyWordSpec with should.Matchers with EitherValues with ScalaCheckPropertyChecks {
+
+  "HttpUrl" should {
+
+    "instantiate for valid absolute git urls" in {
+      forAll(httpUrls(), projectSlugs) { (httpUrl, projectSlug) =>
+        val url = s"$httpUrl/$projectSlug.git"
+        GitHttpUrl.from(url).map(_.value) shouldBe Right(url)
+      }
+    }
+
+    "fail instantiation for non-absolute urls" in {
+
+      val url = s"${relativePaths().generateOne}/${projectSlugs.generateOne}.git"
+
+      val exception = GitHttpUrl.from(url).left.value
+
+      exception            shouldBe an[IllegalArgumentException]
+      exception.getMessage shouldBe s"$url is not a valid repository http url"
+    }
+  }
 }

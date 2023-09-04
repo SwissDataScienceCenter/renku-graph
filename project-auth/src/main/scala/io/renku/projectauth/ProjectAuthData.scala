@@ -18,6 +18,8 @@
 
 package io.renku.projectauth
 
+import cats.Show
+import cats.syntax.all._
 import io.renku.graph.model.projects.{ResourceId, Slug, Visibility}
 import io.renku.graph.model.{RenkuUrl, Schemas}
 import io.renku.jsonld.JsonLD.JsonLDArray
@@ -31,6 +33,7 @@ final case class ProjectAuthData(
 )
 
 object ProjectAuthData {
+
   implicit def jsonLDEncoder(implicit renkuUrl: RenkuUrl): JsonLDEncoder[ProjectAuthData] =
     JsonLDEncoder.instance { data =>
       JsonLD.entity(
@@ -42,4 +45,8 @@ object ProjectAuthData {
         Schemas.renku / "memberRole" -> JsonLDArray(data.members.map(_.encoded.asJsonLD).toSeq)
       )
     }
+
+  implicit val show: Show[ProjectAuthData] = Show.show { case ProjectAuthData(slug, members, visibility) =>
+    show"slug = $slug, visibility = $visibility, members = [${members.toList.mkString_(", ")}]"
+  }
 }

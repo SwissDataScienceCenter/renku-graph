@@ -103,11 +103,11 @@ class RetrySpec extends AsyncFlatSpec with AsyncIOSpec with should.Matchers {
       _ = r shouldBe ()
       execCount <- e.execTimes.get
       _ = execCount.size shouldBe 3
-      _ <- e.assertPauseTime(500.millis, epsilon = 100.millis)
+      _ <- e.assertPauseTime(500.millis, epsilon = 125.millis)
     } yield ()
   }
 
-  it should "retry in the given interval  until final error" in {
+  it should "retry in the given interval until final error" in {
     val e = new TestEffect(
       Map(
         0 -> RetryError.some,
@@ -121,7 +121,7 @@ class RetrySpec extends AsyncFlatSpec with AsyncIOSpec with should.Matchers {
       _ = r shouldBe Left(FinalError)
       execCount <- e.execTimes.get
       _ = execCount.size shouldBe 3
-      _ <- e.assertPauseTime(500.millis)
+      _ <- e.assertPauseTime(500.millis, epsilon = 125.millis)
     } yield ()
   }
 

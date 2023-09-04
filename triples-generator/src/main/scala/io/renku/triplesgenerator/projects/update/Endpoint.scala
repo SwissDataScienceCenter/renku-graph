@@ -24,6 +24,7 @@ import cats.syntax.all._
 import eu.timepit.refined.auto._
 import io.renku.data.Message
 import io.renku.graph.model.projects
+import io.renku.triplesgenerator.TgLockDB.TsWriteLock
 import io.renku.triplesgenerator.api.ProjectUpdates
 import io.renku.triplesstore.SparqlQueryTimeRecorder
 import org.http4s.circe._
@@ -32,18 +33,18 @@ import org.http4s.{EntityDecoder, Request, Response}
 import org.typelevel.log4cats.Logger
 
 trait Endpoint[F[_]] {
-  def `PUT /projects/:slug`(slug: projects.Slug, request: Request[F]): F[Response[F]]
+  def `PATCH /projects/:slug`(slug: projects.Slug, request: Request[F]): F[Response[F]]
 }
 
 object Endpoint {
-  def apply[F[_]: Async: Logger: SparqlQueryTimeRecorder]: F[Endpoint[F]] = for {
-    projectUpdater <- ProjectUpdater[F]
+  def apply[F[_]: Async: Logger: SparqlQueryTimeRecorder](tsWriteLock: TsWriteLock[F]): F[Endpoint[F]] = for {
+    projectUpdater <- ProjectUpdater[F](tsWriteLock)
   } yield new EndpointImpl[F](projectUpdater)
 }
 
 private class EndpointImpl[F[_]: Async](projectUpdater: ProjectUpdater[F]) extends Http4sDsl[F] with Endpoint[F] {
 
-  override def `PUT /projects/:slug`(slug: projects.Slug, request: Request[F]): F[Response[F]] =
+  override def `PATCH /projects/:slug`(slug: projects.Slug, request: Request[F]): F[Response[F]] =
     EitherT(decodePayload(request))
       .semiflatMap(projectUpdater.updateProject(slug, _).map(toHttpResult))
       .merge

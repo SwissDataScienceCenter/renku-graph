@@ -27,6 +27,7 @@ import io.circe.Encoder
 import io.circe.literal._
 import io.circe.syntax._
 import io.renku.db.{DbClient, SqlStatement}
+import io.renku.eventlog.EventLogDB.SessionResource
 import io.renku.eventlog.TypeSerializers
 import io.renku.eventlog.api.events.StatusChangeEvent.{AllEventsToNew, ProjectEventsToNew}
 import io.renku.eventlog.events.consumers.statuschange
@@ -52,7 +53,8 @@ private[statuschange] class DbUpdater[F[_]: Async: QueriesExecutionTimes](
     createEventsResource(sendEventIfFound(_))
       .as(DBUpdateResults.ForProjects.empty)
 
-  override def onRollback(event: AllEventsToNew.type): RollbackOp[F] = RollbackOp.empty[F]
+  override def onRollback(event: AllEventsToNew.type)(implicit sr: SessionResource[F]): RollbackOp[F] =
+    RollbackOp.empty[F]
 
   private def createEventsResource(
       f: Cursor[F, ProjectEventsToNew] => F[Unit]

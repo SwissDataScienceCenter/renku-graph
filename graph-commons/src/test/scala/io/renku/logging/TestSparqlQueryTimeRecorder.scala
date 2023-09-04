@@ -18,7 +18,8 @@
 
 package io.renku.logging
 
-import cats.effect.Sync
+import cats.effect.unsafe.IORuntime
+import cats.effect.{IO, Sync}
 import io.renku.metrics.{MetricsRegistry, TestMetricsRegistry}
 import io.renku.triplesstore.SparqlQueryTimeRecorder
 import org.typelevel.log4cats.Logger
@@ -26,6 +27,9 @@ import org.typelevel.log4cats.Logger
 object TestSparqlQueryTimeRecorder {
   def apply[F[_]: Sync: Logger]: F[SparqlQueryTimeRecorder[F]] = {
     implicit val metricsRegistry: MetricsRegistry[F] = TestMetricsRegistry[F]
-    SparqlQueryTimeRecorder[F]()
+    SparqlQueryTimeRecorder.create[F]()
   }
+
+  def createUnsafe(implicit logger: Logger[IO], IORuntime: IORuntime): SparqlQueryTimeRecorder[IO] =
+    apply[IO].unsafeRunSync()
 }

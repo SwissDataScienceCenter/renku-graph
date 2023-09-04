@@ -19,7 +19,6 @@
 package io.renku.triplesstore
 
 import eu.timepit.refined.auto._
-import io.renku.testtools.IOSpec
 import io.renku.triplesstore.client.util.JenaRunMode
 import org.scalatest.Suite
 
@@ -27,7 +26,7 @@ import org.scalatest.Suite
  * starting a container.  
  */
 trait ExternalJenaForSpec extends InMemoryJenaForSpec {
-  self: Suite with IOSpec =>
+  self: Suite =>
 
   /** Expect the external Jena instance to accept connections on the default port. */
   override val jenaRunMode: JenaRunMode = JenaRunMode.Local(3030)
