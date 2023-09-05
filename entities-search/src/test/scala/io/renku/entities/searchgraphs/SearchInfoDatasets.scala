@@ -21,8 +21,10 @@ package io.renku.entities.searchgraphs
 import cats.effect.IO
 import cats.syntax.all._
 import io.renku.graph.model.entities.EntityFunctions
+import io.renku.graph.model.projects.Role
 import io.renku.graph.model.{RenkuUrl, entities, testentities}
 import io.renku.logging.{ExecutionTimeRecorder, TestExecutionTimeRecorder}
+import io.renku.projectauth.{ProjectAuthData, ProjectAuthService, ProjectMember}
 import io.renku.triplesstore._
 import org.typelevel.log4cats.Logger
 
@@ -60,7 +62,16 @@ trait SearchInfoDatasets {
       graphsProducer:  GraphsProducer[entities.Project],
       renkuUrl:        RenkuUrl
   ): IO[Unit] =
-    uploadIO(projectsDataset, graphsProducer(project): _*) >> insertSearchInfo(project)
+    uploadIO(projectsDataset, graphsProducer(project): _*) >> insertSearchInfo(project) >> insertProjectAuth(project)
+
+  def insertProjectAuth(project: entities.Project)(implicit renkuUrl: RenkuUrl): IO[Unit] = {
+    val execTimeRecorder: ExecutionTimeRecorder[IO] = TestExecutionTimeRecorder[IO]()
+    implicit val sparqlQueryTimeRecorder: SparqlQueryTimeRecorder[IO] =
+      new SparqlQueryTimeRecorder[IO](execTimeRecorder)
+    val ps      = ProjectSparqlClient[IO](projectsDSConnectionInfo).map(ProjectAuthService[IO](_, renkuUrl))
+    val members = project.members.flatMap(p => p.maybeGitLabId.map(id => ProjectMember(id, Role.Reader)))
+    ps.use(_.update(ProjectAuthData(project.slug, members, project.visibility)))
+  }
 
   def insertSearchInfo(project: entities.Project): IO[Unit] =
     createSearchGraphsProvisioner.flatMap(_.provisionSearchGraphs(project))

@@ -27,6 +27,7 @@ import io.renku.graph.model._
 import io.renku.graph.model.entities.Person
 import io.renku.graph.model.projects.Visibility
 import io.renku.http.server.security.model.AuthUser
+import io.renku.projectauth.util.SparqlSnippets
 import io.renku.triplesstore.client.sparql.{Fragment, LuceneQuery, VarName}
 import io.renku.triplesstore.client.syntax._
 
@@ -113,7 +114,7 @@ object DatasetsQuery extends EntityQuery[Entity.Dataset] {
           |        ${namespacesPart(criteria.filters.namespaces)}
           |
           |        # access restriction
-          |        ${accessRightsAndVisibility(criteria.maybeUser, criteria.filters.visibilities)}
+          |        ${accessRightsAndVis(criteria.maybeUser, criteria.filters.visibilities)}
           |
           |        # slug and visibility
           |        $slugVisibility
@@ -144,6 +145,13 @@ object DatasetsQuery extends EntityQuery[Entity.Dataset] {
          |  BIND (CONCAT(STR(?projectSlug), STR(':'),
          |               STR(?visibility)) AS ?idSlugVisibility)
          |""".stripMargin
+
+  private def accessRightsAndVis(maybeUser: Option[AuthUser], visibilities: Set[Visibility]): Fragment =
+    sparql"""
+            |?projId renku:projectVisibility ?visibility .
+            |BIND (?projId AS ${SparqlSnippets.projectId})
+            |${SparqlSnippets.visibleProjects(maybeUser.map(_.id), visibilities)}
+            """
 
   private def accessRightsAndVisibility(maybeUser: Option[AuthUser], visibilities: Set[Visibility]): Fragment =
     maybeUser match {
