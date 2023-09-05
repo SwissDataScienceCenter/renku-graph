@@ -19,10 +19,10 @@
 package io.renku.knowledgegraph.projects.update
 
 import ProvisioningStatusFinder.ProvisioningStatus.Unhealthy
-import cats.NonEmptyParallel
 import cats.effect.Async
 import cats.syntax.all._
-import io.renku.core.client.{RenkuCoreClient, RenkuCoreUri, UserInfo, ProjectUpdates => CoreProjectUpdates}
+import cats.{Applicative, NonEmptyParallel}
+import io.renku.core.client.{Branch, RenkuCoreClient, RenkuCoreUri, UserInfo, ProjectUpdates => CoreProjectUpdates}
 import io.renku.graph.model.projects
 import io.renku.http.client.GitLabClient
 import io.renku.http.server.security.model.AuthUser
@@ -67,14 +67,15 @@ private class ProjectUpdaterImpl[F[_]: Async: NonEmptyParallel: Logger](
         .flatMap(findTGUpdates(slug, updates, _))
         .flatMap(updateTG(slug, _))
     else
-      checkPrerequisites(slug, authUser) >> {
+      checkPrerequisites(slug, authUser) >>= { defaultBranchInfo =>
         for {
-          coreUpdates <- findCoreProjectUpdates(slug, updates, authUser)
-          coreUri     <- findCoreUri(coreUpdates, authUser)
-          _           <- updateCore(slug, coreUri, coreUpdates, authUser)
-          updated     <- updateGL(slug, updates, authUser)
-          tgUpdates   <- findTGUpdates(slug, updates, updated)
-          _           <- updateTG(slug, tgUpdates)
+          coreUpdates    <- findCoreProjectUpdates(slug, updates, authUser)
+          coreUri        <- findCoreUri(coreUpdates, authUser)
+          corePushBranch <- updateCore(slug, coreUri, coreUpdates, authUser)
+          glUpdated      <- updateGL(slug, updates, authUser)
+          tgUpdates      <- findTGUpdates(slug, updates, glUpdated, defaultBranchInfo, corePushBranch)
+          _              <- updateTG(slug, tgUpdates)
+          _              <- failIfPRNeeded(tgUpdates, defaultBranchInfo, corePushBranch)
         } yield ()
       }
 
@@ -91,6 +92,15 @@ private class ProjectUpdaterImpl[F[_]: Async: NonEmptyParallel: Logger](
     .findTGProjectUpdates(updates, maybeGLUpdatedProject)
     .adaptError(Failure.onTGUpdatesFinding(slug, _))
 
+  private def findTGUpdates(slug:                  projects.Slug,
+                            updates:               ProjectUpdates,
+                            maybeGLUpdatedProject: Option[GLUpdatedProject],
+                            maybeDefaultBranch:    Option[DefaultBranch],
+                            corePushBranch:        Branch
+  ) = tgUpdatesFinder
+    .findTGProjectUpdates(updates, maybeGLUpdatedProject, maybeDefaultBranch, corePushBranch)
+    .adaptError(Failure.onTGUpdatesFinding(slug, _))
+
   private def updateTG(slug: projects.Slug, updates: TGProjectUpdates): F[Unit] =
     tgClient
       .updateProject(slug, updates)
@@ -98,9 +108,9 @@ private class ProjectUpdaterImpl[F[_]: Async: NonEmptyParallel: Logger](
       .handleError(_.asLeft)
       .flatMap(_.fold(Failure.onTSUpdate(slug, _).raiseError[F, Unit], _.pure[F]))
 
-  private def checkPrerequisites(slug: projects.Slug, authUser: AuthUser): F[Unit] =
-    (noProvisioningFailures(slug), canPushToDefaultBranch(slug, authUser))
-      .parMapN((_, _) => ())
+  private def checkPrerequisites(slug: projects.Slug, authUser: AuthUser): F[Option[DefaultBranch]] =
+    (noProvisioningFailures(slug), findDefaultBranchInfo(slug, authUser))
+      .parMapN((_, branchInfo) => branchInfo)
 
   private def noProvisioningFailures(slug: projects.Slug): F[Unit] =
     provisioningStatusFinder
@@ -111,14 +121,10 @@ private class ProjectUpdaterImpl[F[_]: Async: NonEmptyParallel: Logger](
         case _                => ().pure[F]
       }
 
-  private def canPushToDefaultBranch(slug: projects.Slug, authUser: AuthUser): F[Unit] =
+  private def findDefaultBranchInfo(slug: projects.Slug, authUser: AuthUser): F[Option[DefaultBranch]] =
     branchProtectionCheck
-      .canPushToDefaultBranch(slug, authUser.accessToken)
+      .findDefaultBranchInfo(slug, authUser.accessToken)
       .adaptError(Failure.onBranchAccessCheck(slug, authUser.id, _))
-      .flatMap {
-        case false => Failure.cannotPushToBranch.raiseError[F, Unit]
-        case true  => ().pure[F]
-      }
 
   private def findCoreProjectUpdates(slug: projects.Slug, updates: ProjectUpdates, authUser: AuthUser) =
     (findProjectGitUrl(slug, authUser) -> findUserInfo(authUser))
@@ -153,11 +159,18 @@ private class ProjectUpdaterImpl[F[_]: Async: NonEmptyParallel: Logger](
                          coreUri:  RenkuCoreUri.Versioned,
                          updates:  CoreProjectUpdates,
                          authUser: AuthUser
-  ): F[Unit] = Async[F].start {
+  ): F[Branch] =
     renkuCoreClient
       .updateProject(coreUri, updates, authUser.accessToken)
       .map(_.toEither)
       .handleError(_.asLeft)
-      .flatMap(_.fold(Logger[F].error(_)(show"Updating project $slug failed"), _.pure[F]))
-  }.void
+      .flatMap(_.fold(Failure.onCoreUpdate(slug, _).raiseError[F, Branch], _.pure[F]))
+
+  private def failIfPRNeeded(tgUpdates:         TGProjectUpdates,
+                             defaultBranchInfo: Option[DefaultBranch],
+                             pushBranch:        Branch
+  ): F[Unit] =
+    Applicative[F].unlessA(defaultBranchInfo.map(_.branch) contains pushBranch) {
+      Failure.corePushedToNonDefaultBranch(tgUpdates, defaultBranchInfo, pushBranch).raiseError[F, Unit]
+    }
 }

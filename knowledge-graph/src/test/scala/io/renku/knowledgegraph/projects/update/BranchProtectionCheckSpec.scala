@@ -28,6 +28,7 @@ import eu.timepit.refined.collection.NonEmpty
 import io.circe.Encoder
 import io.circe.literal._
 import io.circe.syntax._
+import io.renku.core.client.Generators.branches
 import io.renku.generators.CommonGraphGenerators.accessTokens
 import io.renku.generators.Generators.Implicits._
 import io.renku.generators.Generators.booleans
@@ -55,40 +56,48 @@ class BranchProtectionCheckSpec
     with EitherValues
     with GitLabClientTools[IO] {
 
-  it should "call GL's GET gl/projects/:slug/repository/branches and return true " +
-    "if there's a default branch with can_push=true" in {
+  it should "call GL's GET gl/projects/:slug/repository/branches and return Unprotected " +
+    "if the default branch has can_push=true" in {
 
-      val slug        = projectSlugs.generateOne
-      val accessToken = accessTokens.generateOne
+      val slug          = projectSlugs.generateOne
+      val accessToken   = accessTokens.generateOne
+      val defaultBranch = branches.generateOne
 
       givenProjectBranches(
         slug,
         accessToken,
-        returning = List(BranchInfo(default = false, canPush = true),
-                         BranchInfo(default = false, canPush = false),
-                         BranchInfo(default = true, canPush = true)
+        returning = List(
+          BranchInfo(branches.generateOne, default = false, canPush = true),
+          BranchInfo(branches.generateOne, default = false, canPush = false),
+          BranchInfo(defaultBranch, default = true, canPush = true)
         ).pure[IO]
       )
 
-      finder.canPushToDefaultBranch(slug, accessToken).asserting(_ shouldBe true)
+      finder
+        .findDefaultBranchInfo(slug, accessToken)
+        .asserting(_ shouldBe DefaultBranch.Unprotected(defaultBranch).some)
     }
 
-  it should "call GL's GET gl/projects/:slug/repository/branches and return false " +
-    "if there's a default branch with can_push=false" in {
+  it should "call GL's GET gl/projects/:slug/repository/branches and return PushProtected " +
+    "if the default branch has can_push=false" in {
 
-      val slug        = projectSlugs.generateOne
-      val accessToken = accessTokens.generateOne
+      val slug          = projectSlugs.generateOne
+      val accessToken   = accessTokens.generateOne
+      val defaultBranch = branches.generateOne
 
       givenProjectBranches(
         slug,
         accessToken,
-        returning = List(BranchInfo(default = false, canPush = true),
-                         BranchInfo(default = false, canPush = false),
-                         BranchInfo(default = true, canPush = false)
+        returning = List(
+          BranchInfo(branches.generateOne, default = false, canPush = true),
+          BranchInfo(branches.generateOne, default = false, canPush = false),
+          BranchInfo(defaultBranch, default = true, canPush = false)
         ).pure[IO]
       )
 
-      finder.canPushToDefaultBranch(slug, accessToken).asserting(_ shouldBe false)
+      finder
+        .findDefaultBranchInfo(slug, accessToken)
+        .asserting(_ shouldBe DefaultBranch.PushProtected(defaultBranch).some)
     }
 
   it should "call GL's GET gl/projects/:slug/repository/branches and return false " +
@@ -100,11 +109,12 @@ class BranchProtectionCheckSpec
       givenProjectBranches(
         slug,
         accessToken,
-        returning =
-          List(BranchInfo(default = false, canPush = true), BranchInfo(default = false, canPush = false)).pure[IO]
+        returning = List(BranchInfo(branches.generateOne, default = false, canPush = true),
+                         BranchInfo(branches.generateOne, default = false, canPush = false)
+        ).pure[IO]
       )
 
-      finder.canPushToDefaultBranch(slug, accessToken).asserting(_ shouldBe false)
+      finder.findDefaultBranchInfo(slug, accessToken).asserting(_ shouldBe None)
     }
 
   it should "call GL's GET gl/projects/:slug/repository/branches and return false " +
@@ -119,7 +129,7 @@ class BranchProtectionCheckSpec
         returning = List.empty.pure[IO]
       )
 
-      finder.canPushToDefaultBranch(slug, accessToken).asserting(_ shouldBe false)
+      finder.findDefaultBranchInfo(slug, accessToken).asserting(_ shouldBe None)
     }
 
   it should "return a list branches if GL returns 200 with a non empty list" in {
@@ -152,18 +162,19 @@ class BranchProtectionCheckSpec
   private lazy val mapResponse: ResponseMappingF[IO, List[BranchInfo]] =
     captureMapping(glClient)(
       finder
-        .canPushToDefaultBranch(projectSlugs.generateOne, accessTokens.generateOne)
+        .findDefaultBranchInfo(projectSlugs.generateOne, accessTokens.generateOne)
         .unsafeRunSync(),
       branchInfos.toGeneratorOfList()
     )
 
-  private implicit lazy val itemEncoder: Encoder[BranchInfo] = Encoder.instance { case BranchInfo(default, canPush) =>
-    json"""{
+  private implicit lazy val itemEncoder: Encoder[BranchInfo] = Encoder.instance {
+    case BranchInfo(name, default, canPush) => json"""{
+      "name":     $name,
       "can_push": $canPush,
       "default":  $default
     }"""
   }
 
   private lazy val branchInfos: Gen[BranchInfo] =
-    (booleans, booleans).mapN(BranchInfo.apply)
+    (branches, booleans, booleans).mapN(BranchInfo.apply)
 }
