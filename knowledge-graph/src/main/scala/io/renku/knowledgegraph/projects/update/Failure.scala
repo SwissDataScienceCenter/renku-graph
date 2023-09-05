@@ -57,10 +57,10 @@ private object Failure {
     Failure(InternalServerError, Message.Error.unsafeApply(show"Updating project $slug in GitLab failed"), cause)
 
   def onTGUpdatesFinding(slug: projects.Slug, cause: Throwable): Failure =
-    Failure(InternalServerError, Message.Error.unsafeApply(show"Finding TS updates for $slug failed"), cause)
+    Failure(InternalServerError, Message.Error.unsafeApply(show"Finding Knowledge Graph updates for $slug failed"), cause)
 
   def onTSUpdate(slug: projects.Slug, cause: Throwable): Failure =
-    Failure(InternalServerError, Message.Error.unsafeApply(show"Updating project $slug in TS failed"), cause)
+    Failure(InternalServerError, Message.Error.unsafeApply(show"Updating project $slug in the Knowledge Graph failed"), cause)
 
   def onCoreUpdate(slug: projects.Slug, cause: Throwable): Failure =
     Failure(InternalServerError, Message.Error.unsafeApply(show"Updating project $slug in renku-core failed"), cause)
@@ -74,7 +74,7 @@ private object Failure {
       else show"Only $tgUpdates"
     val defaultBranchInfo = defaultBranch.map(_.branch).fold("")(b => show" '$b'")
     val details =
-      show"""|$updatedValuesInfo got updated in the TS due to branch protection rules on the default branch$defaultBranchInfo. 
+      show"""|$updatedValuesInfo got updated in the Knowledge Graph due to branch protection rules on the default branch$defaultBranchInfo.
              |However, an update commit was pushed to a new branch '$corePushBranch' which has to be merged to the default branch with a PR""".stripMargin
         .filter(_ != '\n')
     val message = json"""{

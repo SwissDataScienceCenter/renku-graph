@@ -47,7 +47,7 @@ class FailureSpec extends AnyWordSpec with should.Matchers with ScalaCheckProper
             else show"Only $tgUpdates"
           val defaultBranchInfo = maybeDefaultBranch.map(_.branch).fold("")(b => show" '$b'")
           val details =
-            show"""|$updatedValuesInfo got updated in the TS due to branch protection rules on the default branch$defaultBranchInfo. 
+            show"""|$updatedValuesInfo got updated in the Knowledge Graph due to branch protection rules on the default branch$defaultBranchInfo.
                    |However, an update commit was pushed to a new branch '$corePushBranch' which has to be merged to the default branch with a PR""".stripMargin
               .filter(_ != '\n')
 
