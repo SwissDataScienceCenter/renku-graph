@@ -39,8 +39,11 @@ trait ProjectAuthServiceSupport extends JenaContainerSupport { self: Suite =>
       L:        Logger[IO]
   ) =
     withProjectAuthService.flatMap { s =>
-      val genData = data.toIO.compile.toList
-      val insert  = genData.flatMap(d => Stream.emits(d).through(s.updateAll).compile.drain.as(d))
-      Resource.eval(insert).map(data => (s, data))
+      Resource.eval(insertData(s, data)).map(data => (s, data))
     }
+
+  def insertData(s: ProjectAuthService[IO], data: Stream[Gen, ProjectAuthData]) = {
+    val genData = data.toIO.compile.toList
+    genData.flatMap(d => Stream.emits(d).through(s.updateAll).compile.drain.as(d))
+  }
 }
