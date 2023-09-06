@@ -42,8 +42,7 @@ final class DefaultFusekiClient[F[_]: Async: Logger](
     new DefaultSparqlClient[F](client, subConfig)
   }
 
-
-  override def datasetExists(name: String): F[Boolean] =  {
+  override def datasetExists(name: String): F[Boolean] = {
     val req = GET(datasetsUri).withBasicAuth(cc.basicAuth)
     client.run(req).use { resp =>
       if (resp.status.isSuccess) true.pure[F]
@@ -71,17 +70,16 @@ final class DefaultFusekiClient[F[_]: Async: Logger](
 
   override def createDatasetIfNotExists(name: String, persistent: Boolean): F[Unit] =
     datasetExists(name).flatMap {
-      case true => ().pure[F]
+      case true  => ().pure[F]
       case false => createDataset(name, persistent)
     }
 
   override def deleteDataset(name: String): F[Unit] =
     retry.fold(deleteDataset0(name))(_.retryConnectionError(deleteDataset0(name)))
 
-
   override def deleteDatasetIfExists(name: String): F[Unit] =
     datasetExists(name).flatMap {
-      case true => deleteDataset(name)
+      case true  => deleteDataset(name)
       case false => ().pure[F]
     }
 
