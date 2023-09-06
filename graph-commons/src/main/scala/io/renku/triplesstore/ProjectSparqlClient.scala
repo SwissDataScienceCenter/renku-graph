@@ -18,25 +18,32 @@
 
 package io.renku.triplesstore
 
-import cats.Monad
+import cats.MonadThrow
 import cats.effect._
 import cats.syntax.all._
 import eu.timepit.refined.api.Refined
-import eu.timepit.refined.collection.NonEmpty
 import eu.timepit.refined.auto._
+import eu.timepit.refined.collection.NonEmpty
 import fs2.io.net.Network
+import io.renku.graph.model.RenkuUrl
 import io.renku.jsonld.JsonLD
+import io.renku.projectauth.ProjectAuthService
 import io.renku.triplesstore.client.http.{Retry, SparqlClient, SparqlQuery, SparqlUpdate}
 import org.typelevel.log4cats.Logger
 
 /** SparQL client fixed to the `projects` dataset. */
-trait ProjectSparqlClient[F[_]] extends SparqlClient[F]
+trait ProjectSparqlClient[F[_]] extends SparqlClient[F] {
+  def asProjectAuthService(implicit renkuUrl: RenkuUrl): ProjectAuthService[F]
+}
 
 object ProjectSparqlClient {
 
-  def apply[F[_]: Monad: Logger: SparqlQueryTimeRecorder](c: SparqlClient[F]): ProjectSparqlClient[F] =
-    new ProjectSparqlClient[F] {
+  def apply[F[_]: MonadThrow: Logger: SparqlQueryTimeRecorder](c: SparqlClient[F]): ProjectSparqlClient[F] =
+    new ProjectSparqlClient[F] { self =>
       private[this] val rec = SparqlQueryTimeRecorder[F].instance
+
+      def asProjectAuthService(implicit renkuUrl: RenkuUrl): ProjectAuthService[F] =
+        ProjectAuthService(self, renkuUrl)
 
       override def update(request: SparqlUpdate) = {
         val label = histogramLabel(request)

@@ -42,9 +42,10 @@ import io.renku.http.server.QueryParameterTools._
 import io.renku.http.server.security.Authentication
 import io.renku.http.server.security.model.{AuthUser, MaybeAuthUser}
 import io.renku.http.server.version
+import io.renku.knowledgegraph.datasets.{DatasetIdRecordsFinder, DatasetSameAsRecordsFinder}
 import io.renku.knowledgegraph.datasets.details.RequestedDataset
 import io.renku.metrics.{MetricsRegistry, RoutesMetrics}
-import io.renku.triplesstore.{ProjectsConnectionConfig, SparqlQueryTimeRecorder}
+import io.renku.triplesstore.{ProjectSparqlClient, ProjectsConnectionConfig, SparqlQueryTimeRecorder}
 import org.http4s.dsl.Http4sDsl
 import org.http4s.server.AuthMiddleware
 import org.http4s.{AuthedRoutes, ParseFailure, Request, Response, Status, Uri}
@@ -350,7 +351,8 @@ private class MicroserviceRoutes[F[_]: Async](
 private object MicroserviceRoutes {
 
   def apply[F[_]: Async: Parallel: Logger: MetricsRegistry: SparqlQueryTimeRecorder](
-      projectConnConfig: ProjectsConnectionConfig
+      projectConnConfig:   ProjectsConnectionConfig,
+      projectSparqlClient: ProjectSparqlClient[F]
   ): F[MicroserviceRoutes[F]] = for {
     implicit0(gv: GitLabClient[F])       <- GitLabClient[F]()
     implicit0(atf: AccessTokenFinder[F]) <- AccessTokenFinder[F]()
@@ -372,10 +374,10 @@ private object MicroserviceRoutes {
     usersProjectsEndpoint      <- users.projects.Endpoint[F]
     authenticator              <- GitLabAuthenticator[F]
     authMiddleware             <- Authentication.middlewareAuthenticatingIfNeeded(authenticator)
-    projectSlugAuthorizer      <- Authorizer.using(ProjectSlugRecordsFinder[F])
-    datasetIdAuthorizer        <- Authorizer.using(DatasetIdRecordsFinder[F])
-    datasetSameAsAuthorizer    <- Authorizer.using(DatasetSameAsRecordsFinder[F])
-    versionRoutes              <- version.Routes[F]
+    projectSlugAuthorizer      <- ProjectSlugRecordsFinder[F](projectSparqlClient, ru).map(_.asAuthorizer)
+    datasetIdAuthorizer     = DatasetIdRecordsFinder[F](projectSparqlClient).asAuthorizer
+    datasetSameAsAuthorizer = DatasetSameAsRecordsFinder[F](projectSparqlClient).asAuthorizer
+    versionRoutes <- version.Routes[F]
   } yield new MicroserviceRoutes(
     datasetsSearchEndpoint,
     datasetDetailsEndpoint,

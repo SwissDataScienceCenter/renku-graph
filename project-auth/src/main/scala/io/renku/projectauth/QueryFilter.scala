@@ -16,18 +16,24 @@
  * limitations under the License.
  */
 
-package io.renku.triplesstore
+package io.renku.projectauth
 
-import eu.timepit.refined.auto._
-import io.renku.triplesstore.client.util.JenaRunMode
-import org.scalatest.Suite
+import io.renku.graph.model.persons.GitLabId
+import io.renku.graph.model.projects.Slug
 
-/** Use this trait as a replacement for [[InMemoryJenaForSpec]] to connect to a locally/externally running Jena without 
- * starting a container.  
- */
-trait ExternalJenaForSpec extends InMemoryJenaForSpec {
-  self: Suite =>
+final case class QueryFilter(
+    slug:   Option[Slug],
+    member: Set[GitLabId]
+) {
 
-  /** Expect the external Jena instance to accept connections on the default port. */
-  override val jenaRunMode: JenaRunMode = JenaRunMode.Local(3030)
+  def withSlug(slug: Slug): QueryFilter =
+    copy(slug = Some(slug))
+
+  def withMember(id: GitLabId): QueryFilter =
+    copy(member = member + id)
+}
+
+object QueryFilter {
+
+  def all: QueryFilter = QueryFilter(None, Set.empty)
 }

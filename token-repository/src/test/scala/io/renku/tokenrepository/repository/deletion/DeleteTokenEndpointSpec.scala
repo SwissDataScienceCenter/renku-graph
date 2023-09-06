@@ -60,7 +60,7 @@ class DeleteTokenEndpointSpec
           response.body.compile.toVector.asserting(_ shouldBe Vector.empty)
       } >> {
       deletionResult match {
-        case DeletionResult.Deleted    => IO(logger.loggedOnly(Info(show"Token removed for $projectId")))
+        case DeletionResult.Deleted    => IO(logger.loggedOnly(Info(show"token removed for $projectId")))
         case DeletionResult.NotExisted => IO(logger.expectNoLogs())
       }
     }

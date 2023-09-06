@@ -28,7 +28,7 @@ import io.renku.knowledgegraph.metrics.KGMetrics
 import io.renku.logging.ApplicationLogger
 import io.renku.metrics.MetricsRegistry
 import io.renku.microservices.{IOMicroservice, ResourceUse}
-import io.renku.triplesstore.{ProjectsConnectionConfig, SparqlQueryTimeRecorder}
+import io.renku.triplesstore.{ProjectSparqlClient, ProjectsConnectionConfig, SparqlQueryTimeRecorder}
 import org.http4s.server.Server
 import org.typelevel.log4cats.Logger
 
@@ -36,20 +36,41 @@ object Microservice extends IOMicroservice {
 
   private implicit val logger: Logger[IO] = ApplicationLogger
 
-  override def run(args: List[String]): IO[ExitCode] = for {
-    implicit0(mr: MetricsRegistry[IO])           <- MetricsRegistry[IO]()
-    implicit0(sqtr: SparqlQueryTimeRecorder[IO]) <- SparqlQueryTimeRecorder.create[IO]()
-    projectConnConfig                            <- ProjectsConnectionConfig[IO]()
-    certificateLoader                            <- CertificateLoader[IO]
-    sentryInitializer                            <- SentryInitializer[IO]
-    kgMetrics                                    <- KGMetrics[IO]
-    microserviceRoutes                           <- MicroserviceRoutes[IO](projectConnConfig)
-    termSignal                                   <- SignallingRef.of[IO, Boolean](false)
-    exitCode <- microserviceRoutes.routes.use { routes =>
-                  val httpServer = HttpServer[IO](serverPort = port"9004", routes)
-                  new MicroserviceRunner(certificateLoader, sentryInitializer, httpServer, kgMetrics).run(termSignal)
-                }
-  } yield exitCode
+  override def run(args: List[String]): IO[ExitCode] =
+    Setup.resource.use { setup =>
+      implicit val sqtr: SparqlQueryTimeRecorder[IO] = setup.sparqlQueryTimeRecorder
+      implicit val mr:   MetricsRegistry[IO]         = setup.metricsRegistry
+      for {
+        certificateLoader  <- CertificateLoader[IO]
+        sentryInitializer  <- SentryInitializer[IO]
+        kgMetrics          <- KGMetrics[IO]
+        microserviceRoutes <- MicroserviceRoutes[IO](setup.projectConnConfig, setup.projectSparqlClient)
+        termSignal         <- SignallingRef.of[IO, Boolean](false)
+        exitCode <- microserviceRoutes.routes.use { routes =>
+                      val httpServer = HttpServer[IO](serverPort = port"9004", routes)
+                      new MicroserviceRunner(certificateLoader, sentryInitializer, httpServer, kgMetrics).run(
+                        termSignal
+                      )
+                    }
+      } yield exitCode
+    }
+
+  final case class Setup(
+      projectConnConfig:       ProjectsConnectionConfig,
+      metricsRegistry:         MetricsRegistry[IO],
+      sparqlQueryTimeRecorder: SparqlQueryTimeRecorder[IO],
+      projectSparqlClient:     ProjectSparqlClient[IO]
+  )
+
+  object Setup {
+    val resource: Resource[IO, Setup] = for {
+      pcc <- Resource.eval(ProjectsConnectionConfig[IO]())
+
+      implicit0(mr: MetricsRegistry[IO])           <- Resource.eval(MetricsRegistry[IO]())
+      implicit0(sqtr: SparqlQueryTimeRecorder[IO]) <- Resource.eval(SparqlQueryTimeRecorder.create[IO]())
+      psc                                          <- ProjectSparqlClient[IO](pcc)
+    } yield Setup(pcc, mr, sqtr, psc)
+  }
 }
 
 private class MicroserviceRunner(

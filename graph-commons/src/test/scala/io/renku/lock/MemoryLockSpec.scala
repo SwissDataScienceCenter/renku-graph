@@ -76,20 +76,24 @@ class MemoryLockSpec extends AsyncWordSpec with AsyncIOSpec with should.Matchers
 
   "remove mutexes on release" in {
     for {
-      (state, lock) <- Lock.memory0[IO, Int]
-      latch         <- CountDownLatch[IO](1)
-      lockAcquired  <- Deferred[IO, Unit]
+      (state, lock)  <- Lock.memory0[IO, Int]
+      finalised      <- Deferred.apply[IO, Unit]
+      startReleasing <- Deferred.apply[IO, Unit]
+      lockAcquired   <- Deferred[IO, Unit]
 
       // initial state is empty
       _ <- state.get.asserting(_ shouldBe empty)
 
       // one mutex if active
-      _ <- Async[IO].start(lock(1).use(_ => lockAcquired.complete(()) >> latch.await))
+      _ <- Async[IO].start(
+             lock(1).onFinalize(finalised.complete(()).void).use(_ => lockAcquired.complete(()) >> startReleasing.get)
+           )
       _ <- lockAcquired.get
       _ <- state.get.asserting(_.size shouldBe 1)
 
       // once released, mutex must be removed from map
-      _ <- latch.release
+      _ <- startReleasing.complete(())
+      _ <- finalised.get
       _ <- state.get.asserting(_ shouldBe empty)
     } yield ()
   }

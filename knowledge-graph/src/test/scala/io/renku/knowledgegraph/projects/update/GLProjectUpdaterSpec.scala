@@ -39,7 +39,7 @@ import io.renku.http.client.{AccessToken, GitLabClient}
 import io.renku.http.tinytypes.TinyTypeURIEncoder._
 import io.renku.testtools.GitLabClientTools
 import org.http4s.Method.PUT
-import org.http4s.Status.{BadRequest, Ok}
+import org.http4s.Status.{BadRequest, Forbidden, Ok}
 import org.http4s.circe.CirceEntityEncoder._
 import org.http4s.implicits._
 import org.http4s.multipart.Multipart
@@ -107,7 +107,9 @@ class GLProjectUpdaterSpec
     val error = nonEmptyStrings().generateOne
 
     mapResponse(BadRequest, Request[IO](), Response[IO](BadRequest).withEntity(json"""{"error": $error}"""))
-      .asserting(_.left.value shouldBe Message.Error.fromJsonUnsafe(Json.fromString(error)))
+      .asserting(
+        _.left.value shouldBe Failure.badRequestOnGLUpdate(Message.Error.fromJsonUnsafe(Json.fromString(error)))
+      )
   }
 
   it should "return left if PUT gl/projects/:slug returns 400 BAD_REQUEST with a message" in {
@@ -115,7 +117,15 @@ class GLProjectUpdaterSpec
     val message = jsons.generateOne
 
     mapResponse(BadRequest, Request[IO](), Response[IO](BadRequest).withEntity(json"""{"message": $message}"""))
-      .asserting(_.left.value shouldBe Message.Error.fromJsonUnsafe(message))
+      .asserting(_.left.value shouldBe Failure.badRequestOnGLUpdate(Message.Error.fromJsonUnsafe(message)))
+  }
+
+  it should "return left if PUT gl/projects/:slug returns 403 FORBIDDEN with a message" in {
+
+    val message = jsons.generateOne
+
+    mapResponse(Forbidden, Request[IO](), Response[IO](Forbidden).withEntity(json"""{"message": $message}"""))
+      .asserting(_.left.value shouldBe Failure.forbiddenOnGLUpdate(Message.Error.fromJsonUnsafe(message)))
   }
 
   private implicit val glClient: GitLabClient[IO] = mock[GitLabClient[IO]]

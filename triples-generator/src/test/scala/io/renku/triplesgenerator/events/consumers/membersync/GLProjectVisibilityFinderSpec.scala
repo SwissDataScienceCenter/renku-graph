@@ -25,6 +25,7 @@ import eu.timepit.refined.auto._
 import eu.timepit.refined.collection.NonEmpty
 import io.circe.Json
 import io.circe.literal._
+import io.circe.syntax._
 import io.renku.generators.CommonGraphGenerators.accessTokens
 import io.renku.generators.Generators.Implicits._
 import io.renku.graph.model.GraphModelGenerators._
@@ -72,6 +73,10 @@ class GLProjectVisibilityFinderSpec
       .asserting(_ shouldBe visibility.some)
   }
 
+  it should "map OK response without visibility property to none" in {
+    mapResponse(Status.Ok, Request[IO](), Response[IO](Status.Ok).withEntity(Json.obj())).asserting(_ shouldBe None)
+  }
+
   Status.Unauthorized :: Status.Forbidden :: Status.NotFound :: Nil foreach { status =>
     it should s"map $status response to None" in {
       mapResponse(status, Request[IO](), Response[IO](status)).asserting(_ shouldBe None)
@@ -83,7 +88,11 @@ class GLProjectVisibilityFinderSpec
   }
 
   it should "return an Exception if remote client responds with unexpected body" in {
-    mapResponse(Status.Ok, Request[IO](), Response[IO](Status.Ok).withEntity(Json.obj())).assertThrows[Exception]
+    mapResponse(Status.Ok,
+                Request[IO](),
+                Response[IO](Status.Ok).withEntity(Json.obj("visibility" -> "unknown".asJson))
+    )
+      .assertThrows[Exception]
   }
 
   private implicit lazy val gitLabClient: GitLabClient[IO] = mock[GitLabClient[IO]]

@@ -43,6 +43,10 @@ class TestLogger[F[_]: Async] extends Logger[F] with should.Matchers {
   def getMessages(severity: Level): List[LogMessage] =
     invocations(of = severity).toList.map(_.message)
 
+  def getMessagesF(severity: Level): F[List[LogMessage]] = F.delay {
+    invocations(of = severity).toList.map(_.message)
+  }
+
   private def invocations(of: Level): Iterable[LogEntry] =
     invocations.asScala.filter(_.level === of)
 
@@ -55,6 +59,10 @@ class TestLogger[F[_]: Async] extends Logger[F] with should.Matchers {
   def loggedOnly(expected: LogEntry*): Assertion =
     loggedOnly(expected.toList)
 
+  def loggedOnlyF(expected: LogEntry*): F[Assertion] = F.delay {
+    loggedOnly(expected.toList)
+  }
+
   def loggedOnly(expected: LogEntry, times: Int): Assertion =
     loggedOnly(List.fill(times)(expected))
 
@@ -64,6 +72,11 @@ class TestLogger[F[_]: Async] extends Logger[F] with should.Matchers {
   def expectNoLogs(): Assertion =
     if (invocations.isEmpty) Succeeded
     else fail(s"No logs expected but got $invocationsPrettyPrint")
+
+  def expectNoLogsF(): F[Assertion] = F.delay {
+    if (invocations.isEmpty) Succeeded
+    else fail(s"No logs expected but got $invocationsPrettyPrint")
+  }
 
   def expectNoLogs(severity: Level): Assertion = invocations(of = severity).toList match {
     case Nil         => Succeeded

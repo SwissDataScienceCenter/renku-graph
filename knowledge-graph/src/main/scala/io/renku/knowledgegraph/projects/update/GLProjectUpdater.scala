@@ -42,7 +42,7 @@ private trait GLProjectUpdater[F[_]] {
   def updateProject(slug:    projects.Slug,
                     updates: ProjectUpdates,
                     at:      AccessToken
-  ): F[Either[Message, Option[GLUpdatedProject]]]
+  ): F[Either[Failure, Option[GLUpdatedProject]]]
 }
 
 private object GLProjectUpdater {
@@ -54,7 +54,7 @@ private class GLProjectUpdaterImpl[F[_]: Async: GitLabClient] extends GLProjectU
   override def updateProject(slug:    projects.Slug,
                              updates: ProjectUpdates,
                              at:      AccessToken
-  ): F[Either[Message, Option[GLUpdatedProject]]] =
+  ): F[Either[Failure, Option[GLUpdatedProject]]] =
     if (updates.glUpdateNeeded) {
       implicit val token: Option[AccessToken] = at.some
       toMultipart(updates).flatMap(
@@ -63,7 +63,7 @@ private class GLProjectUpdaterImpl[F[_]: Async: GitLabClient] extends GLProjectU
           .map(_.map(_.some))
       )
     } else
-      Option.empty[GLUpdatedProject].asRight[Message].pure[F]
+      Option.empty[GLUpdatedProject].asRight[Failure].pure[F]
 
   private lazy val toMultipart: ProjectUpdates => F[Multipart[F]] = {
     case ProjectUpdates(_, newImage, _, newVisibility) =>
@@ -88,11 +88,21 @@ private class GLProjectUpdaterImpl[F[_]: Async: GitLabClient] extends GLProjectU
     )
 
   private lazy val mapResponse
-      : PartialFunction[(Status, Request[F], Response[F]), F[Either[Message, GLUpdatedProject]]] = {
+      : PartialFunction[(Status, Request[F], Response[F]), F[Either[Failure, GLUpdatedProject]]] = {
     case (Ok, _, resp) =>
-      resp.as[GLUpdatedProject].map(_.asRight[Message])
+      resp.as[GLUpdatedProject].map(_.asRight[Failure])
     case (BadRequest, _, resp) =>
-      resp.as[Json](MonadThrow[F], jsonOf(Async[F], errorDecoder)).map(Message.Error.fromJsonUnsafe).map(_.asLeft)
+      resp
+        .as[Json](MonadThrow[F], jsonOf(Async[F], errorDecoder))
+        .map(Message.Error.fromJsonUnsafe)
+        .map(Failure.badRequestOnGLUpdate)
+        .map(_.asLeft)
+    case (Forbidden, _, resp) =>
+      resp
+        .as[Json](MonadThrow[F], jsonOf(Async[F], errorDecoder))
+        .map(Message.Error.fromJsonUnsafe)
+        .map(Failure.forbiddenOnGLUpdate)
+        .map(_.asLeft)
   }
 
   private lazy val errorDecoder: Decoder[Json] = { cur =>
