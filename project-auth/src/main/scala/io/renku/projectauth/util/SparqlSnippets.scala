@@ -17,11 +17,13 @@ object SparqlSnippets {
       else selectedVisibility
 
     val parts = visibilities.map(visibilityFragment(userId)).filter(_.nonEmpty)
-    val union = parts.toList.foldSmash(sparql"{ ", sparql" } UNION { ", sparql" }")
+    val inner =
+      if (parts.isEmpty) sparql"""VALUES ($projectId) {}"""
+      else parts.toList.foldSmash(sparql"{ ", sparql" } UNION { ", sparql" }")
     sparql"""
             |Graph ${ProjectAuth.graph} {
             |  $projectId a schema:Project.
-            |  $union
+            |  $inner
             |}
             |""".stripMargin
   }

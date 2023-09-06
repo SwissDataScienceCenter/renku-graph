@@ -21,7 +21,7 @@ package io.renku.projectauth
 import cats.effect._
 import fs2.Stream
 import io.renku.generators.Generators.Implicits._
-import io.renku.graph.model.RenkuUrl
+import io.renku.graph.model.{RenkuUrl, persons}
 import io.renku.triplesstore.client.util.JenaContainerSupport
 import org.scalacheck.Gen
 import org.scalatest.Suite
@@ -45,5 +45,18 @@ trait ProjectAuthServiceSupport extends JenaContainerSupport { self: Suite =>
   def insertData(s: ProjectAuthService[IO], data: Stream[Gen, ProjectAuthData]) = {
     val genData = data.toIO.compile.toList
     genData.flatMap(d => Stream.emits(d).through(s.updateAll).compile.drain.as(d))
+  }
+
+  def selectUserFrom(data: List[ProjectAuthData]): Gen[persons.GitLabId] = {
+    val userIds = data.flatMap(_.members).map(_.gitLabId).toSet
+    Gen.oneOf(userIds)
+  }
+
+  def selectUserNotIn(data: List[ProjectAuthData]): Gen[persons.GitLabId] = {
+    val userIds = data.flatMap(_.members).map(_.gitLabId).toSet
+    Gen
+      .oneOf(1000 to 100000)
+      .suchThat(id => !userIds.contains(id))
+      .map(persons.GitLabId(_))
   }
 }

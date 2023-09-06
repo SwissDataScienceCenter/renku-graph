@@ -21,9 +21,9 @@ package io.renku.entities.search
 import io.circe.Decoder
 import io.renku.entities.search.Criteria.Filters.EntityType
 import io.renku.entities.search.model.{Entity, MatchingScore}
-import io.renku.graph.model.entities.Person
 import io.renku.graph.model.{GraphClass, persons, projects}
 import io.renku.http.server.security.model.AuthUser
+import io.renku.projectauth.util.SparqlSnippets
 import io.renku.triplesstore.client.sparql.{Fragment, LuceneQuery, VarName}
 import io.renku.triplesstore.client.syntax._
 
@@ -92,8 +92,9 @@ private case object ProjectsQuery extends EntityQuery[model.Entity.Project] {
              |
              |      ${filters.maybeOnDateCreated(someDateCreatedVar)}
              |
+             |      ${accessRightsAndVisibility(criteria.maybeUser, criteria.filters.visibilities)}
+             |
              |      GRAPH $projectIdVar {
-             |        ${accessRightsAndVisibility(criteria.maybeUser, criteria.filters.visibilities)}
              |        ${namespacesPart(criteria.filters.namespaces)}
              |      }
              |
@@ -144,46 +145,10 @@ private case object ProjectsQuery extends EntityQuery[model.Entity.Project] {
   }
 
   private def accessRightsAndVisibility(maybeUser: Option[AuthUser], visibilities: Set[projects.Visibility]): Fragment =
-    maybeUser match {
-      case Some(user) =>
-        val nonPrivateVisibilities =
-          if (visibilities.isEmpty)
-            projects.Visibility.all - projects.Visibility.Private
-          else (projects.Visibility.all - projects.Visibility.Private) intersect visibilities
-
-        val selectPrivateValue =
-          if (visibilities.isEmpty || visibilities.contains(projects.Visibility.Private))
-            projects.Visibility.Private.asObject
-          else "".asTripleObject
-        fr"""|{
-             |  $projectIdVar renku:projectVisibility $visibilityVar.
-             |  {
-             |    VALUES ($visibilityVar) {
-             |      ${nonPrivateVisibilities.map(_.asObject)}
-             |    }
-             |  } UNION {
-             |    VALUES ($visibilityVar) {
-             |      ($selectPrivateValue)
-             |    }
-             |    $projectIdVar schema:member ?memberId.
-             |    GRAPH ${GraphClass.Persons.id} {
-             |      ?memberId schema:sameAs ?memberSameAs.
-             |      ?memberSameAs schema:additionalType ${Person.gitLabSameAsAdditionalType.asTripleObject};
-             |                    schema:identifier ${user.id.asObject}
-             |    }
-             |  }
-             |}
-             |""".stripMargin
-      case None =>
-        visibilities match {
-          case v if v.isEmpty || v.contains(projects.Visibility.Public) =>
-            fr"""|$projectIdVar renku:projectVisibility $visibilityVar.
-                 |VALUES ($visibilityVar) { (${projects.Visibility.Public.asObject}) }""".stripMargin
-          case _ =>
-            fr"""|$projectIdVar renku:projectVisibility $visibilityVar.
-                 |VALUES ($visibilityVar) { ('') }""".stripMargin
-        }
-    }
+    sparql"""
+            |$projectIdVar renku:projectVisibility $visibilityVar .
+            |${SparqlSnippets.visibleProjects(maybeUser.map(_.id), visibilities)}
+              """
 
   private def namespacesPart(ns: Set[projects.Namespace]): Fragment = {
     val matchFrag =
