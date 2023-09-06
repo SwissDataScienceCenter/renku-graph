@@ -43,6 +43,9 @@ object Generators {
   implicit lazy val migrationRequiredGen: Gen[MigrationRequired] =
     Gen.oneOf(MigrationRequired.yes, MigrationRequired.no)
 
+  implicit lazy val branches: Gen[Branch] =
+    nonEmptyStrings().toGeneratorOf(Branch)
+
   implicit lazy val coreLatestUris: Gen[RenkuCoreUri.Latest] =
     httpUrls().map(uri => RenkuCoreUri.Latest(Uri.unsafeFromString(uri)))
 

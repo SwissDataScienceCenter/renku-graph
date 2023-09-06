@@ -216,7 +216,7 @@ class RenkuCoreClientSpec
       val updates     = projectUpdatesGen.generateOne
       val accessToken = userAccessTokens.generateOne
 
-      val result = resultsGen(()).generateOne
+      val result = resultsGen(branches).generateOne
       givenPostingProjectUpdate(coreUri, updates, accessToken, returning = result)
 
       client.updateProject(coreUri, updates, accessToken).asserting(_ shouldBe result)
@@ -273,7 +273,7 @@ class RenkuCoreClientSpec
   private def givenPostingProjectUpdate(coreUri:     RenkuCoreUri.Versioned,
                                         updates:     ProjectUpdates,
                                         accessToken: UserAccessToken,
-                                        returning:   Result[Unit]
+                                        returning:   Result[Branch]
   ) = (lowLevelApis.postProjectUpdate _)
     .expects(coreUri, updates, accessToken)
     .returning(returning.pure[IO])

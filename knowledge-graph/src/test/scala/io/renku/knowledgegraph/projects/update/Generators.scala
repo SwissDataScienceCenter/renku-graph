@@ -18,6 +18,7 @@
 
 package io.renku.knowledgegraph.projects.update
 
+import io.renku.core.client.Generators.branches
 import io.renku.generators.Generators.Implicits._
 import io.renku.generators.Generators.nonEmptyStrings
 import io.renku.graph.model.RenkuTinyTypeGenerators.{imageUris, projectDescriptions, projectKeywords, projectVisibilities}
@@ -48,4 +49,8 @@ private object Generators {
       maybeNewImage      <- imageUris.toGeneratorOfOptions
       maybeNewVisibility <- projectVisibilities
     } yield GLUpdatedProject(maybeNewImage, maybeNewVisibility)
+
+  val defaultBranchInfos: Gen[DefaultBranch] =
+    branches
+      .flatMap(branch => Gen.oneOf(DefaultBranch.PushProtected(branch), DefaultBranch.Unprotected(branch)))
 }
