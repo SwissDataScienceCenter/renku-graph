@@ -115,6 +115,7 @@ class LowLevelApisSpec
 
       otherWireMockResource.evalMap { server =>
         val versionedUri = coreUrisVersioned(server.baseUri).generateOne
+        val remoteBranch = branches.generateOne
 
         server.stubFor {
           post(s"/renku/${versionedUri.apiVersion}/project.edit")
@@ -122,12 +123,12 @@ class LowLevelApisSpec
             .withAccessToken(accessToken.some)
             .withHeader("renku-user-email", equalTo(updates.userInfo.email.value))
             .withHeader("renku-user-fullname", equalTo(updates.userInfo.name.value))
-            .willReturn(ok(Result.success(json"""{"edited": {}}""").asJson.spaces2))
+            .willReturn(ok(Result.success(json"""{"edited": {}, "remote_branch": $remoteBranch}""").asJson.spaces2))
         }
 
         client
           .postProjectUpdate(versionedUri, updates, accessToken)
-          .asserting(_ shouldBe Result.success(()))
+          .asserting(_ shouldBe Result.success(remoteBranch))
       }.use_
     }
   }

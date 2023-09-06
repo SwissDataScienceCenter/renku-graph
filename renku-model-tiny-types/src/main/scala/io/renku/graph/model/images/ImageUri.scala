@@ -18,9 +18,10 @@
 
 package io.renku.graph.model.images
 
+import cats.Show
 import cats.syntax.all._
-import io.circe.{Decoder, Encoder, Json}
 import io.circe.syntax._
+import io.circe.{Decoder, Encoder, Json}
 import io.renku.graph.model.views.TinyTypeJsonLDOps
 import io.renku.tinytypes._
 
@@ -62,4 +63,6 @@ object ImageUri extends From[ImageUri] with TinyTypeConversions[ImageUri] with T
   implicit lazy val decoder: Decoder[ImageUri] = Decoder.decodeString.emap { value =>
     (Relative.from(value) orElse Absolute.from(value)).leftMap(_ => s"Cannot decode $value to $ImageUri")
   }
+
+  implicit lazy val show: Show[ImageUri] = Show.show(_.value)
 }

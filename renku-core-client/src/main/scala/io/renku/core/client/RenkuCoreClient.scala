@@ -36,7 +36,7 @@ trait RenkuCoreClient[F[_]] {
   def updateProject(coreUri:     RenkuCoreUri.Versioned,
                     updates:     ProjectUpdates,
                     accessToken: UserAccessToken
-  ): F[Result[Unit]]
+  ): F[Result[Branch]]
 }
 
 object RenkuCoreClient {
@@ -90,5 +90,5 @@ private class RenkuCoreClientImpl[F[_]: Async: Logger](coreUriForSchemaLoader: R
   override def updateProject(coreUri:     RenkuCoreUri.Versioned,
                              updates:     ProjectUpdates,
                              accessToken: UserAccessToken
-  ): F[Result[Unit]] = lowLevelApis.postProjectUpdate(coreUri, updates, accessToken)
+  ): F[Result[Branch]] = lowLevelApis.postProjectUpdate(coreUri, updates, accessToken)
 }

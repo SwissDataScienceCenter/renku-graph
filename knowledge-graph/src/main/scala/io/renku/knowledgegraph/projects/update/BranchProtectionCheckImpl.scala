@@ -23,6 +23,7 @@ import cats.effect.Async
 import cats.syntax.all._
 import eu.timepit.refined.auto._
 import io.circe.Decoder
+import io.renku.core.client.Branch
 import io.renku.graph.model.projects
 import io.renku.http.client.{AccessToken, GitLabClient}
 import io.renku.http.tinytypes.TinyTypeURIEncoder._
@@ -32,22 +33,25 @@ import org.http4s.implicits._
 import org.http4s.{Request, Response, Status}
 
 private trait BranchProtectionCheck[F[_]] {
-  def canPushToDefaultBranch(slug: projects.Slug, at: AccessToken): F[Boolean]
+  def findDefaultBranchInfo(slug: projects.Slug, at: AccessToken): F[Option[DefaultBranch]]
 }
 
 private object BranchProtectionCheck {
 
   def apply[F[_]: Async: GitLabClient]: BranchProtectionCheck[F] = new BranchProtectionCheckImpl[F]
 
-  case class BranchInfo(default: Boolean, canPush: Boolean)
+  case class BranchInfo(name: Branch, default: Boolean, canPush: Boolean)
 }
 
 private class BranchProtectionCheckImpl[F[_]: Async: GitLabClient] extends BranchProtectionCheck[F] {
 
-  override def canPushToDefaultBranch(slug: projects.Slug, at: AccessToken): F[Boolean] =
+  override def findDefaultBranchInfo(slug: projects.Slug, at: AccessToken): F[Option[DefaultBranch]] =
     GitLabClient[F]
       .get(uri"projects" / slug / "repository" / "branches", "project-branches")(mapResponse)(at.some)
-      .map(_.exists(branch => branch.default && branch.canPush))
+      .map(_.find(_.default).map {
+        case bi if bi.canPush => DefaultBranch.Unprotected(bi.name)
+        case bi               => DefaultBranch.PushProtected(bi.name)
+      })
 
   private lazy val mapResponse: PartialFunction[(Status, Request[F], Response[F]), F[List[BranchInfo]]] = {
     case (Ok, _, resp)    => resp.as[List[BranchInfo]]
@@ -55,5 +59,5 @@ private class BranchProtectionCheckImpl[F[_]: Async: GitLabClient] extends Branc
   }
 
   private implicit lazy val itemDecoder: Decoder[BranchInfo] =
-    Decoder.forProduct2("default", "can_push")(BranchInfo.apply)
+    Decoder.forProduct3("name", "default", "can_push")(BranchInfo.apply)
 }

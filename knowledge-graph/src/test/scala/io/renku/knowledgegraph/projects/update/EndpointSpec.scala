@@ -96,7 +96,7 @@ class EndpointSpec extends AsyncFlatSpec with CustomAsyncIOSpec with should.Matc
         Failure.badRequestOnGLUpdate(Message.Error(nonBlankStrings().generateOne)),
         Failure.forbiddenOnGLUpdate(Message.Error(nonBlankStrings().generateOne)),
         Failure.onGLUpdate(slug, exceptions.generateOne),
-        Failure.cannotPushToBranch
+        Failure.onFindingCoreUri(exceptions.generateOne)
       )
       .generateOne
     givenUpdatingProject(slug, updates, authUser, returning = failure.raiseError[IO, Nothing])
