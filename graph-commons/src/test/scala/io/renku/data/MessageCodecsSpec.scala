@@ -18,6 +18,7 @@
 
 package io.renku.data
 
+import MessageCodecs._
 import io.circe.literal._
 import io.circe.syntax._
 import io.renku.generators.Generators.Implicits._
@@ -62,6 +63,15 @@ class MessageCodecsSpec extends AnyWordSpec with should.Matchers with EitherValu
         "severity": ${Message.Severity.Error.value},
         "message":  ${exception.getClass.getName}
       }"""
+    }
+
+    "provide Json encoder that merges the Json body into the output Json" in {
+
+      val jsonBody = jsons.generateOne
+
+      Message.Error.fromJsonUnsafe(jsonBody).asJson shouldBe json"""{
+        "severity": ${Message.Severity.Error.widen}
+      }""".deepMerge(jsonBody)
     }
   }
 

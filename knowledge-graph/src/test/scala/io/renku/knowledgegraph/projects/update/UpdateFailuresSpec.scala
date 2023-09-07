@@ -51,10 +51,9 @@ class UpdateFailuresSpec extends AnyWordSpec with should.Matchers with ScalaChec
                    | However, an update commit was pushed to a new branch '$corePushBranch' which has to be merged to the default branch with a PR""".stripMargin
               .filter(_ != '\n')
 
-          println(failure.message)
           failure.message shouldBe Message.Error.fromJsonUnsafe {
             json"""{
-              "details": $details,
+              "message": $details,
               "branch":  $corePushBranch
             }"""
           }
