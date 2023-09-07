@@ -30,7 +30,7 @@ object Dependencies {
     val refinedPureconfig      = "0.11.0"
     val scalacheck             = "1.17.0"
     val scalamock              = "5.2.0"
-    val scalatest              = "3.2.16"
+    val scalatest              = "3.2.17"
     val scalatestScalacheck    = "3.2.14.0"
     val sentryLogback          = "6.28.0"
     val skunk                  = "0.6.0"
