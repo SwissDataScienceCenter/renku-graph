@@ -451,6 +451,35 @@ class MicroserviceRoutesSpec
     }
   }
 
+  "POST /knowledge-graph/projects" should {
+
+    val request = Request[IO](POST, uri"knowledge-graph/projects")
+
+    s"return $Accepted for valid path parameters, user and payload" in new TestCase {
+
+      val authUser = MaybeAuthUser(authUsers.generateOne)
+
+      (projectCreateEndpoint
+        .`POST /projects`(_: Request[IO], _: AuthUser))
+        .expects(request, authUser.option.get)
+        .returning(Response[IO](Accepted).pure[IO])
+
+      routes(authUser).call(request).status shouldBe Accepted
+
+      routesMetrics.clearRegistry()
+    }
+
+    s"return $Unauthorized when authentication fails" in new TestCase {
+      routes(givenAuthAsUnauthorized)
+        .call(request)
+        .status shouldBe Unauthorized
+    }
+
+    s"return $NotFound when no auth header" in new TestCase {
+      routes(maybeAuthUser = MaybeAuthUser.noUser).call(request).status shouldBe NotFound
+    }
+  }
+
   "DELETE /knowledge-graph/projects/:namespace/../:name" should {
 
     val projectSlug = projectSlugs.generateOne
@@ -560,36 +589,6 @@ class MicroserviceRoutesSpec
       response.status        shouldBe NotFound
       response.contentType   shouldBe Some(`Content-Type`(application.json))
       response.body[Message] shouldBe Message.Error.unsafeApply(AuthorizationFailure.getMessage)
-    }
-  }
-
-  "POST /knowledge-graph/projects/:namespace/../:name" should {
-
-    val projectSlug = projectSlugs.generateOne
-    val request     = Request[IO](POST, Uri.unsafeFromString(s"knowledge-graph/projects/$projectSlug"))
-
-    s"return $Accepted for valid path parameters, user and payload" in new TestCase {
-
-      val authUser = MaybeAuthUser(authUsers.generateOne)
-
-      (projectCreateEndpoint
-        .`POST /projects/:slug`(_: model.projects.Slug, _: Request[IO], _: AuthUser))
-        .expects(projectSlug, request, authUser.option.get)
-        .returning(Response[IO](Accepted).pure[IO])
-
-      routes(authUser).call(request).status shouldBe Accepted
-
-      routesMetrics.clearRegistry()
-    }
-
-    s"return $Unauthorized when authentication fails" in new TestCase {
-      routes(givenAuthAsUnauthorized)
-        .call(request)
-        .status shouldBe Unauthorized
-    }
-
-    s"return $NotFound when no auth header" in new TestCase {
-      routes(maybeAuthUser = MaybeAuthUser.noUser).call(request).status shouldBe NotFound
     }
   }
 

@@ -108,7 +108,7 @@ class GLProjectUpdaterSpec
 
     mapResponse(BadRequest, Request[IO](), Response[IO](BadRequest).withEntity(json"""{"error": $error}"""))
       .asserting(
-        _.left.value shouldBe Failure.badRequestOnGLUpdate(Message.Error.fromJsonUnsafe(Json.fromString(error)))
+        _.left.value shouldBe UpdateFailures.badRequestOnGLUpdate(Message.Error.fromJsonUnsafe(Json.fromString(error)))
       )
   }
 
@@ -117,7 +117,7 @@ class GLProjectUpdaterSpec
     val message = jsons.generateOne
 
     mapResponse(BadRequest, Request[IO](), Response[IO](BadRequest).withEntity(json"""{"message": $message}"""))
-      .asserting(_.left.value shouldBe Failure.badRequestOnGLUpdate(Message.Error.fromJsonUnsafe(message)))
+      .asserting(_.left.value shouldBe UpdateFailures.badRequestOnGLUpdate(Message.Error.fromJsonUnsafe(message)))
   }
 
   it should "return left if PUT gl/projects/:slug returns 403 FORBIDDEN with a message" in {
@@ -125,7 +125,7 @@ class GLProjectUpdaterSpec
     val message = jsons.generateOne
 
     mapResponse(Forbidden, Request[IO](), Response[IO](Forbidden).withEntity(json"""{"message": $message}"""))
-      .asserting(_.left.value shouldBe Failure.forbiddenOnGLUpdate(Message.Error.fromJsonUnsafe(message)))
+      .asserting(_.left.value shouldBe UpdateFailures.forbiddenOnGLUpdate(Message.Error.fromJsonUnsafe(message)))
   }
 
   private implicit val glClient: GitLabClient[IO] = mock[GitLabClient[IO]]

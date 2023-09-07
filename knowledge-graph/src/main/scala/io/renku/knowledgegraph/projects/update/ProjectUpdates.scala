@@ -18,16 +18,14 @@
 
 package io.renku.knowledgegraph.projects.update
 
-import ProjectUpdates.Image
 import cats.Show
 import cats.syntax.all._
 import io.circe.syntax._
 import io.circe.{Decoder, DecodingFailure, Encoder, Json}
 import io.renku.graph.model.projects
+import io.renku.knowledgegraph.projects.images.Image
 import io.renku.tinytypes.json.TinyTypeDecoders._
 import io.renku.tinytypes.{From, TinyType}
-import org.http4s.MediaType
-import scodec.bits.ByteVector
 
 private final case class ProjectUpdates(newDescription: Option[Option[projects.Description]],
                                         newImage:       Option[Option[Image]],
@@ -49,13 +47,6 @@ private final case class ProjectUpdates(newDescription: Option[Option[projects.D
 private object ProjectUpdates {
 
   lazy val empty: ProjectUpdates = ProjectUpdates(None, None, None, None)
-
-  final case class Image(name: String, mediaType: MediaType, data: ByteVector)
-  object Image {
-    implicit val show: Show[Image] = Show.show { case Image(name, mediaType, _) =>
-      show"$name ($mediaType)"
-    }
-  }
 
   implicit val jsonEncoder: Encoder[ProjectUpdates] = Encoder.instance {
     case ProjectUpdates(newDescription, _, newKeywords, newVisibility) =>

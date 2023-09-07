@@ -28,7 +28,7 @@ import io.renku.graph.model.GitLabUrl
 import io.renku.http.rest.Links.{Link, Rel, _links}
 import io.renku.json.JsonOps._
 import io.renku.knowledgegraph
-import io.renku.knowledgegraph.projects.images.ImagesEncoder
+import io.renku.knowledgegraph.projects.images.ImageUrisEncoder
 import model.Permissions._
 import model._
 
@@ -40,7 +40,7 @@ private object ProjectJsonEncoder {
   def apply[F[_]: MonadThrow]: F[ProjectJsonEncoder] = renku.ApiUrl[F]().map(new ProjectJsonEncoderImpl(_))
 }
 
-private class ProjectJsonEncoderImpl(renkuApiUrl: renku.ApiUrl) extends ProjectJsonEncoder with ImagesEncoder {
+private class ProjectJsonEncoderImpl(renkuApiUrl: renku.ApiUrl) extends ProjectJsonEncoder with ImageUrisEncoder {
 
   override def encode(project: model.Project)(implicit gitLabUrl: GitLabUrl): Json = project.asJson
 

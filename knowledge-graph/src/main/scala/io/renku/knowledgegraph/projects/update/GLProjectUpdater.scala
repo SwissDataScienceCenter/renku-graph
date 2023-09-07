@@ -18,7 +18,6 @@
 
 package io.renku.knowledgegraph.projects.update
 
-import ProjectUpdates.Image
 import cats.MonadThrow
 import cats.effect.Async
 import cats.syntax.all._
@@ -29,6 +28,8 @@ import io.renku.data.Message
 import io.renku.graph.model.projects
 import io.renku.http.client.{AccessToken, GitLabClient}
 import io.renku.http.tinytypes.TinyTypeURIEncoder._
+import io.renku.knowledgegraph.Failure
+import io.renku.knowledgegraph.projects.images.Image
 import org.http4s.Status._
 import org.http4s.circe.CirceEntityDecoder._
 import org.http4s.circe.jsonOf
@@ -95,13 +96,13 @@ private class GLProjectUpdaterImpl[F[_]: Async: GitLabClient] extends GLProjectU
       resp
         .as[Json](MonadThrow[F], jsonOf(Async[F], errorDecoder))
         .map(Message.Error.fromJsonUnsafe)
-        .map(Failure.badRequestOnGLUpdate)
+        .map(UpdateFailures.badRequestOnGLUpdate)
         .map(_.asLeft)
     case (Forbidden, _, resp) =>
       resp
         .as[Json](MonadThrow[F], jsonOf(Async[F], errorDecoder))
         .map(Message.Error.fromJsonUnsafe)
-        .map(Failure.forbiddenOnGLUpdate)
+        .map(UpdateFailures.forbiddenOnGLUpdate)
         .map(_.asLeft)
   }
 

@@ -31,14 +31,14 @@ import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
 import org.scalatestplus.scalacheck.ScalaCheckPropertyChecks
 
-class FailureSpec extends AnyWordSpec with should.Matchers with ScalaCheckPropertyChecks {
+class UpdateFailuresSpec extends AnyWordSpec with should.Matchers with ScalaCheckPropertyChecks {
 
   "corePushedToNonDefaultBranch" should {
 
     "return a Conflict Failure with a JSON message containing the branch Core pushed to" in {
       forAll(tgUpdatesGen, defaultBranchInfos.toGeneratorOfOptions, branches) {
         (tgUpdates, maybeDefaultBranch, corePushBranch) =>
-          val failure = Failure.corePushedToNonDefaultBranch(tgUpdates, maybeDefaultBranch, corePushBranch)
+          val failure = UpdateFailures.corePushedToNonDefaultBranch(tgUpdates, maybeDefaultBranch, corePushBranch)
 
           failure.status shouldBe Conflict
 
@@ -48,7 +48,7 @@ class FailureSpec extends AnyWordSpec with should.Matchers with ScalaCheckProper
           val defaultBranchInfo = maybeDefaultBranch.map(_.branch).fold("")(b => show" '$b'")
           val details =
             show"""|$updatedValuesInfo got updated in the Knowledge Graph due to branch protection rules on the default branch$defaultBranchInfo.
-                   |However, an update commit was pushed to a new branch '$corePushBranch' which has to be merged to the default branch with a PR""".stripMargin
+                   | However, an update commit was pushed to a new branch '$corePushBranch' which has to be merged to the default branch with a PR""".stripMargin
               .filter(_ != '\n')
 
           println(failure.message)

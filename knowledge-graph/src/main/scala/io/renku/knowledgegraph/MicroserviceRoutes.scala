@@ -42,8 +42,8 @@ import io.renku.http.server.QueryParameterTools._
 import io.renku.http.server.security.Authentication
 import io.renku.http.server.security.model.{AuthUser, MaybeAuthUser}
 import io.renku.http.server.version
-import io.renku.knowledgegraph.datasets.{DatasetIdRecordsFinder, DatasetSameAsRecordsFinder}
 import io.renku.knowledgegraph.datasets.details.RequestedDataset
+import io.renku.knowledgegraph.datasets.{DatasetIdRecordsFinder, DatasetSameAsRecordsFinder}
 import io.renku.metrics.{MetricsRegistry, RoutesMetrics}
 import io.renku.triplesstore.{ProjectSparqlClient, ProjectsConnectionConfig, SparqlQueryTimeRecorder}
 import org.http4s.dsl.Http4sDsl
@@ -165,6 +165,11 @@ private class MicroserviceRoutes[F[_]: Async](
 
   private lazy val `GET /projects/*` : AuthedRoutes[MaybeAuthUser, F] = AuthedRoutes.of {
 
+    case authReq @ POST -> Root / "knowledge-graph" / "projects" as maybeUser =>
+      maybeUser.withUserOrNotFound {
+        `POST /projects`(authReq.req, _)
+      }
+
     case DELETE -> "knowledge-graph" /: "projects" /: path as maybeUser =>
       maybeUser.withUserOrNotFound { user =>
         path.segments.toList
@@ -177,15 +182,6 @@ private class MicroserviceRoutes[F[_]: Async](
 
     case authReq @ GET -> "knowledge-graph" /: "projects" /: path as maybeUser =>
       routeToProjectsEndpoints(path, maybeUser.option)(authReq.req)
-
-    case authReq @ POST -> "knowledge-graph" /: "projects" /: path as maybeUser =>
-      maybeUser.withUserOrNotFound { user =>
-        path.segments.toList
-          .map(_.toString)
-          .toProjectSlug
-          .semiflatMap(`POST /projects/:slug`(_, authReq.req, user))
-          .merge
-      }
 
     case authReq @ (PATCH | PUT) -> "knowledge-graph" /: "projects" /: path as maybeUser =>
       maybeUser.withUserOrNotFound { user =>

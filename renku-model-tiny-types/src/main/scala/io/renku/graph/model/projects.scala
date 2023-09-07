@@ -140,6 +140,8 @@ object projects {
   }
   object Visibility extends TinyTypeFactory[Visibility](VisibilityInstantiator) {
 
+    implicit val factory: From[Visibility] = this
+
     val allOrdered: List[Visibility] = List(Public, Internal, Private)
     val all:        Set[Visibility]  = allOrdered.toSet
 

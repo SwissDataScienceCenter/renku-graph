@@ -335,6 +335,14 @@ object Generators {
     objects.map(_.asJson)
   }
 
+  def countingGen = {
+    var cnt: Int = 0
+    Gen.double.map { _ =>
+      cnt += 1
+      cnt
+    }
+  }
+
   object Implicits {
 
     implicit class GenOps[T](generator: Gen[T]) {

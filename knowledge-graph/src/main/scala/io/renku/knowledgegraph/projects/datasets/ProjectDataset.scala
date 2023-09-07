@@ -18,9 +18,9 @@
 
 package io.renku.knowledgegraph.projects.datasets
 
-import io.circe.{Encoder, Json}
 import io.circe.literal._
 import io.circe.syntax._
+import io.circe.{Encoder, Json}
 import io.renku.config.renku
 import io.renku.graph.model.datasets._
 import io.renku.graph.model.images.ImageUri
@@ -28,7 +28,7 @@ import io.renku.graph.model.{GitLabUrl, projects}
 import io.renku.http.rest.Links.{Rel, _links}
 import io.renku.knowledgegraph
 import io.renku.knowledgegraph.datasets.details.RequestedDataset
-import io.renku.knowledgegraph.projects.images.ImagesEncoder
+import io.renku.knowledgegraph.projects.images.ImageUrisEncoder
 
 private final case class ProjectDataset(identifier:          Identifier,
                                         originalIdentifier:  OriginalIdentifier,
@@ -40,7 +40,7 @@ private final case class ProjectDataset(identifier:          Identifier,
                                         images:              List[ImageUri]
 )
 
-private object ProjectDataset extends ImagesEncoder {
+private object ProjectDataset extends ImageUrisEncoder {
   type SameAsOrDerived = Either[SameAs, DerivedFrom]
 
   private implicit val sameAsOrDerivedEncoder: Encoder[SameAsOrDerived] = Encoder.instance[SameAsOrDerived] {

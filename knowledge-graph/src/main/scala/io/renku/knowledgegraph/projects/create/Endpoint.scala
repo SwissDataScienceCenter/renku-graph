@@ -18,26 +18,67 @@
 
 package io.renku.knowledgegraph.projects.create
 
+import cats.data.EitherT
 import cats.effect.Async
 import cats.syntax.all._
-import io.renku.graph.model.projects
+import eu.timepit.refined.auto._
+import io.renku.data.Message
 import io.renku.http.client.GitLabClient
 import io.renku.http.server.security.model.AuthUser
+import io.renku.knowledgegraph.Failure
 import io.renku.metrics.MetricsRegistry
+import org.http4s.Status.{Accepted, BadRequest, Conflict, Forbidden, InternalServerError}
+import org.http4s.multipart.Multipart
 import org.http4s.{Request, Response}
 import org.typelevel.log4cats.Logger
 
 trait Endpoint[F[_]] {
-  def `POST /projects/:slug`(slug: projects.Slug, request: Request[F], authUser: AuthUser): F[Response[F]]
+  def `POST /projects`(request: Request[F], authUser: AuthUser): F[Response[F]]
 }
 
 object Endpoint {
   def apply[F[_]: Async: Logger: MetricsRegistry: GitLabClient]: F[Endpoint[F]] =
-    new EndpointImpl[F].pure[F].widen
+    new EndpointImpl[F](ProjectCreator[F]).pure[F].widen
 }
 
-private class EndpointImpl[F[_]] extends Endpoint[F] {
+private class EndpointImpl[F[_]: Async: Logger](projectCreator: ProjectCreator[F]) extends Endpoint[F] {
 
-  override def `POST /projects/:slug`(slug: projects.Slug, request: Request[F], authUser: AuthUser): F[Response[F]] =
-    ???
+  override def `POST /projects`(request: Request[F], authUser: AuthUser): F[Response[F]] =
+    EitherT(decodePayload(request))
+      .semiflatMap { newProject =>
+        projectCreator
+          .createProject(newProject, authUser)
+          .as(Response[F](Accepted).withEntity(Message.Info("Project creation accepted")))
+          .flatTap(_ => Logger[F].info(show"Project ${newProject.slug} created"))
+      }
+      .merge
+      .handleErrorWith(relevantError)
+
+  private lazy val decodePayload: Request[F] => F[Either[Response[F], NewProject]] =
+    _.as[Multipart[F]]
+      .flatMap(MultipartRequestDecoder[F].decode)
+      .map(_.asRight[Response[F]])
+      .handleError(badRequest(_).asLeft[NewProject])
+
+  private def badRequest: Throwable => Response[F] = { _ =>
+    Response[F](BadRequest).withEntity(Message.Error("Invalid payload"))
+  }
+
+  private lazy val relevantError: Throwable => F[Response[F]] = {
+    case f: Failure =>
+      logFailure(f).as(f.toResponse[F])
+    case ex: Exception =>
+      Logger[F]
+        .error(ex)("Creating project failed")
+        .as(Response[F](InternalServerError).withEntity(Message.Error("Creation failed")))
+  }
+
+  private lazy val logFailure: Failure => F[Unit] = {
+    case f if f.status == BadRequest || f.status == Conflict =>
+      Logger[F].info(show"Creating project failed: ${f.getMessage}")
+    case f if f.status == Forbidden =>
+      ().pure[F]
+    case f =>
+      Logger[F].error(f)("Creating project failed")
+  }
 }

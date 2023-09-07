@@ -25,7 +25,7 @@ import io.renku.graph.model.{GitLabUrl, projects}
 import io.renku.graph.model.images.ImageUri
 import io.renku.http.rest.Links.{Href, Link, Rel, _links}
 
-trait ImagesEncoder {
+trait ImageUrisEncoder {
 
   implicit def imagesEncoder(implicit gitLabUrl: GitLabUrl): Encoder[(List[ImageUri], projects.Slug)] =
     Encoder.instance[(List[ImageUri], projects.Slug)] { case (imageUris, exemplarProjectSlug) =>

@@ -25,27 +25,11 @@ import io.circe.literal._
 import io.renku.core.client.Branch
 import io.renku.data.Message
 import io.renku.graph.model.{persons, projects}
+import io.renku.knowledgegraph.Failure
 import io.renku.triplesgenerator.api.{ProjectUpdates => TGProjectUpdates}
-import org.http4s.Status
 import org.http4s.Status.{BadRequest, Conflict, Forbidden, InternalServerError}
 
-private sealed trait Failure extends Exception {
-  val status:  Status
-  val message: Message
-}
-
-private object Failure {
-
-  final case class Simple(status: Status, message: Message) extends Exception(message.show) with Failure
-  final case class WithCause(status: Status, message: Message, cause: Throwable)
-      extends Exception(message.show, cause)
-      with Failure
-
-  def apply(status: Status, message: Message): Failure =
-    Failure.Simple(status, message)
-
-  def apply(status: Status, message: Message, cause: Throwable): Failure =
-    Failure.WithCause(status, message, cause)
+private object UpdateFailures {
 
   def badRequestOnGLUpdate(message: Message): Failure =
     Failure(BadRequest, message)
@@ -54,7 +38,10 @@ private object Failure {
     Failure(Forbidden, message)
 
   def onGLUpdate(slug: projects.Slug, cause: Throwable): Failure =
-    Failure(InternalServerError, Message.Error.unsafeApply(show"Updating project $slug in GitLab failed"), cause)
+    Failure(InternalServerError,
+            Message.Error.unsafeApply(show"Updating project $slug in GitLab failed.${toMessage(cause)}"),
+            cause
+    )
 
   def onTGUpdatesFinding(slug: projects.Slug, cause: Throwable): Failure =
     Failure(InternalServerError,
@@ -64,12 +51,15 @@ private object Failure {
 
   def onTSUpdate(slug: projects.Slug, cause: Throwable): Failure =
     Failure(InternalServerError,
-            Message.Error.unsafeApply(show"Updating project $slug in the Knowledge Graph failed"),
+            Message.Error.unsafeApply(show"Updating project $slug in the Knowledge Graph failed.${toMessage(cause)}"),
             cause
     )
 
   def onCoreUpdate(slug: projects.Slug, cause: Throwable): Failure =
-    Failure(InternalServerError, Message.Error.unsafeApply(show"Updating project $slug in renku-core failed"), cause)
+    Failure(InternalServerError,
+            Message.Error.unsafeApply(show"Updating project $slug in renku-core failed.${toMessage(cause)}"),
+            cause
+    )
 
   def corePushedToNonDefaultBranch(tgUpdates:      TGProjectUpdates,
                                    defaultBranch:  Option[DefaultBranch],
@@ -81,7 +71,7 @@ private object Failure {
     val defaultBranchInfo = defaultBranch.map(_.branch).fold("")(b => show" '$b'")
     val details =
       show"""|$updatedValuesInfo got updated in the Knowledge Graph due to branch protection rules on the default branch$defaultBranchInfo.
-             |However, an update commit was pushed to a new branch '$corePushBranch' which has to be merged to the default branch with a PR""".stripMargin
+             | However, an update commit was pushed to a new branch '$corePushBranch' which has to be merged to the default branch with a PR""".stripMargin
         .filter(_ != '\n')
     val message = json"""{
       "details": $details,
@@ -121,4 +111,9 @@ private object Failure {
 
   def onFindingCoreUri(cause: Throwable): Failure =
     Failure(Conflict, Message.Error.fromExceptionMessage(cause), cause)
+
+  private def toMessage(cause: Throwable): String =
+    Option(cause)
+      .flatMap(c => Option(c.getMessage))
+      .fold(ifEmpty = "")(m => s" $m")
 }
