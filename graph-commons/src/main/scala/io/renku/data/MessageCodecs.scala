@@ -60,7 +60,7 @@ trait MessageCodecs {
 
   implicit def messageJsonEncoder[T <: Message]: Encoder[T] = Encoder.instance[T] {
     case Message.StringMessage(v, s) => Json.obj("severity" -> s.asJson, "message" -> Json.fromString(v))
-    case Message.JsonMessage(v, s)   => Json.obj("severity" -> s.asJson, "message" -> v)
+    case Message.JsonMessage(v, s)   => Json.obj("severity" -> s.asJson).deepMerge(v)
   }
 
   implicit def messageJsonEntityDecoder[F[_]: Concurrent]: EntityDecoder[F, Message] = jsonOf[F, Message]

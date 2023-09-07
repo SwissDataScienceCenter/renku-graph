@@ -79,15 +79,15 @@ private object Failure {
       if (tgUpdates == TGProjectUpdates.empty) "No values"
       else show"Only $tgUpdates"
     val defaultBranchInfo = defaultBranch.map(_.branch).fold("")(b => show" '$b'")
-    val details =
+    val message =
       show"""|$updatedValuesInfo got updated in the Knowledge Graph due to branch protection rules on the default branch$defaultBranchInfo.
              |However, an update commit was pushed to a new branch '$corePushBranch' which has to be merged to the default branch with a PR""".stripMargin
         .filter(_ != '\n')
-    val message = json"""{
-      "details": $details,
+    val json = json"""{
+      "message": $message,
       "branch":  $corePushBranch
     }"""
-    Failure(Conflict, Message.Error.fromJsonUnsafe(message))
+    Failure(Conflict, Message.Error.fromJsonUnsafe(json))
   }
 
   def onProvisioningNotHealthy(slug: projects.Slug, unhealthy: Unhealthy): Failure =
