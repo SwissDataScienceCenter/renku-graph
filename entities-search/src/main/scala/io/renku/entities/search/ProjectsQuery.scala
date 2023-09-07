@@ -148,7 +148,7 @@ private case object ProjectsQuery extends EntityQuery[model.Entity.Project] {
     sparql"""
             |$projectIdVar renku:projectVisibility $visibilityVar .
             |${SparqlSnippets.visibleProjects(maybeUser.map(_.id), visibilities)}
-              """
+              """.stripMargin
 
   private def namespacesPart(ns: Set[projects.Namespace]): Fragment = {
     val matchFrag =
