@@ -18,6 +18,7 @@
 
 package io.renku.knowledgegraph.projects.create
 
+import io.renku.core.client.Branch
 import io.renku.graph.model.projects
 import io.renku.knowledgegraph.projects.images.Image
 import io.renku.tinytypes.constraints.{NonBlank, Url}
@@ -32,7 +33,9 @@ private final case class NewProject(
     visibility:       projects.Visibility,
     template:         Template,
     maybeImage:       Option[Image]
-)
+) {
+  val branch: Branch = Branch.default
+}
 
 private final case class Template(
     repositoryUrl: templates.RepositoryUrl,
