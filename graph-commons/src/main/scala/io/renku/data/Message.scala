@@ -126,7 +126,7 @@ object Message extends MessageCodecs {
 
   private def toStringMessageUnsafe(severity: Severity): String => Message.StringMessage =
     _.trim match {
-      case ""       => throw new IllegalArgumentException(show"$severity message cannot be blank")
+      case ""       => throw new IllegalArgumentException(show"${severity.show.capitalize} message cannot be blank")
       case nonBlank => StringMessage(nonBlank, severity)
     }
 
