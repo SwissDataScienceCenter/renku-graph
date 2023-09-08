@@ -158,7 +158,8 @@ class ProjectEventsFinderSpec
 
     val mapResponse = captureMapping(gitLabClient)(
       finder.find(Project(projectIds.generateOne, projectSlugs.generateOne), nonNegativeInts().generateOne),
-      Gen.const(EitherT(IO(Option.empty[(persons.Name, persons.Email)].asRight[ProcessingRecoverableError])))
+      Gen.const(EitherT(IO(Option.empty[(persons.Name, persons.Email)].asRight[ProcessingRecoverableError]))),
+      underlyingMethod = Get
     )
   }
 

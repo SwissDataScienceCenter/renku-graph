@@ -150,7 +150,8 @@ class ProjectMembersFinderSpec
     val mapResponse =
       captureMapping(gitLabClient)(
         finder.findProjectMembers(projectSlug)(maybeAccessToken).value.unsafeRunSync(),
-        Gen.const((Set.empty[ProjectMemberNoEmail], Option.empty[Int]))
+        Gen.const((Set.empty[ProjectMemberNoEmail], Option.empty[Int])),
+        underlyingMethod = Get
       )
   }
 

@@ -119,7 +119,8 @@ class GitLabProjectFetcherSpec
         givenFindAccessToken(by = projectId, returning = maybeAccessToken.pure[IO])
         fetcher.fetchGitLabProject(projectId).unsafeRunSync()
       },
-      projectSlugs.generateOption.asRight[UnauthorizedException]
+      projectSlugs.generateOption.asRight[UnauthorizedException],
+      underlyingMethod = Get
     )
 
     def givenFindAccessToken(by: projects.GitLabId, returning: IO[Option[AccessToken]]) =

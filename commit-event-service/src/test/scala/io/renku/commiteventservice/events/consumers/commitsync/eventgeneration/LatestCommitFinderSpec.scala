@@ -138,7 +138,8 @@ class LatestCommitFinderSpec
 
     val mapResponse: ResponseMappingF[IO, Option[CommitInfo]] = captureMapping(gitLabClient)(
       latestCommitFinder.findLatestCommit(projectId)(accessTokens.generateOption).unsafeRunSync(),
-      commitInfos.toGeneratorOfOptions
+      commitInfos.toGeneratorOfOptions,
+      underlyingMethod = Get
     )
   }
 }

@@ -154,7 +154,8 @@ class CommitAuthorFinderSpec
 
     val mapResponse = captureMapping(gitLabClient)(
       finder.findCommitAuthor(projectSlugs.generateOne, commitIds.generateOne),
-      Gen.const(EitherT(IO(Option.empty[(persons.Name, persons.Email)].asRight[ProcessingRecoverableError])))
+      Gen.const(EitherT(IO(Option.empty[(persons.Name, persons.Email)].asRight[ProcessingRecoverableError]))),
+      underlyingMethod = Get
     )
   }
 

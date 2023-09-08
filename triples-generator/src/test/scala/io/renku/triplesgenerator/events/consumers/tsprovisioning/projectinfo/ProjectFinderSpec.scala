@@ -186,7 +186,8 @@ class ProjectFinderSpec
     val mapTo: ResponseMappingF[IO, Option[(GitLabProjectInfo, Option[persons.GitLabId])]] =
       captureMapping(gitLabClient)(
         finder.findProject(projectSlugs.generateOne)(maybeAccessToken).value.unsafeRunSync(),
-        Gen.const((gitLabProjectInfos.generateOne, Option.empty[persons.GitLabId]).some)
+        Gen.const((gitLabProjectInfos.generateOne, Option.empty[persons.GitLabId]).some),
+        underlyingMethod = Get
       )
   }
 

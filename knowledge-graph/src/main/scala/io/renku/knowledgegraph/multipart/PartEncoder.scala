@@ -42,6 +42,9 @@ object PartValueEncoder {
 
   def instance[A](f: A => String): PartValueEncoder[A] = (a: A) => f(a)
 
+  implicit def stringEnc: PartValueEncoder[String] =
+    instance(identity)
+
   implicit def stringTinyTypePartEnc[TT <: TinyType { type V = String }]: PartValueEncoder[TT] =
     instance(_.value)
 

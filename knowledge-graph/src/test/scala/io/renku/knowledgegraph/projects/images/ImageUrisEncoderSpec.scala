@@ -29,7 +29,11 @@ import org.scalatest.flatspec.AnyFlatSpec
 import org.scalatest.matchers.should
 import org.scalatestplus.scalacheck.ScalaCheckPropertyChecks
 
-class ImageUrisEncoderSpec extends AnyFlatSpec with should.Matchers with ScalaCheckPropertyChecks with ImageUrisEncoder {
+class ImageUrisEncoderSpec
+    extends AnyFlatSpec
+    with should.Matchers
+    with ScalaCheckPropertyChecks
+    with ImageUrisEncoder {
 
   it should "encode the List[ImageUri] -> slug tuples to JSON" in {
     forAll(imageUris.toGeneratorOfList()) { images =>

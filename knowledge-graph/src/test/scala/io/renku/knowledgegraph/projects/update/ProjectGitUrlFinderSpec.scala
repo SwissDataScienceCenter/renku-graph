@@ -99,7 +99,8 @@ class ProjectGitUrlFinderSpec
       finder
         .findGitUrl(projectSlugs.generateOne, userAccessTokens.generateOne)
         .unsafeRunSync(),
-      projectGitHttpUrls.toGeneratorOfOptions
+      projectGitHttpUrls.toGeneratorOfOptions,
+      underlyingMethod = Get
     )
 
   private lazy val payloadEncoder: Encoder[projects.GitHttpUrl] = Encoder.instance { url =>

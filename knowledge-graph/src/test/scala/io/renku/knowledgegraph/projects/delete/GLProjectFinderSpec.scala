@@ -98,7 +98,8 @@ class GLProjectFinderSpec
 
     lazy val mapResponse: ResponseMappingF[IO, Option[Project]] =
       captureMapping(glClient)(finder.findProject(projectSlugs.generateOne).unsafeRunSync(),
-                               consumerProjects.toGeneratorOfOptions
+                               consumerProjects.toGeneratorOfOptions,
+                               underlyingMethod = Get
       )
   }
 

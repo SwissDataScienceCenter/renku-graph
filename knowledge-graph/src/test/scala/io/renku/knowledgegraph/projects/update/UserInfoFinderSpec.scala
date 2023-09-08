@@ -91,7 +91,8 @@ class UserInfoFinderSpec
       finder
         .findUserInfo(userAccessTokens.generateOne)
         .unsafeRunSync(),
-      userInfos.toGeneratorOfOptions
+      userInfos.toGeneratorOfOptions,
+      underlyingMethod = Get
     )
 
   private implicit lazy val payloadEncoder: Encoder[UserInfo] = Encoder.instance { case UserInfo(name, email) =>

@@ -25,16 +25,15 @@ import eu.timepit.refined.auto._
 import eu.timepit.refined.collection.NonEmpty
 import io.renku.generators.CommonGraphGenerators.accessTokens
 import io.renku.generators.Generators.Implicits._
-import io.renku.graph.model.projects
 import io.renku.graph.model.RenkuTinyTypeGenerators.projectIds
-import io.renku.http.client.{AccessToken, GitLabClient}
+import io.renku.graph.model.projects
 import io.renku.http.client.RestClient.ResponseMappingF
+import io.renku.http.client.{AccessToken, GitLabClient}
 import io.renku.http.tinytypes.TinyTypeURIEncoder._
 import io.renku.testtools.{GitLabClientTools, IOSpec}
-import org.http4s.{Request, Response, Uri}
-import org.http4s.implicits._
-import org.http4s.Method.DELETE
 import org.http4s.Status._
+import org.http4s.implicits._
+import org.http4s.{Request, Response, Uri}
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
@@ -85,6 +84,9 @@ class ProjectRemoverSpec
     }
 
     lazy val mapResponse: ResponseMappingF[IO, Unit] =
-      captureMapping(glClient)(remover.deleteProject(projectIds.generateOne).unsafeRunSync(), (), method = DELETE)
+      captureMapping(glClient)(remover.deleteProject(projectIds.generateOne).unsafeRunSync(),
+                               (),
+                               underlyingMethod = Delete
+      )
   }
 }

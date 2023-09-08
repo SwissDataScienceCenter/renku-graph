@@ -174,7 +174,7 @@ class MessageSpec extends AnyWordSpec with should.Matchers with EitherValues {
     "fail for a null exception and blank message" in {
       intercept[IllegalArgumentException](
         Message.Error.fromMessageAndStackTraceUnsafe(blankStrings().generateOne, exception = null)
-      ).getMessage shouldBe "Error message cannot be blank"
+      ).getMessage shouldBe "error message cannot be blank"
     }
   }
 

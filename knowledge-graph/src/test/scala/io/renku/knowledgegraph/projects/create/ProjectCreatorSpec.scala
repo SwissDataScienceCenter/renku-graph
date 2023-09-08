@@ -18,7 +18,14 @@
 
 package io.renku.knowledgegraph.projects.create
 
-import org.scalatest.flatspec.AnyFlatSpec
+import cats.effect.IO
+import cats.effect.testing.scalatest.AsyncIOSpec
+import org.scalatest.flatspec.AsyncFlatSpec
 import org.scalatest.matchers.should
 
-class ProjectCreatorSpec extends AnyFlatSpec with should.Matchers {}
+class ProjectCreatorSpec extends AsyncFlatSpec with AsyncIOSpec with should.Matchers {
+
+//  it should "" {}
+
+  private lazy val creator = new ProjectCreatorImpl[IO]
+}

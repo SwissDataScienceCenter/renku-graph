@@ -116,7 +116,8 @@ class GLAuthenticatorSpec
     lazy val mapResponse =
       captureMapping(gitLabClient)(
         authenticator.authenticate(accessToken).unsafeRunSync(),
-        Gen.const(Right(AuthUser(personGitLabIds.generateOne, accessToken)))
+        Gen.const(Right(AuthUser(personGitLabIds.generateOne, accessToken))),
+        underlyingMethod = Get
       )
   }
 }

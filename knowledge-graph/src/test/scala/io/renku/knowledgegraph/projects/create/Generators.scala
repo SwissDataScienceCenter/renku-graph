@@ -45,4 +45,7 @@ private object Generators {
       template         <- templatesGen
       image            <- ImageGenerators.images.toGeneratorOfOptions
     } yield NewProject(name, namespaceId, slug, maybeDescription, keywords, visibility, template, image)
+
+  implicit val glCreatedProjectsGen: Gen[GLCreatedProject] =
+    imageUris.toGeneratorOfOptions.map(GLCreatedProject.apply)
 }
