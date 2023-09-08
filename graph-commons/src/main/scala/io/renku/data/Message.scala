@@ -39,7 +39,7 @@ object Message extends MessageCodecs {
 
   sealed trait Severity extends Product {
     lazy val widen:             Severity = this
-    lazy val value:             String   = productPrefix
+    lazy val value:             String   = productPrefix.toLowerCase
     override lazy val toString: String   = value
   }
   object Severity {
