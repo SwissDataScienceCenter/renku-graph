@@ -23,9 +23,9 @@ import cats.syntax.all._
 import cats.{Functor, MonadThrow}
 import eu.timepit.refined.api.{RefType, Refined}
 import eu.timepit.refined.collection.NonEmpty
-import io.renku.tinytypes.{From, TinyType}
+import io.renku.tinytypes.{From, TinyType, TinyTypeFactory}
 import org.http4s.multipart.{Multipart, Part}
-import org.http4s.{DecodeResult, EntityDecoder, MalformedMessageBodyFailure}
+import org.http4s.{DecodeFailure, DecodeResult, EntityDecoder, MalformedMessageBodyFailure}
 
 object syntax {
 
@@ -95,5 +95,18 @@ object syntax {
           err => DecodeResult.failureT(MalformedMessageBodyFailure(err.getMessage)),
           DecodeResult.successT(_)
         )
+    }
+
+  implicit def intTinyTypeEntityDecoder[F[_]: Concurrent, TT <: TinyType { type V = Int }](implicit
+      ttFactory: TinyTypeFactory[TT]
+  ): EntityDecoder[F, TT] =
+    EntityDecoder.text[F].flatMapR { v =>
+      DecodeResult.apply {
+        v.toIntOption
+          .toRight(MalformedMessageBodyFailure(s"'$v' is not valid ${ttFactory.typeName}"))
+          .flatMap(ttFactory.from(_).leftMap(err => MalformedMessageBodyFailure(err.getMessage)))
+          .leftWiden[DecodeFailure]
+          .pure[F]
+      }
     }
 }

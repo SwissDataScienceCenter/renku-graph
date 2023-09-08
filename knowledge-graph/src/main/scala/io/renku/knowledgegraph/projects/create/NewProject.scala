@@ -26,7 +26,7 @@ import io.renku.tinytypes.{StringTinyType, TinyTypeFactory, UrlTinyType}
 
 private final case class NewProject(
     name:             projects.Name,
-    namespace:        projects.Namespace,
+    namespaceId:      NamespaceId,
     slug:             projects.Slug,
     maybeDescription: Option[projects.Description],
     keywords:         Set[projects.Keyword],

@@ -44,4 +44,7 @@ object PartValueEncoder {
 
   implicit def stringTinyTypePartEnc[TT <: TinyType { type V = String }]: PartValueEncoder[TT] =
     instance(_.value)
+
+  implicit def intTinyTypePartEnc[TT <: TinyType { type V = Int }]: PartValueEncoder[TT] =
+    instance(_.value.toString)
 }

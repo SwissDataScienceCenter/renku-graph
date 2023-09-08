@@ -20,13 +20,14 @@ package io.renku.knowledgegraph.projects.create
 
 import cats.syntax.all._
 import io.renku.generators.Generators.Implicits._
-import io.renku.generators.Generators.{httpUrls, noDashUuid}
+import io.renku.generators.Generators.{httpUrls, noDashUuid, positiveInts}
 import io.renku.graph.model.RenkuTinyTypeGenerators._
 import io.renku.knowledgegraph.projects.images.ImageGenerators
 import org.scalacheck.Gen
 
 private object Generators {
 
+  implicit val namespaceIds: Gen[NamespaceId] = positiveInts().map(_.value).toGeneratorOf(NamespaceId)
   implicit val templateRepositoryUrls: Gen[templates.RepositoryUrl] = httpUrls().toGeneratorOf(templates.RepositoryUrl)
   implicit val templateIdentifiers:    Gen[templates.Identifier]    = noDashUuid.toGeneratorOf(templates.Identifier)
 
@@ -36,12 +37,12 @@ private object Generators {
   implicit val newProjects: Gen[NewProject] =
     for {
       name             <- projectNames
-      namespace        <- projectNamespaces
+      namespaceId      <- namespaceIds
       slug             <- projectSlugs
       maybeDescription <- projectDescriptions.toGeneratorOfOptions
       keywords         <- projectKeywords.toGeneratorOfSet()
       visibility       <- projectVisibilities
       template         <- templatesGen
       image            <- ImageGenerators.images.toGeneratorOfOptions
-    } yield NewProject(name, namespace, slug, maybeDescription, keywords, visibility, template, image)
+    } yield NewProject(name, namespaceId, slug, maybeDescription, keywords, visibility, template, image)
 }
