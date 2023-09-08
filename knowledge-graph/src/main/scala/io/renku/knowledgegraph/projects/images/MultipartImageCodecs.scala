@@ -67,11 +67,9 @@ object MultipartImageCodecs {
             .map(ct => DecodeResult.successT(ct.mediaType))
             .getOrElse(mediaTypeFailure[F, MediaType](part))
 
-        findImageData.flatMap {
-          case None => DecodeResult.successT(Option.empty[Image])
-          case Some(data) =>
-            (findImageFilename, findImageMediaType)
-              .mapN(Image.apply(_, _, data).some)
+        findImageData >>= {
+          case None       => DecodeResult.successT(Option.empty[Image])
+          case Some(data) => (findImageFilename, findImageMediaType).mapN(Image.apply(_, _, data).some)
         }
       case m =>
         mediaTypeFailure[F, Option[Image]](m)
