@@ -134,11 +134,19 @@ lazy val eventLog = project
     AutomateHeaderPlugin
   )
 
+lazy val webhookServiceApi = project
+  .in(file("webhook-service-api"))
+  .withId("webhook-service-api")
+  .settings(commonSettings)
+  .dependsOn(graphCommons % "compile->compile; test->test")
+  .enablePlugins(AutomateHeaderPlugin)
+
 lazy val webhookService = project
   .in(file("webhook-service"))
   .withId("webhook-service")
   .settings(commonSettings)
   .dependsOn(
+    webhookServiceApi   % "compile->compile; test->test",
     eventLogApi         % "compile->compile; test->test",
     triplesGeneratorApi % "compile->compile; test->test"
   )
@@ -241,6 +249,7 @@ lazy val knowledgeGraph = project
   .dependsOn(
     graphCommons        % "compile->compile; test->test",
     entitiesSearch      % "compile->compile; test->test",
+    webhookServiceApi   % "compile->compile; test->test",
     triplesGeneratorApi % "compile->compile; test->test",
     renkuCoreClient     % "compile->compile; test->test",
     entitiesViewingsCollector
