@@ -60,8 +60,8 @@ private class GLProjectCreatorImpl[F[_]: Async: GitLabClient] extends GLProjectC
         .asParts[F]("avatar")
         .toVector
         .appended(newProject.name.asPart[F]("name"))
-        .appended(newProject.slug.value.split("/").last.asPart[F]("path"))
-        .appended(newProject.namespaceId.asPart[F]("namespace_id"))
+        .appended(newProject.slug.toPath.asPart[F]("path"))
+        .appended(newProject.namespace.identifier.asPart[F]("namespace_id"))
         .appended(newProject.visibility.asPart[F]("visibility"))
         .appended(newProject.branch.asPart[F]("default_branch"))
 

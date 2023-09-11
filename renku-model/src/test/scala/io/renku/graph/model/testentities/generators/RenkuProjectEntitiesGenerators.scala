@@ -74,7 +74,7 @@ trait RenkuProjectEntitiesGenerators {
       forksCountGen:         Gen[ForksCount] = anyForksCount
   ): Gen[RenkuProject.WithoutParent] = for {
     slug             <- projectSlugs
-    name             <- Gen.const(slug.toName)
+    name             <- Gen.const(slug.toPath.asName)
     maybeDescription <- projectDescriptions.toGeneratorOfOptions
     agent            <- cliVersions
     dateCreated      <- projectDateCreatedGen

@@ -153,8 +153,8 @@ class GLProjectCreatorSpec
         .getOrElse(fail(s"No '$name' part"))
 
     findPart("name").as[projects.Name].asserting(_ shouldBe newProject.name) >>
-      findPart("path").as[String].asserting(_ shouldBe newProject.slug.value.split("/").last) >>
-      findPart("namespace_id").as[NamespaceId].asserting(_ shouldBe newProject.namespaceId) >>
+      findPart("path").as[projects.GitLabPath].asserting(_ shouldBe newProject.slug.toPath) >>
+      findPart("namespace_id").as[NamespaceId].asserting(_ shouldBe newProject.namespace.identifier) >>
       findPart("visibility").as[projects.Visibility].asserting(_ shouldBe newProject.visibility) >>
       findPart("default_branch").as[Branch].asserting(_ shouldBe newProject.branch) >>
       newProject.maybeImage

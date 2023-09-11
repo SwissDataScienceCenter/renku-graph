@@ -19,9 +19,9 @@
 package io.renku.core.client
 
 import io.circe.Decoder
-import io.renku.tinytypes.constraints.NonBlank
+import io.renku.tinytypes.constraints.{NonBlank, Url}
 import io.renku.tinytypes.json.TinyTypeDecoders
-import io.renku.tinytypes.{BooleanTinyType, StringTinyType, TinyTypeFactory}
+import io.renku.tinytypes.{BooleanTinyType, StringTinyType, TinyTypeFactory, UrlTinyType}
 
 final class ApiVersion private (val value: String) extends AnyVal with StringTinyType
 object ApiVersion extends TinyTypeFactory[ApiVersion](new ApiVersion(_)) with NonBlank[ApiVersion] {
@@ -34,6 +34,11 @@ object MigrationRequired extends TinyTypeFactory[MigrationRequired](new Migratio
   lazy val no:          MigrationRequired          = MigrationRequired(false)
   implicit val decoder: Decoder[MigrationRequired] = TinyTypeDecoders.booleanDecoder(MigrationRequired)
 }
+
+final class ProjectRepository private (val value: String) extends AnyVal with UrlTinyType
+object ProjectRepository
+    extends TinyTypeFactory[ProjectRepository](new ProjectRepository(_))
+    with Url[ProjectRepository]
 
 final class Branch private (val value: String) extends AnyVal with StringTinyType
 object Branch extends TinyTypeFactory[Branch](new Branch(_)) with NonBlank[Branch] {

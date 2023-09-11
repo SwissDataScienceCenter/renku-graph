@@ -27,6 +27,7 @@ import io.renku.graph.model.projects.Role
 import io.renku.graph.model.versions.{CliVersion, SchemaVersion}
 import io.renku.tinytypes.InstantTinyType
 import org.scalacheck.Gen
+import org.scalacheck.Gen.{alphaChar, frequency, oneOf}
 
 import java.nio.charset.StandardCharsets
 import java.time.{Instant, LocalDate, ZoneOffset}
@@ -114,6 +115,10 @@ trait RenkuTinyTypeGenerators {
       .toGeneratorOf(persons.OrcidId)
 
   implicit val projectIds: Gen[projects.GitLabId] = Gen.uuid.map(_ => projects.GitLabId(Random.nextInt(1000000) + 1))
+  implicit val projectPaths: Gen[projects.GitLabPath] =
+    Generators
+      .nonEmptyStrings(minLength = 5, charsGenerator = frequency(9 -> alphaChar, 1 -> oneOf('-', '_')))
+      .map(projects.GitLabPath)
   implicit val projectNames: Gen[projects.Name] =
     Generators.nonBlankStrings(minLength = 5) map (n => projects.Name(n.value))
   implicit val projectDescriptions: Gen[projects.Description] =

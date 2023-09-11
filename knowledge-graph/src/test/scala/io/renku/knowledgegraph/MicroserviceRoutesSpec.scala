@@ -43,6 +43,7 @@ import io.renku.http.server.security.EndpointSecurityException
 import io.renku.http.server.security.EndpointSecurityException.AuthorizationFailure
 import io.renku.http.server.security.model.{AuthUser, MaybeAuthUser}
 import io.renku.http.server.version
+import io.renku.http.tinytypes.TinyTypeURIEncoder._
 import io.renku.interpreters.TestRoutesMetrics
 import io.renku.knowledgegraph.datasets.details.RequestedDataset
 import io.renku.testtools.IOSpec
@@ -652,7 +653,7 @@ class MicroserviceRoutesSpec
 
     val projectSlug = projectSlugs.generateOne
     val projectDsUri = projectSlug.toNamespaces
-      .foldLeft(uri"/knowledge-graph/projects")(_ / _.show) / projectSlug.toName.show / "datasets"
+      .foldLeft(uri"/knowledge-graph/projects")(_ / _.show) / projectSlug.toPath / "datasets"
 
     forAll {
       Table(
@@ -743,8 +744,7 @@ class MicroserviceRoutesSpec
     val projectSlug = projectSlugs.generateOne
     val datasetName = datasetNames.generateOne
     val projectDsTagsUri = projectSlug.toNamespaces
-      .foldLeft(uri"/knowledge-graph/projects")(_ / _.show) /
-      projectSlug.toName.show / "datasets" / datasetName.show / "tags"
+      .foldLeft(uri"/knowledge-graph/projects")(_ / _) / projectSlug.toPath / "datasets" / datasetName / "tags"
 
     forAll {
       Table(

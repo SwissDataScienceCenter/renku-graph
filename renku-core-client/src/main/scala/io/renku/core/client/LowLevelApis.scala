@@ -43,6 +43,7 @@ private trait LowLevelApis[F[_]] {
                         accessToken:       AccessToken
   ):               F[Result[ProjectMigrationCheck]]
   def getVersions: F[Result[List[SchemaVersion]]]
+  def postProjectCreate(newProject: NewProject, accessToken: UserAccessToken): F[Result[Unit]]
   def postProjectUpdate(coreUri:     RenkuCoreUri.Versioned,
                         updates:     ProjectUpdates,
                         accessToken: UserAccessToken
@@ -102,6 +103,17 @@ private class LowLevelApisImpl[F[_]: Async: Logger](coreLatestUri: RenkuCoreUri.
     }
   }
 
+  override def postProjectCreate(newProject: NewProject, accessToken: UserAccessToken): F[Result[Unit]] =
+    send(
+      request(POST, coreLatestUri.uri / "renku" / "templates.create_project", accessToken)
+        .withEntity(newProject.asJson)
+        .putHeaders(Header.Raw(ci"renku-user-email", newProject.userInfo.email.value))
+        .putHeaders(Header.Raw(ci"renku-user-fullname", newProject.userInfo.name.value))
+    ) {
+      case (Ok, _, resp) => toResult[Unit](resp)(toSuccessfulCreation)
+      case reqInfo       => toFailure[Unit]("Submitting Project Creation payload failed")(reqInfo)
+    }
+
   override def postProjectUpdate(uri:         RenkuCoreUri.Versioned,
                                  updates:     ProjectUpdates,
                                  accessToken: UserAccessToken
@@ -115,6 +127,15 @@ private class LowLevelApisImpl[F[_]: Async: Logger](coreLatestUri: RenkuCoreUri.
       case (Ok, _, resp) => toResult[Branch](resp)(toSuccessfulEdit)
       case reqInfo       => toFailure[Branch]("Submitting Project Edit payload failed")(reqInfo)
     }
+
+  private lazy val toSuccessfulCreation: Decoder[Unit] = Decoder.instance { cur =>
+    def failure[A](message: Option[String] = None) = {
+      val m = message.fold("")(v => s": $v")
+      DecodingFailure(CustomReason(s"Submitting Project Creation payload did not succeed$m"), cur).asLeft[A]
+    }
+
+    cur.downField("name").success.fold(failure[Unit]())(_ => ().asRight[DecodingFailure])
+  }
 
   private lazy val toSuccessfulEdit: Decoder[Branch] = Decoder.instance { cur =>
     def failure[A](message: Option[String] = None) = {

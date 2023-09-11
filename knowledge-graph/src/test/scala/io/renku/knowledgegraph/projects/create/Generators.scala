@@ -19,32 +19,30 @@
 package io.renku.knowledgegraph.projects.create
 
 import cats.syntax.all._
+import io.renku.core.client.Generators.templatesGen
 import io.renku.generators.Generators.Implicits._
-import io.renku.generators.Generators.{httpUrls, noDashUuid, positiveInts}
+import io.renku.generators.Generators.positiveInts
 import io.renku.graph.model.RenkuTinyTypeGenerators._
 import io.renku.knowledgegraph.projects.images.ImageGenerators
 import org.scalacheck.Gen
 
 private object Generators {
 
-  implicit val namespaceIds: Gen[NamespaceId] = positiveInts().map(_.value).toGeneratorOf(NamespaceId)
-  implicit val templateRepositoryUrls: Gen[templates.RepositoryUrl] = httpUrls().toGeneratorOf(templates.RepositoryUrl)
-  implicit val templateIdentifiers:    Gen[templates.Identifier]    = noDashUuid.toGeneratorOf(templates.Identifier)
-
-  implicit val templatesGen: Gen[Template] =
-    (templateRepositoryUrls, templateIdentifiers).mapN(Template.apply)
+  implicit val namespaceIds:     Gen[NamespaceId]  = positiveInts().map(_.value).toGeneratorOf(NamespaceId)
+  implicit val namespacesIdOnly: Gen[Namespace.Id] = namespaceIds.map(Namespace.apply)
+  implicit val namespaces:       Gen[Namespace]    = (namespaceIds, projectNamespaces).mapN(Namespace.WithName.apply)
 
   implicit val newProjects: Gen[NewProject] =
     for {
       name             <- projectNames
-      namespaceId      <- namespaceIds
+      namespace        <- namespacesIdOnly
       slug             <- projectSlugs
       maybeDescription <- projectDescriptions.toGeneratorOfOptions
       keywords         <- projectKeywords.toGeneratorOfSet()
       visibility       <- projectVisibilities
       template         <- templatesGen
       image            <- ImageGenerators.images.toGeneratorOfOptions
-    } yield NewProject(name, namespaceId, slug, maybeDescription, keywords, visibility, template, image)
+    } yield NewProject(name, namespace, slug, maybeDescription, keywords, visibility, template, image)
 
   implicit val glCreatedProjectsGen: Gen[GLCreatedProject] =
     imageUris.toGeneratorOfOptions.map(GLCreatedProject.apply)

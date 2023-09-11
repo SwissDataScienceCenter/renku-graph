@@ -18,15 +18,13 @@
 
 package io.renku.knowledgegraph.projects.create
 
-import io.renku.core.client.Branch
+import io.renku.core.client.{Branch, Template}
 import io.renku.graph.model.projects
 import io.renku.knowledgegraph.projects.images.Image
-import io.renku.tinytypes.constraints.{NonBlank, Url}
-import io.renku.tinytypes.{StringTinyType, TinyTypeFactory, UrlTinyType}
 
 private final case class NewProject(
     name:             projects.Name,
-    namespaceId:      NamespaceId,
+    namespace:        Namespace,
     slug:             projects.Slug,
     maybeDescription: Option[projects.Description],
     keywords:         Set[projects.Keyword],
@@ -37,16 +35,16 @@ private final case class NewProject(
   val branch: Branch = Branch.default
 }
 
-private final case class Template(
-    repositoryUrl: templates.RepositoryUrl,
-    identifier:    templates.Identifier
-)
+private sealed trait Namespace {
+  val identifier: NamespaceId
+}
 
-private object templates {
+private object Namespace {
 
-  final class RepositoryUrl private (val value: String) extends AnyVal with UrlTinyType
-  implicit object RepositoryUrl extends TinyTypeFactory[RepositoryUrl](new RepositoryUrl(_)) with Url[RepositoryUrl]
+  def apply(identifier: NamespaceId): Namespace.Id = Namespace.Id(identifier)
 
-  final class Identifier private (val value: String) extends AnyVal with StringTinyType
-  implicit object Identifier extends TinyTypeFactory[Identifier](new Identifier(_)) with NonBlank[Identifier]
+  final case class Id(identifier: NamespaceId) extends Namespace {
+    def withName(name: projects.Namespace): Namespace.WithName = Namespace.WithName(identifier, name)
+  }
+  final case class WithName(identifier: NamespaceId, name: projects.Namespace) extends Namespace
 }

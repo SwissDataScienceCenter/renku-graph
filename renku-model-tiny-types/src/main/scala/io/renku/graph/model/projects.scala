@@ -43,6 +43,14 @@ object projects {
       with NonNegativeInt[GitLabId]
       with TinyTypeJsonLDOps[GitLabId]
 
+  final class GitLabPath private (val value: String) extends AnyVal with StringTinyType {
+    def asName: Name = Name(value)
+  }
+  implicit object GitLabPath
+      extends TinyTypeFactory[GitLabPath](new GitLabPath(_))
+      with NonBlank[GitLabPath]
+      with TinyTypeJsonLDOps[GitLabPath]
+
   final class Slug private (val value: String) extends AnyVal with RelativePathTinyType with Identifier
   implicit object Slug extends TinyTypeFactory[Slug](new Slug(_)) with RelativePath[Slug] with TinyTypeJsonLDOps[Slug] {
     private val allowedFirstChar         = ('a' to 'z') ++ ('A' to 'Z') ++ ('0' to '9') :+ '_'
@@ -54,8 +62,8 @@ object projects {
     )
 
     implicit class SlugOps(slug: Slug) {
-      private lazy val nameString :: namespacesStringReversed = slug.show.split('/').toList.reverse
-      lazy val toName:       Name            = Name(nameString)
+      private lazy val path :: namespacesStringReversed = slug.show.split('/').toList.reverse
+      lazy val toPath:       GitLabPath      = GitLabPath(path)
       lazy val toNamespaces: List[Namespace] = namespacesStringReversed.reverseIterator.map(Namespace(_)).toList
       lazy val toNamespace:  Namespace       = toNamespaces.mkString("/")
     }

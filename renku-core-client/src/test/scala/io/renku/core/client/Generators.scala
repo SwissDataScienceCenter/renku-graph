@@ -21,7 +21,7 @@ package io.renku.core.client
 import cats.syntax.all._
 import io.renku.generators.Generators.Implicits._
 import io.renku.generators.Generators._
-import io.renku.graph.model.RenkuTinyTypeGenerators.{cliVersions, personEmails, personNames, projectDescriptions, projectGitHttpUrls, projectKeywords, projectSchemaVersions}
+import io.renku.graph.model.RenkuTinyTypeGenerators.{cliVersions, personEmails, personNames, projectDescriptions, projectGitHttpUrls, projectKeywords, projectNames, projectNamespaces, projectSchemaVersions}
 import org.http4s.Uri
 import org.scalacheck.Gen
 
@@ -42,6 +42,10 @@ object Generators {
 
   implicit lazy val migrationRequiredGen: Gen[MigrationRequired] =
     Gen.oneOf(MigrationRequired.yes, MigrationRequired.no)
+
+  implicit val projectRepositories: Gen[ProjectRepository] =
+    (httpUrls() -> relativePaths(maxSegments = 2))
+      .mapN((url, path) => ProjectRepository(s"$url/$path"))
 
   implicit lazy val branches: Gen[Branch] =
     nonEmptyStrings().toGeneratorOf(Branch)
@@ -82,4 +86,20 @@ object Generators {
      projectDescriptions.toGeneratorOfOptions.toGeneratorOfOptions,
      projectKeywords.toGeneratorOfSet().toGeneratorOfOptions
     ).mapN(ProjectUpdates.apply)
+
+  implicit val templateRepositoryUrls: Gen[templates.RepositoryUrl] = httpUrls().toGeneratorOf(templates.RepositoryUrl)
+  implicit val templateIdentifiers:    Gen[templates.Identifier]    = noDashUuid.toGeneratorOf(templates.Identifier)
+
+  implicit val templatesGen: Gen[Template] =
+    (templateRepositoryUrls, templateIdentifiers).mapN(Template.apply)
+
+  implicit lazy val newProjectsGen: Gen[NewProject] =
+    (projectRepositories,
+     projectNamespaces,
+     projectNames,
+     templatesGen,
+     branches,
+     projectDescriptions.toGeneratorOfOptions,
+     userInfos
+    ).mapN(NewProject.apply)
 }

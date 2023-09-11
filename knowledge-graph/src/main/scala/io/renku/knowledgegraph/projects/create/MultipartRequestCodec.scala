@@ -21,6 +21,7 @@ package io.renku.knowledgegraph.projects.create
 import MultipartRequestCodec.PartName
 import cats.effect.{Async, Sync}
 import cats.syntax.all._
+import io.renku.core.client.{Template, templates}
 import io.renku.graph.model.projects
 import io.renku.knowledgegraph.multipart.syntax._
 import io.renku.knowledgegraph.projects.images.Image
@@ -73,7 +74,7 @@ private class MultipartRequestEncoderImpl[F[_]: Sync] extends MultipartRequestEn
         newProject.maybeImage.asParts[F](PartName.image)
       ).flatten
         .appended(newProject.name.asPart[F](PartName.name))
-        .appended(newProject.namespaceId.asPart[F](PartName.namespaceId))
+        .appended(newProject.namespace.identifier.asPart[F](PartName.namespaceId))
         .appended(newProject.slug.asPart[F](PartName.slug))
         .appended(newProject.visibility.asPart[F](PartName.visibility))
         .appended(newProject.template.repositoryUrl.asPart[F](PartName.templateRepositoryUrl))
@@ -97,7 +98,7 @@ private class MultipartRequestDecoderImpl[F[_]: Async] extends MultipartRequestD
 
   override def decode(multipart: Multipart[F]): F[NewProject] =
     (multipart.part(PartName.name).flatMap(_.as[projects.Name]),
-     multipart.part(PartName.namespaceId).flatMap(_.as[NamespaceId]),
+     multipart.part(PartName.namespaceId).flatMap(_.as[NamespaceId]).map(Namespace(_)),
      multipart.part(PartName.slug).flatMap(_.as[projects.Slug]),
      multipart.findPart(PartName.description).map(_.as[Option[projects.Description]]).sequence.map(_.flatten),
      multipart.findParts(PartName.keywords).map(_.as[projects.Keyword]).sequence.map(_.toSet),
