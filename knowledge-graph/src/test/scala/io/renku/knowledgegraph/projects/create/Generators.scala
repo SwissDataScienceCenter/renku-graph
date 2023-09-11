@@ -30,7 +30,7 @@ private object Generators {
 
   implicit val namespaceIds:     Gen[NamespaceId]  = positiveInts().map(_.value).toGeneratorOf(NamespaceId)
   implicit val namespacesIdOnly: Gen[Namespace.Id] = namespaceIds.map(Namespace.apply)
-  implicit val namespaces:       Gen[Namespace]    = (namespaceIds, projectNamespaces).mapN(Namespace.WithName.apply)
+  implicit val namespaces: Gen[Namespace.WithName] = (namespaceIds, projectNamespaces).mapN(Namespace.WithName.apply)
 
   implicit val newProjects: Gen[NewProject] =
     for {
