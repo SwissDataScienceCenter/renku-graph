@@ -63,7 +63,7 @@ private class ProjectCreatorImpl[F[_]: MonadThrow](
   private def createProjectInGL(newProject: NewProject, accessToken: UserAccessToken): F[GLCreatedProject] =
     glProjectCreator
       .createProject(newProject, accessToken)
-      .adaptError(CreateFailures.onGLCreation(newProject.slug, _))
+      .adaptError(CreationFailures.onGLCreation(newProject.slug, _))
       .flatMap(_.fold(_.raiseError[F, GLCreatedProject], _.pure[F]))
 
   private def createProjectInCore(newProject: NewProject, corePayload: CorePayload, authUser: AuthUser): F[Unit] =
@@ -71,7 +71,7 @@ private class ProjectCreatorImpl[F[_]: MonadThrow](
       .createProject(corePayload, authUser.accessToken)
       .map(_.toEither)
       .handleError(_.asLeft)
-      .flatMap(_.fold(CreateFailures.onCoreCreation(newProject.slug, _).raiseError[F, Unit], _.pure[F]))
+      .flatMap(_.fold(CreationFailures.onCoreCreation(newProject.slug, _).raiseError[F, Unit], _.pure[F]))
 
   private def activateProject(newProject:       NewProject,
                               glCreatedProject: GLCreatedProject,
@@ -82,11 +82,11 @@ private class ProjectCreatorImpl[F[_]: MonadThrow](
       .map(_.toEither)
       .handleError(_.asLeft)
       .flatMap(
-        _.fold(CreateFailures.onActivation(newProject.slug, _).raiseError[F, Unit], checkActivationResult(newProject))
+        _.fold(CreationFailures.onActivation(newProject.slug, _).raiseError[F, Unit], checkActivationResult(newProject))
       )
 
   private def checkActivationResult(newProject: NewProject): HookCreationResult => F[Unit] = {
     case HookCreationResult.Created | HookCreationResult.Existed => ().pure[F]
-    case HookCreationResult.NotFound => CreateFailures.activationReturningNotFound(newProject.slug).raiseError[F, Unit]
+    case HookCreationResult.NotFound => CreationFailures.activationReturningNotFound(newProject).raiseError[F, Unit]
   }
 }

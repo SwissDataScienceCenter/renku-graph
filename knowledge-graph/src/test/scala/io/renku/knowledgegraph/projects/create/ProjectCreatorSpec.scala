@@ -95,7 +95,7 @@ class ProjectCreatorSpec extends AsyncFlatSpec with AsyncIOSpec with should.Matc
 
     creator
       .createProject(newProject, authUser)
-      .assertThrowsError[Exception](_ shouldBe CreateFailures.onGLCreation(newProject.slug, failure))
+      .assertThrowsError[Exception](_ shouldBe CreationFailures.onGLCreation(newProject.slug, failure))
   }
 
   it should "fail if project creation in Core returns a failure" in {
@@ -115,7 +115,7 @@ class ProjectCreatorSpec extends AsyncFlatSpec with AsyncIOSpec with should.Matc
 
     creator
       .createProject(newProject, authUser)
-      .assertThrowsError[Exception](_ shouldBe CreateFailures.onCoreCreation(newProject.slug, failure))
+      .assertThrowsError[Exception](_ shouldBe CreationFailures.onCoreCreation(newProject.slug, failure))
   }
 
   it should "fail if creating project in Core failed" in {
@@ -135,7 +135,7 @@ class ProjectCreatorSpec extends AsyncFlatSpec with AsyncIOSpec with should.Matc
 
     creator
       .createProject(newProject, authUser)
-      .assertThrowsError[Exception](_ shouldBe CreateFailures.onCoreCreation(newProject.slug, failure))
+      .assertThrowsError[Exception](_ shouldBe CreationFailures.onCoreCreation(newProject.slug, failure))
   }
 
   it should "fail if project activation returns a failure" in {
@@ -157,7 +157,7 @@ class ProjectCreatorSpec extends AsyncFlatSpec with AsyncIOSpec with should.Matc
 
     creator
       .createProject(newProject, authUser)
-      .assertThrowsError[Exception](_ shouldBe CreateFailures.onActivation(newProject.slug, failure))
+      .assertThrowsError[Exception](_ shouldBe CreationFailures.onActivation(newProject.slug, failure))
   }
 
   it should "fail if activating project fails" in {
@@ -179,7 +179,7 @@ class ProjectCreatorSpec extends AsyncFlatSpec with AsyncIOSpec with should.Matc
 
     creator
       .createProject(newProject, authUser)
-      .assertThrowsError[Exception](_ shouldBe CreateFailures.onActivation(newProject.slug, failure))
+      .assertThrowsError[Exception](_ shouldBe CreationFailures.onActivation(newProject.slug, failure))
   }
 
   it should "fail if project activation returns NotFound" in {
@@ -200,7 +200,7 @@ class ProjectCreatorSpec extends AsyncFlatSpec with AsyncIOSpec with should.Matc
 
     creator
       .createProject(newProject, authUser)
-      .assertThrowsError[Exception](_ shouldBe CreateFailures.activationReturningNotFound(newProject.slug))
+      .assertThrowsError[Exception](_ shouldBe CreationFailures.activationReturningNotFound(newProject))
   }
 
   private val glProjectCreator  = mock[GLProjectCreator[IO]]

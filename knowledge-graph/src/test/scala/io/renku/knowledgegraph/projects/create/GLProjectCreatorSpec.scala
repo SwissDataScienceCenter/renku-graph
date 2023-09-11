@@ -96,7 +96,9 @@ class GLProjectCreatorSpec
 
     mapResponse(BadRequest, Request[IO](), Response[IO](BadRequest).withEntity(json"""{"error": $error}"""))
       .asserting(
-        _.left.value shouldBe CreateFailures.badRequestOnGLCreate(Message.Error.fromJsonUnsafe(Json.fromString(error)))
+        _.left.value shouldBe CreationFailures.badRequestOnGLCreate(
+          Message.Error.fromJsonUnsafe(Json.fromString(error))
+        )
       )
   }
 
@@ -105,7 +107,7 @@ class GLProjectCreatorSpec
     val message = jsons.generateOne
 
     mapResponse(BadRequest, Request[IO](), Response[IO](BadRequest).withEntity(json"""{"message": $message}"""))
-      .asserting(_.left.value shouldBe CreateFailures.badRequestOnGLCreate(Message.Error.fromJsonUnsafe(message)))
+      .asserting(_.left.value shouldBe CreationFailures.badRequestOnGLCreate(Message.Error.fromJsonUnsafe(message)))
   }
 
   it should "return left if POST gl/projects returns 403 FORBIDDEN with a message" in {
@@ -113,7 +115,7 @@ class GLProjectCreatorSpec
     val message = jsons.generateOne
 
     mapResponse(Forbidden, Request[IO](), Response[IO](Forbidden).withEntity(json"""{"message": $message}"""))
-      .asserting(_.left.value shouldBe CreateFailures.forbiddenOnGLCreate(Message.Error.fromJsonUnsafe(message)))
+      .asserting(_.left.value shouldBe CreationFailures.forbiddenOnGLCreate(Message.Error.fromJsonUnsafe(message)))
   }
 
   private implicit val glClient: GitLabClient[IO] = mock[GitLabClient[IO]]

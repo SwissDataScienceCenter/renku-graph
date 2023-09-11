@@ -84,7 +84,7 @@ class CorePayloadFinderSpec
     corePayloadFinder
       .findCorePayload(newProject, authUser)
       .assertThrowsError[Exception](
-        _ shouldBe CreateFailures.onFindingNamespace(newProject.namespace.identifier, failure)
+        _ shouldBe CreationFailures.onFindingNamespace(newProject.namespace.identifier, failure)
       )
   }
 
@@ -100,7 +100,7 @@ class CorePayloadFinderSpec
 
     corePayloadFinder
       .findCorePayload(newProject, authUser)
-      .assertThrowsError[Exception](_ shouldBe CreateFailures.noNamespaceFound(newProject.namespace.identifier))
+      .assertThrowsError[Exception](_ shouldBe CreationFailures.noNamespaceFound(newProject.namespace))
   }
 
   it should "fail finding user info fails" in {
@@ -116,7 +116,7 @@ class CorePayloadFinderSpec
 
     corePayloadFinder
       .findCorePayload(newProject, authUser)
-      .assertThrowsError[Exception](_ shouldBe CreateFailures.onFindingUserInfo(authUser.id, failure))
+      .assertThrowsError[Exception](_ shouldBe CreationFailures.onFindingUserInfo(authUser.id, failure))
   }
 
   it should "fail if no user info found" in {
@@ -131,7 +131,7 @@ class CorePayloadFinderSpec
 
     corePayloadFinder
       .findCorePayload(newProject, authUser)
-      .assertThrowsError[Exception](_ shouldBe CreateFailures.noUserInfoFound(authUser.id))
+      .assertThrowsError[Exception](_ shouldBe CreationFailures.noUserInfoFound(authUser.id))
   }
 
   private lazy val glUrl             = gitLabUrls.generateOne

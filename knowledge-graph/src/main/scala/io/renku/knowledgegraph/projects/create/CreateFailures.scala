@@ -24,7 +24,7 @@ import io.renku.graph.model.{persons, projects}
 import io.renku.knowledgegraph.Failure
 import org.http4s.Status.{BadRequest, Forbidden, InternalServerError}
 
-private object CreateFailures {
+private object CreationFailures {
 
   def badRequestOnGLCreate(message: Message): Failure =
     Failure(BadRequest, message)
@@ -38,8 +38,8 @@ private object CreateFailures {
             cause
     )
 
-  def noNamespaceFound(namespaceId: NamespaceId): Failure =
-    Failure(BadRequest, Message.Error.unsafeApply(show"No namespace with $namespaceId found"))
+  def noNamespaceFound(namespace: Namespace): Failure =
+    Failure(BadRequest, Message.Error.unsafeApply(show"No namespace with ${namespace.identifier} found"))
 
   def onFindingUserInfo(userId: persons.GitLabId, cause: Throwable): Failure =
     Failure(InternalServerError, Message.Error.unsafeApply(show"Finding info about $userId failed"), cause)
@@ -65,9 +65,9 @@ private object CreateFailures {
             cause
     )
 
-  def activationReturningNotFound(slug: projects.Slug): Failure =
+  def activationReturningNotFound(newProject: NewProject): Failure =
     Failure(InternalServerError,
-            Message.Error.unsafeApply(show"Project $slug couldn't be activated as it did not exist")
+            Message.Error.unsafeApply(show"Project ${newProject.slug} couldn't be activated as it did not exist")
     )
 
   private def toMessage(cause: Throwable): String =

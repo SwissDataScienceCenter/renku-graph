@@ -52,19 +52,19 @@ private class CorePayloadFinderImpl[F[_]: Async: NonEmptyParallel](namespaceFind
   private def findNamespace(newProject: NewProject, accessToken: UserAccessToken): F[Namespace.WithName] =
     namespaceFinder
       .findNamespace(newProject.namespace.identifier, accessToken)
-      .adaptError(CreateFailures.onFindingNamespace(newProject.namespace.identifier, _))
+      .adaptError(CreationFailures.onFindingNamespace(newProject.namespace.identifier, _))
       .flatMap {
         case Some(ns) => ns.pure[F]
-        case None => CreateFailures.noNamespaceFound(newProject.namespace.identifier).raiseError[F, Namespace.WithName]
+        case None     => CreationFailures.noNamespaceFound(newProject.namespace).raiseError[F, Namespace.WithName]
       }
 
   private def findUserInfo(authUser: AuthUser): F[UserInfo] =
     userInfoFinder
       .findUserInfo(authUser.accessToken)
-      .adaptError(CreateFailures.onFindingUserInfo(authUser.id, _))
+      .adaptError(CreationFailures.onFindingUserInfo(authUser.id, _))
       .flatMap {
         case Some(info) => info.pure[F]
-        case None       => CreateFailures.noUserInfoFound(authUser.id).raiseError[F, UserInfo]
+        case None       => CreationFailures.noUserInfoFound(authUser.id).raiseError[F, UserInfo]
       }
 
   private def toPayload(newProject: NewProject): (Namespace.WithName, UserInfo) => CoreNewProject = {
