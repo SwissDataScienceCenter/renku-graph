@@ -31,6 +31,8 @@ private object Generators {
   implicit val namespaceIds:     Gen[NamespaceId]  = positiveInts().map(_.value).toGeneratorOf(NamespaceId)
   implicit val namespacesIdOnly: Gen[Namespace.Id] = namespaceIds.map(Namespace.apply)
   implicit val namespaces: Gen[Namespace.WithName] = (namespaceIds, projectNamespaces).mapN(Namespace.WithName.apply)
+  def namespacesWithName(from: Namespace): Gen[Namespace.WithName] =
+    projectNamespaces.map(Namespace.WithName(from.identifier, _))
 
   implicit val newProjects: Gen[NewProject] =
     for {
@@ -45,5 +47,5 @@ private object Generators {
     } yield NewProject(name, namespace, slug, maybeDescription, keywords, visibility, template, image)
 
   implicit val glCreatedProjectsGen: Gen[GLCreatedProject] =
-    imageUris.toGeneratorOfOptions.map(GLCreatedProject.apply)
+    projectIds.map(GLCreatedProject.apply)
 }

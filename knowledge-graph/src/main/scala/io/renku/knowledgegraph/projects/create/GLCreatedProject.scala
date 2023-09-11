@@ -19,11 +19,12 @@
 package io.renku.knowledgegraph.projects.create
 
 import io.circe.Decoder
-import io.renku.graph.model.images.ImageUri
+import io.renku.graph.model.projects
+import io.renku.tinytypes.json.TinyTypeDecoders._
 
-private final case class GLCreatedProject(image: Option[ImageUri])
+private final case class GLCreatedProject(id: projects.GitLabId)
 
 private object GLCreatedProject {
   implicit val decoder: Decoder[GLCreatedProject] =
-    Decoder.forProduct1("avatar_url")(GLCreatedProject.apply)
+    Decoder.forProduct1("id")(GLCreatedProject.apply)
 }

@@ -16,7 +16,7 @@
  * limitations under the License.
  */
 
-package io.renku.knowledgegraph.projects.update
+package io.renku.knowledgegraph.gitlab
 
 import cats.effect.Async
 import cats.syntax.all._
@@ -30,15 +30,15 @@ import org.http4s.circe.CirceEntityDecoder._
 import org.http4s.implicits._
 import org.http4s.{Request, Response, Status}
 
-private trait UserInfoFinder[F[_]] {
-  def findUserInfo(generateOne: UserAccessToken): F[Option[UserInfo]]
+trait UserInfoFinder[F[_]] {
+  def findUserInfo(accessToken: UserAccessToken): F[Option[UserInfo]]
 }
 
-private object UserInfoFinder {
+object UserInfoFinder {
   def apply[F[_]: Async: GitLabClient]: UserInfoFinder[F] = new UserInfoFinderImpl[F]
 }
 
-private class UserInfoFinderImpl[F[_]: Async: GitLabClient] extends UserInfoFinder[F] {
+class UserInfoFinderImpl[F[_]: Async: GitLabClient] extends UserInfoFinder[F] {
 
   override def findUserInfo(at: UserAccessToken): F[Option[UserInfo]] =
     GitLabClient[F]

@@ -26,6 +26,7 @@ import io.renku.core.client.{Branch, RenkuCoreClient, RenkuCoreUri, UserInfo, Pr
 import io.renku.graph.model.projects
 import io.renku.http.client.GitLabClient
 import io.renku.http.server.security.model.AuthUser
+import io.renku.knowledgegraph.gitlab.UserInfoFinder
 import io.renku.metrics.MetricsRegistry
 import io.renku.triplesgenerator.api.{TriplesGeneratorClient, ProjectUpdates => TGProjectUpdates}
 import org.typelevel.log4cats.Logger

@@ -16,18 +16,15 @@
  * limitations under the License.
  */
 
-package io.renku.graph.config
+package io.renku.webhookservice.api
 
-import cats.MonadThrow
-import com.typesafe.config.{Config, ConfigFactory}
-import io.renku.config.ConfigLoader.{find, urlTinyTypeReader}
-import io.renku.graph.model.GitLabUrl
-import pureconfig.ConfigReader
+import org.scalacheck.Gen
 
-object GitLabUrlLoader {
+object Generators {
 
-  private implicit val gitLabUrlReader: ConfigReader[GitLabUrl] = urlTinyTypeReader(GitLabUrl)
+  val successfulHookCreationResults: Gen[HookCreationResult] =
+    Gen.oneOf(HookCreationResult.Created, HookCreationResult.Existed)
 
-  def apply[F[_]: MonadThrow](config: Config = ConfigFactory.load): F[GitLabUrl] =
-    find[F, GitLabUrl]("services.gitlab.url", config)
+  implicit val hookCreationResults: Gen[HookCreationResult] =
+    Gen.oneOf(successfulHookCreationResults, Gen.const(HookCreationResult.NotFound))
 }

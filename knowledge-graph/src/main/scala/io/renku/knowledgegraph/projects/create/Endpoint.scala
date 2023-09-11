@@ -18,9 +18,11 @@
 
 package io.renku.knowledgegraph.projects.create
 
+import cats.NonEmptyParallel
 import cats.data.EitherT
 import cats.effect.Async
 import cats.syntax.all._
+import com.typesafe.config.Config
 import eu.timepit.refined.auto._
 import io.renku.data.Message
 import io.renku.http.client.GitLabClient
@@ -37,8 +39,8 @@ trait Endpoint[F[_]] {
 }
 
 object Endpoint {
-  def apply[F[_]: Async: Logger: MetricsRegistry: GitLabClient]: F[Endpoint[F]] =
-    new EndpointImpl[F](ProjectCreator[F]).pure[F].widen
+  def apply[F[_]: Async: NonEmptyParallel: Logger: MetricsRegistry: GitLabClient](config: Config): F[Endpoint[F]] =
+    ProjectCreator[F](config).map(new EndpointImpl[F](_))
 }
 
 private class EndpointImpl[F[_]: Async: Logger](projectCreator: ProjectCreator[F]) extends Endpoint[F] {

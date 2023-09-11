@@ -76,13 +76,13 @@ private class GLProjectCreatorImpl[F[_]: Async: GitLabClient] extends GLProjectC
       resp
         .as[Json](MonadThrow[F], jsonOf(Async[F], errorDecoder))
         .map(Message.Error.fromJsonUnsafe)
-        .map(UpdateFailures.badRequestOnGLCreate)
+        .map(CreateFailures.badRequestOnGLCreate)
         .map(_.asLeft)
     case (Forbidden, _, resp) =>
       resp
         .as[Json](MonadThrow[F], jsonOf(Async[F], errorDecoder))
         .map(Message.Error.fromJsonUnsafe)
-        .map(UpdateFailures.forbiddenOnGLCreate)
+        .map(CreateFailures.forbiddenOnGLCreate)
         .map(_.asLeft)
   }
 

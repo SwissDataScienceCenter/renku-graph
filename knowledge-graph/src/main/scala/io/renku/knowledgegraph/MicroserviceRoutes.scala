@@ -19,11 +19,12 @@
 package io.renku.knowledgegraph
 
 import QueryParamDecoders._
-import cats.Parallel
 import cats.data.Validated.Valid
 import cats.data.{EitherT, Validated, ValidatedNel}
 import cats.effect.{Async, Resource}
 import cats.syntax.all._
+import cats.{MonadThrow, Parallel}
+import com.typesafe.config.ConfigFactory
 import eu.timepit.refined.auto._
 import io.renku.data.Message
 import io.renku.entities.search.{Criteria => EntitiesSearchCriteria}
@@ -350,6 +351,7 @@ private object MicroserviceRoutes {
       projectConnConfig:   ProjectsConnectionConfig,
       projectSparqlClient: ProjectSparqlClient[F]
   ): F[MicroserviceRoutes[F]] = for {
+    config                               <- MonadThrow[F].catchNonFatal(ConfigFactory.load())
     implicit0(gv: GitLabClient[F])       <- GitLabClient[F]()
     implicit0(atf: AccessTokenFinder[F]) <- AccessTokenFinder[F]()
     implicit0(ru: RenkuUrl)              <- RenkuUrlLoader[F]()
@@ -361,7 +363,7 @@ private object MicroserviceRoutes {
     ontologyEndpoint           <- ontology.Endpoint[F]
     projectDeleteEndpoint      <- projects.delete.Endpoint[F]
     projectDetailsEndpoint     <- projects.details.Endpoint[F]
-    projectCreateEndpoint      <- projects.create.Endpoint[F]
+    projectCreateEndpoint      <- projects.create.Endpoint[F](config)
     projectUpdateEndpoint      <- projects.update.Endpoint[F]
     projectDatasetsEndpoint    <- projects.datasets.Endpoint[F]
     projectDatasetTagsEndpoint <- projects.datasets.tags.Endpoint[F]

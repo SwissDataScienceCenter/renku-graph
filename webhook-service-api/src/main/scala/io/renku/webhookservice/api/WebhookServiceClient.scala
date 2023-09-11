@@ -20,6 +20,7 @@ package io.renku.webhookservice.api
 
 import cats.effect.Async
 import cats.syntax.all._
+import com.typesafe.config.Config
 import io.renku.control.Throttler
 import io.renku.data.Message
 import io.renku.data.MessageCodecs._
@@ -35,13 +36,13 @@ import org.http4s.{Request, Response, Status, Uri}
 import org.typelevel.log4cats.Logger
 
 trait WebhookServiceClient[F[_]] {
-  def createHook(slug: projects.GitLabId, accessToken: AccessToken): F[Result[HookCreationResult]]
+  def createHook(projectId: projects.GitLabId, accessToken: AccessToken): F[Result[HookCreationResult]]
 }
 
 object WebhookServiceClient {
 
-  def apply[F[_]: Async: Logger: MetricsRegistry]: F[WebhookServiceClient[F]] =
-    WebhookServiceUrl[F]()
+  def apply[F[_]: Async: Logger: MetricsRegistry](config: Config): F[WebhookServiceClient[F]] =
+    WebhookServiceUrl[F](config)
       .map(wsUrl => new WebhookServiceClientImpl[F](Uri.unsafeFromString(wsUrl.value)))
 
   sealed trait Result[+A] {
@@ -69,8 +70,8 @@ private class WebhookServiceClientImpl[F[_]: Async: Logger](wsUri: Uri)
     with Http4sDsl[F]
     with Http4sClientDsl[F] {
 
-  override def createHook(id: projects.GitLabId, accessToken: AccessToken): F[Result[HookCreationResult]] =
-    send(request(POST, wsUri / "projects" / id / "webhooks", accessToken)) {
+  override def createHook(projectId: projects.GitLabId, accessToken: AccessToken): F[Result[HookCreationResult]] =
+    send(request(POST, wsUri / "projects" / projectId / "webhooks", accessToken)) {
       case (Ok, _, _)       => Result.success(HookCreationResult.Existed.widen).pure[F]
       case (Created, _, _)  => Result.success(HookCreationResult.Created.widen).pure[F]
       case (NotFound, _, _) => Result.success(HookCreationResult.NotFound.widen).pure[F]

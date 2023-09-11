@@ -16,7 +16,7 @@
  * limitations under the License.
  */
 
-package io.renku.knowledgegraph.projects.update
+package io.renku.knowledgegraph.gitlab
 
 import cats.effect.IO
 import cats.effect.testing.scalatest.AsyncIOSpec

@@ -16,17 +16,22 @@
  * limitations under the License.
  */
 
-package io.renku.knowledgegraph.projects.create
+package io.renku.core.client
 
-import io.renku.data.Message
-import io.renku.knowledgegraph.Failure
-import org.http4s.Status.{BadRequest, Forbidden}
+import io.renku.generators.Generators.Implicits._
+import io.renku.graph.model.GraphModelGenerators.gitLabUrls
+import org.scalatest.matchers.should
+import org.scalatest.wordspec.AnyWordSpec
 
-private object UpdateFailures {
+class modelSpec extends AnyWordSpec with should.Matchers {
 
-  def badRequestOnGLCreate(message: Message): Failure =
-    Failure(BadRequest, message)
+  "ProjectRepository.of" should {
 
-  def forbiddenOnGLCreate(message: Message): Failure =
-    Failure(Forbidden, message)
+    "instantiate ProjectRepository from the given GLUrl" in {
+
+      val glUrl = gitLabUrls.generateOne
+
+      ProjectRepository.of(glUrl) shouldBe ProjectRepository(glUrl.value)
+    }
+  }
 }

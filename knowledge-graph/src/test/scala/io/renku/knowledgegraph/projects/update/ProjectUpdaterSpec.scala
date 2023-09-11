@@ -34,6 +34,7 @@ import io.renku.graph.model.projects
 import io.renku.http.client.{AccessToken, UserAccessToken}
 import io.renku.interpreters.TestLogger
 import io.renku.knowledgegraph.Failure
+import io.renku.knowledgegraph.gitlab.UserInfoFinder
 import io.renku.testtools.CustomAsyncIOSpec
 import io.renku.triplesgenerator.api.Generators.{projectUpdatesGen => tgUpdatesGen}
 import io.renku.triplesgenerator.api.{TriplesGeneratorClient, ProjectUpdates => TGProjectUpdates}

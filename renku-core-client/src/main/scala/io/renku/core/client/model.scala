@@ -19,6 +19,7 @@
 package io.renku.core.client
 
 import io.circe.Decoder
+import io.renku.graph.model.GitLabUrl
 import io.renku.tinytypes.constraints.{NonBlank, Url}
 import io.renku.tinytypes.json.TinyTypeDecoders
 import io.renku.tinytypes.{BooleanTinyType, StringTinyType, TinyTypeFactory, UrlTinyType}
@@ -38,7 +39,9 @@ object MigrationRequired extends TinyTypeFactory[MigrationRequired](new Migratio
 final class ProjectRepository private (val value: String) extends AnyVal with UrlTinyType
 object ProjectRepository
     extends TinyTypeFactory[ProjectRepository](new ProjectRepository(_))
-    with Url[ProjectRepository]
+    with Url[ProjectRepository] {
+  def of(glUrl: GitLabUrl): ProjectRepository = ProjectRepository(glUrl.value)
+}
 
 final class Branch private (val value: String) extends AnyVal with StringTinyType
 object Branch extends TinyTypeFactory[Branch](new Branch(_)) with NonBlank[Branch] {
