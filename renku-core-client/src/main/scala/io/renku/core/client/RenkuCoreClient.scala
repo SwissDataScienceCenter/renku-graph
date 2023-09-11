@@ -55,8 +55,8 @@ private class RenkuCoreClientImpl[F[_]: Async: Logger](coreUriForSchemaLoader: R
     with Http4sDsl[F]
     with Http4sClientDsl[F] {
 
-  private val nestedF = NestedF[F]
-  import nestedF._
+  private val nestedResult = NestedResult[F]
+  import nestedResult._
 
   override def findCoreUri(projectUrl:  projects.GitHttpUrl,
                            accessToken: AccessToken

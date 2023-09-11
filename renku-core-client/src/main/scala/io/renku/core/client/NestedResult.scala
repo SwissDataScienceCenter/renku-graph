@@ -22,22 +22,22 @@ import cats.Monad
 import cats.data.Nested
 import cats.syntax.all._
 
-private object NestedF {
-  def apply[F[_]: Monad]: NestedF[F] = new NestedF[F]
+private object NestedResult {
+  def apply[F[_]: Monad]: NestedResult[F] = new NestedResult[F]
 }
 
-private class NestedF[F[_]: Monad] {
+private class NestedResult[F[_]: Monad] {
 
-  type NestedF[A] = Nested[F, Result, A]
+  type NestedResult[A] = Nested[F, Result, A]
 
-  implicit lazy val nestedResultMonad: Monad[NestedF] = new Monad[NestedF] {
+  implicit lazy val nestedResultMonad: Monad[NestedResult] = new Monad[NestedResult] {
 
-    override def pure[A](a: A): NestedF[A] =
+    override def pure[A](a: A): NestedResult[A] =
       Nested {
         Result.success(a).pure[F]
       }
 
-    override def flatMap[A, B](fa: NestedF[A])(f: A => NestedF[B]): NestedF[B] =
+    override def flatMap[A, B](fa: NestedResult[A])(f: A => NestedResult[B]): NestedResult[B] =
       Nested {
         fa.value >>= {
           case Result.Success(a) => f(a).value
@@ -45,12 +45,12 @@ private class NestedF[F[_]: Monad] {
         }
       }
 
-    override def map[A, B](fa: NestedF[A])(f: A => B): NestedF[B] =
+    override def map[A, B](fa: NestedResult[A])(f: A => B): NestedResult[B] =
       Nested {
         fa.value.map(_.map(f))
       }
 
-    override def tailRecM[A, B](a: A)(f: A => NestedF[Either[A, B]]): NestedF[B] =
+    override def tailRecM[A, B](a: A)(f: A => NestedResult[Either[A, B]]): NestedResult[B] =
       Nested[F, Result, B](
         Monad[F].tailRecM[Result[A], Result[B]](Result.success(a)) {
           case failure: Result.Failure => failure.asInstanceOf[Result[B]].asRight[Result[A]].pure[F]
@@ -64,12 +64,12 @@ private class NestedF[F[_]: Monad] {
       )
   }
 
-  implicit class NestedFOps[A](nestedF: NestedF[A]) {
+  implicit class NestedResultOps[A](nestedF: NestedResult[A]) {
 
-    def flatMapF[B](f: A => F[Result[B]]): NestedF[B] =
+    def flatMapF[B](f: A => F[Result[B]]): NestedResult[B] =
       nestedF.flatMap(a => Nested(f(a)))
 
-    def subflatMap[B](f: A => Result[B]): NestedF[B] =
+    def subflatMap[B](f: A => Result[B]): NestedResult[B] =
       nestedF.flatMap(a => Nested(f(a).pure[F]))
   }
 }
