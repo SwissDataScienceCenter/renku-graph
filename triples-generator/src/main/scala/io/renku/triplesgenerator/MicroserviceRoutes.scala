@@ -36,6 +36,7 @@ import scala.jdk.CollectionConverters._
 
 private class MicroserviceRoutes[F[_]: MonadThrow](
     eventEndpoint:         EventEndpoint[F],
+    projectCreateEndpoint: projects.create.Endpoint[F],
     projectUpdateEndpoint: projects.update.Endpoint[F],
     routesMetrics:         RoutesMetrics[F],
     versionRoutes:         version.Routes[F],
@@ -44,6 +45,7 @@ private class MicroserviceRoutes[F[_]: MonadThrow](
 
   import eventEndpoint._
   import org.http4s.HttpRoutes
+  import projectCreateEndpoint.`POST /projects`
   import projectUpdateEndpoint.`PATCH /projects/:slug`
   import routesMetrics._
 
@@ -51,6 +53,7 @@ private class MicroserviceRoutes[F[_]: MonadThrow](
   lazy val routes: Resource[F, HttpRoutes[F]] = HttpRoutes.of[F] {
     case req @ POST  -> Root / "events"                       => processEvent(req)
     case GET         -> Root / "ping"                         => Ok("pong")
+    case req @ POST  -> Root / "projects"                     => `POST /projects`(req)
     case req @ PATCH -> Root / "projects" / ProjectSlug(slug) => `PATCH /projects/:slug`(slug, req)
     case GET         -> Root / "config-info"                  => Ok(configInfo)
   }.withMetrics.map(_ <+> versionRoutes())
@@ -67,9 +70,10 @@ private object MicroserviceRoutes {
   def apply[F[_]: Async: Logger: MetricsRegistry: SparqlQueryTimeRecorder](consumersRegistry: EventConsumersRegistry[F],
                                                                            tsWriteLock:       TsWriteLock[F],
                                                                            config:            Config
-  ): F[MicroserviceRoutes[F]] = for {
-    eventEndpoint         <- EventEndpoint(consumersRegistry)
-    projectUpdateEndpoint <- projects.update.Endpoint[F](tsWriteLock)
-    versionRoutes         <- version.Routes[F]
-  } yield new MicroserviceRoutes(eventEndpoint, projectUpdateEndpoint, new RoutesMetrics[F], versionRoutes, config)
+  ): F[MicroserviceRoutes[F]] = (
+    EventEndpoint(consumersRegistry),
+    projects.create.Endpoint[F](tsWriteLock),
+    projects.update.Endpoint[F](tsWriteLock),
+    version.Routes[F],
+  ).mapN(new MicroserviceRoutes(_, _, _, new RoutesMetrics[F], _, config))
 }

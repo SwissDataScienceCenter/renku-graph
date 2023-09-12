@@ -16,7 +16,7 @@
  * limitations under the License.
  */
 
-package io.renku.triplesgenerator.projects.update
+package io.renku.triplesgenerator.projects.create
 
 import cats.effect.IO
 import cats.syntax.all._
@@ -25,15 +25,13 @@ import io.circe.Json
 import io.circe.syntax._
 import io.renku.data.Message
 import io.renku.generators.Generators.Implicits._
-import io.renku.graph.model.RenkuTinyTypeGenerators.projectSlugs
-import io.renku.graph.model.projects
 import io.renku.interpreters.TestLogger
 import io.renku.testtools.CustomAsyncIOSpec
-import io.renku.triplesgenerator.api.Generators.projectUpdatesGen
-import io.renku.triplesgenerator.api.ProjectUpdates
+import io.renku.triplesgenerator.api.Generators.newProjectsGen
+import io.renku.triplesgenerator.api.NewProject
 import org.http4s.MediaType.application
 import org.http4s.Request
-import org.http4s.Status.{BadRequest, NotFound, Ok}
+import org.http4s.Status.{BadRequest, Ok}
 import org.http4s.circe._
 import org.http4s.headers.`Content-Type`
 import org.scalamock.scalatest.AsyncMockFactory
@@ -42,50 +40,35 @@ import org.scalatest.matchers.should
 
 class EndpointSpec extends AsyncFlatSpec with CustomAsyncIOSpec with should.Matchers with AsyncMockFactory {
 
-  it should "decode the payload, pass it to the project updater and return Ok for Result.Updated" in {
+  it should "decode the payload, pass it to the project creator and return Ok on success" in {
 
-    val slug    = projectSlugs.generateOne
-    val updates = projectUpdatesGen.generateOne
-    givenProjectUpdating(slug, updates, returning = ProjectUpdater.Result.Updated.pure[IO])
+    val newProject = newProjectsGen.generateOne
+    givenProjectCreation(newProject, returning = ().pure[IO])
 
-    endpoint.`PATCH /projects/:slug`(slug, Request[IO]().withEntity(updates.asJson)) >>= { response =>
+    endpoint.`POST /projects`(Request[IO]().withEntity(newProject.asJson)) >>= { response =>
       response.status.pure[IO].asserting(_ shouldBe Ok) >>
         response.contentType.pure[IO].asserting(_ shouldBe `Content-Type`(application.json).some) >>
-        response.as[Message].asserting(_ shouldBe Message.Info("Project updated"))
+        response.as[Message].asserting(_ shouldBe Message.Info("Project created"))
     }
   }
 
   it should "return BadRequest if payload decoding fails" in {
 
-    val slug    = projectSlugs.generateOne
     val request = Request[IO]().withEntity(Json.obj("visibility" -> Json.obj("newValue" -> "invalid".asJson)))
 
-    endpoint.`PATCH /projects/:slug`(slug, request) >>= { response =>
+    endpoint.`POST /projects`(request) >>= { response =>
       response.status.pure[IO].asserting(_ shouldBe BadRequest) >>
         response.contentType.pure[IO].asserting(_ shouldBe `Content-Type`(application.json).some) >>
         response.as[Message].asserting(_ shouldBe Message.Error("Invalid payload"))
     }
   }
 
-  it should "return NotFound if project with the given slug does not exist" in {
-
-    val slug    = projectSlugs.generateOne
-    val updates = projectUpdatesGen.generateOne
-    givenProjectUpdating(slug, updates, returning = ProjectUpdater.Result.NotExists.pure[IO])
-
-    endpoint.`PATCH /projects/:slug`(slug, Request[IO]().withEntity(updates.asJson)) >>= { response =>
-      response.status.pure[IO].asserting(_ shouldBe NotFound) >>
-        response.contentType.pure[IO].asserting(_ shouldBe `Content-Type`(application.json).some) >>
-        response.as[Message].asserting(_ shouldBe Message.Info("Project not found"))
-    }
-  }
-
   private implicit val logger: TestLogger[IO] = TestLogger[IO]()
-  private lazy val projectUpdater = mock[ProjectUpdater[IO]]
-  private lazy val endpoint       = new EndpointImpl[IO](projectUpdater)
+  private lazy val projectCreator = mock[ProjectCreator[IO]]
+  private lazy val endpoint       = new EndpointImpl[IO](projectCreator)
 
-  private def givenProjectUpdating(slug: projects.Slug, updates: ProjectUpdates, returning: IO[ProjectUpdater.Result]) =
-    (projectUpdater.updateProject _)
-      .expects(slug, updates)
+  private def givenProjectCreation(newProject: NewProject, returning: IO[Unit]) =
+    (projectCreator.createProject _)
+      .expects(newProject)
       .returning(returning)
 }

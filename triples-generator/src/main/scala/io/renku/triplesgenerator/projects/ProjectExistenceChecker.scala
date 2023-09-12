@@ -16,7 +16,7 @@
  * limitations under the License.
  */
 
-package io.renku.triplesgenerator.projects.update
+package io.renku.triplesgenerator.projects
 
 import cats.effect.Async
 import cats.syntax.all._
@@ -27,8 +27,8 @@ import io.renku.graph.model.Schemas.{renku, schema}
 import io.renku.graph.model.projects
 import io.renku.triplesstore.ResultsDecoder._
 import io.renku.triplesstore.SparqlQuery.Prefixes
-import io.renku.triplesstore.client.syntax._
 import io.renku.triplesstore._
+import io.renku.triplesstore.client.syntax._
 import org.typelevel.log4cats.Logger
 
 private trait ProjectExistenceChecker[F[_]] {
@@ -49,7 +49,7 @@ private class ProjectExistenceCheckerImpl[F[_]](tsClient: TSClient[F]) extends P
 
   private def query(slug: projects.Slug) =
     SparqlQuery.ofUnsafe(
-      show"$reportingPrefix: check project exists",
+      show"create/update api: check project exists",
       Prefixes of (renku -> "renku", schema -> "schema"),
       sparql"""|SELECT (COUNT(DISTINCT ?id) AS ?count)
                |WHERE {

@@ -21,9 +21,9 @@ package tsprovisioning
 package minprojectinfo
 
 import ProcessingRecoverableError.{LogWorthyRecoverableError, SilentRecoverableError}
-import cats.{MonadThrow, NonEmptyParallel, Parallel}
 import cats.effect.Async
 import cats.syntax.all._
+import cats.{MonadThrow, NonEmptyParallel, Parallel}
 import io.renku.graph.tokenrepository.AccessTokenFinder
 import io.renku.http.client.{AccessToken, GitLabClient}
 import io.renku.logging.ExecutionTimeRecorder
@@ -34,8 +34,8 @@ import io.renku.triplesgenerator.api.events.ProjectActivated
 import io.renku.triplesstore.SparqlQueryTimeRecorder
 import org.typelevel.log4cats.Logger
 import transformation.TransformationStepsCreator
-import triplesuploading.{TransformationStepsRunner, TriplesUploadResult}
 import triplesuploading.TriplesUploadResult.{DeliverySuccess, NonRecoverableFailure, RecoverableFailure}
+import triplesuploading.{TransformationStepsRunner, TriplesUploadResult}
 
 import scala.util.control.NonFatal
 
@@ -45,7 +45,7 @@ private trait EventProcessor[F[_]] {
 
 private class EventProcessorImpl[F[_]: MonadThrow: AccessTokenFinder: Logger](
     stepsCreator:            TransformationStepsCreator[F],
-    uploader:                TransformationStepsRunner[F],
+    stepsRunner:             TransformationStepsRunner[F],
     entityBuilder:           EntityBuilder[F],
     projectExistenceChecker: ProjectExistenceChecker[F],
     tgClient:                triplesgenerator.api.events.Client[F],
@@ -58,8 +58,8 @@ private class EventProcessorImpl[F[_]: MonadThrow: AccessTokenFinder: Logger](
   import entityBuilder._
   import executionTimeRecorder._
   import projectExistenceChecker._
-  import stepsCreator._
-  import uploader._
+  import stepsCreator.createSteps
+  import stepsRunner.run
 
   override def process(event: MinProjectInfoEvent): F[Unit] = {
     for {

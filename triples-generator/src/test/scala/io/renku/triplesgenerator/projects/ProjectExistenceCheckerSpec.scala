@@ -16,7 +16,7 @@
  * limitations under the License.
  */
 
-package io.renku.triplesgenerator.projects.update
+package io.renku.triplesgenerator.projects
 
 import cats.effect.IO
 import io.renku.entities.searchgraphs.SearchInfoDatasets

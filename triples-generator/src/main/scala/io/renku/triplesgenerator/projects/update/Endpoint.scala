@@ -27,9 +27,9 @@ import io.renku.graph.model.projects
 import io.renku.triplesgenerator.TgLockDB.TsWriteLock
 import io.renku.triplesgenerator.api.ProjectUpdates
 import io.renku.triplesstore.SparqlQueryTimeRecorder
-import org.http4s.circe._
+import org.http4s.circe.CirceEntityDecoder._
 import org.http4s.dsl.Http4sDsl
-import org.http4s.{EntityDecoder, Request, Response}
+import org.http4s.{Request, Response}
 import org.typelevel.log4cats.Logger
 
 trait Endpoint[F[_]] {
@@ -42,11 +42,17 @@ object Endpoint {
   } yield new EndpointImpl[F](projectUpdater)
 }
 
-private class EndpointImpl[F[_]: Async](projectUpdater: ProjectUpdater[F]) extends Http4sDsl[F] with Endpoint[F] {
+private class EndpointImpl[F[_]: Async: Logger](projectUpdater: ProjectUpdater[F])
+    extends Http4sDsl[F]
+    with Endpoint[F] {
 
   override def `PATCH /projects/:slug`(slug: projects.Slug, request: Request[F]): F[Response[F]] =
     EitherT(decodePayload(request))
-      .semiflatMap(projectUpdater.updateProject(slug, _).map(toHttpResult))
+      .semiflatMap(updates => projectUpdater.updateProject(slug, updates).map(updates -> _))
+      .semiflatMap { case (updates, result) =>
+        Logger[F].info(show"""project $slug updated with $updates""").as(result)
+      }
+      .map(toHttpResult)
       .merge
 
   private def decodePayload: Request[F] => F[Either[Response[F], ProjectUpdates]] =
@@ -60,6 +66,4 @@ private class EndpointImpl[F[_]: Async](projectUpdater: ProjectUpdater[F]) exten
     case ProjectUpdater.Result.Updated   => Response[F](Ok).withEntity(Message.Info("Project updated"))
     case ProjectUpdater.Result.NotExists => Response[F](NotFound).withEntity(Message.Info("Project not found"))
   }
-
-  private implicit lazy val entityDecoder: EntityDecoder[F, ProjectUpdates] = jsonOf[F, ProjectUpdates]
 }

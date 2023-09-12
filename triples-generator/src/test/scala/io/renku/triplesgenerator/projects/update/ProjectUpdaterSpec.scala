@@ -16,7 +16,8 @@
  * limitations under the License.
  */
 
-package io.renku.triplesgenerator.projects.update
+package io.renku.triplesgenerator.projects
+package update
 
 import cats.effect.IO
 import cats.effect.testing.scalatest.AsyncIOSpec
