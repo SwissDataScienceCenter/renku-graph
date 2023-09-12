@@ -16,13 +16,13 @@
  * limitations under the License.
  */
 
-package io.renku.triplesgenerator.events.consumers
-package awaitinggeneration
+package io.renku.triplesgenerator.events.consumers.awaitinggeneration
 
 import cats.Show
 import cats.syntax.all._
 import io.renku.events.consumers.Project
 import io.renku.graph.model.events._
+import io.renku.triplesgenerator.events.consumers.CategoryEvent
 
 private final case class CommitEvent(eventId: EventId, project: Project, commitId: CommitId) extends CategoryEvent {
   override val compoundEventId: CompoundEventId = CompoundEventId(eventId, project.id)

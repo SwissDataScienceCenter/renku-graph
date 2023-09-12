@@ -23,7 +23,7 @@ import cats.{MonadThrow, Show}
 import cats.effect.Async
 import cats.syntax.all._
 import io.renku.graph.triplesstore.DatasetTTLs
-import io.renku.triplesgenerator.events.consumers.tsmigrationrequest.migrations.reprovisioning.ReProvisioningStatus
+import tsmigrationrequest.migrations.reprovisioning.ReProvisioningStatus
 import io.renku.triplesstore.{DatasetName, SparqlQueryTimeRecorder, TSAdminClient}
 import org.typelevel.log4cats.Logger
 
