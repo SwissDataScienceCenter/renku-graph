@@ -16,12 +16,14 @@
  * limitations under the License.
  */
 
-package io.renku.knowledgegraph.projects.create
+package io.renku.knowledgegraph.projects
+package create
 
 import cats.effect.Async
 import cats.syntax.all._
 import cats.{MonadThrow, NonEmptyParallel}
 import com.typesafe.config.Config
+import delete.ProjectRemover
 import io.renku.core.client.{RenkuCoreClient, NewProject => CorePayload}
 import io.renku.http.client.{GitLabClient, UserAccessToken}
 import io.renku.http.server.security.model.AuthUser
@@ -38,21 +40,22 @@ private object ProjectCreator {
       config: Config
   ): F[ProjectCreator[F]] =
     (CorePayloadFinder[F](config), RenkuCoreClient[F](config), WebhookServiceClient[F](config))
-      .mapN(new ProjectCreatorImpl[F](GLProjectCreator[F], _, _, _))
+      .mapN(new ProjectCreatorImpl[F](GLProjectCreator[F], _, _, _, ProjectRemover[F]))
 }
 
-private class ProjectCreatorImpl[F[_]: MonadThrow](
+private class ProjectCreatorImpl[F[_]: MonadThrow: Logger](
     glProjectCreator:  GLProjectCreator[F],
     corePayloadFinder: CorePayloadFinder[F],
     coreClient:        RenkuCoreClient[F],
-    wsClient:          WebhookServiceClient[F]
+    wsClient:          WebhookServiceClient[F],
+    glProjectRemover:  ProjectRemover[F]
 ) extends ProjectCreator[F] {
 
   override def createProject(newProject: NewProject, authUser: AuthUser): F[Unit] =
     for {
       corePayload <- findCorePayload(newProject, authUser)
       glCreated   <- createProjectInGL(newProject, authUser.accessToken)
-      _           <- createProjectInCore(newProject, corePayload, authUser)
+      _           <- createProjectInCore(newProject, glCreated, corePayload, authUser)
       _           <- activateProject(newProject, glCreated, authUser.accessToken)
     } yield ()
 
@@ -66,12 +69,27 @@ private class ProjectCreatorImpl[F[_]: MonadThrow](
       .adaptError(CreationFailures.onGLCreation(newProject.slug, _))
       .flatMap(_.fold(_.raiseError[F, GLCreatedProject], _.pure[F]))
 
-  private def createProjectInCore(newProject: NewProject, corePayload: CorePayload, authUser: AuthUser): F[Unit] =
+  private def createProjectInCore(newProject:       NewProject,
+                                  glCreatedProject: GLCreatedProject,
+                                  corePayload:      CorePayload,
+                                  authUser:         AuthUser
+  ): F[Unit] =
     coreClient
       .createProject(corePayload, authUser.accessToken)
       .map(_.toEither)
       .handleError(_.asLeft)
+      .flatTap {
+        case _: Right[_, _] => ().pure[F]
+        case _: Left[_, _]  => deleteProjectInGL(glCreatedProject, authUser.accessToken)
+      }
       .flatMap(_.fold(CreationFailures.onCoreCreation(newProject.slug, _).raiseError[F, Unit], _.pure[F]))
+
+  private def deleteProjectInGL(glCreatedProject: GLCreatedProject, accessToken: UserAccessToken): F[Unit] =
+    glProjectRemover
+      .deleteProject(glCreatedProject.id)(accessToken)
+      .handleErrorWith(err =>
+        Logger[F].warn(show"GL project deletion on Core failure on project creation failed: ${err.getMessage}")
+      )
 
   private def activateProject(newProject:       NewProject,
                               glCreatedProject: GLCreatedProject,

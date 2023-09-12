@@ -27,10 +27,13 @@ import io.renku.core.client.{RenkuCoreClient, NewProject => CorePayload, Result 
 import io.renku.generators.CommonGraphGenerators.authUsers
 import io.renku.generators.Generators.Implicits._
 import io.renku.generators.Generators.{exceptions, nonEmptyStrings}
-import io.renku.http.client.UserAccessToken
+import io.renku.graph.model.projects
+import io.renku.http.client.{AccessToken, UserAccessToken}
 import io.renku.http.server.security.model.AuthUser
+import io.renku.interpreters.TestLogger
 import io.renku.knowledgegraph.Failure
 import io.renku.knowledgegraph.Generators.failures
+import io.renku.knowledgegraph.projects.delete.ProjectRemover
 import io.renku.webhookservice.api.Generators.successfulHookCreationResults
 import io.renku.webhookservice.api.WebhookServiceClient.{Result => WSResult}
 import io.renku.webhookservice.api.{HookCreationResult, WebhookServiceClient}
@@ -98,7 +101,7 @@ class ProjectCreatorSpec extends AsyncFlatSpec with AsyncIOSpec with should.Matc
       .assertThrowsError[Exception](_ shouldBe CreationFailures.onGLCreation(newProject.slug, failure))
   }
 
-  it should "fail if project creation in Core returns a failure" in {
+  it should "remove the project from GL and fail if project creation in Core returns a failure" in {
 
     val newProject  = newProjects.generateOne
     val authUser    = authUsers.generateOne
@@ -113,12 +116,14 @@ class ProjectCreatorSpec extends AsyncFlatSpec with AsyncIOSpec with should.Matc
     val failure = CoreResult.Failure.Simple(nonEmptyStrings().generateOne)
     givenCoreProjectCreation(corePayload, accessToken, returning = failure.pure[IO])
 
+    givenGLProjectRemover(glCreatedProject, accessToken, returning = ().pure[IO])
+
     creator
       .createProject(newProject, authUser)
       .assertThrowsError[Exception](_ shouldBe CreationFailures.onCoreCreation(newProject.slug, failure))
   }
 
-  it should "fail if creating project in Core failed" in {
+  it should "remove the project from GL and fail if creating project in Core failed" in {
 
     val newProject  = newProjects.generateOne
     val authUser    = authUsers.generateOne
@@ -132,6 +137,30 @@ class ProjectCreatorSpec extends AsyncFlatSpec with AsyncIOSpec with should.Matc
 
     val failure = exceptions.generateOne
     givenCoreProjectCreation(corePayload, accessToken, returning = failure.raiseError[IO, Nothing])
+
+    givenGLProjectRemover(glCreatedProject, accessToken, returning = ().pure[IO])
+
+    creator
+      .createProject(newProject, authUser)
+      .assertThrowsError[Exception](_ shouldBe CreationFailures.onCoreCreation(newProject.slug, failure))
+  }
+
+  it should "fail with the Core failure if removing project from GL failed, too" in {
+
+    val newProject  = newProjects.generateOne
+    val authUser    = authUsers.generateOne
+    val accessToken = authUser.accessToken
+
+    val corePayload = corePayloads.generateOne
+    givenCorePayloadFinding(newProject, authUser, returning = corePayload.pure[IO])
+
+    val glCreatedProject = glCreatedProjectsGen.generateOne
+    givenGLProjectCreation(newProject, accessToken, returning = glCreatedProject.asRight.pure[IO])
+
+    val failure = exceptions.generateOne
+    givenCoreProjectCreation(corePayload, accessToken, returning = failure.raiseError[IO, Nothing])
+
+    givenGLProjectRemover(glCreatedProject, accessToken, returning = exceptions.generateOne.raiseError[IO, Nothing])
 
     creator
       .createProject(newProject, authUser)
@@ -203,11 +232,14 @@ class ProjectCreatorSpec extends AsyncFlatSpec with AsyncIOSpec with should.Matc
       .assertThrowsError[Exception](_ shouldBe CreationFailures.activationReturningNotFound(newProject))
   }
 
+  private implicit val logger: TestLogger[IO] = TestLogger[IO]()
   private val glProjectCreator  = mock[GLProjectCreator[IO]]
   private val corePayloadFinder = mock[CorePayloadFinder[IO]]
   private val coreClient        = mock[RenkuCoreClient[IO]]
   private val wsClient          = mock[WebhookServiceClient[IO]]
-  private lazy val creator      = new ProjectCreatorImpl[IO](glProjectCreator, corePayloadFinder, coreClient, wsClient)
+  private val glProjectRemover  = mock[ProjectRemover[IO]]
+  private lazy val creator =
+    new ProjectCreatorImpl[IO](glProjectCreator, corePayloadFinder, coreClient, wsClient, glProjectRemover)
 
   private def givenGLProjectCreation(newProject:  NewProject,
                                      accessToken: UserAccessToken,
@@ -232,6 +264,14 @@ class ProjectCreatorSpec extends AsyncFlatSpec with AsyncIOSpec with should.Matc
                                 accessToken:      UserAccessToken,
                                 returning:        IO[WSResult[HookCreationResult]]
   ) = (wsClient.createHook _)
+    .expects(glCreatedProject.id, accessToken)
+    .returning(returning)
+
+  private def givenGLProjectRemover(glCreatedProject: GLCreatedProject,
+                                    accessToken:      UserAccessToken,
+                                    returning:        IO[Unit]
+  ) = (glProjectRemover
+    .deleteProject(_: projects.GitLabId)(_: AccessToken))
     .expects(glCreatedProject.id, accessToken)
     .returning(returning)
 }
