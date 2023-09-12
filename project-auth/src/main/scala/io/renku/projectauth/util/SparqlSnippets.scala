@@ -19,7 +19,7 @@
 package io.renku.projectauth.util
 
 import cats.syntax.all._
-import io.renku.graph.model.persons
+import io.renku.graph.model.{persons, projects}
 import io.renku.graph.model.projects.Visibility
 import io.renku.projectauth.ProjectAuth
 import io.renku.triplesstore.client.sparql.{Fragment, VarName}
@@ -28,6 +28,17 @@ import io.renku.triplesstore.client.syntax._
 object SparqlSnippets {
   val projectId         = VarName("projectId")
   val projectVisibility = VarName("projectVisibility")
+
+  def changeVisibility(slug: projects.Slug, newValue: projects.Visibility): Fragment =
+    sparql"""|DELETE { GRAPH ${ProjectAuth.graph} { ?id renku:visibility ?visibility } }
+             |INSERT { GRAPH ${ProjectAuth.graph} { ?id renku:visibility ${newValue.asObject} } }
+             |WHERE {
+             |  GRAPH ${ProjectAuth.graph} {
+             |    ?id a schema:Project;
+             |        renku:slug ${slug.asObject};
+             |        renku:visibility ?visibility.
+             |  }
+             |}""".stripMargin
 
   def visibleProjects(userId: Option[persons.GitLabId], selectedVisibility: Set[Visibility]): Fragment = {
     val visibilities =

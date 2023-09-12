@@ -26,6 +26,8 @@ import io.renku.graph.model.Schemas.{rdf, renku, schema}
 import io.renku.graph.model.images.{Image, ImageUri}
 import io.renku.graph.model.{GraphClass, RenkuUrl, projects}
 import io.renku.jsonld.syntax._
+import io.renku.projectauth.ProjectAuth
+import io.renku.projectauth.util.SparqlSnippets
 import io.renku.triplesgenerator.api.ProjectUpdates
 import io.renku.triplesstore.SparqlQuery
 import io.renku.triplesstore.SparqlQuery.Prefixes
@@ -224,8 +226,16 @@ private class UpdateQueriesCalculatorImpl[F[_]: Applicative: Logger](implicit ru
 
   private def visibilityUpdates(slug: projects.Slug, newValue: projects.Visibility): List[SparqlQuery] = List(
     visibilityInProjectUpdate(slug, newValue),
-    visibilityInProjectsUpdate(slug, newValue)
+    visibilityInProjectsUpdate(slug, newValue),
+    visibilityInProjectAuthUpdate(slug, newValue)
   )
+
+  private def visibilityInProjectAuthUpdate(slug: projects.Slug, newValue: projects.Visibility) =
+    SparqlQuery.ofUnsafe(
+      show"$reportingPrefix: update visibility in ProjectAuth",
+      Prefixes of (renku -> "renku", schema -> "schema"),
+      SparqlSnippets.changeVisibility(slug, newValue)
+    )
 
   private def visibilityInProjectUpdate(slug: projects.Slug, newValue: projects.Visibility) =
     SparqlQuery.ofUnsafe(
