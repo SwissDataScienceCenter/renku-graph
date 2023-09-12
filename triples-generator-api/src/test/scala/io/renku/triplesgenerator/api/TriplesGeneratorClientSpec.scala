@@ -28,7 +28,7 @@ import io.renku.http.client.UrlEncoder.urlEncode
 import io.renku.interpreters.TestLogger
 import io.renku.stubbing.ExternalServiceStubbing
 import io.renku.testtools.CustomAsyncIOSpec
-import org.http4s.Status.NotFound
+import org.http4s.Status.{BadRequest, NotFound}
 import org.http4s.Uri
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AsyncWordSpec
@@ -42,6 +42,34 @@ class TriplesGeneratorClientSpec
 
   private implicit val logger: Logger[IO] = TestLogger()
   private lazy val client = new TriplesGeneratorClientImpl[IO](Uri.unsafeFromString(externalServiceBaseUrl))
+
+  "createProject" should {
+
+    "succeed if sending project creation payload to the TG's Project Create API returned Ok" in {
+
+      val newProject = newProjectsGen.generateOne
+
+      stubFor {
+        post(urlEqualTo("/projects"))
+          .withRequestBody(equalToJson(newProject.asJson.spaces2))
+          .willReturn(ok())
+      }
+
+      client.createProject(newProject).asserting(_ shouldBe TriplesGeneratorClient.Result.success(()))
+    }
+
+    "failed if sending the payload returns other status" in {
+
+      val newProject = newProjectsGen.generateOne
+
+      stubFor {
+        post(urlEqualTo("/projects"))
+          .willReturn(aResponse.withStatus(BadRequest.code))
+      }
+
+      client.createProject(newProject).asserting(_ shouldBe a[TriplesGeneratorClient.Result.Failure])
+    }
+  }
 
   "updateProject" should {
 
@@ -59,7 +87,7 @@ class TriplesGeneratorClientSpec
       client.updateProject(slug, updates).asserting(_ shouldBe TriplesGeneratorClient.Result.success(()))
     }
 
-    "failed if sending project update to the TG's Project Update API returned other status" in {
+    "failed if sending the update returns other status" in {
 
       val slug    = projectSlugs.generateOne
       val updates = projectUpdatesGen.generateOne

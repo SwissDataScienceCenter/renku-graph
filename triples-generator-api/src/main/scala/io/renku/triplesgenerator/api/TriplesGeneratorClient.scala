@@ -32,7 +32,8 @@ import org.http4s.dsl.Http4sDsl
 import org.typelevel.log4cats.Logger
 
 trait TriplesGeneratorClient[F[_]] {
-  def updateProject(slug: projects.Slug, updates: ProjectUpdates): F[Result[Unit]]
+  def createProject(newProject: NewProject): F[Result[Unit]]
+  def updateProject(slug:       projects.Slug, updates: ProjectUpdates): F[Result[Unit]]
 }
 
 object TriplesGeneratorClient {
@@ -69,6 +70,13 @@ private class TriplesGeneratorClientImpl[F[_]: Async: Logger](tgUri: Uri)
   import io.circe.syntax._
   import io.renku.http.tinytypes.TinyTypeURIEncoder._
   import org.http4s.circe._
+
+  override def createProject(newProject: NewProject): F[Result[Unit]] =
+    send(POST(tgUri / "projects") withEntity newProject.asJson) {
+      case (Ok, _, _) => Result.success(()).pure[F]
+      case (status, req, _) =>
+        Result.failure[Unit](s"Creating project in TG failed: ${req.pathInfo.renderString}: $status").pure[F]
+    }
 
   override def updateProject(slug: projects.Slug, updates: ProjectUpdates): F[Result[Unit]] =
     send(PATCH(tgUri / "projects" / slug) withEntity updates.asJson) {
