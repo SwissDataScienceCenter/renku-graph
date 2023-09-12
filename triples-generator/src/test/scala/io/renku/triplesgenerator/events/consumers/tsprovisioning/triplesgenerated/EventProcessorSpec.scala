@@ -42,11 +42,9 @@ import io.renku.logging.TestExecutionTimeRecorder
 import io.renku.testtools.IOSpec
 import io.renku.triplesgenerator.events.consumers.EventStatusUpdater.{ExecutionDelay, RollbackStatus}
 import io.renku.triplesgenerator.events.consumers.ProcessingRecoverableError._
-import io.renku.triplesgenerator.events.consumers.tsprovisioning.transformation.Generators._
-import io.renku.triplesgenerator.events.consumers.tsprovisioning.transformation.TransformationStepsCreator
 import io.renku.triplesgenerator.events.consumers.tsprovisioning.triplesgenerated.CategoryGenerators._
+import io.renku.triplesgenerator.events.consumers.tsprovisioning.triplesuploading.TriplesUploadResult
 import io.renku.triplesgenerator.events.consumers.tsprovisioning.triplesuploading.TriplesUploadResult._
-import io.renku.triplesgenerator.events.consumers.tsprovisioning.triplesuploading.{TransformationStepsRunner, TriplesUploadResult}
 import io.renku.triplesgenerator.generators.ErrorGenerators.{logWorthyRecoverableErrors, nonRecoverableMalformedRepoErrors, silentRecoverableErrors}
 import org.scalacheck.Gen
 import org.scalamock.scalatest.MockFactory
@@ -70,7 +68,7 @@ class EventProcessorSpec extends AnyWordSpec with IOSpec with MockFactory with s
       val project = anyRenkuProjectEntities.generateOne.to[entities.Project]
       givenEntityBuilding(event, returning = EitherT.rightT(project))
 
-      successfulTriplesTransformationAndUpload(project)
+      givenSuccessfulTSProvisioning(project)
 
       expectEventMarkedAsDone(event.compoundEventId, event.project.slug)
 
@@ -162,7 +160,7 @@ class EventProcessorSpec extends AnyWordSpec with IOSpec with MockFactory with s
 
         val processingRecoverableError = logWorthyRecoverableErrors.generateOne
         val failure                    = TriplesUploadResult.RecoverableFailure(processingRecoverableError)
-        successfulStepsCreation(project, runningToReturn = failure.pure[IO])
+        givenTSProvisioning(project, returning = failure.pure[IO])
 
         expectEventMarkedAsRecoverableFailure(event, failure.error)
 
@@ -183,7 +181,7 @@ class EventProcessorSpec extends AnyWordSpec with IOSpec with MockFactory with s
 
         val processingRecoverableError = silentRecoverableErrors.generateOne
         val failure                    = TriplesUploadResult.RecoverableFailure(processingRecoverableError)
-        successfulStepsCreation(project, runningToReturn = failure.pure[IO])
+        givenTSProvisioning(project, returning = failure.pure[IO])
 
         expectEventMarkedAsRecoverableFailure(event, failure.error)
 
@@ -203,7 +201,7 @@ class EventProcessorSpec extends AnyWordSpec with IOSpec with MockFactory with s
 
         val failure =
           TriplesUploadResult.RecoverableFailure(SilentRecoverableError(exceptions.generateOne.getMessage))
-        successfulStepsCreation(project, runningToReturn = failure.pure[IO])
+        givenTSProvisioning(project, returning = failure.pure[IO])
 
         expectEventMarkedAsRecoverableFailure(event, failure.error)
 
@@ -222,7 +220,7 @@ class EventProcessorSpec extends AnyWordSpec with IOSpec with MockFactory with s
       givenEntityBuilding(event, returning = EitherT.rightT(project))
 
       val exception = exceptions.generateOne
-      successfulStepsCreation(project, runningToReturn = exception.raiseError[IO, TriplesUploadResult])
+      givenTSProvisioning(project, returning = exception.raiseError[IO, TriplesUploadResult])
 
       expectEventMarkedAsNonRecoverableFailure(event, exception)
 
@@ -243,7 +241,7 @@ class EventProcessorSpec extends AnyWordSpec with IOSpec with MockFactory with s
 
         val uploadingError =
           nonEmptyStrings().map(message => RecoverableFailure(LogWorthyRecoverableError(message))).generateOne
-        successfulStepsCreation(project, runningToReturn = uploadingError.pure[IO])
+        givenTSProvisioning(project, returning = uploadingError.pure[IO])
 
         expectEventMarkedAsRecoverableFailure(event, uploadingError.error)
 
@@ -263,7 +261,7 @@ class EventProcessorSpec extends AnyWordSpec with IOSpec with MockFactory with s
         givenEntityBuilding(event, returning = EitherT.rightT(project))
 
         val failure = NonRecoverableFailure("error")
-        successfulStepsCreation(project, runningToReturn = failure.pure[IO])
+        givenTSProvisioning(project, returning = failure.pure[IO])
 
         expectEventMarkedAsNonRecoverableFailure(event, failure)
 
@@ -281,7 +279,7 @@ class EventProcessorSpec extends AnyWordSpec with IOSpec with MockFactory with s
       val project = anyProjectEntities.generateOne.to[entities.Project]
       givenEntityBuilding(event, returning = EitherT.rightT(project))
 
-      successfulTriplesTransformationAndUpload(project)
+      givenSuccessfulTSProvisioning(project)
 
       val exception = exceptions.generateOne
       (eventStatusUpdater
@@ -326,35 +324,24 @@ class EventProcessorSpec extends AnyWordSpec with IOSpec with MockFactory with s
 
     implicit val logger:            TestLogger[IO]        = TestLogger[IO]()
     implicit val accessTokenFinder: AccessTokenFinder[IO] = mock[AccessTokenFinder[IO]]
-    val stepsCreator          = mock[TransformationStepsCreator[IO]]
-    val stepsRunner           = mock[TransformationStepsRunner[IO]]
+    val tsProvisioner         = mock[TSProvisioner[IO]]
     val eventStatusUpdater    = mock[EventStatusUpdater[IO]]
     val entityBuilder         = mock[EntityBuilder[IO]]
     val executionTimeRecorder = TestExecutionTimeRecorder[IO](maybeHistogram = None)
     val eventProcessor =
-      new EventProcessorImpl[IO](stepsCreator, stepsRunner, eventStatusUpdater, entityBuilder, executionTimeRecorder)
+      new EventProcessorImpl[IO](tsProvisioner, eventStatusUpdater, entityBuilder, executionTimeRecorder)
 
     def givenFetchingAccessToken(forProjectSlug: Slug) =
       (accessTokenFinder
         .findAccessToken(_: Slug)(_: Slug => String))
         .expects(forProjectSlug, projectSlugToPath)
 
-    def successfulTriplesTransformationAndUpload(project: Project) =
-      successfulStepsCreation(project, runningToReturn = DeliverySuccess.pure[IO])
+    def givenSuccessfulTSProvisioning(project: Project) =
+      givenTSProvisioning(project, returning = DeliverySuccess.pure[IO])
 
-    def successfulStepsCreation(project: Project, runningToReturn: IO[TriplesUploadResult]) = {
-      val steps = transformationSteps[IO].generateList()
-      (() => stepsCreator.createSteps)
-        .expects()
-        .returning(steps)
-
-      givenStepsRunnerFor(steps, project, returning = runningToReturn)
-    }
-
-    def givenStepsRunnerFor(steps: List[TransformationStep[IO]], project: Project, returning: IO[TriplesUploadResult]) =
-      (stepsRunner
-        .run(_: List[TransformationStep[IO]], _: Project))
-        .expects(steps, project)
+    def givenTSProvisioning(project: Project, returning: IO[TriplesUploadResult]) =
+      (tsProvisioner.provisionTS _)
+        .expects(project)
         .returning(returning)
 
     def givenEntityBuilding(event: TriplesGeneratedEvent, returning: EitherT[IO, ProcessingRecoverableError, Project]) =

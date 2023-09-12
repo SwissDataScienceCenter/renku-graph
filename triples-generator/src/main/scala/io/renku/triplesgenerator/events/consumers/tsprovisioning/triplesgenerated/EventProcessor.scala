@@ -33,9 +33,8 @@ import io.renku.logging.ExecutionTimeRecorder.ElapsedTime
 import io.renku.metrics.{Histogram, MetricsRegistry}
 import io.renku.triplesgenerator.events.consumers.EventStatusUpdater._
 import io.renku.triplesgenerator.events.consumers.ProcessingRecoverableError._
-import io.renku.triplesgenerator.events.consumers.tsprovisioning.transformation.TransformationStepsCreator
+import io.renku.triplesgenerator.events.consumers.tsprovisioning.triplesuploading.TriplesUploadResult
 import io.renku.triplesgenerator.events.consumers.tsprovisioning.triplesuploading.TriplesUploadResult._
-import io.renku.triplesgenerator.events.consumers.tsprovisioning.triplesuploading.{TransformationStepsRunner, TriplesUploadResult}
 import io.renku.triplesstore.SparqlQueryTimeRecorder
 import org.typelevel.log4cats.Logger
 
@@ -47,8 +46,7 @@ private trait EventProcessor[F[_]] {
 }
 
 private class EventProcessorImpl[F[_]: MonadThrow: AccessTokenFinder: Logger](
-    stepsCreator:          TransformationStepsCreator[F],
-    uploader:              TransformationStepsRunner[F],
+    tsProvisioner:         TSProvisioner[F],
     statusUpdater:         EventStatusUpdater[F],
     entityBuilder:         EntityBuilder[F],
     executionTimeRecorder: ExecutionTimeRecorder[F]
@@ -59,8 +57,7 @@ private class EventProcessorImpl[F[_]: MonadThrow: AccessTokenFinder: Logger](
   import accessTokenFinder._
   import entityBuilder._
   import executionTimeRecorder._
-  import stepsCreator._
-  import uploader._
+  import tsProvisioner.provisionTS
 
   def process(event: TriplesGeneratedEvent): F[Unit] = {
     for {
@@ -81,7 +78,7 @@ private class EventProcessorImpl[F[_]: MonadThrow: AccessTokenFinder: Logger](
   )(implicit mat: Option[AccessToken]): F[EventUploadingResult] = {
     for {
       project <- buildEntity(event) leftSemiflatMap toRecoverableError(event)
-      result  <- right[EventUploadingResult](run(createSteps, project) >>= toUploadingResult(event))
+      result  <- right[EventUploadingResult](provisionTS(project) >>= toUploadingResult(event))
     } yield result
   }.merge recoverWith nonRecoverableFailure(event)
 
@@ -199,8 +196,7 @@ private object EventProcessor {
       _
   ]: Async: NonEmptyParallel: Parallel: GitLabClient: AccessTokenFinder: Logger: MetricsRegistry: SparqlQueryTimeRecorder]
       : F[EventProcessor[F]] = for {
-    uploader           <- TransformationStepsRunner[F]
-    stepsCreator       <- TransformationStepsCreator[F]
+    tsProvisioner      <- TSProvisioner[F]
     eventStatusUpdater <- EventStatusUpdater(categoryName)
     eventsProcessingTimes <- Histogram(
                                name = "triples_transformation_processing_times",
@@ -210,5 +206,5 @@ private object EventProcessor {
                              )
     executionTimeRecorder <- ExecutionTimeRecorder[F](maybeHistogram = Some(eventsProcessingTimes))
     entityBuilder         <- EntityBuilder[F]
-  } yield new EventProcessorImpl(stepsCreator, uploader, eventStatusUpdater, entityBuilder, executionTimeRecorder)
+  } yield new EventProcessorImpl(tsProvisioner, eventStatusUpdater, entityBuilder, executionTimeRecorder)
 }

@@ -33,9 +33,8 @@ import io.renku.triplesgenerator
 import io.renku.triplesgenerator.api.events.ProjectActivated
 import io.renku.triplesstore.SparqlQueryTimeRecorder
 import org.typelevel.log4cats.Logger
-import transformation.TransformationStepsCreator
+import triplesuploading.TriplesUploadResult
 import triplesuploading.TriplesUploadResult.{DeliverySuccess, NonRecoverableFailure, RecoverableFailure}
-import triplesuploading.{TransformationStepsRunner, TriplesUploadResult}
 
 import scala.util.control.NonFatal
 
@@ -44,8 +43,7 @@ private trait EventProcessor[F[_]] {
 }
 
 private class EventProcessorImpl[F[_]: MonadThrow: AccessTokenFinder: Logger](
-    stepsCreator:            TransformationStepsCreator[F],
-    stepsRunner:             TransformationStepsRunner[F],
+    tsProvisioner:           TSProvisioner[F],
     entityBuilder:           EntityBuilder[F],
     projectExistenceChecker: ProjectExistenceChecker[F],
     tgClient:                triplesgenerator.api.events.Client[F],
@@ -58,8 +56,6 @@ private class EventProcessorImpl[F[_]: MonadThrow: AccessTokenFinder: Logger](
   import entityBuilder._
   import executionTimeRecorder._
   import projectExistenceChecker._
-  import stepsCreator.createSteps
-  import stepsRunner.run
 
   override def process(event: MinProjectInfoEvent): F[Unit] = {
     for {
@@ -81,7 +77,7 @@ private class EventProcessorImpl[F[_]: MonadThrow: AccessTokenFinder: Logger](
     (buildEntity(event) leftSemiflatMap toUploadingError(event)).semiflatMap { project =>
       checkProjectExists(project.resourceId) >>= {
         case true  => Skipped(event).widen.pure[F]
-        case false => run(createSteps, project) >>= toUploadingResult(event)
+        case false => tsProvisioner.provisionTS(project) >>= toUploadingResult(event)
       }
     }.merge recoverWith nonRecoverableFailure(event)
 
@@ -170,8 +166,7 @@ private object EventProcessor {
       _
   ]: Async: NonEmptyParallel: Parallel: GitLabClient: AccessTokenFinder: Logger: MetricsRegistry: SparqlQueryTimeRecorder]
       : F[EventProcessor[F]] = for {
-    uploader                <- TransformationStepsRunner[F]
-    stepsCreator            <- TransformationStepsCreator[F]
+    tsProvisioner           <- TSProvisioner[F]
     entityBuilder           <- EntityBuilder[F]
     projectExistenceChecker <- ProjectExistenceChecker[F]
     tgClient                <- triplesgenerator.api.events.Client[F]
@@ -182,11 +177,5 @@ private object EventProcessor {
                                              1000000, 5000000, 10000000, 50000000, 100000000, 500000000)
                              )
     executionTimeRecorder <- ExecutionTimeRecorder[F](maybeHistogram = Some(eventsProcessingTimes))
-  } yield new EventProcessorImpl(stepsCreator,
-                                 uploader,
-                                 entityBuilder,
-                                 projectExistenceChecker,
-                                 tgClient,
-                                 executionTimeRecorder
-  )
+  } yield new EventProcessorImpl(tsProvisioner, entityBuilder, projectExistenceChecker, tgClient, executionTimeRecorder)
 }
