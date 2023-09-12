@@ -143,7 +143,7 @@ trait InMemoryJena {
 
         import io.circe.Decoder._
 
-        def uploadPayload(jsonLD: JsonLD) = upload(jsonLD)
+        def uploadPayload(jsonLD: JsonLD) = this.upload(jsonLD)
 
         def runQuery(query: SparqlQuery): IO[List[Map[String, String]]] =
           queryExpecting[List[Map[String, String]]](query)
