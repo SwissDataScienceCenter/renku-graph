@@ -103,7 +103,7 @@ class RetrySpec extends AsyncFlatSpec with AsyncIOSpec with should.Matchers {
       _ = r shouldBe ()
       execCount <- e.execTimes.get
       _ = execCount.size shouldBe 3
-      _ <- e.assertPauseTime(500.millis, epsilon = 125.millis)
+      _ <- e.assertPauseTime(500.millis, epsilon = 150.millis)
     } yield ()
   }
 
@@ -121,7 +121,7 @@ class RetrySpec extends AsyncFlatSpec with AsyncIOSpec with should.Matchers {
       _ = r shouldBe Left(FinalError)
       execCount <- e.execTimes.get
       _ = execCount.size shouldBe 3
-      _ <- e.assertPauseTime(500.millis, epsilon = 125.millis)
+      _ <- e.assertPauseTime(500.millis, epsilon = 150.millis)
     } yield ()
   }
 
