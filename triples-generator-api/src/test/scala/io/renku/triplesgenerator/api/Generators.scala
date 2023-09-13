@@ -37,6 +37,8 @@ object Generators {
     (projectNames,
      projectSlugs,
      projectDescriptions.toGeneratorOfOptions,
+     projectCreatedDates(),
+     (personNames, personGitLabIds).mapN(NewProject.Creator.apply),
      projectKeywords.toGeneratorOfSet(min = 0),
      projectVisibilities,
      imageUris.toGeneratorOfList()

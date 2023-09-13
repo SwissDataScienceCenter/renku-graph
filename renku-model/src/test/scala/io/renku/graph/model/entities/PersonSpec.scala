@@ -21,8 +21,8 @@ package io.renku.graph.model.entities
 import cats.syntax.all._
 import io.renku.cli.model.{CliPerson, CliPersonResourceId}
 import io.renku.generators.Generators.Implicits._
-import io.renku.graph.model.testentities.generators.EntitiesGenerators
 import io.renku.graph.model.testentities.Person
+import io.renku.graph.model.testentities.generators.EntitiesGenerators
 import io.renku.graph.model.tools.AdditionalMatchers
 import io.renku.graph.model.{GraphClass, GraphModelGenerators, entities, persons}
 import io.renku.jsonld.syntax._
@@ -45,6 +45,21 @@ class PersonSpec
     "use the Person resourceId if there's no GitLabId" in {
       val person = personEntities().generateOne.to[entities.Person]
       person.asJsonLD shouldBe person.resourceId.asEntityId.asJsonLD
+    }
+  }
+
+  "apply(Name, GitLabId)" should {
+
+    "instantiate a Person.WithGitLabId" in {
+      forAll(personNames, personGitLabIds) { (name, glId) =>
+        entities.Person(name, glId) shouldBe entities.Person.WithGitLabId(persons.ResourceId(glId),
+                                                                          glId,
+                                                                          name,
+                                                                          maybeEmail = None,
+                                                                          maybeOrcidId = None,
+                                                                          maybeAffiliation = None
+        )
+      }
     }
   }
 

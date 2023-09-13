@@ -45,7 +45,11 @@ class NewProjectSpec extends AnyWordSpec with should.Matchers with ScalaCheckPro
 
       val newProject = newProjectsGen.generateOne.copy(maybeDescription = None, keywords = Set.empty, images = Nil)
 
-      newProject.show shouldBe s"name=${newProject.name}, slug=${newProject.slug}, visibility=${newProject.visibility}"
+      newProject.show shouldBe s"name=${newProject.name}, " +
+        s"slug=${newProject.slug}, " +
+        s"dateCreated=${newProject.dateCreated}, " +
+        s"creator=(name=${newProject.creator.name}, id=${newProject.creator.id}), " +
+        s"visibility=${newProject.visibility}"
     }
 
     "print all set values" in {
@@ -59,6 +63,8 @@ class NewProjectSpec extends AnyWordSpec with should.Matchers with ScalaCheckPro
       newProject.show shouldBe s"name=${newProject.name}, " +
         s"slug=${newProject.slug}, " +
         s"description=$desc, " +
+        s"dateCreated=${newProject.dateCreated}, " +
+        s"creator=(name=${newProject.creator.name}, id=${newProject.creator.id}), " +
         s"keywords=[${newProject.keywords.mkString(", ")}], " +
         s"images=[${newProject.images.mkString(", ")}], " +
         s"visibility=${newProject.visibility}"

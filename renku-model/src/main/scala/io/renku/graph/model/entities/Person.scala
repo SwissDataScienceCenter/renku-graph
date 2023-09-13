@@ -90,6 +90,15 @@ object Person {
       Person.WithGitLabId(ResourceId(gitLabId), gitLabId, name, maybeEmail = None, maybeOrcidId, maybeAffiliation)
   }
 
+  def apply(name: Name, gitLabId: GitLabId)(implicit renkuUrl: RenkuUrl): Person.WithGitLabId =
+    Person.WithGitLabId(persons.ResourceId(gitLabId),
+                        gitLabId,
+                        name,
+                        maybeEmail = None,
+                        maybeOrcidId = None,
+                        maybeAffiliation = None
+    )
+
   def from(
       resourceId:       ResourceId,
       name:             Name,

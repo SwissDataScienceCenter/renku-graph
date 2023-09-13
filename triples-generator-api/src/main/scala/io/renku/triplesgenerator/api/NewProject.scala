@@ -23,13 +23,15 @@ import cats.{Foldable, Show}
 import io.circe.literal._
 import io.circe.{Decoder, Encoder}
 import io.renku.graph.model.images.ImageUri
-import io.renku.graph.model.projects
+import io.renku.graph.model.{persons, projects}
 import io.renku.tinytypes.json.TinyTypeDecoders._
 
 final case class NewProject(
     name:             projects.Name,
     slug:             projects.Slug,
     maybeDescription: Option[projects.Description],
+    dateCreated:      projects.DateCreated,
+    creator:          NewProject.Creator,
     keywords:         Set[projects.Keyword],
     visibility:       projects.Visibility,
     images:           List[ImageUri]
@@ -37,31 +39,57 @@ final case class NewProject(
 
 object NewProject {
 
+  final case class Creator(name: persons.Name, id: persons.GitLabId) {
+    val role: projects.Role = projects.Role.Owner
+  }
+
+  object Creator {
+    implicit val show: Show[Creator] = Show.show { case Creator(name, id) =>
+      s"name=$name, id=$id"
+    }
+  }
+
   implicit val encoder: Encoder[NewProject] = Encoder.instance {
-    case NewProject(name, slug, maybeDescription, keywords, visibility, images) =>
+    case NewProject(name, slug, maybeDescription, dateCreated, creator, keywords, visibility, images) =>
       json"""{
         "name":        $name,
         "slug":        $slug,
         "description": $maybeDescription,
+        "dateCreated": $dateCreated,
         "keywords":    $keywords,
         "visibility":  $visibility,
-        "images":      $images
+        "images":      $images,
+        "creator": {
+          "name": ${creator.name},
+          "id":   ${creator.id}
+        }
       }""".dropNullValues
   }
 
   implicit val decoder: Decoder[NewProject] = Decoder.instance { cur =>
     for {
-      name       <- cur.downField("name").as[projects.Name]
-      slug       <- cur.downField("slug").as[projects.Slug]
-      maybeDesc  <- cur.downField("description").as[Option[projects.Description]]
-      keywords   <- cur.downField("keywords").as[List[projects.Keyword]].map(_.toSet)
-      visibility <- cur.downField("visibility").as[projects.Visibility]
-      images     <- cur.downField("images").as[List[ImageUri]]
-    } yield NewProject(name, slug, maybeDesc, keywords, visibility, images)
+      name        <- cur.downField("name").as[projects.Name]
+      slug        <- cur.downField("slug").as[projects.Slug]
+      maybeDesc   <- cur.downField("description").as[Option[projects.Description]]
+      dateCreated <- cur.downField("dateCreated").as[projects.DateCreated]
+      keywords    <- cur.downField("keywords").as[List[projects.Keyword]].map(_.toSet)
+      visibility  <- cur.downField("visibility").as[projects.Visibility]
+      images      <- cur.downField("images").as[List[ImageUri]]
+      creatorName <- cur.downField("creator").downField("name").as[persons.Name]
+      creatorId   <- cur.downField("creator").downField("id").as[persons.GitLabId]
+    } yield NewProject(name,
+                       slug,
+                       maybeDesc,
+                       dateCreated,
+                       Creator(creatorName, creatorId),
+                       keywords,
+                       visibility,
+                       images
+    )
   }
 
   implicit val show: Show[NewProject] = Show.show {
-    case NewProject(name, slug, maybeDescription, keywords, visibility, images) =>
+    case NewProject(name, slug, maybeDescription, dateCreated, creator, keywords, visibility, images) =>
       def showIterable[M[_]: Foldable, T](iterable: M[T])(implicit show: Show[T]) =
         iterable match {
           case it if it.isEmpty => None
@@ -72,6 +100,8 @@ object NewProject {
         s"name=$name".some,
         s"slug=$slug".some,
         maybeDescription.map(v => s"description=$v"),
+        s"dateCreated=$dateCreated".some,
+        show"creator=($creator)".some,
         showIterable(keywords.toList).map(v => s"keywords=$v"),
         showIterable(images).map(v => s"images=$v"),
         s"visibility=$visibility".some

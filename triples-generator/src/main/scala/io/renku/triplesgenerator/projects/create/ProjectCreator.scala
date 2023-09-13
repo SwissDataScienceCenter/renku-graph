@@ -37,9 +37,10 @@ private object ProjectCreator {
   def apply[F[_]: Async: Logger: SparqlQueryTimeRecorder](tsWriteLock: TsWriteLock[F]): F[ProjectCreator[F]] =
     for {
       connectionConfig <- ProjectsConnectionConfig[F]()
+      payloadConverter <- PayloadConverter[F]
       tsProvisioner    <- TSProvisioner[F]
     } yield new ProjectCreatorImpl[F](ProjectExistenceChecker[F](connectionConfig),
-                                      PayloadConverter,
+                                      payloadConverter,
                                       tsProvisioner,
                                       tsWriteLock
     )
