@@ -26,7 +26,6 @@ import io.renku.graph.model.Schemas.{rdf, renku, schema}
 import io.renku.graph.model.images.{Image, ImageUri}
 import io.renku.graph.model.{GraphClass, RenkuUrl, projects}
 import io.renku.jsonld.syntax._
-import io.renku.projectauth.ProjectAuth
 import io.renku.projectauth.util.SparqlSnippets
 import io.renku.triplesgenerator.api.ProjectUpdates
 import io.renku.triplesstore.SparqlQuery
