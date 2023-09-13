@@ -29,7 +29,7 @@ import io.renku.graph.model.entities.RenkuProject.ProjectFactory
 import io.renku.graph.model.images.{Image, ImageUri}
 import io.renku.graph.model.projects._
 import io.renku.graph.model.versions.{CliVersion, SchemaVersion}
-import io.renku.jsonld.Property
+import io.renku.jsonld.{JsonLD, JsonLDEncoder, Property}
 import io.renku.jsonld.ontology._
 import io.renku.tinytypes.InstantTinyType
 import monocle.{Lens, Traversal}
@@ -46,7 +46,7 @@ sealed trait Project extends Product with Serializable {
   val maybeCreator:     Option[Person]
   val visibility:       Visibility
   val keywords:         Set[Keyword]
-  val members:          Set[Person]
+  val members:          Set[Project.Member]
   val images:           List[Image]
 
   val activities: List[Activity]
@@ -84,7 +84,7 @@ object NonRenkuProject {
                                  maybeCreator:     Option[Person],
                                  visibility:       Visibility,
                                  keywords:         Set[Keyword],
-                                 members:          Set[Person],
+                                 members:          Set[Project.Member],
                                  images:           List[Image]
   ) extends NonRenkuProject {
     override def fold[P](rnp:  RenkuProject.WithoutParent => P,
@@ -104,7 +104,7 @@ object NonRenkuProject {
              maybeCreator:     Option[Person],
              visibility:       Visibility,
              keywords:         Set[Keyword],
-             members:          Set[Person],
+             members:          Set[Project.Member],
              images:           List[Image]
     ): ValidatedNel[String, NonRenkuProject.WithoutParent] =
       validateDates(dateCreated, dateModified).as(
@@ -132,7 +132,7 @@ object NonRenkuProject {
                               maybeCreator:     Option[Person],
                               visibility:       Visibility,
                               keywords:         Set[Keyword],
-                              members:          Set[Person],
+                              members:          Set[Project.Member],
                               parentResourceId: ResourceId,
                               images:           List[Image]
   ) extends NonRenkuProject
@@ -154,7 +154,7 @@ object NonRenkuProject {
              maybeCreator:     Option[Person],
              visibility:       Visibility,
              keywords:         Set[Keyword],
-             members:          Set[Person],
+             members:          Set[Project.Member],
              parentResourceId: ResourceId,
              images:           List[Image]
     ): ValidatedNel[String, NonRenkuProject.WithParent] =
@@ -196,7 +196,7 @@ object RenkuProject {
                                  maybeCreator:     Option[Person],
                                  visibility:       Visibility,
                                  keywords:         Set[Keyword],
-                                 members:          Set[Person],
+                                 members:          Set[Project.Member],
                                  version:          SchemaVersion,
                                  activities:       List[Activity],
                                  datasets:         List[Dataset[Dataset.Provenance]],
@@ -222,7 +222,7 @@ object RenkuProject {
              maybeCreator:     Option[Person],
              visibility:       Visibility,
              keywords:         Set[Keyword],
-             members:          Set[Person],
+             members:          Set[Project.Member],
              version:          SchemaVersion,
              activities:       List[Activity],
              datasets:         List[Dataset[Dataset.Provenance]],
@@ -235,7 +235,7 @@ object RenkuProject {
       updatePlansOriginalId(plans)
     ).mapN { (_, _, _, updatedPlans) =>
       val (syncedActivities, syncedDatasets, syncedPlans) =
-        syncPersons(projectPersons = members ++ maybeCreator, activities, datasets, updatedPlans)
+        syncPersons(projectPersons = members.map(_.person) ++ maybeCreator, activities, datasets, updatedPlans)
       RenkuProject.WithoutParent(
         resourceId,
         slug,
@@ -309,7 +309,7 @@ object RenkuProject {
                               maybeCreator:     Option[Person],
                               visibility:       Visibility,
                               keywords:         Set[Keyword],
-                              members:          Set[Person],
+                              members:          Set[Project.Member],
                               version:          SchemaVersion,
                               activities:       List[Activity],
                               datasets:         List[Dataset[Dataset.Provenance]],
@@ -337,7 +337,7 @@ object RenkuProject {
              maybeCreator:     Option[Person],
              visibility:       Visibility,
              keywords:         Set[Keyword],
-             members:          Set[Person],
+             members:          Set[Project.Member],
              version:          SchemaVersion,
              activities:       List[Activity],
              datasets:         List[Dataset[Dataset.Provenance]],
@@ -352,7 +352,7 @@ object RenkuProject {
       validateCompositePlanData(plans)
     ) mapN { (_, _, _, updatedPlans, _) =>
       val (syncedActivities, syncedDatasets, syncedPlans) =
-        syncPersons(projectPersons = members ++ maybeCreator, activities, datasets, updatedPlans)
+        syncPersons(projectPersons = members.map(_.person) ++ maybeCreator, activities, datasets, updatedPlans)
       RenkuProject.WithParent(
         resourceId,
         slug,
@@ -583,6 +583,13 @@ object RenkuProject {
 }
 
 object Project {
+  final case class Member(person: Person, role: Role)
+  object Member {
+    implicit def jsonLDEncoder(implicit glUrl: GitLabApiUrl, graph: GraphClass): JsonLDEncoder[Member] =
+      JsonLDEncoder.instance { member =>
+        ??? //TODO hm, this changes the ontology of a project. need a new entity that points to person and stores role
+      }
+  }
 
   import io.renku.jsonld.{EntityTypes, JsonLD, JsonLDEncoder}
 
@@ -590,7 +597,7 @@ object Project {
     new EntityFunctions[P] {
 
       override val findAllPersons: P => Set[Person] = { project =>
-        project.members ++
+        project.members.map(_.person) ++
           project.maybeCreator ++
           project.activities.flatMap(EntityFunctions[Activity].findAllPersons) ++
           project.datasets.flatMap(EntityFunctions[Dataset[Dataset.Provenance]].findAllPersons) ++
