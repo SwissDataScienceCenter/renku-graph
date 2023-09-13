@@ -22,7 +22,10 @@ package projects.update
 import cats.syntax.all._
 import eu.timepit.refined.auto._
 import io.circe.literal._
+import io.circe.syntax._
+import io.renku.core.client.Branch
 import io.renku.data.Message
+import io.renku.data.MessageCodecs._
 import io.renku.graph.model.projects
 import io.renku.knowledgegraph.docs.model.Operation.PATCH
 import io.renku.knowledgegraph.docs.model._
@@ -117,7 +120,13 @@ object EndpointDocs extends docs.EndpointDocs {
         Contents(
           MediaType.`application/json`(
             "Reason",
-            Message.Info("Updating project not possible; quite likely the user cannot push to the default branch")
+            UpdateFailures
+              .corePushedToNonDefaultBranch(io.renku.triplesgenerator.api.ProjectUpdates.empty,
+                                            DefaultBranch.PushProtected(Branch("main")).some,
+                                            corePushBranch = Branch("main/351bb74")
+              )
+              .message
+              .asJson
           )
         )
       ),
