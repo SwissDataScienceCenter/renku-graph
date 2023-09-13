@@ -24,6 +24,8 @@ import cats.syntax.all._
 import io.renku.triplesgenerator.TgLockDB.TsWriteLock
 import io.renku.triplesgenerator.api.NewProject
 import io.renku.triplesgenerator.projects.ProjectExistenceChecker
+import io.renku.triplesgenerator.tsprovisioning.TSProvisioner
+import io.renku.triplesgenerator.tsprovisioning.triplesuploading.TriplesUploadResult
 import io.renku.triplesstore.{ProjectsConnectionConfig, SparqlQueryTimeRecorder}
 import org.typelevel.log4cats.Logger
 
@@ -35,17 +37,31 @@ private object ProjectCreator {
   def apply[F[_]: Async: Logger: SparqlQueryTimeRecorder](tsWriteLock: TsWriteLock[F]): F[ProjectCreator[F]] =
     for {
       connectionConfig <- ProjectsConnectionConfig[F]()
-      projectExistenceChecker = ProjectExistenceChecker[F](connectionConfig)
-    } yield new ProjectCreatorImpl[F](projectExistenceChecker, tsWriteLock)
+      tsProvisioner    <- TSProvisioner[F]
+    } yield new ProjectCreatorImpl[F](ProjectExistenceChecker[F](connectionConfig),
+                                      PayloadConverter,
+                                      tsProvisioner,
+                                      tsWriteLock
+    )
 }
 
 private class ProjectCreatorImpl[F[_]: MonadCancelThrow](projectExistenceChecker: ProjectExistenceChecker[F],
-                                                         tsWriteLock: TsWriteLock[F]
+                                                         payloadConverter: PayloadConverter,
+                                                         tsProvisioner:    TSProvisioner[F],
+                                                         tsWriteLock:      TsWriteLock[F]
 ) extends ProjectCreator[F] {
 
   override def createProject(project: NewProject): F[Unit] =
     tsWriteLock(project.slug).surround(create(project))
 
   private def create(project: NewProject): F[Unit] =
-    projectExistenceChecker.checkExists(project.slug).void
+    projectExistenceChecker.checkExists(project.slug) >>= {
+      case true  => ().pure[F]
+      case false => tsProvisioner.provisionTS(payloadConverter(project)).flatMap(succeedOfFail)
+    }
+
+  private lazy val succeedOfFail: TriplesUploadResult => F[Unit] = {
+    case TriplesUploadResult.DeliverySuccess => ().pure[F]
+    case f: TriplesUploadResult.TriplesUploadFailure => f.raiseError[F, Unit]
+  }
 }

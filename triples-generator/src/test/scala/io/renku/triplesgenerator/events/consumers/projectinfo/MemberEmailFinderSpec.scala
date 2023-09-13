@@ -35,7 +35,7 @@ import io.renku.interpreters.TestLogger
 import io.renku.stubbing.ExternalServiceStubbing
 import io.renku.testtools.IOSpec
 import io.renku.triplesgenerator.errors.ProcessingRecoverableError
-import io.renku.triplesgenerator.generators.ErrorGenerators.processingRecoverableErrors
+import io.renku.triplesgenerator.errors.ErrorGenerators.processingRecoverableErrors
 import org.scalacheck.Gen
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.matchers.should

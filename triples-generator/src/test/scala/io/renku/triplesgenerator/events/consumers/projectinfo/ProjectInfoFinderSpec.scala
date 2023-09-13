@@ -34,7 +34,7 @@ import io.renku.http.client.AccessToken
 import io.renku.interpreters.TestLogger
 import io.renku.testtools.IOSpec
 import io.renku.triplesgenerator.errors.ProcessingRecoverableError
-import io.renku.triplesgenerator.generators.ErrorGenerators.processingRecoverableErrors
+import io.renku.triplesgenerator.errors.ErrorGenerators.processingRecoverableErrors
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec

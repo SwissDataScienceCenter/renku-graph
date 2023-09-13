@@ -31,16 +31,20 @@ object TriplesUploadResult {
     val message: String = "Delivery success"
   }
 
-  sealed trait TriplesUploadFailure extends TriplesUploadResult
-  final case class RecoverableFailure(error: ProcessingRecoverableError) extends TriplesUploadFailure {
+  sealed trait TriplesUploadFailure extends Exception with TriplesUploadResult
+  final case class RecoverableFailure(error: ProcessingRecoverableError)
+      extends Exception(error)
+      with TriplesUploadFailure {
     override val message: String = error.getMessage
   }
   sealed trait NonRecoverableFailure extends Exception with TriplesUploadFailure
   object NonRecoverableFailure {
-    case class NonRecoverableFailureWithCause(message: String, cause: Throwable)
+    private case class NonRecoverableFailureWithCause(message: String, cause: Throwable)
         extends Exception(message, cause)
         with NonRecoverableFailure
-    case class NonRecoverableFailureWithoutCause(message: String) extends Exception(message) with NonRecoverableFailure
+    private case class NonRecoverableFailureWithoutCause(message: String)
+        extends Exception(message)
+        with NonRecoverableFailure
 
     def apply(message: String, cause: Throwable): NonRecoverableFailure = NonRecoverableFailureWithCause(message, cause)
     def apply(message: String): NonRecoverableFailure = NonRecoverableFailureWithoutCause(message)

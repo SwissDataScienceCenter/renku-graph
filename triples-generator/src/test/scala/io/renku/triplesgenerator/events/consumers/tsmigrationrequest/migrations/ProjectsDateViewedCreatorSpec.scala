@@ -35,7 +35,7 @@ import io.renku.logging.TestSparqlQueryTimeRecorder
 import io.renku.testtools.IOSpec
 import io.renku.triplesgenerator
 import io.renku.triplesgenerator.api.events.ProjectViewedEvent
-import io.renku.triplesgenerator.generators.ErrorGenerators.processingRecoverableErrors
+import io.renku.triplesgenerator.errors.ErrorGenerators.processingRecoverableErrors
 import io.renku.triplesstore._
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.EitherValues

@@ -28,7 +28,7 @@ import io.renku.graph.model.GraphModelGenerators.personNames
 import io.renku.graph.model.entities
 import io.renku.graph.model.testentities._
 import io.renku.triplesgenerator.errors.ProcessingRecoverableError
-import io.renku.triplesgenerator.generators.ErrorGenerators.{logWorthyRecoverableErrors, processingRecoverableErrors}
+import io.renku.triplesgenerator.errors.ErrorGenerators.{logWorthyRecoverableErrors, processingRecoverableErrors}
 import io.renku.triplesgenerator.tsprovisioning.Generators._
 import io.renku.triplesgenerator.tsprovisioning.TransformationStep
 import io.renku.triplesgenerator.tsprovisioning.TransformationStep.{ProjectWithQueries, Queries}

@@ -42,7 +42,7 @@ import io.renku.triplesgenerator.errors.{ProcessingNonRecoverableError, Processi
 import io.renku.triplesgenerator.errors.ProcessingRecoverableError._
 import io.renku.triplesgenerator.events.consumers.awaitinggeneration.triplesgeneration.renkulog.Commands.{GitLabRepoUrlFinder, RepositoryPath}
 import io.renku.triplesgenerator.events.consumers.awaitinggeneration.{CommitEvent, categoryName}
-import io.renku.triplesgenerator.generators.ErrorGenerators.nonRecoverableMalformedRepoErrors
+import io.renku.triplesgenerator.errors.ErrorGenerators.nonRecoverableMalformedRepoErrors
 import org.scalacheck.Gen
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.matchers.should

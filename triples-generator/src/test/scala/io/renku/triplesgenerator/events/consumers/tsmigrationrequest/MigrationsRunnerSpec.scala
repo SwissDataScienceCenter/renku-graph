@@ -27,7 +27,7 @@ import io.renku.interpreters.TestLogger
 import io.renku.interpreters.TestLogger.Level.{Error, Info}
 import io.renku.testtools.IOSpec
 import io.renku.triplesgenerator.errors.ProcessingRecoverableError
-import io.renku.triplesgenerator.generators.ErrorGenerators._
+import io.renku.triplesgenerator.errors.ErrorGenerators._
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec

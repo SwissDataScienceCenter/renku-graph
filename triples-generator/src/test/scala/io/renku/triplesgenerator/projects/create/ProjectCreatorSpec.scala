@@ -23,10 +23,15 @@ import cats.effect.IO
 import cats.effect.testing.scalatest.AsyncIOSpec
 import cats.syntax.all._
 import io.renku.generators.Generators.Implicits._
-import io.renku.graph.model.projects
+import io.renku.graph.model.testentities._
+import io.renku.graph.model.{entities, projects}
 import io.renku.lock.Lock
 import io.renku.triplesgenerator.TgLockDB.TsWriteLock
 import io.renku.triplesgenerator.api.Generators.newProjectsGen
+import io.renku.triplesgenerator.api.NewProject
+import io.renku.triplesgenerator.tsprovisioning.Generators.triplesUploadFailures
+import io.renku.triplesgenerator.tsprovisioning.TSProvisioner
+import io.renku.triplesgenerator.tsprovisioning.triplesuploading.TriplesUploadResult
 import org.scalamock.scalatest.AsyncMockFactory
 import org.scalatest.flatspec.AsyncFlatSpec
 import org.scalatest.matchers.should
@@ -42,12 +47,55 @@ class ProjectCreatorSpec extends AsyncFlatSpec with AsyncIOSpec with should.Matc
     creator.createProject(newProject).assertNoException
   }
 
+  it should "turn the new project payload into a Project entity and pass it to the TSProvisioner " +
+    "if the project does not exist yet" in {
+
+      val newProject = newProjectsGen.generateOne
+
+      givenProjectExistenceChecking(newProject.slug, returning = false.pure[IO])
+
+      val project = anyProjectEntities.generateOne.to[entities.Project]
+      givenPayloadConverting(newProject, returning = project)
+
+      givenTSProvisioning(project, returning = TriplesUploadResult.DeliverySuccess.pure[IO])
+
+      creator.createProject(newProject).assertNoException
+    }
+
+  it should "fail if TS Provisioning returns a failure" in {
+
+    val newProject = newProjectsGen.generateOne
+
+    givenProjectExistenceChecking(newProject.slug, returning = false.pure[IO])
+
+    val project = anyProjectEntities.generateOne.to[entities.Project]
+    givenPayloadConverting(newProject, returning = project)
+
+    val failure = triplesUploadFailures.generateOne
+    givenTSProvisioning(project, returning = failure.pure[IO])
+
+    creator.createProject(newProject).assertThrowsError[TriplesUploadResult.TriplesUploadFailure](_ shouldBe failure)
+  }
+
   private val tsWriteLock: TsWriteLock[IO] = Lock.none[IO, projects.Slug]
   private val projectExistenceChecker = mock[ProjectExistenceChecker[IO]]
-  private lazy val creator            = new ProjectCreatorImpl[IO](projectExistenceChecker, tsWriteLock)
+  private val payloadConverter        = mock[PayloadConverter]
+  private val tsProvisioner           = mock[TSProvisioner[IO]]
+  private lazy val creator =
+    new ProjectCreatorImpl[IO](projectExistenceChecker, payloadConverter, tsProvisioner, tsWriteLock)
 
   private def givenProjectExistenceChecking(slug: projects.Slug, returning: IO[Boolean]) =
     (projectExistenceChecker.checkExists _)
       .expects(slug)
+      .returning(returning)
+
+  private def givenPayloadConverting(newProject: NewProject, returning: entities.Project) =
+    (payloadConverter.apply _)
+      .expects(newProject)
+      .returning(returning)
+
+  private def givenTSProvisioning(project: entities.Project, returning: IO[TriplesUploadResult]) =
+    (tsProvisioner.provisionTS _)
+      .expects(project)
       .returning(returning)
 }

@@ -22,11 +22,9 @@ import cats.effect.IO
 import cats.effect.testing.scalatest.AsyncIOSpec
 import cats.syntax.all._
 import io.renku.generators.Generators.Implicits._
-import io.renku.generators.Generators.nonEmptyStrings
 import io.renku.graph.model.entities
 import io.renku.graph.model.entities.Project
 import io.renku.graph.model.testentities._
-import io.renku.triplesgenerator.generators.ErrorGenerators.logWorthyRecoverableErrors
 import io.renku.triplesgenerator.tsprovisioning.Generators.transformationSteps
 import io.renku.triplesgenerator.tsprovisioning.transformation.TransformationStepsCreator
 import io.renku.triplesgenerator.tsprovisioning.triplesuploading.TriplesUploadResult.DeliverySuccess
@@ -50,7 +48,7 @@ class TSProvisionerSpec extends AsyncFlatSpec with AsyncIOSpec with should.Match
 
     val project = anyProjectEntities.generateOne.to[entities.Project]
 
-    val failure = TriplesUploadResult.RecoverableFailure(logWorthyRecoverableErrors.generateOne)
+    val failure = Generators.triplesUploadRecoverableFailures.generateOne
     givenSuccessfulStepsCreation(project, runningToReturn = failure.pure[IO])
 
     provisioner.provisionTS(project).asserting(_ shouldBe failure)
@@ -60,7 +58,7 @@ class TSProvisionerSpec extends AsyncFlatSpec with AsyncIOSpec with should.Match
 
     val project = anyProjectEntities.generateOne.to[entities.Project]
 
-    val failure = TriplesUploadResult.NonRecoverableFailure(nonEmptyStrings().generateOne)
+    val failure = Generators.triplesUploadNonRecoverableFailures.generateOne
     givenSuccessfulStepsCreation(project, runningToReturn = failure.pure[IO])
 
     provisioner.provisionTS(project).asserting(_ shouldBe failure)

@@ -20,18 +20,21 @@ package io.renku.triplesgenerator.tsprovisioning
 
 import cats.MonadThrow
 import cats.data.EitherT
+import cats.syntax.all._
 import io.renku.generators.CommonGraphGenerators._
 import io.renku.generators.Generators.Implicits._
 import io.renku.generators.Generators._
 import io.renku.http.client.RestClientError
 import io.renku.http.client.RestClientError.UnexpectedResponseException
+import io.renku.triplesgenerator.errors.ErrorGenerators.processingRecoverableErrors
 import io.renku.triplesgenerator.tsprovisioning.TransformationStep.Queries
+import io.renku.triplesgenerator.tsprovisioning.triplesuploading.TriplesUploadResult
 import org.http4s.Status.{BadGateway, GatewayTimeout, ServiceUnavailable}
 import org.scalacheck.Gen
 
-private[tsprovisioning] object Generators {
+object Generators {
 
-  implicit def transformationSteps[F[_]: MonadThrow]: Gen[TransformationStep[F]] = for {
+  private[tsprovisioning] implicit def transformationSteps[F[_]: MonadThrow]: Gen[TransformationStep[F]] = for {
     name    <- nonBlankStrings(minLength = 5)
     queries <- queriesGen
   } yield TransformationStep[F](
@@ -39,7 +42,7 @@ private[tsprovisioning] object Generators {
     project => EitherT.rightT((project, queries))
   )
 
-  implicit lazy val queriesGen: Gen[Queries] = for {
+  private[tsprovisioning] implicit lazy val queriesGen: Gen[Queries] = for {
     pre  <- sparqlQueries.toGeneratorOfList()
     post <- sparqlQueries.toGeneratorOfList()
   } yield Queries(pre, post)
@@ -52,5 +55,21 @@ private[tsprovisioning] object Generators {
         status  <- Gen.oneOf(BadGateway, ServiceUnavailable, GatewayTimeout)
         message <- nonBlankStrings()
       } yield UnexpectedResponseException(status, message.value)
+    )
+
+  lazy val triplesUploadNonRecoverableFailures: Gen[TriplesUploadResult.NonRecoverableFailure] =
+    Gen.oneOf(
+      (nonEmptyStrings(), exceptions).mapN(TriplesUploadResult.NonRecoverableFailure(_, _)),
+      nonEmptyStrings().map(TriplesUploadResult.NonRecoverableFailure(_)),
+      nonEmptyStrings().map(TriplesUploadResult.NonRecoverableFailure(_))
+    )
+
+  lazy val triplesUploadRecoverableFailures: Gen[TriplesUploadResult.RecoverableFailure] =
+    processingRecoverableErrors.map(TriplesUploadResult.RecoverableFailure)
+
+  lazy val triplesUploadFailures: Gen[TriplesUploadResult.TriplesUploadFailure] =
+    Gen.oneOf(
+      triplesUploadNonRecoverableFailures,
+      triplesUploadRecoverableFailures
     )
 }

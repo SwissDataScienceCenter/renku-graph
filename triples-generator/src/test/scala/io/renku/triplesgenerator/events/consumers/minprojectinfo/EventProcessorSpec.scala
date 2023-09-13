@@ -41,7 +41,7 @@ import io.renku.triplesgenerator
 import io.renku.triplesgenerator.api.events.ProjectActivated
 import io.renku.triplesgenerator.errors.ProcessingRecoverableError
 import io.renku.triplesgenerator.errors.ProcessingRecoverableError.{LogWorthyRecoverableError, SilentRecoverableError}
-import io.renku.triplesgenerator.generators.ErrorGenerators.{logWorthyRecoverableErrors, nonRecoverableMalformedRepoErrors, silentRecoverableErrors}
+import io.renku.triplesgenerator.errors.ErrorGenerators.{logWorthyRecoverableErrors, nonRecoverableMalformedRepoErrors, silentRecoverableErrors}
 import io.renku.triplesgenerator.tsprovisioning.TSProvisioner
 import io.renku.triplesgenerator.tsprovisioning.triplesuploading.TriplesUploadResult
 import io.renku.triplesgenerator.tsprovisioning.triplesuploading.TriplesUploadResult._
