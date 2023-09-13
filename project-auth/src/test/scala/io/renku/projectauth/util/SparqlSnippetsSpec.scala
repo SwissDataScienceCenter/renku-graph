@@ -25,7 +25,7 @@ import fs2.Stream
 import io.renku.generators.Generators.Implicits._
 import io.renku.graph.model.projects.Visibility
 import io.renku.graph.model.{RenkuUrl, Schemas, persons}
-import io.renku.projectauth.{Generators, ProjectAuth, ProjectAuthData, ProjectAuthService, ProjectAuthServiceSupport}
+import io.renku.projectauth.{Generators, ProjectAuth, ProjectAuthData, ProjectAuthService, ProjectAuthServiceSupport, QueryFilter}
 import io.renku.triplesstore.client.sparql.Fragment
 import io.renku.triplesstore.client.syntax._
 import org.scalatest.flatspec.AsyncFlatSpec
@@ -141,6 +141,23 @@ class SparqlSnippetsSpec extends AsyncFlatSpec with AsyncIOSpec with ProjectAuth
         expected = data.filter(projectFilter(user, Visibility.all)).sortBy(_.slug)
         found    = Stream.emits(r).through(ProjectAuthDataRow.collect).toList
         _        = found shouldBe expected
+      } yield ()
+    }
+  }
+
+  it should "update visibility on a project" in {
+    clientAndData.use { case (client, data) =>
+      val el = data.head
+      val otherVis = (Visibility.all - el.visibility).head
+      for {
+        _ <- client.update(
+          sparql"""${"renku" -> Schemas.renku}
+                  |${"schema" -> Schemas.schema}
+                  |${SparqlSnippets.changeVisibility(el.slug, otherVis)}
+                  |""".stripMargin
+        )
+        r <- ProjectAuthService(client, renkuUrl).getAll(QueryFilter.all.withSlug(el.slug)).compile.lastOrError
+        _ = r.visibility shouldBe otherVis
       } yield ()
     }
   }
