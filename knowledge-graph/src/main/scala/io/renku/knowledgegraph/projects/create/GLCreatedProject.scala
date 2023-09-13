@@ -19,12 +19,25 @@
 package io.renku.knowledgegraph.projects.create
 
 import io.circe.Decoder
-import io.renku.graph.model.projects
+import io.renku.graph.model.images.ImageUri
+import io.renku.graph.model.{persons, projects}
 import io.renku.tinytypes.json.TinyTypeDecoders._
 
-private final case class GLCreatedProject(id: projects.GitLabId)
+private final case class GLCreatedProject(id:          projects.GitLabId,
+                                          dateCreated: projects.DateCreated,
+                                          creator:     GLCreatedProject.Creator,
+                                          maybeImage:  Option[ImageUri]
+)
 
 private object GLCreatedProject {
+
+  final case class Creator(name: persons.Name, id: persons.GitLabId)
+
+  object Creator {
+    implicit val decoder: Decoder[Creator] =
+      Decoder.forProduct2("name", "id")(Creator.apply)
+  }
+
   implicit val decoder: Decoder[GLCreatedProject] =
-    Decoder.forProduct1("id")(GLCreatedProject.apply)
+    Decoder.forProduct4("id", "created_at", "owner", "avatar_url")(GLCreatedProject.apply)
 }

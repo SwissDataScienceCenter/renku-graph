@@ -164,9 +164,16 @@ class GLProjectCreatorSpec
         .getOrElse(Succeeded.pure[IO])
   }
 
-  private implicit lazy val responseEncoder: Encoder[GLCreatedProject] = Encoder.instance { case GLCreatedProject(id) =>
-    json"""{
-      "id": $id
-    }"""
+  private implicit lazy val responseEncoder: Encoder[GLCreatedProject] = Encoder.instance {
+    case GLCreatedProject(id, dateCreated, creator, maybeImage) =>
+      json"""{
+        "id":         $id,
+        "created_at": $dateCreated,
+        "avatar_url": $maybeImage,
+        "owner": {
+          "id":   ${creator.id},
+          "name": ${creator.name}
+        }
+      }"""
   }
 }

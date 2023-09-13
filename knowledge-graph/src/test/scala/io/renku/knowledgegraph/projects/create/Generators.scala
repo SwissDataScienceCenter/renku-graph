@@ -46,6 +46,10 @@ private object Generators {
       image            <- ImageGenerators.images.toGeneratorOfOptions
     } yield NewProject(name, namespace, slug, maybeDescription, keywords, visibility, template, image)
 
+  implicit val glCreatedProjectCreatorsGen: Gen[GLCreatedProject.Creator] =
+    (personNames, personGitLabIds).mapN(GLCreatedProject.Creator.apply)
+
   implicit val glCreatedProjectsGen: Gen[GLCreatedProject] =
-    projectIds.map(GLCreatedProject.apply)
+    (projectIds, projectCreatedDates(), glCreatedProjectCreatorsGen, imageUris.toGeneratorOfOptions)
+      .mapN(GLCreatedProject.apply)
 }
