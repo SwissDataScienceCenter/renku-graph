@@ -34,6 +34,8 @@ import io.renku.interpreters.TestLogger
 import io.renku.knowledgegraph.Failure
 import io.renku.knowledgegraph.Generators.failures
 import io.renku.knowledgegraph.projects.delete.ProjectRemover
+import io.renku.triplesgenerator.api.TriplesGeneratorClient.{Result => TGResult}
+import io.renku.triplesgenerator.api.{TriplesGeneratorClient, NewProject => TGNewProject}
 import io.renku.webhookservice.api.Generators.successfulHookCreationResults
 import io.renku.webhookservice.api.WebhookServiceClient.{Result => WSResult}
 import io.renku.webhookservice.api.{HookCreationResult, WebhookServiceClient}
@@ -47,7 +49,7 @@ class ProjectCreatorSpec extends AsyncFlatSpec with AsyncIOSpec with should.Matc
     "find payload for Core, " +
     "create the project in Core, " +
     "activate it with the webhook-service and " +
-    "wait for the events to be processed" in {
+    "create the project in TG" in {
 
       val newProject  = newProjects.generateOne
       val authUser    = authUsers.generateOne
@@ -65,6 +67,8 @@ class ProjectCreatorSpec extends AsyncFlatSpec with AsyncIOSpec with should.Matc
                         accessToken,
                         returning = WSResult.success(successfulHookCreationResults.generateOne).pure[IO]
       )
+
+      givenTGProjectCreation(newProject, glCreatedProject, returning = TGResult.success(()).pure[IO])
 
       creator.createProject(newProject, authUser).assertNoException
     }
@@ -232,14 +236,63 @@ class ProjectCreatorSpec extends AsyncFlatSpec with AsyncIOSpec with should.Matc
       .assertThrowsError[Exception](_ shouldBe CreationFailures.activationReturningNotFound(newProject))
   }
 
+  it should "fail with the failure returned by project creation in TG" in {
+
+    val newProject  = newProjects.generateOne
+    val authUser    = authUsers.generateOne
+    val accessToken = authUser.accessToken
+
+    val corePayload = corePayloads.generateOne
+    givenCorePayloadFinding(newProject, authUser, returning = corePayload.pure[IO])
+
+    val glCreatedProject = glCreatedProjectsGen.generateOne
+    givenGLProjectCreation(newProject, accessToken, returning = glCreatedProject.asRight.pure[IO])
+
+    givenCoreProjectCreation(corePayload, accessToken, returning = CoreResult.success(()).pure[IO])
+
+    givenHookCreation(glCreatedProject, accessToken, returning = WSResult.success(HookCreationResult.Created).pure[IO])
+
+    val failure = TGResult.Failure(nonEmptyStrings().generateOne)
+    givenTGProjectCreation(newProject, glCreatedProject, returning = failure.pure[IO])
+
+    creator
+      .createProject(newProject, authUser)
+      .assertThrowsError[Exception](_ shouldBe CreationFailures.onTGCreation(newProject.slug, failure))
+  }
+
+  it should "fail if creating project in TG failed" in {
+
+    val newProject  = newProjects.generateOne
+    val authUser    = authUsers.generateOne
+    val accessToken = authUser.accessToken
+
+    val corePayload = corePayloads.generateOne
+    givenCorePayloadFinding(newProject, authUser, returning = corePayload.pure[IO])
+
+    val glCreatedProject = glCreatedProjectsGen.generateOne
+    givenGLProjectCreation(newProject, accessToken, returning = glCreatedProject.asRight.pure[IO])
+
+    givenCoreProjectCreation(corePayload, accessToken, returning = CoreResult.success(()).pure[IO])
+
+    givenHookCreation(glCreatedProject, accessToken, returning = WSResult.success(HookCreationResult.Created).pure[IO])
+
+    val failure = exceptions.generateOne
+    givenTGProjectCreation(newProject, glCreatedProject, returning = failure.raiseError[IO, Nothing])
+
+    creator
+      .createProject(newProject, authUser)
+      .assertThrowsError[Exception](_ shouldBe CreationFailures.onTGCreation(newProject.slug, failure))
+  }
+
   private implicit val logger: TestLogger[IO] = TestLogger[IO]()
   private val glProjectCreator  = mock[GLProjectCreator[IO]]
   private val corePayloadFinder = mock[CorePayloadFinder[IO]]
   private val coreClient        = mock[RenkuCoreClient[IO]]
   private val wsClient          = mock[WebhookServiceClient[IO]]
+  private val tgClient          = mock[TriplesGeneratorClient[IO]]
   private val glProjectRemover  = mock[ProjectRemover[IO]]
   private lazy val creator =
-    new ProjectCreatorImpl[IO](glProjectCreator, corePayloadFinder, coreClient, wsClient, glProjectRemover)
+    new ProjectCreatorImpl[IO](glProjectCreator, corePayloadFinder, coreClient, wsClient, tgClient, glProjectRemover)
 
   private def givenGLProjectCreation(newProject:  NewProject,
                                      accessToken: UserAccessToken,
@@ -273,5 +326,23 @@ class ProjectCreatorSpec extends AsyncFlatSpec with AsyncIOSpec with should.Matc
   ) = (glProjectRemover
     .deleteProject(_: projects.GitLabId)(_: AccessToken))
     .expects(glCreatedProject.id, accessToken)
+    .returning(returning)
+
+  private def givenTGProjectCreation(newProject:       NewProject,
+                                     glCreatedProject: GLCreatedProject,
+                                     returning:        IO[TGResult[Unit]]
+  ) = (tgClient.createProject _)
+    .expects(
+      TGNewProject(
+        newProject.name,
+        newProject.slug,
+        newProject.maybeDescription,
+        glCreatedProject.dateCreated,
+        TGNewProject.Creator(glCreatedProject.creator.name, glCreatedProject.creator.id),
+        newProject.keywords,
+        newProject.visibility,
+        glCreatedProject.maybeImage.toList
+      )
+    )
     .returning(returning)
 }

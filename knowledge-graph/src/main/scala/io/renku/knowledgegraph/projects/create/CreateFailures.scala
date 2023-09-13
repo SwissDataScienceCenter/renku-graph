@@ -70,6 +70,12 @@ private object CreationFailures {
             Message.Error.unsafeApply(show"Project ${newProject.slug} couldn't be activated as it did not exist")
     )
 
+  def onTGCreation(slug: projects.Slug, cause: Throwable): Failure =
+    Failure(InternalServerError,
+            Message.Error.unsafeApply(show"Creating project $slug in Knowledge Graph failed.${toMessage(cause)}"),
+            cause
+    )
+
   private def toMessage(cause: Throwable): String =
     Option(cause)
       .flatMap(c => Option(c.getMessage))

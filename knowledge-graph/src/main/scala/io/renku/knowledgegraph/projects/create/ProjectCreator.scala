@@ -28,6 +28,7 @@ import io.renku.core.client.{RenkuCoreClient, NewProject => CorePayload}
 import io.renku.http.client.{GitLabClient, UserAccessToken}
 import io.renku.http.server.security.model.AuthUser
 import io.renku.metrics.MetricsRegistry
+import io.renku.triplesgenerator.api.{TriplesGeneratorClient, NewProject => TGNewProject}
 import io.renku.webhookservice.api.{HookCreationResult, WebhookServiceClient}
 import org.typelevel.log4cats.Logger
 
@@ -39,8 +40,11 @@ private object ProjectCreator {
   def apply[F[_]: Async: NonEmptyParallel: GitLabClient: Logger: MetricsRegistry](
       config: Config
   ): F[ProjectCreator[F]] =
-    (CorePayloadFinder[F](config), RenkuCoreClient[F](config), WebhookServiceClient[F](config))
-      .mapN(new ProjectCreatorImpl[F](GLProjectCreator[F], _, _, _, ProjectRemover[F]))
+    (CorePayloadFinder[F](config),
+     RenkuCoreClient[F](config),
+     WebhookServiceClient[F](config),
+     TriplesGeneratorClient[F](config)
+    ).mapN(new ProjectCreatorImpl[F](GLProjectCreator[F], _, _, _, _, ProjectRemover[F]))
 }
 
 private class ProjectCreatorImpl[F[_]: MonadThrow: Logger](
@@ -48,6 +52,7 @@ private class ProjectCreatorImpl[F[_]: MonadThrow: Logger](
     corePayloadFinder: CorePayloadFinder[F],
     coreClient:        RenkuCoreClient[F],
     wsClient:          WebhookServiceClient[F],
+    tgClient:          TriplesGeneratorClient[F],
     glProjectRemover:  ProjectRemover[F]
 ) extends ProjectCreator[F] {
 
@@ -57,6 +62,7 @@ private class ProjectCreatorImpl[F[_]: MonadThrow: Logger](
       glCreated   <- createProjectInGL(newProject, authUser.accessToken)
       _           <- createProjectInCore(newProject, glCreated, corePayload, authUser)
       _           <- activateProject(newProject, glCreated, authUser.accessToken)
+      _           <- createProjectInTG(tgNewProject(newProject, glCreated))
     } yield ()
 
   private def findCorePayload(newProject: NewProject, authUser: AuthUser): F[CorePayload] =
@@ -107,4 +113,23 @@ private class ProjectCreatorImpl[F[_]: MonadThrow: Logger](
     case HookCreationResult.Created | HookCreationResult.Existed => ().pure[F]
     case HookCreationResult.NotFound => CreationFailures.activationReturningNotFound(newProject).raiseError[F, Unit]
   }
+
+  private def tgNewProject(newProject: NewProject, glCreatedProject: GLCreatedProject): TGNewProject =
+    TGNewProject(
+      newProject.name,
+      newProject.slug,
+      newProject.maybeDescription,
+      glCreatedProject.dateCreated,
+      TGNewProject.Creator(glCreatedProject.creator.name, glCreatedProject.creator.id),
+      newProject.keywords,
+      newProject.visibility,
+      glCreatedProject.maybeImage.toList
+    )
+
+  private def createProjectInTG(tgNewProject: TGNewProject): F[Unit] =
+    tgClient
+      .createProject(tgNewProject)
+      .map(_.toEither)
+      .handleError(_.asLeft)
+      .flatMap(_.fold(CreationFailures.onTGCreation(tgNewProject.slug, _).raiseError[F, Unit], _.pure[F]))
 }

@@ -21,6 +21,7 @@ package io.renku.triplesgenerator.api
 import TriplesGeneratorClient.Result
 import cats.effect.Async
 import cats.syntax.all._
+import com.typesafe.config.{Config, ConfigFactory}
 import io.renku.control.Throttler
 import io.renku.graph.config.TriplesGeneratorUrl
 import io.renku.graph.model.projects
@@ -38,8 +39,10 @@ trait TriplesGeneratorClient[F[_]] {
 
 object TriplesGeneratorClient {
 
-  def apply[F[_]: Async: Logger: MetricsRegistry]: F[TriplesGeneratorClient[F]] =
-    TriplesGeneratorUrl[F]()
+  def apply[F[_]: Async: Logger: MetricsRegistry]: F[TriplesGeneratorClient[F]] = apply()
+
+  def apply[F[_]: Async: Logger: MetricsRegistry](config: Config = ConfigFactory.load): F[TriplesGeneratorClient[F]] =
+    TriplesGeneratorUrl[F](config)
       .map(tgUrl => new TriplesGeneratorClientImpl[F](Uri.unsafeFromString(tgUrl.value)))
 
   sealed trait Result[+A] {
