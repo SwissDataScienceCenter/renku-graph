@@ -25,8 +25,8 @@ import cats.{Applicative, MonadThrow, NonEmptyParallel, Parallel}
 import io.circe.DecodingFailure
 import io.renku.graph.config.RenkuUrlLoader
 import io.renku.graph.model.RenkuUrl
-import io.renku.graph.model.entities.Project.GitLabProjectInfo
 import io.renku.graph.model.entities._
+import io.renku.graph.model.gitlab.GitLabProjectInfo
 import io.renku.http.client.{AccessToken, GitLabClient}
 import io.renku.triplesgenerator.errors.{ProcessingNonRecoverableError, ProcessingRecoverableError}
 import io.renku.triplesgenerator.events.consumers.projectinfo.ProjectInfoFinder

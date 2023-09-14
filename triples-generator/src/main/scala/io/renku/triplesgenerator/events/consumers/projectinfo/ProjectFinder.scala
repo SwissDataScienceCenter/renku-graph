@@ -23,7 +23,7 @@ import cats.effect.Async
 import cats.syntax.all._
 import eu.timepit.refined.auto._
 import io.circe.Decoder
-import io.renku.graph.model.entities.Project.{GitLabProjectInfo, ProjectMember}
+import io.renku.graph.model.gitlab.{GitLabProjectInfo, GitLabUser}
 import io.renku.graph.model.images.ImageUri
 import io.renku.graph.model.{persons, projects}
 import io.renku.http.client.{AccessToken, GitLabClient}
@@ -121,12 +121,12 @@ private class ProjectFinderImpl[F[_]: Async: GitLabClient: Logger](
 
   private def fetchCreator(
       maybeCreatorId: Option[persons.GitLabId]
-  )(implicit maybeAccessToken: Option[AccessToken]): OptionT[F, Option[ProjectMember]] =
+  )(implicit maybeAccessToken: Option[AccessToken]): OptionT[F, Option[GitLabUser]] =
     maybeCreatorId match {
-      case None => OptionT.some[F](Option.empty[ProjectMember])
+      case None => OptionT.some[F](Option.empty[GitLabUser])
       case Some(creatorId) =>
         OptionT.liftF {
-          GitLabClient[F].get(uri"users" / creatorId, "single-user")(mapTo[ProjectMember])
+          GitLabClient[F].get(uri"users" / creatorId, "single-user")(mapTo[GitLabUser])
         }
     }
 }

@@ -19,18 +19,28 @@
 package io.renku.triplesgenerator.events.consumers.projectinfo
 
 import io.circe.Decoder
-import io.renku.graph.model.entities.Project.ProjectMember
-import io.renku.graph.model.persons
+import io.renku.graph.model.gitlab.{GitLabMember, GitLabUser}
+import io.renku.graph.model.persons._
 import io.renku.tinytypes.json.TinyTypeDecoders._
 
 trait GitlabJsonDecoder {
 
-  implicit val memberDecoder: Decoder[ProjectMember] = cursor =>
+  implicit val memberDecoder: Decoder[GitLabMember] = cursor =>
     for {
-      gitLabId    <- cursor.downField("id").as[persons.GitLabId]
-      name        <- cursor.downField("name").as[persons.Name]
-      username    <- cursor.downField("username").as[persons.Username]
+      gitLabId    <- cursor.downField("id").as[GitLabId]
+      name        <- cursor.downField("name").as[Name]
+      username    <- cursor.downField("username").as[Username]
       accessLevel <- cursor.downField("access_level").as[Int]
-    } yield ProjectMember(name, username, gitLabId, accessLevel)
+      email       <- cursor.downField("email").as[Option[Email]]
+    } yield GitLabMember(name, username, gitLabId, email, accessLevel)
+
+  implicit val userDecoder: Decoder[GitLabUser] = cursor =>
+    for {
+      gitLabId <- cursor.downField("id").as[GitLabId]
+      name     <- cursor.downField("name").as[Name]
+      username <- cursor.downField("username").as[Username]
+      email1   <- cursor.downField("email").as[Option[Email]]
+      email2   <- cursor.downField("public_email").as[Option[Email]]
+    } yield GitLabUser(name, username, gitLabId, email1.orElse(email2))
 
 }

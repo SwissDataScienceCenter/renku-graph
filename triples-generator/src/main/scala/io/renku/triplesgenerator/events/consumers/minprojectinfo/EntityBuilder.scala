@@ -24,8 +24,7 @@ import cats.syntax.all._
 import cats.{MonadThrow, NonEmptyParallel, Parallel}
 import io.renku.graph.config.RenkuUrlLoader
 import io.renku.graph.model.entities.Project
-import io.renku.graph.model.entities.Project.ProjectMember.{ProjectMemberNoEmail, ProjectMemberWithEmail}
-import io.renku.graph.model.entities.Project.{GitLabProjectInfo, ProjectMember}
+import io.renku.graph.model.gitlab.{GitLabMember, GitLabProjectInfo, GitLabUser}
 import io.renku.graph.model.images.Image
 import io.renku.graph.model.projects.ResourceId
 import io.renku.graph.model.{RenkuUrl, entities, persons}
@@ -60,7 +59,7 @@ private class EntityBuilderImpl[F[_]: MonadThrow](projectInfoFinder: ProjectInfo
             .raiseError[F, GitLabProjectInfo]
       }
 
-  private def toProject(info: GitLabProjectInfo) =
+  private def toProject(info: GitLabProjectInfo): EitherT[F, ProcessingRecoverableError, Project] =
     EitherT
       .fromEither[F](convert(info).toEither)
       .leftSemiflatMap(err =>
@@ -90,7 +89,7 @@ private class EntityBuilderImpl[F[_]: MonadThrow](projectInfoFinder: ProjectInfo
         maybeDescription,
         dateCreated,
         dateModified,
-        maybeCreator.map(toMember).map(_.person),
+        maybeCreator.map(toPerson),
         visibility,
         keywords,
         members.map(toMember),
@@ -117,7 +116,7 @@ private class EntityBuilderImpl[F[_]: MonadThrow](projectInfoFinder: ProjectInfo
         maybeDescription,
         dateCreated,
         dateModified,
-        maybeCreator.map(toMember).map(_.person),
+        maybeCreator.map(toPerson),
         visibility,
         keywords,
         members.map(toMember),
@@ -125,30 +124,18 @@ private class EntityBuilderImpl[F[_]: MonadThrow](projectInfoFinder: ProjectInfo
       )
   }
 
-  private def toMember(projectMember: ProjectMember): Project.Member = projectMember match {
-    case ProjectMemberNoEmail(name, _, gitLabId, _) =>
-      Project.Member(
-        entities.Person.WithGitLabId(persons.ResourceId(gitLabId),
-                                     gitLabId,
-                                     name,
-                                     maybeEmail = None,
-                                     maybeOrcidId = None,
-                                     maybeAffiliation = None
-        ),
-        projectMember.role
-      )
-    case ProjectMemberWithEmail(name, _, gitLabId, email, _) =>
-      Project.Member(
-        entities.Person.WithGitLabId(persons.ResourceId(gitLabId),
-                                     gitLabId,
-                                     name,
-                                     email.some,
-                                     maybeOrcidId = None,
-                                     maybeAffiliation = None
-        ),
-        projectMember.role
-      )
-  }
+  private def toPerson(user: GitLabUser): entities.Person =
+    entities.Person.WithGitLabId(
+      persons.ResourceId(user.gitLabId),
+      user.gitLabId,
+      user.name,
+      maybeEmail = user.email,
+      maybeOrcidId = None,
+      maybeAffiliation = None
+    )
+
+  private def toMember(projectMember: GitLabMember): Project.Member =
+    Project.Member(toPerson(projectMember.asUser), projectMember.role)
 }
 
 private object EntityBuilder {
