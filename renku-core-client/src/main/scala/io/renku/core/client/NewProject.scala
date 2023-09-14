@@ -26,15 +26,16 @@ import io.renku.graph.model.projects
 final case class NewProject(projectRepository: ProjectRepository,
                             namespace:         projects.Namespace,
                             name:              projects.Name,
+                            maybeDescription:  Option[projects.Description],
+                            keywords:          Set[projects.Keyword],
                             template:          Template,
                             branch:            Branch,
-                            maybeDescription:  Option[projects.Description],
                             userInfo:          UserInfo
 )
 
 object NewProject {
   implicit val encoder: Encoder[NewProject] = Encoder.instance {
-    case NewProject(projectRepository, namespace, name, template, branch, maybeDescription, _) =>
+    case NewProject(projectRepository, namespace, name, maybeDescription, keywords, template, branch, _) =>
       Json.obj(
         List(
           ("url"                -> template.repositoryUrl.asJson).some,
@@ -42,8 +43,9 @@ object NewProject {
           ("project_repository" -> projectRepository.asJson).some,
           ("project_namespace"  -> namespace.asJson).some,
           ("project_name"       -> name.asJson).some,
+          ("project_keywords"   -> keywords.asJson).some,
           ("initial_branch"     -> branch.asJson).some,
-          maybeDescription.map("description" -> _.asJson)
+          maybeDescription.map("project_description" -> _.asJson)
         ).flatten: _*
       )
   }

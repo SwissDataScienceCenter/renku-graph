@@ -73,9 +73,10 @@ private class CorePayloadFinderImpl[F[_]: Async: NonEmptyParallel](namespaceFind
         ProjectRepository.of(gitLabUrl),
         namespace.name,
         newProject.slug.toPath.asName,
+        newProject.maybeDescription,
+        newProject.keywords,
         newProject.template,
         newProject.branch,
-        maybeDescription = newProject.maybeDescription,
         userInfo
       )
   }

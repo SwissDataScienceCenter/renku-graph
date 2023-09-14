@@ -97,9 +97,10 @@ object Generators {
     (projectRepositories,
      projectNamespaces,
      projectNames,
+     projectDescriptions.toGeneratorOfOptions,
+     projectKeywords.toGeneratorOfSet(),
      templatesGen,
      branches,
-     projectDescriptions.toGeneratorOfOptions,
      userInfos
     ).mapN(NewProject.apply)
 }

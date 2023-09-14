@@ -62,9 +62,10 @@ class CorePayloadFinderSpec
             ProjectRepository.of(glUrl),
             enrichedNamespace.name,
             newProject.slug.toPath.asName,
+            newProject.maybeDescription,
+            newProject.keywords,
             newProject.template,
             newProject.branch,
-            newProject.maybeDescription,
             userInfo
           )
         )
