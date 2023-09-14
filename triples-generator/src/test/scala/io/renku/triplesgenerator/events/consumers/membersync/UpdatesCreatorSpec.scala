@@ -46,15 +46,15 @@ class UpdatesCreatorSpec
   "removal" should {
 
     "prepare query to delete the member links to project" in {
-      val memberToRemove0 = personEntities(withGitLabId).generateOne
-      val memberToRemove1 = personEntities(withGitLabId).generateOne
-      val memberToStay    = personEntities(withGitLabId).generateOne
+      val memberToRemove0 = projectMemberEntities(withGitLabId).generateOne
+      val memberToRemove1 = projectMemberEntities(withGitLabId).generateOne
+      val memberToStay    = projectMemberEntities(withGitLabId).generateOne
       val allMembers      = Set(memberToRemove0, memberToRemove1, memberToStay)
       val project         = anyRenkuProjectEntities.modify(membersLens.modify(_ => allMembers)).generateOne
 
       upload(to = projectsDataset, project)
 
-      findMembers(project.slug) shouldBe allMembers.flatMap(_.maybeGitLabId)
+      findMembers(project.slug) shouldBe allMembers.map(_.person).flatMap(_.maybeGitLabId)
 
       val queries = updatesCreator.removal(
         project.slug,
@@ -63,7 +63,7 @@ class UpdatesCreatorSpec
 
       queries.runAll(on = projectsDataset).unsafeRunSync()
 
-      findMembers(project.slug) shouldBe Set(memberToStay.maybeGitLabId).flatten
+      findMembers(project.slug) shouldBe Set(memberToStay.person.maybeGitLabId).flatten
     }
   }
 

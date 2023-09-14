@@ -287,7 +287,7 @@ class EntityBuilderSpec
       project.maybeDescription,
       project.maybeCreator.map(_.to[GitLabUser]),
       project.keywords,
-      gitLapProjectMembers.generateSet(),
+      gitLabProjectMembers.generateSet(),
       project.visibility,
       maybeParentSlug = project match {
         case p: Project with Parent => p.parent.slug.some

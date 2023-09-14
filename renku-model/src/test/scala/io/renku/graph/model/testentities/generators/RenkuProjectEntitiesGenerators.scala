@@ -124,9 +124,9 @@ trait RenkuProjectEntitiesGenerators {
     maybeDescription <- projectDescriptions.toGeneratorOfOptions
     dateCreated      <- projectCreatedDates()
     dateModified     <- projectModifiedDates(dateCreated.value)
-    maybeCreator     <- gitLapProjectMembers.toGeneratorOfOptions
+    maybeCreator     <- gitLabProjectMembers.toGeneratorOfOptions
     keywords         <- projectKeywords.toGeneratorOfSet(min = 0)
-    members          <- gitLapProjectMembers.toGeneratorOfList(min = 1).map(_.toSet)
+    members          <- gitLabProjectMembers.toGeneratorOfList(min = 1).map(_.toSet)
     visibility       <- projectVisibilities
     maybeParentSlug  <- projectSlugs.toGeneratorOfOptions
     avatarUri        <- imageUris.toGeneratorOfOptions
@@ -156,7 +156,7 @@ trait RenkuProjectEntitiesGenerators {
     email         <- personEmails
   } yield memberNoEmail withEmail email
 
-  lazy val gitLapProjectMembers: Gen[GitLabMember] = Gen.oneOf(projectMembersNoEmail, projectMembersWithEmail)
+  lazy val gitLabProjectMembers: Gen[GitLabMember] = Gen.oneOf(projectMembersNoEmail, projectMembersWithEmail)
 
   implicit class ProjectMemberGenOps(membersGen: Gen[GitLabMember]) {
     def modify(f: GitLabMember => GitLabMember): Gen[GitLabMember] = membersGen.map(f)
