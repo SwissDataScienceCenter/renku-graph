@@ -106,5 +106,15 @@ class MessageCodecsSpec extends AnyWordSpec with should.Matchers with EitherValu
         "message":  ${value.value}
       }"""
     }
+
+    "provide Json encoder that merges the Json body into the output Json" in {
+
+      val jsonBody = jsons.generateOne
+
+      Message.Info.fromJsonUnsafe(jsonBody).asJson shouldBe
+        json"""{
+          "severity": ${Message.Severity.Info.widen}
+        }""".deepMerge(jsonBody)
+    }
   }
 }

@@ -22,10 +22,13 @@ import Generators.newProjects
 import cats.effect.IO
 import cats.syntax.all._
 import eu.timepit.refined.auto._
+import io.circe.literal._
 import io.renku.data.Message
 import io.renku.generators.CommonGraphGenerators.authUsers
 import io.renku.generators.Generators.Implicits._
 import io.renku.generators.Generators.exceptions
+import io.renku.graph.model.RenkuTinyTypeGenerators.projectSlugs
+import io.renku.graph.model.projects
 import io.renku.http.server.security.model.AuthUser
 import io.renku.interpreters.TestLogger
 import io.renku.knowledgegraph
@@ -42,12 +45,20 @@ class EndpointSpec extends AsyncFlatSpec with CustomAsyncIOSpec with should.Matc
     val authUser   = authUsers.generateOne
     val newProject = newProjects.generateOne
 
-    givenCreatingProject(newProject, authUser, returning = ().pure[IO])
+    val slug = projectSlugs.generateOne
+    givenCreatingProject(newProject, authUser, returning = slug.pure[IO])
 
     MultipartRequestEncoder[IO].encode(newProject).map(mp => Request[IO]().withEntity(mp).putHeaders(mp.headers)) >>=
       (req => endpoint.`POST /projects`(req, authUser)) >>= { response =>
       response.pure[IO].asserting(_.status shouldBe Status.Accepted) >>
-        response.as[Message].asserting(_ shouldBe Message.Info("Project creation accepted"))
+        response
+          .as[Message]
+          .asserting {
+            _ shouldBe Message.Info.fromJsonUnsafe(json"""{
+              "message": "Project created",
+              "slug":     $slug
+            }""")
+          }
     }
   }
 
@@ -95,7 +106,7 @@ class EndpointSpec extends AsyncFlatSpec with CustomAsyncIOSpec with should.Matc
   private val projectCreator = mock[ProjectCreator[IO]]
   private lazy val endpoint  = new EndpointImpl[IO](projectCreator)
 
-  private def givenCreatingProject(newProject: NewProject, authUser: AuthUser, returning: IO[Unit]) =
+  private def givenCreatingProject(newProject: NewProject, authUser: AuthUser, returning: IO[projects.Slug]) =
     (projectCreator.createProject _)
       .expects(newProject, authUser)
       .returning(returning)

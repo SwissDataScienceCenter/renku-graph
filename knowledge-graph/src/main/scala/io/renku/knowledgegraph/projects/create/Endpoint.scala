@@ -24,7 +24,9 @@ import cats.effect.Async
 import cats.syntax.all._
 import com.typesafe.config.Config
 import eu.timepit.refined.auto._
+import io.circe.literal._
 import io.renku.data.Message
+import io.renku.graph.model.projects
 import io.renku.http.client.GitLabClient
 import io.renku.http.server.security.model.AuthUser
 import io.renku.knowledgegraph.Failure
@@ -50,8 +52,9 @@ private class EndpointImpl[F[_]: Async: Logger](projectCreator: ProjectCreator[F
       .semiflatMap { newProject =>
         projectCreator
           .createProject(newProject, authUser)
-          .as(Response[F](Accepted).withEntity(Message.Info("Project creation accepted")))
-          .flatTap(_ => Logger[F].info(show"Project ${newProject.name} created"))
+          .fproduct(toAccepted)
+          .flatTap { case (slug, _) => Logger[F].info(show"Project $slug created") }
+          .map { case (_, response) => response }
       }
       .merge
       .handleErrorWith(relevantError)
@@ -65,6 +68,16 @@ private class EndpointImpl[F[_]: Async: Logger](projectCreator: ProjectCreator[F
   private def badRequest: Throwable => Response[F] = { _ =>
     Response[F](BadRequest).withEntity(Message.Error("Invalid payload"))
   }
+
+  private def toAccepted(slug: projects.Slug): Response[F] =
+    Response[F](Accepted).withEntity {
+      Message.Info.fromJsonUnsafe {
+        json"""{
+          "message": "Project created",
+          "slug":    $slug
+        }"""
+      }
+    }
 
   private lazy val relevantError: Throwable => F[Response[F]] = {
     case f: Failure =>

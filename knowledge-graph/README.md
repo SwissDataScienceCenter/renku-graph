@@ -691,6 +691,14 @@ Content-Type: image/png
 | FORBIDDEN (403)             | If the user cannot create the project in the namespace |
 | INTERNAL SERVER ERROR (500) | Otherwise                                              |
 
+Response body example for `CREATED (201)`:
+
+```json
+{
+  "message": "Project created",
+  "slug":    "namespace/project-path"
+}
+```
 
 #### DELETE /knowledge-graph/projects/:namespace/:name
 

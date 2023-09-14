@@ -48,10 +48,8 @@ trait MessageCodecs {
     def toMessage(severity: Severity): Json => Decoder.Result[Message] = { messageJson =>
       if (messageJson.isString)
         messageJson.as[String].map(Message.unsafeApply(_, severity))
-      else if (severity == Message.Severity.Error)
-        Message.Error.fromJsonUnsafe(messageJson).asRight
       else
-        DecodingFailure(CustomReason(s"Malformed '$severity' Message with '$messageJson'"), cur).asLeft
+        Message.fromJsonUnsafe(messageJson, severity).asRight
     }
 
     cur.downField("severity").as[Message.Severity] >>= { severity =>

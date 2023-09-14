@@ -55,6 +55,27 @@ class MessageSpec extends AnyWordSpec with should.Matchers with EitherValues {
     }
   }
 
+  "Message.Info.fromJsonUnsafe" should {
+
+    "return the JsonMessage" in {
+
+      val message = jsons.generateOne
+
+      Message.Info.fromJsonUnsafe(message).value shouldBe message
+    }
+
+    "fail for an empty on null JSON" in {
+
+      intercept[IllegalArgumentException](
+        Message.Info.fromJsonUnsafe(Json.Null)
+      ).getMessage shouldBe "Message cannot be an empty Json"
+
+      intercept[IllegalArgumentException](
+        Message.Info.fromJsonUnsafe(Json.obj())
+      ).getMessage shouldBe "Message cannot be an empty Json"
+    }
+  }
+
   "Message.Error.fromJsonUnsafe" should {
 
     "return the JsonMessage" in {

@@ -20,6 +20,7 @@ package io.renku.knowledgegraph
 package projects.create
 
 import eu.timepit.refined.auto._
+import io.circe.literal._
 import io.renku.data.Message
 import io.renku.data.MessageCodecs._
 import io.renku.knowledgegraph.docs.model.Operation.POST
@@ -93,7 +94,17 @@ object EndpointDocs extends docs.EndpointDocs {
       ),
       Status.Created -> Response(
         "Project created",
-        Contents(MediaType.`application/json`("Project created", Message.Info("Project created")))
+        Contents(
+          MediaType.`application/json`(
+            "Project created",
+            Message.Info.fromJsonUnsafe {
+              json"""{
+                "message": "Project created",
+                "slug":    "namespace/path"
+              }"""
+            }
+          )
+        )
       ),
       Status.BadRequest -> Response(
         "Invalid payload",

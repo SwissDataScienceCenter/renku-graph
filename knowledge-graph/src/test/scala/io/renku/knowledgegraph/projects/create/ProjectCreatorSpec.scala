@@ -70,7 +70,7 @@ class ProjectCreatorSpec extends AsyncFlatSpec with AsyncIOSpec with should.Matc
 
       givenTGProjectCreation(newProject, glCreatedProject, returning = TGResult.success(()).pure[IO])
 
-      creator.createProject(newProject, authUser).assertNoException
+      creator.createProject(newProject, authUser).asserting(_ shouldBe glCreatedProject.slug)
     }
 
   it should "fail with the failure returned by project creation in GL" in {

@@ -25,6 +25,7 @@ import cats.{MonadThrow, NonEmptyParallel}
 import com.typesafe.config.Config
 import delete.ProjectRemover
 import io.renku.core.client.{RenkuCoreClient, NewProject => CorePayload}
+import io.renku.graph.model.projects
 import io.renku.http.client.{GitLabClient, UserAccessToken}
 import io.renku.http.server.security.model.AuthUser
 import io.renku.metrics.MetricsRegistry
@@ -33,7 +34,7 @@ import io.renku.webhookservice.api.{HookCreationResult, WebhookServiceClient}
 import org.typelevel.log4cats.Logger
 
 private trait ProjectCreator[F[_]] {
-  def createProject(newProject: NewProject, authUser: AuthUser): F[Unit]
+  def createProject(newProject: NewProject, authUser: AuthUser): F[projects.Slug]
 }
 
 private object ProjectCreator {
@@ -56,14 +57,14 @@ private class ProjectCreatorImpl[F[_]: MonadThrow: Logger](
     glProjectRemover:  ProjectRemover[F]
 ) extends ProjectCreator[F] {
 
-  override def createProject(newProject: NewProject, authUser: AuthUser): F[Unit] =
+  override def createProject(newProject: NewProject, authUser: AuthUser): F[projects.Slug] =
     for {
       glCreated   <- createProjectInGL(newProject, authUser.accessToken)
       corePayload <- findCorePayload(newProject, glCreated, authUser)
       _           <- createProjectInCore(glCreated, corePayload, authUser)
       _           <- activateProject(glCreated, authUser.accessToken)
       _           <- createProjectInTG(tgNewProject(newProject, glCreated))
-    } yield ()
+    } yield glCreated.slug
 
   private def findCorePayload(newProject: NewProject, glCreated: GLCreatedProject, authUser: AuthUser): F[CorePayload] =
     corePayloadFinder.findCorePayload(newProject, glCreated, authUser)

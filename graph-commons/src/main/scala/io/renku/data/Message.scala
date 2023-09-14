@@ -55,6 +55,9 @@ object Message extends MessageCodecs {
         .getOrElse(throw new IllegalArgumentException("Message cannot be instantiated with a blank String"))
     }
 
+  def fromJsonUnsafe(message: Json, severity: Severity): Message =
+    JsonMessage(message, severity)
+
   object Info {
 
     def apply(value: String Refined NonEmpty): Message =
@@ -66,6 +69,12 @@ object Message extends MessageCodecs {
           .map(toSingleLine)
           .getOrElse(throw new IllegalArgumentException("Message cannot be instantiated with a blank String"))
       }
+
+    def fromJsonUnsafe(message: Json): Message =
+      if (message.isNull || message == Json.obj())
+        throw new IllegalArgumentException("Message cannot be an empty Json")
+      else
+        JsonMessage(message, Severity.Info)
   }
 
   object Error {
