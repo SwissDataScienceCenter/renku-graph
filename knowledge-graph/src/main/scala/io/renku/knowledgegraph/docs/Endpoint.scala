@@ -41,6 +41,7 @@ object Endpoint {
                        datasets.details.EndpointDocs[F],
                        entities.EndpointDocs[F],
                        ontology.EndpointDocs[F],
+                       projects.create.EndpointDocs.pure[F].widen[docs.EndpointDocs],
                        projects.delete.EndpointDocs.pure[F].widen[docs.EndpointDocs],
                        projects.details.EndpointDocs[F],
                        projects.update.EndpointDocs.pure[F].widen[docs.EndpointDocs],

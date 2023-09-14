@@ -13,10 +13,10 @@ The following routes may be slightly different when accessed via the main Renku 
 | GET    | ```/knowledge-graph/entities```                                          | Returns entities filtered by the given predicates`                                   |
 | GET    | ```/knowledge-graph/entities/current-user/recently-viewed```             | Returns entities recently viewed by the user introducing himself with the token.     |
 | GET    | ```/knowledge-graph/ontology```                                          | Returns ontology used in the Knowledge Graph                                         |
+| POST   | ```/knowledge-graph/projects```                                          | Creates a project from the given payload in GitLab and in the Knowledge Graph        |
 | DELETE | ```/knowledge-graph/projects/:namespace/:name```                         | Deletes the project with the given `namespace/name` from knowledge-graph and GitLab  |
 | GET    | ```/knowledge-graph/projects/:namespace/:name```                         | Returns details of the project with the given `namespace/name`                       |
 | PATCH  | ```/knowledge-graph/projects/:namespace/:name```                         | Updates selected properties of the project with the given `namespace/name`           |
-| POST   | ```/knowledge-graph/projects/:namespace/:name```                         | Creates a project from the given payload in GitLab and the Knowledge Graph           |
 | GET    | ```/knowledge-graph/projects/:namespace/:name/datasets```                | Returns datasets of the project with the given `slug`                                |
 | GET    | ```/knowledge-graph/projects/:namespace/:name/datasets/:dsName/tags```   | Returns tags of the dataset with the given `dsName` on project with the given `slug` |
 | GET    | ```/knowledge-graph/projects/:namespace/:name/files/:location/lineage``` | Returns the lineage for a the path (location) of a file on a project                 |
@@ -635,7 +635,7 @@ The endpoint requires an authorization token to be passed. Supported headers are
 **Request**
 
 ```
-POST /knowledge-graph/projects/namespace/path HTTP/1.1
+POST /knowledge-graph/projects HTTP/1.1
 Host: dev.renku.ch
 Authorization: Bearer <XXX>
 Content-Length: 575
@@ -687,12 +687,13 @@ Content-Type: image/png
 
 **Response**
 
-| Status                      | Description                                                                                |
-|-----------------------------|--------------------------------------------------------------------------------------------|
-| OK (200)                    | If the creation process was successful                                                     |
-| BAD_REQUEST (400)           | If the given payload is empty or malformed or a project with the given slug already exists |
-| UNAUTHORIZED (401)          | If given auth header cannot be authenticated                                               |
-| INTERNAL_SERVER_ERROR (500) | Otherwise                                                                                  |
+| Status                      | Description                                            |
+|-----------------------------|--------------------------------------------------------|
+| CREATED (201)               | If the project is created                              |
+| BAD REQUEST (400)           | If the given payload is invalid                        |
+| UNAUTHORIZED (401)          | If the given auth header cannot be authenticated       |
+| FORBIDDEN (403)             | If the user cannot create the project in the namespace |
+| INTERNAL SERVER ERROR (500) | Otherwise                                              |
 
 
 #### DELETE /knowledge-graph/projects/:namespace/:name
