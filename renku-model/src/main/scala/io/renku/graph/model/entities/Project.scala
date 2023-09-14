@@ -29,7 +29,7 @@ import io.renku.graph.model.entities.RenkuProject.ProjectFactory
 import io.renku.graph.model.images.{Image, ImageUri}
 import io.renku.graph.model.projects._
 import io.renku.graph.model.versions.{CliVersion, SchemaVersion}
-import io.renku.jsonld.{JsonLD, JsonLDEncoder, Property}
+import io.renku.jsonld.{JsonLDEncoder, Property}
 import io.renku.jsonld.ontology._
 import io.renku.tinytypes.InstantTinyType
 import monocle.{Lens, Traversal}
@@ -586,8 +586,8 @@ object Project {
   final case class Member(person: Person, role: Role)
   object Member {
     implicit def jsonLDEncoder(implicit glUrl: GitLabApiUrl, graph: GraphClass): JsonLDEncoder[Member] =
-      JsonLDEncoder.instance { member =>
-        ??? //TODO hm, this changes the ontology of a project. need a new entity that points to person and stores role
+      JsonLDEncoder.instance { _ =>
+        ??? // TODO hm, this changes the ontology of a project. need a new entity that points to person and stores role
       }
   }
 
@@ -744,25 +744,39 @@ object Project {
   )
 
   sealed trait ProjectMember {
-    val name:     persons.Name
-    val username: persons.Username
-    val gitLabId: persons.GitLabId
+    val name:        persons.Name
+    val username:    persons.Username
+    val gitLabId:    persons.GitLabId
+    val accessLevel: Int
+    def role: Role = Role.fromGitLabAccessLevel(accessLevel)
   }
   object ProjectMember {
 
-    def apply(name: persons.Name, username: persons.Username, gitLabId: persons.GitLabId): ProjectMemberNoEmail =
-      ProjectMemberNoEmail(name, username, gitLabId)
+    def apply(
+        name:        persons.Name,
+        username:    persons.Username,
+        gitLabId:    persons.GitLabId,
+        accessLevel: Int
+    ): ProjectMemberNoEmail =
+      ProjectMemberNoEmail(name, username, gitLabId, accessLevel: Int)
 
-    final case class ProjectMemberNoEmail(name: persons.Name, username: persons.Username, gitLabId: persons.GitLabId)
-        extends ProjectMember {
+    final case class ProjectMemberNoEmail(
+        name:        persons.Name,
+        username:    persons.Username,
+        gitLabId:    persons.GitLabId,
+        accessLevel: Int
+    ) extends ProjectMember {
 
-      def add(email: persons.Email): ProjectMemberWithEmail = ProjectMemberWithEmail(name, username, gitLabId, email)
+      def add(email: persons.Email): ProjectMemberWithEmail =
+        ProjectMemberWithEmail(name, username, gitLabId, email, accessLevel)
     }
 
-    final case class ProjectMemberWithEmail(name:     persons.Name,
-                                            username: persons.Username,
-                                            gitLabId: persons.GitLabId,
-                                            email:    persons.Email
+    final case class ProjectMemberWithEmail(
+        name:        persons.Name,
+        username:    persons.Username,
+        gitLabId:    persons.GitLabId,
+        email:       persons.Email,
+        accessLevel: Int
     ) extends ProjectMember
   }
 }

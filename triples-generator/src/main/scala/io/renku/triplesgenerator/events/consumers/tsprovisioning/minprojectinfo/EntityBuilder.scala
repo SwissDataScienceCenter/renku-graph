@@ -91,10 +91,10 @@ private class EntityBuilderImpl[F[_]: MonadThrow](projectInfoFinder: ProjectInfo
         maybeDescription,
         dateCreated,
         dateModified,
-        maybeCreator.map(toPerson),
+        maybeCreator.map(toMember).map(_.person),
         visibility,
         keywords,
-        members.map(toPerson),
+        members.map(toMember),
         ResourceId(parentSlug),
         avatarUrl.map(Image.projectImage(ResourceId(slug), _)).toList
       )
@@ -118,30 +118,36 @@ private class EntityBuilderImpl[F[_]: MonadThrow](projectInfoFinder: ProjectInfo
         maybeDescription,
         dateCreated,
         dateModified,
-        maybeCreator.map(toPerson),
+        maybeCreator.map(toMember).map(_.person),
         visibility,
         keywords,
-        members.map(toPerson),
+        members.map(toMember),
         avatarUrl.map(Image.projectImage(ResourceId(slug), _)).toList
       )
   }
 
-  private def toPerson(projectMember: ProjectMember): entities.Person = projectMember match {
-    case ProjectMemberNoEmail(name, _, gitLabId) =>
-      entities.Person.WithGitLabId(persons.ResourceId(gitLabId),
-                                   gitLabId,
-                                   name,
-                                   maybeEmail = None,
-                                   maybeOrcidId = None,
-                                   maybeAffiliation = None
+  private def toMember(projectMember: ProjectMember): Project.Member = projectMember match {
+    case ProjectMemberNoEmail(name, _, gitLabId, _) =>
+      Project.Member(
+        entities.Person.WithGitLabId(persons.ResourceId(gitLabId),
+                                     gitLabId,
+                                     name,
+                                     maybeEmail = None,
+                                     maybeOrcidId = None,
+                                     maybeAffiliation = None
+        ),
+        projectMember.role
       )
-    case ProjectMemberWithEmail(name, _, gitLabId, email) =>
-      entities.Person.WithGitLabId(persons.ResourceId(gitLabId),
-                                   gitLabId,
-                                   name,
-                                   email.some,
-                                   maybeOrcidId = None,
-                                   maybeAffiliation = None
+    case ProjectMemberWithEmail(name, _, gitLabId, email, _) =>
+      Project.Member(
+        entities.Person.WithGitLabId(persons.ResourceId(gitLabId),
+                                     gitLabId,
+                                     name,
+                                     email.some,
+                                     maybeOrcidId = None,
+                                     maybeAffiliation = None
+        ),
+        projectMember.role
       )
   }
 }

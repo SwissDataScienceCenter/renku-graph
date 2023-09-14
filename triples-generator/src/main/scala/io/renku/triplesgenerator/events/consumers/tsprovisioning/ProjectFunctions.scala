@@ -36,7 +36,7 @@ private trait ProjectFunctions {
 
   def update(oldPerson: Person, newPerson: Person): Project => Project = project =>
     project
-      .updateMember(oldPerson, newPerson)
+      .updateMember(oldPerson, _.copy(person = newPerson))
       .updateCreator(oldPerson, newPerson)
       .updateActivities(updateAuthorsAndAgents(oldPerson, newPerson))
       .updateDatasets(updateDatasetCreators(oldPerson, newPerson))
@@ -120,12 +120,20 @@ private object ProjectFunctions extends ProjectFunctions {
 
   private implicit class ProjectOps(project: Project) {
 
-    def updateMember(oldPerson: Person, newPerson: Person): Project =
+    def updateMember(oldMember: Project.Member, newMember: Project.Member): Project =
       projectMembersLens
         .composeTraversal(membersLens)
         .modify {
-          case `oldPerson` => newPerson
+          case `oldMember` => newMember
           case p           => p
+        }(project)
+
+    def updateMember(person: Person, f: Project.Member => Project.Member): Project =
+      projectMembersLens
+        .composeTraversal(membersLens)
+        .modify { member =>
+          if (member.person == person) f(member)
+          else member
         }(project)
 
     def updateCreator(oldPerson: Person, newPerson: Person): Project =
@@ -184,8 +192,8 @@ private object ProjectFunctions extends ProjectFunctions {
       }
 
   private object Lenses {
-    val membersLens = Traversal.fromTraverse[List, Person]
-    val projectMembersLens = Lens[Project, List[Person]](_.members.toList)(persons => {
+    val membersLens = Traversal.fromTraverse[List, Project.Member]
+    val projectMembersLens = Lens[Project, List[Project.Member]](_.members.toList)(persons => {
       case p: RenkuProject.WithoutParent    => p.copy(members = persons.toSet)
       case p: RenkuProject.WithParent       => p.copy(members = persons.toSet)
       case p: NonRenkuProject.WithoutParent => p.copy(members = persons.toSet)
