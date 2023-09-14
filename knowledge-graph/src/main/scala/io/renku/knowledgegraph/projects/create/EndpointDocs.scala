@@ -109,7 +109,7 @@ object EndpointDocs extends docs.EndpointDocs {
       ),
       Status.Forbidden -> Response(
         "Forbidden",
-        Contents(MediaType.`application/json`("User not authorized to create a project", Message.Info("Forbidden")))
+        Contents(MediaType.`application/json`("User not authorized to create the project", Message.Info("Forbidden")))
       ),
       Status.InternalServerError -> Response("Error",
                                              Contents(MediaType.`application/json`("Reason", Message.Info("Message")))
