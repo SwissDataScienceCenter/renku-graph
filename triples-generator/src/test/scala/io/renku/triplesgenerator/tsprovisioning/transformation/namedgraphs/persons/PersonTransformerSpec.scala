@@ -44,9 +44,10 @@ class PersonTransformerSpec extends AnyWordSpec with should.Matchers with MockFa
       "try to find matching Person in KG, " +
       "merge the data and update the project " +
       "and generate relevant pre data upload queries" in new TestCase {
-        val persons = personEntities.generateSet()
+        val members = projectMemberEntities().generateSet()
+        val persons = members.map(_.person)
         val project = anyProjectEntities
-          .map(membersLens.modify(_ => persons) andThen creatorLens.modify(_ => None))
+          .map(membersLens.modify(_ => members) andThen creatorLens.modify(_ => None))
           .generateOne
           .to[entities.Project]
 

@@ -226,7 +226,7 @@ class ProjectSpec
     "turn non-renku CliProject entity without parent into the NonRenkuProject object" in {
       forAll(gitLabProjectInfos.map(projectInfoMaybeParent.replace(None))) { projectInfo =>
         val creator = projectMembersWithEmail.generateOne
-        val members = gitLapProjectMembers.generateSet()
+        val members = gitLabProjectMembers.generateSet()
         val info    = projectInfo.copy(maybeCreator = creator.user.some, members = members)
         val testProject: testentities.Project = createNonRenkuProject(info)
 
@@ -247,7 +247,7 @@ class ProjectSpec
     "turn non-renku CliProject entity with parent into the NonRenkuProject object" in {
       forAll(gitLabProjectInfos.map(projectInfoMaybeParent.replace(projectSlugs.generateSome))) { projectInfo =>
         val creator = projectMembersWithEmail.generateOne
-        val members = gitLapProjectMembers.generateSet()
+        val members = gitLabProjectMembers.generateSet()
         val info    = projectInfo.copy(maybeCreator = creator.user.some, members = members)
         val testProject: testentities.Project = createNonRenkuProject(info)
 

@@ -75,6 +75,12 @@ trait ProjectEntitiesGenerators {
   def memberPersonLens: Lens[Project.Member, Person] =
     Lens[Project.Member, Person](_.person)(a => b => b.copy(person = a))
 
+  def personNameLens: Lens[Person, persons.Name] =
+    Lens[Person, persons.Name](_.name)(a => b => b.copy(name = a))
+
+  def memberPersonNameLens: Lens[Project.Member, persons.Name] =
+    memberPersonLens.composeLens(personNameLens)
+
   def projectMembersPersonLens[P <: Project]: Traversal[P, Person] = {
     val t = Traversal.fromTraverse[List, Project.Member]
     membersLensAsList.andThen(t).andThen(memberPersonLens)
