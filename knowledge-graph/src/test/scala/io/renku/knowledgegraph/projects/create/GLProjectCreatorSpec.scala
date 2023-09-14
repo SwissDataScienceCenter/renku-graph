@@ -158,6 +158,7 @@ class GLProjectCreatorSpec
       findPart("path").as[projects.GitLabPath].asserting(_ shouldBe newProject.slug.toPath) >>
       findPart("namespace_id").as[NamespaceId].asserting(_ shouldBe newProject.namespace.identifier) >>
       findPart("visibility").as[projects.Visibility].asserting(_ shouldBe newProject.visibility) >>
+      findPart("topics").as[List[projects.Keyword]].map(_.toSet).asserting(_ shouldBe newProject.keywords) >>
       findPart("default_branch").as[Branch].asserting(_ shouldBe newProject.branch) >>
       newProject.maybeImage
         .map(v => findPart("avatar").as[Option[Image]].asserting(_ shouldBe v.some))
