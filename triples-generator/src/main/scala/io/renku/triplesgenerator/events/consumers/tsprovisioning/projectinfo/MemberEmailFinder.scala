@@ -22,18 +22,17 @@ import cats.data.EitherT
 import cats.data.EitherT.rightT
 import cats.effect.Async
 import cats.syntax.all._
+import io.renku.graph.model.gitlab.GitLabMember
 import io.renku.graph.model.{persons, projects}
-import io.renku.graph.model.entities.Project.ProjectMember
-import io.renku.graph.model.entities.Project.ProjectMember.{ProjectMemberNoEmail, ProjectMemberWithEmail}
 import io.renku.http.client.{AccessToken, GitLabClient}
 import io.renku.triplesgenerator.events.consumers.ProcessingRecoverableError
 import io.renku.triplesgenerator.events.consumers.tsprovisioning.RecoverableErrorsRecovery
 import org.typelevel.log4cats.Logger
 
 private trait MemberEmailFinder[F[_]] {
-  def findMemberEmail(member: ProjectMember, project: Project)(implicit
+  def findMemberEmail(member: GitLabMember, project: Project)(implicit
       maybeAccessToken: Option[AccessToken]
-  ): EitherT[F, ProcessingRecoverableError, ProjectMember]
+  ): EitherT[F, ProcessingRecoverableError, GitLabMember]
 }
 
 private object MemberEmailFinder {
@@ -51,22 +50,22 @@ private class MemberEmailFinderImpl[F[_]: Async: Logger](
 
   import commitAuthorFinder._
 
-  override def findMemberEmail(member: ProjectMember, project: Project)(implicit
+  override def findMemberEmail(member: GitLabMember, project: Project)(implicit
       maybeAccessToken: Option[AccessToken]
-  ): EitherT[F, ProcessingRecoverableError, ProjectMember] = EitherT {
+  ): EitherT[F, ProcessingRecoverableError, GitLabMember] = EitherT {
     member match {
-      case member: ProjectMemberWithEmail =>
-        member.asRight[ProcessingRecoverableError].widen[ProjectMember].pure[F]
-      case member: ProjectMemberNoEmail =>
+      case member if member.email.isDefined =>
+        member.asRight[ProcessingRecoverableError].pure[F]
+      case member =>
         findInCommitsAndEvents(member, project).value
-          .recoverWith(recoveryStrategy.maybeRecoverableError[F, ProjectMember])
+          .recoverWith(recoveryStrategy.maybeRecoverableError[F, GitLabMember])
     }
   }
 
-  private def findInCommitsAndEvents(member:  ProjectMemberNoEmail,
+  private def findInCommitsAndEvents(member:  GitLabMember,
                                      project: Project,
                                      paging:  PagingInfo = PagingInfo(maybeNextPage = Some(1), maybeTotalPages = None)
-  )(implicit maybeAccessToken: Option[AccessToken]): EitherT[F, ProcessingRecoverableError, ProjectMember] =
+  )(implicit maybeAccessToken: Option[AccessToken]): EitherT[F, ProcessingRecoverableError, GitLabMember] =
     paging.findNextPage match {
       case None => rightT[F, ProcessingRecoverableError](member)
       case Some(nextPage) =>
@@ -78,18 +77,18 @@ private class MemberEmailFinderImpl[F[_]: Async: Logger](
     }
 
   private def filterEventsFor(
-      member: ProjectMember
+      member: GitLabMember
   ): ((List[PushEvent], PagingInfo)) => (List[PushEvent], PagingInfo) = { case (events, paging) =>
     events.filter(ev => ev.authorId == member.gitLabId) -> paging
   }
 
-  private def addEmailOrCheckNextPage(member:     ProjectMemberNoEmail,
+  private def addEmailOrCheckNextPage(member:     GitLabMember,
                                       maybeEmail: Option[persons.Email],
                                       project:    Project,
                                       paging:     PagingInfo
   )(implicit maybeAccessToken: Option[AccessToken]) = maybeEmail match {
     case None        => findInCommitsAndEvents(member, project, paging)
-    case Some(email) => rightT[F, ProcessingRecoverableError](member add email)
+    case Some(email) => rightT[F, ProcessingRecoverableError](member withEmail email)
   }
 
   private def matchEmailFromCommits(events:  List[PushEvent],

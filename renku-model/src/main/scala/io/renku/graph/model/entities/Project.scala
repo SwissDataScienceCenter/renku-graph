@@ -18,23 +18,24 @@
 
 package io.renku.graph.model.entities
 
-import PlanLens.{getPlanDerivation, setPlanDerivation}
 import cats.Show
 import cats.data.{NonEmptyList, Validated, ValidatedNel}
 import cats.syntax.all._
 import io.renku.cli.model.{CliPerson, CliProject}
 import io.renku.graph.model._
 import io.renku.graph.model.entities.Dataset.Provenance
+import io.renku.graph.model.entities.PlanLens.{getPlanDerivation, setPlanDerivation}
 import io.renku.graph.model.entities.RenkuProject.ProjectFactory
-import io.renku.graph.model.images.{Image, ImageUri}
+import io.renku.graph.model.gitlab.GitLabProjectInfo
+import io.renku.graph.model.images.Image
 import io.renku.graph.model.projects._
 import io.renku.graph.model.versions.{CliVersion, SchemaVersion}
-import io.renku.jsonld.{JsonLDEncoder, Property}
 import io.renku.jsonld.ontology._
+import io.renku.jsonld.{JsonLDEncoder, Property}
 import io.renku.tinytypes.InstantTinyType
 import monocle.{Lens, Traversal}
 
-import Ordered.orderingToOrdered
+import scala.math.Ordered.orderingToOrdered
 
 sealed trait Project extends Product with Serializable {
   val resourceId:       ResourceId
@@ -727,56 +728,5 @@ object Project {
           schemaVersionProperty
         )
       )
-  }
-
-  final case class GitLabProjectInfo(id:               GitLabId,
-                                     name:             Name,
-                                     slug:             Slug,
-                                     dateCreated:      DateCreated,
-                                     dateModified:     DateModified,
-                                     maybeDescription: Option[Description],
-                                     maybeCreator:     Option[ProjectMember],
-                                     keywords:         Set[Keyword],
-                                     members:          Set[ProjectMember],
-                                     visibility:       Visibility,
-                                     maybeParentSlug:  Option[Slug],
-                                     avatarUrl:        Option[ImageUri]
-  )
-
-  sealed trait ProjectMember {
-    val name:        persons.Name
-    val username:    persons.Username
-    val gitLabId:    persons.GitLabId
-    val accessLevel: Int
-    def role: Role = Role.fromGitLabAccessLevel(accessLevel)
-  }
-  object ProjectMember {
-
-    def apply(
-        name:        persons.Name,
-        username:    persons.Username,
-        gitLabId:    persons.GitLabId,
-        accessLevel: Int
-    ): ProjectMemberNoEmail =
-      ProjectMemberNoEmail(name, username, gitLabId, accessLevel: Int)
-
-    final case class ProjectMemberNoEmail(
-        name:        persons.Name,
-        username:    persons.Username,
-        gitLabId:    persons.GitLabId,
-        accessLevel: Int
-    ) extends ProjectMember {
-
-      def add(email: persons.Email): ProjectMemberWithEmail =
-        ProjectMemberWithEmail(name, username, gitLabId, email, accessLevel)
-    }
-
-    final case class ProjectMemberWithEmail(
-        name:        persons.Name,
-        username:    persons.Username,
-        gitLabId:    persons.GitLabId,
-        email:       persons.Email,
-        accessLevel: Int
-    ) extends ProjectMember
   }
 }
