@@ -27,7 +27,7 @@ import io.renku.generators.Generators.Implicits._
 import io.renku.generators.Generators.ints
 import io.renku.graph.model.EventsGenerators._
 import io.renku.graph.model.GraphModelGenerators.{personEmails, personGitLabIds, personNames, projectIds, projectSlugs}
-import io.renku.graph.model.entities.Project.ProjectMember
+import io.renku.graph.model.gitlab.GitLabUser
 import io.renku.graph.model.events.CommitId
 import io.renku.graph.model.testentities.generators.EntitiesGenerators._
 import io.renku.graph.model.{persons, projects}
@@ -57,7 +57,7 @@ class MemberEmailFinderSpec
 
     "iterate over project's push events " +
       "until commit info for the commit found on the push event lists an author with the same name" in new TestCase {
-        val event  = pushEvents.generateOne.forMember(member).forProject(project)
+        val event  = pushEvents.generateOne.forMember(member.user).forProject(project)
         val events = Random.shuffle(event :: pushEvents.generateNonEmptyList().toList)
 
         val returningVal = EitherT.fromEither[IO]((events, PagingInfo(None, None)).asRight[ProcessingRecoverableError])
@@ -74,20 +74,20 @@ class MemberEmailFinderSpec
             event.commitId,
             maybeAccessToken
           )
-          .returning(EitherT.rightT[IO, ProcessingRecoverableError]((member.name -> authorEmail).some))
+          .returning(EitherT.rightT[IO, ProcessingRecoverableError]((member.user.name -> authorEmail).some))
 
-        finder.findMemberEmail(member, project).value.unsafeRunSync() shouldBe (member add authorEmail).asRight
+        finder.findMemberEmail(member, project).value.unsafeRunSync() shouldBe (member withEmail authorEmail).asRight
       }
 
     "do nothing if email is already set on the given member" in new TestCase {
-      val memberWithEmail = member add personEmails.generateOne
+      val memberWithEmail = member withEmail personEmails.generateOne
       finder.findMemberEmail(memberWithEmail, project).value.unsafeRunSync() shouldBe memberWithEmail.asRight
     }
 
     "take the email from commitTo and skip commitFrom if both commitIds exist on the event" in new TestCase {
       val commit = commitIds.generateOne
       val event = pushEvents.generateOne
-        .forMember(member)
+        .forMember(member.user)
         .forProject(project)
         .copy(commitId = commit)
       val events = Random.shuffle(event :: pushEvents.generateNonEmptyList().toList)
@@ -103,13 +103,13 @@ class MemberEmailFinderSpec
       (commitAuthorFinder
         .findCommitAuthor(_: projects.Slug, _: CommitId)(_: Option[AccessToken]))
         .expects(project.slug, commit, maybeAccessToken)
-        .returning(EitherT.rightT[IO, ProcessingRecoverableError]((member.name -> authorEmail).some))
+        .returning(EitherT.rightT[IO, ProcessingRecoverableError]((member.user.name -> authorEmail).some))
 
-      finder.findMemberEmail(member, project).value.unsafeRunSync() shouldBe (member add authorEmail).asRight
+      finder.findMemberEmail(member, project).value.unsafeRunSync() shouldBe (member withEmail authorEmail).asRight
     }
 
     "find the email if a matching commit exists on the second page" in new TestCase {
-      val event       = pushEvents.generateOne.forMember(member).forProject(project)
+      val event       = pushEvents.generateOne.forMember(member.user).forProject(project)
       val eventsPage2 = Random.shuffle(event :: pushEvents.generateNonEmptyList().toList)
 
       val returnedFirstTime =
@@ -138,9 +138,9 @@ class MemberEmailFinderSpec
           event.commitId,
           maybeAccessToken
         )
-        .returning(EitherT.rightT[IO, ProcessingRecoverableError]((member.name -> authorEmail).some))
+        .returning(EitherT.rightT[IO, ProcessingRecoverableError]((member.user.name -> authorEmail).some))
 
-      finder.findMemberEmail(member, project).value.unsafeRunSync() shouldBe (member add authorEmail).asRight
+      finder.findMemberEmail(member, project).value.unsafeRunSync() shouldBe (member withEmail authorEmail).asRight
     }
 
     /* checking all events is really inefficient
@@ -174,7 +174,7 @@ class MemberEmailFinderSpec
               .returning(nextPageResults)
           }
 
-        val event = pushEvents.generateOne.forMember(member).forProject(project)
+        val event = pushEvents.generateOne.forMember(member.user).forProject(project)
 
         def setExpectationForLastPage = {
           val nextPageEvents  = event :: pushEvents.generateNonEmptyList(min = 20, max = 20).toList
@@ -195,28 +195,28 @@ class MemberEmailFinderSpec
               event.commitId,
               maybeAccessToken
             )
-            .returning(EitherT.rightT[IO, ProcessingRecoverableError]((member.name -> authorEmail).some))
+            .returning(EitherT.rightT[IO, ProcessingRecoverableError]((member.user.name -> authorEmail).some))
 
         setExpectationForFirstPage
         setExpectationForMiddlePages
         setExpectationForLastPage
         setExpectationForCommitAuthorFinder
 
-        finder.findMemberEmail(member, project).value.unsafeRunSync() shouldBe (member add authorEmail).asRight
+        finder.findMemberEmail(member, project).value.unsafeRunSync() shouldBe (member withEmail authorEmail).asRight
       }
 
     "find the email if a matching commits exist on both pages, " +
       "however, the first matching commit has author with a different name" in new TestCase {
         val eventPage1 = pushEvents.generateOne
-          .forMember(member)
+          .forMember(member.user)
           .forProject(project)
         val eventsPage1 = Random.shuffle(eventPage1 :: pushEvents.generateNonEmptyList().toList)
         val eventPage2 = pushEvents.generateOne
-          .forMember(member)
+          .forMember(member.user)
           .forProject(project)
         val eventsPage2 = Random.shuffle(eventPage2 :: pushEvents.generateNonEmptyList().toList)
 
-        val firstEvent = pushEvents.generateOne.forMember(member).forProject(project)
+        val firstEvent = pushEvents.generateOne.forMember(member.user).forProject(project)
 
         (projectEventsFinder
           .find(_: Project, _: Int)(_: Option[AccessToken]))
@@ -245,18 +245,18 @@ class MemberEmailFinderSpec
             eventPage2.commitId,
             maybeAccessToken
           )
-          .returning(EitherT.rightT[IO, ProcessingRecoverableError]((member.name -> authorEmail).some))
+          .returning(EitherT.rightT[IO, ProcessingRecoverableError]((member.user.name -> authorEmail).some))
 
-        finder.findMemberEmail(member, project).value.unsafeRunSync() shouldBe (member add authorEmail).asRight
+        finder.findMemberEmail(member, project).value.unsafeRunSync() shouldBe (member withEmail authorEmail).asRight
       }
 
     "return the given member back if a matching commit author cannot be found on any events" in new TestCase {
       val eventPage1 = pushEvents.generateOne
-        .forMember(member)
+        .forMember(member.user)
         .forProject(project)
       val eventsPage1 = Random.shuffle(eventPage1 :: pushEvents.generateNonEmptyList().toList)
       val eventPage2 = pushEvents.generateOne
-        .forMember(member)
+        .forMember(member.user)
         .forProject(project)
       val eventsPage2 = Random.shuffle(eventPage2 :: pushEvents.generateNonEmptyList().toList)
 
@@ -317,7 +317,7 @@ class MemberEmailFinderSpec
     }
 
     s"return a Recoverable Failure when returned when fetching commit info" in new TestCase {
-      val event  = pushEvents.generateOne.forMember(member).forProject(project)
+      val event  = pushEvents.generateOne.forMember(member.user).forProject(project)
       val events = Random.shuffle(event :: pushEvents.generateNonEmptyList().toList)
 
       (projectEventsFinder
@@ -355,7 +355,7 @@ class MemberEmailFinderSpec
   }
 
   private implicit class PushEventOps(event: PushEvent) {
-    def forMember(member: ProjectMember): PushEvent =
+    def forMember(member: GitLabUser): PushEvent =
       event.copy(authorId = member.gitLabId, authorName = member.name)
 
     def forProject(project: Project): PushEvent = event.copy(projectId = project.id)

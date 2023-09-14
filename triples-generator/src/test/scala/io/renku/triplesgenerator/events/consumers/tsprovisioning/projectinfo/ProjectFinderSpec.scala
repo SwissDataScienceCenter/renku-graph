@@ -30,8 +30,7 @@ import io.renku.generators.CommonGraphGenerators.accessTokens
 import io.renku.generators.Generators.Implicits._
 import io.renku.generators.Generators._
 import io.renku.graph.model.GraphModelGenerators.projectSlugs
-import io.renku.graph.model.entities.Project.ProjectMember.ProjectMemberNoEmail
-import io.renku.graph.model.entities.Project.{GitLabProjectInfo, ProjectMember}
+import io.renku.graph.model.gitlab.{GitLabMember, GitLabProjectInfo, GitLabUser}
 import io.renku.graph.model.projects.Slug
 import io.renku.graph.model.testentities.generators.EntitiesGenerators._
 import io.renku.graph.model.{persons, projects}
@@ -65,7 +64,8 @@ class ProjectFinderSpec
   "findProject" should {
 
     "fetch info about the project with the given slug from GitLab" in new TestCase {
-      forAll { (projectInfoRaw: GitLabProjectInfo, creator: ProjectMemberNoEmail) =>
+      implicit val gitLabUser: Gen[GitLabUser] = gitLabUserGen(maybeEmails = Gen.const(None))
+      forAll { (projectInfoRaw: GitLabProjectInfo, creator: GitLabUser) =>
         val projectInfo = projectInfoRaw.copy(maybeCreator = creator.some, members = Set.empty)
 
         setGitLabClientExpectationProjects(projectInfo.slug, (projectInfo, creator.gitLabId.some).some.pure[IO])
@@ -77,7 +77,8 @@ class ProjectFinderSpec
     }
 
     "fetch info about the project without creator if it does not exist" in new TestCase {
-      forAll { (projectInfoRaw: GitLabProjectInfo, creator: ProjectMemberNoEmail) =>
+      implicit val gitLabUser: Gen[GitLabUser] = gitLabUserGen(maybeEmails = Gen.const(None))
+      forAll { (projectInfoRaw: GitLabProjectInfo, creator: GitLabUser) =>
         val projectInfo = projectInfoRaw.copy(maybeCreator = creator.some, members = Set.empty)
 
         setGitLabClientExpectationProjects(projectInfo.slug, (projectInfo, creator.gitLabId.some).some.pure[IO])
@@ -114,7 +115,7 @@ class ProjectFinderSpec
 
       s"return a Recoverable Failure for $problemName when fetching creator" in new TestCase {
         val creator     = projectMembersNoEmail.generateOne
-        val projectInfo = gitLabProjectInfos.generateOne.copy(maybeCreator = creator.some)
+        val projectInfo = gitLabProjectInfos.generateOne.copy(maybeCreator = creator.user.some)
 
         setGitLabClientExpectationProjects(projectInfo.slug, IO.raiseError(error))
 
@@ -160,19 +161,21 @@ class ProjectFinderSpec
 
     private implicit val logger: TestLogger[IO]   = TestLogger[IO]()
     implicit val gitLabClient:   GitLabClient[IO] = mock[GitLabClient[IO]]
+
     val finder = new ProjectFinderImpl[IO]
 
     private type ProjectAndCreators = (GitLabProjectInfo, Option[persons.GitLabId])
 
-    def setGitLabClientExpectationUsers(id: persons.GitLabId, returning: IO[Option[ProjectMember]]) =
+    def setGitLabClientExpectationUsers(id: persons.GitLabId, returning: IO[Option[GitLabUser]]) =
       setGitLabClientExpectation("single-user", id.show, returning)
 
     def setGitLabClientExpectationProjects(id: projects.Slug, returning: IO[Option[ProjectAndCreators]]) =
       setGitLabClientExpectation("single-project", id.show, returning)
 
-    private def setGitLabClientExpectation[ResultType](endpointName: String Refined NonEmpty,
-                                                       id:           String,
-                                                       returning:    IO[ResultType]
+    private def setGitLabClientExpectation[ResultType](
+        endpointName: String Refined NonEmpty,
+        id:           String,
+        returning:    IO[ResultType]
     ) = {
       val endpointStart = if (endpointName.value == "single-project") uri"projects" else uri"users"
       (gitLabClient
@@ -211,11 +214,21 @@ class ProjectFinderSpec
       .addIfDefined("avatar_url" -> project.avatarUrl)
   }
 
-  private implicit lazy val memberEncoder: Encoder[ProjectMemberNoEmail] = Encoder.instance { member =>
+  private implicit lazy val userEncoder: Encoder[GitLabUser] = Encoder.instance { user =>
     json"""{
-      "id":       ${member.gitLabId},     
-      "name":     ${member.name},
-      "username": ${member.username}
+      "id":       ${user.gitLabId},
+      "name":     ${user.name},
+      "username": ${user.username}
     }"""
   }
+
+  private implicit lazy val memberEncoder: Encoder[GitLabMember] =
+    Encoder.instance { member =>
+      json"""{
+          "id":       ${member.user.gitLabId},
+          "name":     ${member.user.name},
+          "username": ${member.user.username},
+          "access_level": ${member.accessLevel}
+        }"""
+    }
 }

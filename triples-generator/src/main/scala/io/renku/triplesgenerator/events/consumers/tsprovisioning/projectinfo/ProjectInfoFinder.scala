@@ -73,7 +73,7 @@ private class ProjectInfoFinderImpl[F[_]: MonadThrow: Parallel: Logger](
     val forCreator =
       project.maybeCreator.toList
         .traverse(user => findMemberEmail(user.toMember(Role.Reader), proj))
-        .map(_.headOption.map(_.asUser))
+        .map(_.headOption.map(_.user))
 
     forCreator
       .map(user => user.map(u => project.copy(maybeCreator = u.some)).getOrElse(project))
@@ -82,22 +82,22 @@ private class ProjectInfoFinderImpl[F[_]: MonadThrow: Parallel: Logger](
 
   private lazy val deduplicateSameIdMembers: List[GitLabMember] => List[GitLabMember] =
     _.foldLeft(List.empty[GitLabMember]) { (deduplicated, member) =>
-      deduplicated.find(_.gitLabId == member.gitLabId) match {
-        case None                         => member :: deduplicated
-        case Some(p) if p.email.isDefined => deduplicated
-        case Some(existing)               => member :: deduplicated.filterNot(_ == existing)
+      deduplicated.find(_.user.gitLabId == member.user.gitLabId) match {
+        case None                              => member :: deduplicated
+        case Some(p) if p.user.email.isDefined => deduplicated
+        case Some(existing)                    => member :: deduplicated.filterNot(_ == existing)
       }
     }
 
   private def updateCreator(members: List[GitLabMember]): GitLabProjectInfo => GitLabProjectInfo = project =>
     project.maybeCreator
       .flatMap(creator =>
-        members.find(_.gitLabId == creator.gitLabId).map(member => project.copy(maybeCreator = member.asUser.some))
+        members.find(_.user.gitLabId == creator.gitLabId).map(member => project.copy(maybeCreator = member.user.some))
       )
       .getOrElse(project)
 
   private def updateMembers(members: List[GitLabMember]): GitLabProjectInfo => GitLabProjectInfo = project =>
     project.copy(
-      members = members.filter(member => project.members.exists(_.gitLabId == member.gitLabId)).toSet
+      members = members.filter(member => project.members.exists(_.user.gitLabId == member.user.gitLabId)).toSet
     )
 }

@@ -32,7 +32,7 @@ import io.renku.generators.Generators.Implicits._
 import io.renku.generators.Generators._
 import io.renku.graph.model.EventsGenerators.commitIds
 import io.renku.graph.model.GraphModelGenerators.{personGitLabIds, personNames, projectIds, projectSlugs}
-import io.renku.graph.model.entities.Project.ProjectMember
+import io.renku.graph.model.gitlab.{GitLabMember, GitLabUser}
 import io.renku.graph.model.events.CommitId
 import io.renku.graph.model.testentities.generators.EntitiesGenerators.projectMembersNoEmail
 import io.renku.graph.model.{persons, projects}
@@ -64,7 +64,7 @@ class ProjectEventsFinderSpec
 
   "find" should {
     "return a list of events for a given page" in new TestCase {
-      val event  = pushEvents.generateOne.forMember(member).forProject(project)
+      val event  = pushEvents.generateOne.forMember(member.user).forProject(project)
       val events = Random.shuffle(event :: pushEvents.generateNonEmptyList().toList)
       val endpointName: String Refined NonEmpty = "project-events"
       val page        = 1
@@ -93,7 +93,7 @@ class ProjectEventsFinderSpec
       val commitFrom = commitIds.generateSome
       val commitTo   = commitIds.generateSome
       val event = pushEvents.generateOne
-        .forMember(member)
+        .forMember(member.user)
         .forProject(project)
         .copy(maybeCommitFrom = commitFrom, maybeCommitTo = commitTo)
       val events = Random.shuffle(event :: pushEvents.generateNonEmptyList().toList)
@@ -108,7 +108,7 @@ class ProjectEventsFinderSpec
     "take commitFrom if commitTo doesn't exist on the event" in new TestCase {
       val commitFrom = commitIds.generateSome
       val event = pushEvents.generateOne
-        .forMember(member)
+        .forMember(member.user)
         .forProject(project)
         .copy(maybeCommitFrom = commitFrom, maybeCommitTo = None)
       val events = Random.shuffle(event :: pushEvents.generateNonEmptyList().toList)
@@ -182,7 +182,7 @@ class ProjectEventsFinderSpec
                                      authorId:        persons.GitLabId,
                                      authorName:      persons.Name
   ) {
-    def forMember(member: ProjectMember): GitLabPushEvent =
+    def forMember(member: GitLabUser): GitLabPushEvent =
       copy(authorId = member.gitLabId, authorName = member.name)
 
     def forProject(project: Project): GitLabPushEvent = copy(projectId = project.id)

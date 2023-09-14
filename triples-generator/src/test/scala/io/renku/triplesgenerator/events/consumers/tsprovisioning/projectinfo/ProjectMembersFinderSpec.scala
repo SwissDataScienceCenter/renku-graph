@@ -30,7 +30,7 @@ import io.renku.generators.CommonGraphGenerators.accessTokens
 import io.renku.generators.Generators.Implicits._
 import io.renku.generators.Generators.nonEmptyStrings
 import io.renku.graph.model.GraphModelGenerators.projectSlugs
-import io.renku.graph.model.entities.Project.ProjectMember.ProjectMemberNoEmail
+import io.renku.graph.model.gitlab.{GitLabMember, GitLabUser}
 import io.renku.graph.model.projects
 import io.renku.graph.model.testentities.generators.EntitiesGenerators._
 import io.renku.http.client.RestClient.ResponseMappingF
@@ -65,7 +65,8 @@ class ProjectMembersFinderSpec
   "findProject" should {
 
     "fetch and merge project users and members" in new TestCase {
-      forAll { members: Set[ProjectMemberNoEmail] =>
+      val gitLabMember: Gen[Set[GitLabMember]] = gitLabMemberGen(maybeEmails = Gen.const(None)).toGeneratorOfSet()
+      forAll(gitLabMember) { members: Set[GitLabMember] =>
         setGitLabClientExpectation(projectSlug, returning = (members, None).pure[IO])
 
         finder.findProjectMembers(projectSlug).value.unsafeRunSync().value shouldBe members
@@ -84,7 +85,7 @@ class ProjectMembersFinderSpec
 
     "return an empty set even if GL endpoint responds with NOT_FOUND" in new TestCase {
 
-      setGitLabClientExpectation(projectSlug, returning = (Set.empty[ProjectMemberNoEmail], None).pure[IO])
+      setGitLabClientExpectation(projectSlug, returning = (Set.empty[GitLabMember], None).pure[IO])
 
       finder.findProjectMembers(projectSlug).value.unsafeRunSync().value shouldBe Set.empty
     }
@@ -128,7 +129,7 @@ class ProjectMembersFinderSpec
 
     def setGitLabClientExpectation(projectSlug: projects.Slug,
                                    maybePage:   Option[Int] = None,
-                                   returning:   IO[(Set[ProjectMemberNoEmail], Option[Int])]
+                                   returning:   IO[(Set[GitLabMember], Option[Int])]
     ) = {
       val endpointName: String Refined NonEmpty = "project-members"
       val uri = {
@@ -141,7 +142,7 @@ class ProjectMembersFinderSpec
 
       (gitLabClient
         .get(_: Uri, _: String Refined NonEmpty)(
-          _: ResponseMappingF[IO, (Set[ProjectMemberNoEmail], Option[Int])]
+          _: ResponseMappingF[IO, (Set[GitLabMember], Option[Int])]
         )(_: Option[AccessToken]))
         .expects(uri, endpointName, *, maybeAccessToken)
         .returning(returning)
@@ -150,15 +151,24 @@ class ProjectMembersFinderSpec
     val mapResponse =
       captureMapping(gitLabClient)(
         finder.findProjectMembers(projectSlug)(maybeAccessToken).value.unsafeRunSync(),
-        Gen.const((Set.empty[ProjectMemberNoEmail], Option.empty[Int]))
+        Gen.const((Set.empty[GitLabMember], Option.empty[Int]))
       )
   }
 
-  private implicit lazy val memberEncoder: Encoder[ProjectMemberNoEmail] = Encoder.instance { member =>
+  private implicit val userEncoder: Encoder[GitLabUser] = Encoder.instance { user =>
     json"""{
-      "id":       ${member.gitLabId},     
-      "name":     ${member.name},
-      "username": ${member.username}
+          "id":       ${user.gitLabId},
+          "name":     ${user.name},
+          "username": ${user.username}
+        }"""
+  }
+
+  private implicit lazy val memberEncoder: Encoder[GitLabMember] = Encoder.instance { member =>
+    json"""{
+      "id":       ${member.user.gitLabId},
+      "name":     ${member.user.name},
+      "username": ${member.user.username},
+      "access_level": ${member.accessLevel}
     }"""
   }
 }

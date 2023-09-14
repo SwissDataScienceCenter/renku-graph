@@ -171,12 +171,13 @@ class TransformationStepsRunnerSpec extends AnyWordSpec with MockFactory with sh
       val step1Transformation = mockFunction[entities.Project, ProjectWithQueries[Try]]
 
       // preparing a project for which json-ld flattening fails
-      val Some(person) = personEntities(withGitLabId).generateOne.toMaybe[entities.Person.WithGitLabId]
+      val member = projectMemberEntities(withGitLabId).generateOne
       val step1Project = renkuProjectEntities(anyVisibility).generateOne
         .to[entities.RenkuProject.WithoutParent]
         .copy(
-          maybeCreator = person.some,
-          members = Set(person.copy(name = personNames.generateOne))
+          maybeCreator = member.person.to[entities.Person].some,
+          members =
+            Set(member.copy(person = member.person.copy(name = personNames.generateOne)).to[entities.Project.Member])
         )
       step1Transformation
         .expects(originalProject)

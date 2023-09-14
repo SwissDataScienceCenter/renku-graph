@@ -73,7 +73,7 @@ class WorkflowsEntitiesFinderSpec
         .withActivities(activityEntities(stepPlanEntities()))
         .generateOne
 
-      val member = personEntities(personGitLabIds.toGeneratorOfSomes).generateOne
+      val member = projectMemberEntities(personGitLabIds.toGeneratorOfSomes).generateOne
       val original -> fork = {
         val original -> fork = publicProject.forkOnce()
         original -> fork.copy(visibility = visibilityNonPublic.generateOne, members = Set(member))
@@ -85,7 +85,7 @@ class WorkflowsEntitiesFinderSpec
       finder
         .findEntities(
           Criteria(filters = Filters(entityTypes = Set(Filters.EntityType.Workflow)),
-                   maybeUser = member.toAuthUser.some
+                   maybeUser = member.person.toAuthUser.some
           )
         )
         .unsafeRunSync()
@@ -94,7 +94,7 @@ class WorkflowsEntitiesFinderSpec
 
     "favour workflows on internal projects over private projects if exist" in new TestCase {
 
-      val member = personEntities(personGitLabIds.toGeneratorOfSomes).generateOne
+      val member = projectMemberEntities(personGitLabIds.toGeneratorOfSomes).generateOne
       val internalProject = renkuProjectEntities(fixed(projects.Visibility.Internal))
         .modify(replaceMembers(to = Set(member)))
         .withActivities(activityEntities(stepPlanEntities()))
@@ -111,7 +111,7 @@ class WorkflowsEntitiesFinderSpec
       finder
         .findEntities(
           Criteria(filters = Filters(entityTypes = Set(Filters.EntityType.Workflow)),
-                   maybeUser = member.toAuthUser.some
+                   maybeUser = member.person.toAuthUser.some
           )
         )
         .unsafeRunSync()
@@ -120,7 +120,7 @@ class WorkflowsEntitiesFinderSpec
 
     "select workflows on private projects if there are no projects with broader visibility" in new TestCase {
 
-      val member = personEntities(personGitLabIds.toGeneratorOfSomes).generateOne
+      val member = projectMemberEntities(personGitLabIds.toGeneratorOfSomes).generateOne
       val privateProject = renkuProjectEntities(fixed(projects.Visibility.Private))
         .modify(replaceMembers(to = Set(member)))
         .withActivities(activityEntities(stepPlanEntities()))
@@ -132,7 +132,7 @@ class WorkflowsEntitiesFinderSpec
       finder
         .findEntities(
           Criteria(filters = Filters(entityTypes = Set(Filters.EntityType.Workflow)),
-                   maybeUser = member.toAuthUser.some
+                   maybeUser = member.person.toAuthUser.some
           )
         )
         .unsafeRunSync()

@@ -54,7 +54,7 @@ private class MemberEmailFinderImpl[F[_]: Async: Logger](
       maybeAccessToken: Option[AccessToken]
   ): EitherT[F, ProcessingRecoverableError, GitLabMember] = EitherT {
     member match {
-      case member if member.email.isDefined =>
+      case member if member.user.email.isDefined =>
         member.asRight[ProcessingRecoverableError].pure[F]
       case member =>
         findInCommitsAndEvents(member, project).value
@@ -79,7 +79,7 @@ private class MemberEmailFinderImpl[F[_]: Async: Logger](
   private def filterEventsFor(
       member: GitLabMember
   ): ((List[PushEvent], PagingInfo)) => (List[PushEvent], PagingInfo) = { case (events, paging) =>
-    events.filter(ev => ev.authorId == member.gitLabId) -> paging
+    events.filter(ev => ev.authorId == member.user.gitLabId) -> paging
   }
 
   private def addEmailOrCheckNextPage(member:     GitLabMember,

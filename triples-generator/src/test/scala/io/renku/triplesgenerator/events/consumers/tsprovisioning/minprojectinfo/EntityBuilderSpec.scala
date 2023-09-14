@@ -28,8 +28,7 @@ import io.renku.generators.CommonGraphGenerators.accessTokens
 import io.renku.generators.Generators.Implicits._
 import io.renku.generators.Generators._
 import io.renku.graph.model._
-import io.renku.graph.model.entities.Project.ProjectMember.{ProjectMemberNoEmail, ProjectMemberWithEmail}
-import io.renku.graph.model.entities.Project.{GitLabProjectInfo, ProjectMember}
+import io.renku.graph.model.gitlab.{GitLabMember, GitLabProjectInfo, GitLabUser}
 import io.renku.graph.model.testentities.ModelOps
 import io.renku.graph.model.testentities.generators.EntitiesGenerators
 import io.renku.http.client.AccessToken
@@ -151,7 +150,7 @@ class EntityBuilderSpec
         maybeCreator.map(toPerson),
         visibility,
         keywords,
-        members.map(toPerson),
+        members.map(toMember),
         ResourceId(parentSlug),
         convertImageUris(ResourceId(slug).asEntityId)(avatarUrl.toList)
       )
@@ -178,28 +177,21 @@ class EntityBuilderSpec
         maybeCreator.map(toPerson),
         visibility,
         keywords,
-        members.map(toPerson),
+        members.map(toMember),
         convertImageUris(ResourceId(slug).asEntityId)(avatarUrl.toList)
       )
   }
 
-  private def toPerson(projectMember: ProjectMember)(implicit renkuUrl: RenkuUrl): entities.Person =
-    projectMember match {
-      case ProjectMemberNoEmail(name, _, gitLabId) =>
-        entities.Person.WithGitLabId(persons.ResourceId(gitLabId),
-                                     gitLabId,
-                                     name,
-                                     maybeEmail = None,
-                                     maybeOrcidId = None,
-                                     maybeAffiliation = None
-        )
-      case ProjectMemberWithEmail(name, _, gitLabId, email) =>
-        entities.Person.WithGitLabId(persons.ResourceId(gitLabId),
-                                     gitLabId,
-                                     name,
-                                     email.some,
-                                     maybeOrcidId = None,
-                                     maybeAffiliation = None
-        )
-    }
+  private def toMember(member: GitLabMember)(implicit renkuUrl: RenkuUrl): entities.Project.Member =
+    entities.Project.Member(toPerson(member.user), member.role)
+
+  private def toPerson(user: GitLabUser)(implicit renkuUrl: RenkuUrl): entities.Person =
+    entities.Person.WithGitLabId(
+      persons.ResourceId(user.gitLabId),
+      user.gitLabId,
+      user.name,
+      maybeEmail = user.email,
+      maybeOrcidId = None,
+      maybeAffiliation = None
+    )
 }

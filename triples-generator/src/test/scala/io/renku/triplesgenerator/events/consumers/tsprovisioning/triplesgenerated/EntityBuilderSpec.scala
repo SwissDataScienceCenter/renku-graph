@@ -34,8 +34,7 @@ import io.renku.generators.Generators.Implicits._
 import io.renku.generators.Generators._
 import io.renku.graph.model._
 import io.renku.graph.model.entities.DiffInstances
-import io.renku.graph.model.entities.Project.ProjectMember.{ProjectMemberNoEmail, ProjectMemberWithEmail}
-import io.renku.graph.model.entities.Project.{GitLabProjectInfo, ProjectMember}
+import io.renku.graph.model.gitlab.{GitLabMember, GitLabProjectInfo, GitLabUser}
 import io.renku.graph.model.testentities.StepPlanCommandParameter.{CommandInput, CommandOutput, CommandParameter}
 import io.renku.graph.model.testentities.generators.EntitiesGenerators
 import io.renku.graph.model.testentities.generators.EntitiesGenerators.ActivityGenFactory
@@ -286,9 +285,9 @@ class EntityBuilderSpec
       project.dateCreated,
       project.dateModified,
       project.maybeDescription,
-      project.maybeCreator.map(_.to[ProjectMember]),
+      project.maybeCreator.map(_.to[GitLabUser]),
       project.keywords,
-      projectMembers.generateSet(),
+      gitLapProjectMembers.generateSet(),
       project.visibility,
       maybeParentSlug = project match {
         case p: Project with Parent => p.parent.slug.some
@@ -300,13 +299,8 @@ class EntityBuilderSpec
     private val projectInfoFinder = mock[ProjectInfoFinder[Try]]
     val entityBuilder             = new EntityBuilderImpl[Try](projectInfoFinder, renkuUrl)
 
-    private implicit lazy val toProjectMember: Person => ProjectMember = person => {
-      val member = ProjectMember(person.name, persons.Username(person.name.value), personGitLabIds.generateOne)
-      person.maybeEmail match {
-        case Some(email) => member.add(email)
-        case None        => member
-      }
-    }
+    private implicit lazy val toGitLabUser: Person => GitLabUser = person =>
+      GitLabUser(person.name, persons.Username(person.name.value), personGitLabIds.generateOne, person.maybeEmail)
 
     def givenFindProjectInfo(projectSlug: projects.Slug) = new {
       def returning(result: EitherT[Try, ProcessingRecoverableError, Option[GitLabProjectInfo]]) =
@@ -344,16 +338,14 @@ class EntityBuilderSpec
     val creatorWithGLId = blend(modelProject.maybeCreator, glProject.maybeCreator)
     val dateModified    = List(cliProject.dateModified, glProject.dateModified).max
     modelProject.fold(
-      _.copy(maybeCreator = creatorWithGLId, members = glProject.members.map(toPerson), dateModified = dateModified),
-      _.copy(maybeCreator = creatorWithGLId, members = glProject.members.map(toPerson), dateModified = dateModified),
-      _.copy(maybeCreator = creatorWithGLId, members = glProject.members.map(toPerson), dateModified = dateModified),
-      _.copy(maybeCreator = creatorWithGLId, members = glProject.members.map(toPerson), dateModified = dateModified)
+      _.copy(maybeCreator = creatorWithGLId, members = glProject.members.map(toMember), dateModified = dateModified),
+      _.copy(maybeCreator = creatorWithGLId, members = glProject.members.map(toMember), dateModified = dateModified),
+      _.copy(maybeCreator = creatorWithGLId, members = glProject.members.map(toMember), dateModified = dateModified),
+      _.copy(maybeCreator = creatorWithGLId, members = glProject.members.map(toMember), dateModified = dateModified)
     )
   }
 
-  private def blend[F[_]: Functor: Foldable](persons: F[entities.Person],
-                                             members: F[ProjectMember]
-  ): F[entities.Person] =
+  private def blend[F[_]: Functor: Foldable](persons: F[entities.Person], members: F[GitLabUser]): F[entities.Person] =
     persons.map(p =>
       members
         .find(m => m.name == p.name || m.username.value == p.name.value)
@@ -361,22 +353,16 @@ class EntityBuilderSpec
         .getOrElse(p)
     )
 
-  private def toPerson(projectMember: ProjectMember): entities.Person = projectMember match {
-    case ProjectMemberNoEmail(name, _, gitLabId) =>
-      entities.Person.WithGitLabId(persons.ResourceId(gitLabId),
-                                   gitLabId,
-                                   name,
-                                   maybeEmail = None,
-                                   maybeOrcidId = None,
-                                   maybeAffiliation = None
-      )
-    case ProjectMemberWithEmail(name, _, gitLabId, email) =>
-      entities.Person.WithGitLabId(persons.ResourceId(gitLabId),
-                                   gitLabId,
-                                   name,
-                                   email.some,
-                                   maybeOrcidId = None,
-                                   maybeAffiliation = None
-      )
-  }
+  private def toMember(member: GitLabMember)(implicit renkuUrl: RenkuUrl): entities.Project.Member =
+    entities.Project.Member(toPerson(member.user), member.role)
+
+  private def toPerson(user: GitLabUser)(implicit renkuUrl: RenkuUrl): entities.Person =
+    entities.Person.WithGitLabId(
+      persons.ResourceId(user.gitLabId),
+      user.gitLabId,
+      user.name,
+      maybeEmail = user.email,
+      maybeOrcidId = None,
+      maybeAffiliation = None
+    )
 }

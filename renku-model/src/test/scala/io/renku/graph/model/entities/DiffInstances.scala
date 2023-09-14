@@ -133,6 +133,9 @@ trait DiffInstances extends CliDiffInstances {
 
   implicit val nonRenkuProjectDiff: Diff[NonRenkuProject] = Diff.derived[NonRenkuProject]
 
+  implicit val projectMemberDiff: Diff[Project.Member] =
+    Diff.derived[Project.Member]
+
   implicit val projectDiff: Diff[Project] = Diff.derived[Project]
 }
 
