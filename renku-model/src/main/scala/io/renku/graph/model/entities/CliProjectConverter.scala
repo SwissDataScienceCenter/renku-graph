@@ -18,13 +18,13 @@
 
 package io.renku.graph.model.entities
 
-import ProjectLens._
 import cats.data.{Validated, ValidatedNel}
 import cats.syntax.all._
 import io.renku.cli.model.{CliPerson, CliProject}
 import io.renku.graph.model._
 import io.renku.graph.model.entities.Project.ProjectMember.{ProjectMemberNoEmail, ProjectMemberWithEmail}
 import io.renku.graph.model.entities.Project.{GitLabProjectInfo, ProjectMember}
+import io.renku.graph.model.entities.ProjectLens._
 import io.renku.graph.model.images.Image
 import io.renku.graph.model.projects.{DateCreated, DateModified, Description, Keyword, ResourceId}
 import io.renku.graph.model.versions.{CliVersion, SchemaVersion}
@@ -186,18 +186,18 @@ private[entities] object CliProjectConverter {
     gitLabInfo.maybeCreator.map { creator =>
       allJsonLdPersons
         .find(byEmailOrUsername(creator))
-        .map(merge(creator))
-        .getOrElse(toPerson(creator))
+        .map(merge(creator).andThen(_.person))
+        .getOrElse(toMember(creator).person)
     }
 
   private def members(
       allJsonLdPersons: Set[Person]
-  )(gitLabInfo: GitLabProjectInfo)(implicit renkuUrl: RenkuUrl): Set[Person] =
+  )(gitLabInfo: GitLabProjectInfo)(implicit renkuUrl: RenkuUrl): Set[Project.Member] =
     gitLabInfo.members.map(member =>
       allJsonLdPersons
         .find(byEmailOrUsername(member))
         .map(merge(member))
-        .getOrElse(toPerson(member))
+        .getOrElse(toMember(member))
     )
 
   private lazy val byEmailOrUsername: ProjectMember => Person => Boolean = {
@@ -210,31 +210,47 @@ private[entities] object CliProjectConverter {
     case member: ProjectMemberNoEmail => person => person.name.value == member.username.value
   }
 
-  private def merge(member: Project.ProjectMember)(implicit renkuUrl: RenkuUrl): Person => Person =
+  private def merge(member: Project.ProjectMember)(implicit renkuUrl: RenkuUrl): Person => Project.Member =
     member match {
-      case ProjectMemberWithEmail(name, _, gitLabId, email) =>
-        _.add(gitLabId).copy(name = name, maybeEmail = email.some)
-      case ProjectMemberNoEmail(name, _, gitLabId) =>
-        _.add(gitLabId).copy(name = name)
+      case ProjectMemberWithEmail(name, _, gitLabId, email, _) =>
+        p =>
+          Project.Member(
+            p.add(gitLabId).copy(name = name, maybeEmail = email.some),
+            member.role
+          )
+      case ProjectMemberNoEmail(name, _, gitLabId, _) =>
+        p =>
+          Project.Member(
+            p.add(gitLabId).copy(name = name),
+            member.role
+          )
     }
 
-  private def toPerson(projectMember: ProjectMember)(implicit renkuUrl: RenkuUrl): Person =
+  private def toMember(projectMember: ProjectMember)(implicit renkuUrl: RenkuUrl): Project.Member =
     projectMember match {
-      case ProjectMemberNoEmail(name, _, gitLabId) =>
-        Person.WithGitLabId(persons.ResourceId(gitLabId),
-                            gitLabId,
-                            name,
-                            maybeEmail = None,
-                            maybeOrcidId = None,
-                            maybeAffiliation = None
+      case ProjectMemberNoEmail(name, _, gitLabId, _) =>
+        Project.Member(
+          Person.WithGitLabId(
+            persons.ResourceId(gitLabId),
+            gitLabId,
+            name,
+            maybeEmail = None,
+            maybeOrcidId = None,
+            maybeAffiliation = None
+          ),
+          projectMember.role
         )
-      case ProjectMemberWithEmail(name, _, gitLabId, email) =>
-        Person.WithGitLabId(persons.ResourceId(gitLabId),
-                            gitLabId,
-                            name,
-                            email.some,
-                            maybeOrcidId = None,
-                            maybeAffiliation = None
+      case ProjectMemberWithEmail(name, _, gitLabId, email, _) =>
+        Project.Member(
+          Person.WithGitLabId(
+            persons.ResourceId(gitLabId),
+            gitLabId,
+            name,
+            email.some,
+            maybeOrcidId = None,
+            maybeAffiliation = None
+          ),
+          projectMember.role
         )
     }
 }

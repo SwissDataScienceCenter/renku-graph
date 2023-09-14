@@ -25,13 +25,12 @@ import cats.syntax.all._
 import eu.timepit.refined.api.Refined
 import eu.timepit.refined.auto._
 import eu.timepit.refined.collection.NonEmpty
-import io.circe.Decoder
 import io.renku.graph.model.entities.Project.ProjectMember
-import io.renku.graph.model.{persons, projects}
+import io.renku.graph.model.projects
 import io.renku.http.client.{AccessToken, GitLabClient}
 import io.renku.triplesgenerator.errors.{ProcessingRecoverableError, RecoverableErrorsRecovery}
 import org.http4s._
-import org.http4s.circe.jsonOf
+import org.http4s.circe.CirceEntityDecoder._
 import org.http4s.dsl.io.{NotFound, Ok}
 import org.http4s.implicits.http4sLiteralsSyntax
 import org.typelevel.ci._
@@ -50,10 +49,10 @@ private object ProjectMembersFinder {
 
 private class ProjectMembersFinderImpl[F[_]: Async: NonEmptyParallel: GitLabClient: Logger](
     recoveryStrategy: RecoverableErrorsRecovery = RecoverableErrorsRecovery
-) extends ProjectMembersFinder[F] {
+) extends ProjectMembersFinder[F]
+    with GitlabJsonDecoder {
 
   import io.renku.http.tinytypes.TinyTypeURIEncoder._
-  import io.renku.tinytypes.json.TinyTypeDecoders._
 
   override def findProjectMembers(
       slug: projects.Slug
@@ -62,15 +61,6 @@ private class ProjectMembersFinderImpl[F[_]: Async: NonEmptyParallel: GitLabClie
       .map(_.asRight[ProcessingRecoverableError])
       .recoverWith(recoveryStrategy.maybeRecoverableError)
   }
-
-  private implicit val memberDecoder: Decoder[ProjectMember] = cursor =>
-    for {
-      gitLabId <- cursor.downField("id").as[persons.GitLabId]
-      name     <- cursor.downField("name").as[persons.Name]
-      username <- cursor.downField("username").as[persons.Username]
-    } yield ProjectMember(name, username, gitLabId)
-
-  private implicit lazy val membersDecoder: EntityDecoder[F, List[ProjectMember]] = jsonOf[F, List[ProjectMember]]
 
   private val endpointName: String Refined NonEmpty = "project-members"
 
