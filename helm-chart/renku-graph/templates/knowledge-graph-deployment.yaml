@@ -49,6 +49,8 @@ spec:
                 secretKeyRef:
                   name: {{ include "jena.fullname" . }}
                   key: jena-users-renku-password
+            - name: WEBHOOK_SERVICE_BASE_URL
+              value: "http://{{ template "webhookService.fullname" . }}:{{ .Values.webhookService.service.port }}"
             - name: TRIPLES_GENERATOR_BASE_URL
               value: "http://{{ template "triplesGenerator.fullname" . }}:{{ .Values.triplesGenerator.service.port }}"
             - name: TOKEN_REPOSITORY_BASE_URL
