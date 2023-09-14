@@ -58,37 +58,32 @@ private class ProjectCreatorImpl[F[_]: MonadThrow: Logger](
 
   override def createProject(newProject: NewProject, authUser: AuthUser): F[Unit] =
     for {
-      corePayload <- findCorePayload(newProject, authUser)
       glCreated   <- createProjectInGL(newProject, authUser.accessToken)
-      _           <- createProjectInCore(newProject, glCreated, corePayload, authUser)
-      _           <- activateProject(newProject, glCreated, authUser.accessToken)
+      corePayload <- findCorePayload(newProject, glCreated, authUser)
+      _           <- createProjectInCore(glCreated, corePayload, authUser)
+      _           <- activateProject(glCreated, authUser.accessToken)
       _           <- createProjectInTG(tgNewProject(newProject, glCreated))
     } yield ()
 
-  private def findCorePayload(newProject: NewProject, authUser: AuthUser): F[CorePayload] =
-    corePayloadFinder
-      .findCorePayload(newProject, authUser)
+  private def findCorePayload(newProject: NewProject, glCreated: GLCreatedProject, authUser: AuthUser): F[CorePayload] =
+    corePayloadFinder.findCorePayload(newProject, glCreated, authUser)
 
   private def createProjectInGL(newProject: NewProject, accessToken: UserAccessToken): F[GLCreatedProject] =
     glProjectCreator
       .createProject(newProject, accessToken)
-      .adaptError(CreationFailures.onGLCreation(newProject.slug, _))
+      .adaptError(CreationFailures.onGLCreation(newProject.name, _))
       .flatMap(_.fold(_.raiseError[F, GLCreatedProject], _.pure[F]))
 
-  private def createProjectInCore(newProject:       NewProject,
-                                  glCreatedProject: GLCreatedProject,
-                                  corePayload:      CorePayload,
-                                  authUser:         AuthUser
-  ): F[Unit] =
+  private def createProjectInCore(glCreated: GLCreatedProject, corePayload: CorePayload, authUser: AuthUser): F[Unit] =
     coreClient
       .createProject(corePayload, authUser.accessToken)
       .map(_.toEither)
       .handleError(_.asLeft)
       .flatTap {
         case _: Right[_, _] => ().pure[F]
-        case _: Left[_, _]  => deleteProjectInGL(glCreatedProject, authUser.accessToken)
+        case _: Left[_, _]  => deleteProjectInGL(glCreated, authUser.accessToken)
       }
-      .flatMap(_.fold(CreationFailures.onCoreCreation(newProject.slug, _).raiseError[F, Unit], _.pure[F]))
+      .flatMap(_.fold(CreationFailures.onCoreCreation(glCreated.slug, _).raiseError[F, Unit], _.pure[F]))
 
   private def deleteProjectInGL(glCreatedProject: GLCreatedProject, accessToken: UserAccessToken): F[Unit] =
     glProjectRemover
@@ -97,33 +92,30 @@ private class ProjectCreatorImpl[F[_]: MonadThrow: Logger](
         Logger[F].warn(show"GL project deletion on Core failure on project creation failed: ${err.getMessage}")
       )
 
-  private def activateProject(newProject:       NewProject,
-                              glCreatedProject: GLCreatedProject,
-                              accessToken:      UserAccessToken
-  ): F[Unit] =
+  private def activateProject(glProject: GLCreatedProject, accessToken: UserAccessToken): F[Unit] =
     wsClient
-      .createHook(glCreatedProject.id, accessToken)
+      .createHook(glProject.id, accessToken)
       .map(_.toEither)
       .handleError(_.asLeft)
       .flatMap(
-        _.fold(CreationFailures.onActivation(newProject.slug, _).raiseError[F, Unit], checkActivationResult(newProject))
+        _.fold(CreationFailures.onActivation(glProject.slug, _).raiseError[F, Unit], checkActivationResult(glProject))
       )
 
-  private def checkActivationResult(newProject: NewProject): HookCreationResult => F[Unit] = {
+  private def checkActivationResult(glProject: GLCreatedProject): HookCreationResult => F[Unit] = {
     case HookCreationResult.Created | HookCreationResult.Existed => ().pure[F]
-    case HookCreationResult.NotFound => CreationFailures.activationReturningNotFound(newProject).raiseError[F, Unit]
+    case HookCreationResult.NotFound => CreationFailures.activationReturningNotFound(glProject.slug).raiseError[F, Unit]
   }
 
-  private def tgNewProject(newProject: NewProject, glCreatedProject: GLCreatedProject): TGNewProject =
+  private def tgNewProject(newProject: NewProject, glCreated: GLCreatedProject): TGNewProject =
     TGNewProject(
       newProject.name,
-      newProject.slug,
+      glCreated.slug,
       newProject.maybeDescription,
-      glCreatedProject.dateCreated,
-      TGNewProject.Creator(glCreatedProject.creator.name, glCreatedProject.creator.id),
+      glCreated.dateCreated,
+      TGNewProject.Creator(glCreated.creator.name, glCreated.creator.id),
       newProject.keywords,
       newProject.visibility,
-      glCreatedProject.maybeImage.toList
+      glCreated.maybeImage.toList
     )
 
   private def createProjectInTG(tgNewProject: TGNewProject): F[Unit] =

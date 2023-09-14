@@ -51,7 +51,7 @@ private class EndpointImpl[F[_]: Async: Logger](projectCreator: ProjectCreator[F
         projectCreator
           .createProject(newProject, authUser)
           .as(Response[F](Accepted).withEntity(Message.Info("Project creation accepted")))
-          .flatTap(_ => Logger[F].info(show"Project ${newProject.slug} created"))
+          .flatTap(_ => Logger[F].info(show"Project ${newProject.name} created"))
       }
       .merge
       .handleErrorWith(relevantError)

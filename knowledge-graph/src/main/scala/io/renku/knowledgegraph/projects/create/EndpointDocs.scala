@@ -43,7 +43,7 @@ object EndpointDocs extends docs.EndpointDocs {
         Contents(
           MediaType.`multipart/form-data`(
             "Multipart request example",
-            """|POST /knowledge-graph/projects/namespace/path HTTP/1.1
+            """|POST /knowledge-graph/projects HTTP/1.1
                |Host: dev.renku.ch
                |Authorization: Bearer <XXX>
                |Content-Length: 575
@@ -54,11 +54,7 @@ object EndpointDocs extends docs.EndpointDocs {
                |
                |project name
                |------WebKitFormBoundary7MA4YWxkTrZu0gW
-               |Content-Disposition: form-data; name="namespace"
-               |
-               |namespaceId
-               |------WebKitFormBoundary7MA4YWxkTrZu0gW
-               |Content-Disposition: form-data; name="slug"
+               |Content-Disposition: form-data; name="namespaceId"
                |
                |15
                |------WebKitFormBoundary7MA4YWxkTrZu0gW

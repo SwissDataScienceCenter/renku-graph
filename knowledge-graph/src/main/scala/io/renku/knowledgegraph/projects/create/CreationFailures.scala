@@ -47,9 +47,9 @@ private object CreationFailures {
   def noUserInfoFound(userId: persons.GitLabId): Failure =
     Failure(InternalServerError, Message.Error.unsafeApply(show"Cannot find info about user $userId"))
 
-  def onGLCreation(slug: projects.Slug, cause: Throwable): Failure =
+  def onGLCreation(name: projects.Name, cause: Throwable): Failure =
     Failure(InternalServerError,
-            Message.Error.unsafeApply(show"Creating project $slug in GitLab failed.${toMessage(cause)}"),
+            Message.Error.unsafeApply(show"Creating project $name in GitLab failed.${toMessage(cause)}"),
             cause
     )
 
@@ -65,9 +65,9 @@ private object CreationFailures {
             cause
     )
 
-  def activationReturningNotFound(newProject: NewProject): Failure =
+  def activationReturningNotFound(slug: projects.Slug): Failure =
     Failure(InternalServerError,
-            Message.Error.unsafeApply(show"Project ${newProject.slug} couldn't be activated as it did not exist")
+            Message.Error.unsafeApply(show"Project $slug couldn't be activated as it did not exist")
     )
 
   def onTGCreation(slug: projects.Slug, cause: Throwable): Failure =

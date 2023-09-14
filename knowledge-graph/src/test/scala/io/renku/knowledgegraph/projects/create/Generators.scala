@@ -35,21 +35,19 @@ private object Generators {
     projectNamespaces.map(Namespace.WithName(from.identifier, _))
 
   implicit val newProjects: Gen[NewProject] =
-    for {
-      name             <- projectNames
-      namespace        <- namespacesIdOnly
-      slug             <- projectSlugs
-      maybeDescription <- projectDescriptions.toGeneratorOfOptions
-      keywords         <- projectKeywords.toGeneratorOfSet()
-      visibility       <- projectVisibilities
-      template         <- templatesGen
-      image            <- ImageGenerators.images.toGeneratorOfOptions
-    } yield NewProject(name, namespace, slug, maybeDescription, keywords, visibility, template, image)
+    (projectNames,
+     namespacesIdOnly,
+     projectDescriptions.toGeneratorOfOptions,
+     projectKeywords.toGeneratorOfSet(),
+     projectVisibilities,
+     templatesGen,
+     ImageGenerators.images.toGeneratorOfOptions,
+    ).mapN(NewProject.apply)
 
   implicit val glCreatedProjectCreatorsGen: Gen[GLCreatedProject.Creator] =
     (personNames, personGitLabIds).mapN(GLCreatedProject.Creator.apply)
 
   implicit val glCreatedProjectsGen: Gen[GLCreatedProject] =
-    (projectIds, projectCreatedDates(), glCreatedProjectCreatorsGen, imageUris.toGeneratorOfOptions)
+    (projectIds, projectSlugs, projectCreatedDates(), glCreatedProjectCreatorsGen, imageUris.toGeneratorOfOptions)
       .mapN(GLCreatedProject.apply)
 }

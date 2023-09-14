@@ -24,6 +24,7 @@ import io.renku.graph.model.{persons, projects}
 import io.renku.tinytypes.json.TinyTypeDecoders._
 
 private final case class GLCreatedProject(id:          projects.GitLabId,
+                                          slug:        projects.Slug,
                                           dateCreated: projects.DateCreated,
                                           creator:     GLCreatedProject.Creator,
                                           maybeImage:  Option[ImageUri]
@@ -39,5 +40,5 @@ private object GLCreatedProject {
   }
 
   implicit val decoder: Decoder[GLCreatedProject] =
-    Decoder.forProduct4("id", "created_at", "owner", "avatar_url")(GLCreatedProject.apply)
+    Decoder.forProduct5("id", "path_with_namespace", "created_at", "owner", "avatar_url")(GLCreatedProject.apply)
 }

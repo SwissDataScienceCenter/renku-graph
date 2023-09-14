@@ -155,7 +155,6 @@ class GLProjectCreatorSpec
         .getOrElse(fail(s"No '$name' part"))
 
     findPart("name").as[projects.Name].asserting(_ shouldBe newProject.name) >>
-      findPart("path").as[projects.GitLabPath].asserting(_ shouldBe newProject.slug.toPath) >>
       findPart("namespace_id").as[NamespaceId].asserting(_ shouldBe newProject.namespace.identifier) >>
       findPart("visibility").as[projects.Visibility].asserting(_ shouldBe newProject.visibility) >>
       findPart("topics").as[List[projects.Keyword]].map(_.toSet).asserting(_ shouldBe newProject.keywords) >>
@@ -166,11 +165,12 @@ class GLProjectCreatorSpec
   }
 
   private implicit lazy val responseEncoder: Encoder[GLCreatedProject] = Encoder.instance {
-    case GLCreatedProject(id, dateCreated, creator, maybeImage) =>
+    case GLCreatedProject(id, slug, dateCreated, creator, maybeImage) =>
       json"""{
-        "id":         $id,
-        "created_at": $dateCreated,
-        "avatar_url": $maybeImage,
+        "id":                  $id,
+        "path_with_namespace": $slug,
+        "created_at":          $dateCreated,
+        "avatar_url":          $maybeImage,
         "owner": {
           "id":   ${creator.id},
           "name": ${creator.name}

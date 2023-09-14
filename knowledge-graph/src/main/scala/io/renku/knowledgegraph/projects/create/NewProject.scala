@@ -25,7 +25,6 @@ import io.renku.knowledgegraph.projects.images.Image
 private final case class NewProject(
     name:             projects.Name,
     namespace:        Namespace,
-    slug:             projects.Slug,
     maybeDescription: Option[projects.Description],
     keywords:         Set[projects.Keyword],
     visibility:       projects.Visibility,

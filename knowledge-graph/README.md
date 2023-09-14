@@ -646,11 +646,7 @@ Content-Disposition: form-data; name="name"
 
 project name
 ------WebKitFormBoundary7MA4YWxkTrZu0gW
-Content-Disposition: form-data; name="namespace"
-
-namespaceId
-------WebKitFormBoundary7MA4YWxkTrZu0gW
-Content-Disposition: form-data; name="slug"
+Content-Disposition: form-data; name="namespaceId"
 
 15
 ------WebKitFormBoundary7MA4YWxkTrZu0gW

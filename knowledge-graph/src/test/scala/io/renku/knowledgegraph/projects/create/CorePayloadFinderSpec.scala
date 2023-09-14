@@ -55,13 +55,15 @@ class CorePayloadFinderSpec
       val userInfo = userInfos.generateOne
       givenUserInfoFinding(authUser.accessToken, returning = userInfo.some.pure[IO])
 
+      val glCreatedProject = glCreatedProjectsGen.generateOne
+
       corePayloadFinder
-        .findCorePayload(newProject, authUser)
+        .findCorePayload(newProject, glCreatedProject, authUser)
         .asserting(
           _ shouldBe CoreNewProject(
             ProjectRepository.of(glUrl),
             enrichedNamespace.name,
-            newProject.slug.toPath.asName,
+            glCreatedProject.slug.toPath.asName,
             newProject.maybeDescription,
             newProject.keywords,
             newProject.template,
@@ -83,7 +85,7 @@ class CorePayloadFinderSpec
     givenUserInfoFinding(authUser.accessToken, returning = userInfo.some.pure[IO])
 
     corePayloadFinder
-      .findCorePayload(newProject, authUser)
+      .findCorePayload(newProject, glCreatedProjectsGen.generateOne, authUser)
       .assertThrowsError[Exception](
         _ shouldBe CreationFailures.onFindingNamespace(newProject.namespace.identifier, failure)
       )
@@ -100,7 +102,7 @@ class CorePayloadFinderSpec
     givenUserInfoFinding(authUser.accessToken, returning = userInfo.some.pure[IO])
 
     corePayloadFinder
-      .findCorePayload(newProject, authUser)
+      .findCorePayload(newProject, glCreatedProjectsGen.generateOne, authUser)
       .assertThrowsError[Exception](_ shouldBe CreationFailures.noNamespaceFound(newProject.namespace))
   }
 
@@ -116,7 +118,7 @@ class CorePayloadFinderSpec
     givenUserInfoFinding(authUser.accessToken, returning = failure.raiseError[IO, Nothing])
 
     corePayloadFinder
-      .findCorePayload(newProject, authUser)
+      .findCorePayload(newProject, glCreatedProjectsGen.generateOne, authUser)
       .assertThrowsError[Exception](_ shouldBe CreationFailures.onFindingUserInfo(authUser.id, failure))
   }
 
@@ -131,7 +133,7 @@ class CorePayloadFinderSpec
     givenUserInfoFinding(authUser.accessToken, returning = None.pure[IO])
 
     corePayloadFinder
-      .findCorePayload(newProject, authUser)
+      .findCorePayload(newProject, glCreatedProjectsGen.generateOne, authUser)
       .assertThrowsError[Exception](_ shouldBe CreationFailures.noUserInfoFound(authUser.id))
   }
 

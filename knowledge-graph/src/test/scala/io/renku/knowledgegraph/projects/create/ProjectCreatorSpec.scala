@@ -55,11 +55,11 @@ class ProjectCreatorSpec extends AsyncFlatSpec with AsyncIOSpec with should.Matc
       val authUser    = authUsers.generateOne
       val accessToken = authUser.accessToken
 
-      val corePayload = corePayloads.generateOne
-      givenCorePayloadFinding(newProject, authUser, returning = corePayload.pure[IO])
-
       val glCreatedProject = glCreatedProjectsGen.generateOne
       givenGLProjectCreation(newProject, accessToken, returning = glCreatedProject.asRight.pure[IO])
+
+      val corePayload = corePayloads.generateOne
+      givenCorePayloadFinding(newProject, glCreatedProject, authUser, returning = corePayload.pure[IO])
 
       givenCoreProjectCreation(corePayload, accessToken, returning = CoreResult.success(()).pure[IO])
 
@@ -75,15 +75,11 @@ class ProjectCreatorSpec extends AsyncFlatSpec with AsyncIOSpec with should.Matc
 
   it should "fail with the failure returned by project creation in GL" in {
 
-    val newProject  = newProjects.generateOne
-    val authUser    = authUsers.generateOne
-    val accessToken = authUser.accessToken
-
-    val corePayload = corePayloads.generateOne
-    givenCorePayloadFinding(newProject, authUser, returning = corePayload.pure[IO])
+    val newProject = newProjects.generateOne
+    val authUser   = authUsers.generateOne
 
     val failure = failures.generateOne
-    givenGLProjectCreation(newProject, accessToken, returning = failure.asLeft.pure[IO])
+    givenGLProjectCreation(newProject, authUser.accessToken, returning = failure.asLeft.pure[IO])
 
     creator.createProject(newProject, authUser).assertThrowsError[Exception](_ shouldBe failure)
   }
@@ -94,15 +90,12 @@ class ProjectCreatorSpec extends AsyncFlatSpec with AsyncIOSpec with should.Matc
     val authUser    = authUsers.generateOne
     val accessToken = authUser.accessToken
 
-    val corePayload = corePayloads.generateOne
-    givenCorePayloadFinding(newProject, authUser, returning = corePayload.pure[IO])
-
     val failure = exceptions.generateOne
     givenGLProjectCreation(newProject, accessToken, returning = failure.raiseError[IO, Nothing])
 
     creator
       .createProject(newProject, authUser)
-      .assertThrowsError[Exception](_ shouldBe CreationFailures.onGLCreation(newProject.slug, failure))
+      .assertThrowsError[Exception](_ shouldBe CreationFailures.onGLCreation(newProject.name, failure))
   }
 
   it should "remove the project from GL and fail if project creation in Core returns a failure" in {
@@ -111,11 +104,11 @@ class ProjectCreatorSpec extends AsyncFlatSpec with AsyncIOSpec with should.Matc
     val authUser    = authUsers.generateOne
     val accessToken = authUser.accessToken
 
-    val corePayload = corePayloads.generateOne
-    givenCorePayloadFinding(newProject, authUser, returning = corePayload.pure[IO])
-
     val glCreatedProject = glCreatedProjectsGen.generateOne
     givenGLProjectCreation(newProject, accessToken, returning = glCreatedProject.asRight.pure[IO])
+
+    val corePayload = corePayloads.generateOne
+    givenCorePayloadFinding(newProject, glCreatedProject, authUser, returning = corePayload.pure[IO])
 
     val failure = CoreResult.Failure.Simple(nonEmptyStrings().generateOne)
     givenCoreProjectCreation(corePayload, accessToken, returning = failure.pure[IO])
@@ -124,7 +117,7 @@ class ProjectCreatorSpec extends AsyncFlatSpec with AsyncIOSpec with should.Matc
 
     creator
       .createProject(newProject, authUser)
-      .assertThrowsError[Exception](_ shouldBe CreationFailures.onCoreCreation(newProject.slug, failure))
+      .assertThrowsError[Exception](_ shouldBe CreationFailures.onCoreCreation(glCreatedProject.slug, failure))
   }
 
   it should "remove the project from GL and fail if creating project in Core failed" in {
@@ -133,11 +126,11 @@ class ProjectCreatorSpec extends AsyncFlatSpec with AsyncIOSpec with should.Matc
     val authUser    = authUsers.generateOne
     val accessToken = authUser.accessToken
 
-    val corePayload = corePayloads.generateOne
-    givenCorePayloadFinding(newProject, authUser, returning = corePayload.pure[IO])
-
     val glCreatedProject = glCreatedProjectsGen.generateOne
     givenGLProjectCreation(newProject, accessToken, returning = glCreatedProject.asRight.pure[IO])
+
+    val corePayload = corePayloads.generateOne
+    givenCorePayloadFinding(newProject, glCreatedProject, authUser, returning = corePayload.pure[IO])
 
     val failure = exceptions.generateOne
     givenCoreProjectCreation(corePayload, accessToken, returning = failure.raiseError[IO, Nothing])
@@ -146,7 +139,7 @@ class ProjectCreatorSpec extends AsyncFlatSpec with AsyncIOSpec with should.Matc
 
     creator
       .createProject(newProject, authUser)
-      .assertThrowsError[Exception](_ shouldBe CreationFailures.onCoreCreation(newProject.slug, failure))
+      .assertThrowsError[Exception](_ shouldBe CreationFailures.onCoreCreation(glCreatedProject.slug, failure))
   }
 
   it should "fail with the Core failure if removing project from GL failed, too" in {
@@ -155,11 +148,11 @@ class ProjectCreatorSpec extends AsyncFlatSpec with AsyncIOSpec with should.Matc
     val authUser    = authUsers.generateOne
     val accessToken = authUser.accessToken
 
-    val corePayload = corePayloads.generateOne
-    givenCorePayloadFinding(newProject, authUser, returning = corePayload.pure[IO])
-
     val glCreatedProject = glCreatedProjectsGen.generateOne
     givenGLProjectCreation(newProject, accessToken, returning = glCreatedProject.asRight.pure[IO])
+
+    val corePayload = corePayloads.generateOne
+    givenCorePayloadFinding(newProject, glCreatedProject, authUser, returning = corePayload.pure[IO])
 
     val failure = exceptions.generateOne
     givenCoreProjectCreation(corePayload, accessToken, returning = failure.raiseError[IO, Nothing])
@@ -168,7 +161,7 @@ class ProjectCreatorSpec extends AsyncFlatSpec with AsyncIOSpec with should.Matc
 
     creator
       .createProject(newProject, authUser)
-      .assertThrowsError[Exception](_ shouldBe CreationFailures.onCoreCreation(newProject.slug, failure))
+      .assertThrowsError[Exception](_ shouldBe CreationFailures.onCoreCreation(glCreatedProject.slug, failure))
   }
 
   it should "fail if project activation returns a failure" in {
@@ -177,11 +170,11 @@ class ProjectCreatorSpec extends AsyncFlatSpec with AsyncIOSpec with should.Matc
     val authUser    = authUsers.generateOne
     val accessToken = authUser.accessToken
 
-    val corePayload = corePayloads.generateOne
-    givenCorePayloadFinding(newProject, authUser, returning = corePayload.pure[IO])
-
     val glCreatedProject = glCreatedProjectsGen.generateOne
     givenGLProjectCreation(newProject, accessToken, returning = glCreatedProject.asRight.pure[IO])
+
+    val corePayload = corePayloads.generateOne
+    givenCorePayloadFinding(newProject, glCreatedProject, authUser, returning = corePayload.pure[IO])
 
     givenCoreProjectCreation(corePayload, accessToken, returning = CoreResult.success(()).pure[IO])
 
@@ -190,7 +183,7 @@ class ProjectCreatorSpec extends AsyncFlatSpec with AsyncIOSpec with should.Matc
 
     creator
       .createProject(newProject, authUser)
-      .assertThrowsError[Exception](_ shouldBe CreationFailures.onActivation(newProject.slug, failure))
+      .assertThrowsError[Exception](_ shouldBe CreationFailures.onActivation(glCreatedProject.slug, failure))
   }
 
   it should "fail if activating project fails" in {
@@ -199,11 +192,11 @@ class ProjectCreatorSpec extends AsyncFlatSpec with AsyncIOSpec with should.Matc
     val authUser    = authUsers.generateOne
     val accessToken = authUser.accessToken
 
-    val corePayload = corePayloads.generateOne
-    givenCorePayloadFinding(newProject, authUser, returning = corePayload.pure[IO])
-
     val glCreatedProject = glCreatedProjectsGen.generateOne
     givenGLProjectCreation(newProject, accessToken, returning = glCreatedProject.asRight.pure[IO])
+
+    val corePayload = corePayloads.generateOne
+    givenCorePayloadFinding(newProject, glCreatedProject, authUser, returning = corePayload.pure[IO])
 
     givenCoreProjectCreation(corePayload, accessToken, returning = CoreResult.success(()).pure[IO])
 
@@ -212,7 +205,7 @@ class ProjectCreatorSpec extends AsyncFlatSpec with AsyncIOSpec with should.Matc
 
     creator
       .createProject(newProject, authUser)
-      .assertThrowsError[Exception](_ shouldBe CreationFailures.onActivation(newProject.slug, failure))
+      .assertThrowsError[Exception](_ shouldBe CreationFailures.onActivation(glCreatedProject.slug, failure))
   }
 
   it should "fail if project activation returns NotFound" in {
@@ -221,11 +214,11 @@ class ProjectCreatorSpec extends AsyncFlatSpec with AsyncIOSpec with should.Matc
     val authUser    = authUsers.generateOne
     val accessToken = authUser.accessToken
 
-    val corePayload = corePayloads.generateOne
-    givenCorePayloadFinding(newProject, authUser, returning = corePayload.pure[IO])
-
     val glCreatedProject = glCreatedProjectsGen.generateOne
     givenGLProjectCreation(newProject, accessToken, returning = glCreatedProject.asRight.pure[IO])
+
+    val corePayload = corePayloads.generateOne
+    givenCorePayloadFinding(newProject, glCreatedProject, authUser, returning = corePayload.pure[IO])
 
     givenCoreProjectCreation(corePayload, accessToken, returning = CoreResult.success(()).pure[IO])
 
@@ -233,7 +226,7 @@ class ProjectCreatorSpec extends AsyncFlatSpec with AsyncIOSpec with should.Matc
 
     creator
       .createProject(newProject, authUser)
-      .assertThrowsError[Exception](_ shouldBe CreationFailures.activationReturningNotFound(newProject))
+      .assertThrowsError[Exception](_ shouldBe CreationFailures.activationReturningNotFound(glCreatedProject.slug))
   }
 
   it should "fail with the failure returned by project creation in TG" in {
@@ -242,11 +235,11 @@ class ProjectCreatorSpec extends AsyncFlatSpec with AsyncIOSpec with should.Matc
     val authUser    = authUsers.generateOne
     val accessToken = authUser.accessToken
 
-    val corePayload = corePayloads.generateOne
-    givenCorePayloadFinding(newProject, authUser, returning = corePayload.pure[IO])
-
     val glCreatedProject = glCreatedProjectsGen.generateOne
     givenGLProjectCreation(newProject, accessToken, returning = glCreatedProject.asRight.pure[IO])
+
+    val corePayload = corePayloads.generateOne
+    givenCorePayloadFinding(newProject, glCreatedProject, authUser, returning = corePayload.pure[IO])
 
     givenCoreProjectCreation(corePayload, accessToken, returning = CoreResult.success(()).pure[IO])
 
@@ -257,7 +250,7 @@ class ProjectCreatorSpec extends AsyncFlatSpec with AsyncIOSpec with should.Matc
 
     creator
       .createProject(newProject, authUser)
-      .assertThrowsError[Exception](_ shouldBe CreationFailures.onTGCreation(newProject.slug, failure))
+      .assertThrowsError[Exception](_ shouldBe CreationFailures.onTGCreation(glCreatedProject.slug, failure))
   }
 
   it should "fail if creating project in TG failed" in {
@@ -266,11 +259,11 @@ class ProjectCreatorSpec extends AsyncFlatSpec with AsyncIOSpec with should.Matc
     val authUser    = authUsers.generateOne
     val accessToken = authUser.accessToken
 
-    val corePayload = corePayloads.generateOne
-    givenCorePayloadFinding(newProject, authUser, returning = corePayload.pure[IO])
-
     val glCreatedProject = glCreatedProjectsGen.generateOne
     givenGLProjectCreation(newProject, accessToken, returning = glCreatedProject.asRight.pure[IO])
+
+    val corePayload = corePayloads.generateOne
+    givenCorePayloadFinding(newProject, glCreatedProject, authUser, returning = corePayload.pure[IO])
 
     givenCoreProjectCreation(corePayload, accessToken, returning = CoreResult.success(()).pure[IO])
 
@@ -281,7 +274,7 @@ class ProjectCreatorSpec extends AsyncFlatSpec with AsyncIOSpec with should.Matc
 
     creator
       .createProject(newProject, authUser)
-      .assertThrowsError[Exception](_ shouldBe CreationFailures.onTGCreation(newProject.slug, failure))
+      .assertThrowsError[Exception](_ shouldBe CreationFailures.onTGCreation(glCreatedProject.slug, failure))
   }
 
   private implicit val logger: TestLogger[IO] = TestLogger[IO]()
@@ -301,10 +294,13 @@ class ProjectCreatorSpec extends AsyncFlatSpec with AsyncIOSpec with should.Matc
     .expects(newProject, accessToken)
     .returning(returning)
 
-  private def givenCorePayloadFinding(newProject: NewProject, authUser: AuthUser, returning: IO[CorePayload]) =
-    (corePayloadFinder.findCorePayload _)
-      .expects(newProject, authUser)
-      .returning(returning)
+  private def givenCorePayloadFinding(newProject: NewProject,
+                                      glCreated:  GLCreatedProject,
+                                      authUser:   AuthUser,
+                                      returning:  IO[CorePayload]
+  ) = (corePayloadFinder.findCorePayload _)
+    .expects(newProject, glCreated, authUser)
+    .returning(returning)
 
   private def givenCoreProjectCreation(corePayload: CorePayload,
                                        accessToken: UserAccessToken,
@@ -328,20 +324,20 @@ class ProjectCreatorSpec extends AsyncFlatSpec with AsyncIOSpec with should.Matc
     .expects(glCreatedProject.id, accessToken)
     .returning(returning)
 
-  private def givenTGProjectCreation(newProject:       NewProject,
-                                     glCreatedProject: GLCreatedProject,
-                                     returning:        IO[TGResult[Unit]]
+  private def givenTGProjectCreation(newProject: NewProject,
+                                     glCreated:  GLCreatedProject,
+                                     returning:  IO[TGResult[Unit]]
   ) = (tgClient.createProject _)
     .expects(
       TGNewProject(
         newProject.name,
-        newProject.slug,
+        glCreated.slug,
         newProject.maybeDescription,
-        glCreatedProject.dateCreated,
-        TGNewProject.Creator(glCreatedProject.creator.name, glCreatedProject.creator.id),
+        glCreated.dateCreated,
+        TGNewProject.Creator(glCreated.creator.name, glCreated.creator.id),
         newProject.keywords,
         newProject.visibility,
-        glCreatedProject.maybeImage.toList
+        glCreated.maybeImage.toList
       )
     )
     .returning(returning)

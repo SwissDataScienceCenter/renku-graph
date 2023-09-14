@@ -45,7 +45,6 @@ private object MultipartRequestCodec {
   private[create] object PartName {
     val name                  = "name"
     val namespaceId           = "namespaceId"
-    val slug                  = "slug"
     val description           = "description"
     val keywords              = "keywords"
     val visibility            = "visibility"
@@ -75,7 +74,6 @@ private class MultipartRequestEncoderImpl[F[_]: Sync] extends MultipartRequestEn
       ).flatten
         .appended(newProject.name.asPart[F](PartName.name))
         .appended(newProject.namespace.identifier.asPart[F](PartName.namespaceId))
-        .appended(newProject.slug.asPart[F](PartName.slug))
         .appended(newProject.visibility.asPart[F](PartName.visibility))
         .appended(newProject.template.repositoryUrl.asPart[F](PartName.templateRepositoryUrl))
         .appended(newProject.template.identifier.asPart[F](PartName.templateId))
@@ -99,7 +97,6 @@ private class MultipartRequestDecoderImpl[F[_]: Async] extends MultipartRequestD
   override def decode(multipart: Multipart[F]): F[NewProject] =
     (multipart.part(PartName.name).flatMap(_.as[projects.Name]),
      multipart.part(PartName.namespaceId).flatMap(_.as[NamespaceId]).map(Namespace(_)),
-     multipart.part(PartName.slug).flatMap(_.as[projects.Slug]),
      multipart.findPart(PartName.description).map(_.as[Option[projects.Description]]).sequence.map(_.flatten),
      multipart.findParts(PartName.keywords).map(_.as[projects.Keyword]).sequence.map(_.toSet),
      multipart.part(PartName.visibility).flatMap(_.as[projects.Visibility]),

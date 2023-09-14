@@ -30,7 +30,7 @@ import io.renku.http.server.security.model.AuthUser
 import io.renku.knowledgegraph.gitlab.UserInfoFinder
 
 private trait CorePayloadFinder[F[_]] {
-  def findCorePayload(newProject: NewProject, authUser: AuthUser): F[CoreNewProject]
+  def findCorePayload(newProject: NewProject, glCreated: GLCreatedProject, authUser: AuthUser): F[CoreNewProject]
 }
 
 private object CorePayloadFinder {
@@ -45,9 +45,12 @@ private class CorePayloadFinderImpl[F[_]: Async: NonEmptyParallel](namespaceFind
                                                                    gitLabUrl:      GitLabUrl
 ) extends CorePayloadFinder[F] {
 
-  override def findCorePayload(newProject: NewProject, authUser: AuthUser): F[CoreNewProject] =
+  override def findCorePayload(newProject: NewProject,
+                               glCreated:  GLCreatedProject,
+                               authUser:   AuthUser
+  ): F[CoreNewProject] =
     (findNamespace(newProject, authUser.accessToken), findUserInfo(authUser))
-      .parMapN(toPayload(newProject))
+      .parMapN(toPayload(newProject, glCreated))
 
   private def findNamespace(newProject: NewProject, accessToken: UserAccessToken): F[Namespace.WithName] =
     namespaceFinder
@@ -67,17 +70,18 @@ private class CorePayloadFinderImpl[F[_]: Async: NonEmptyParallel](namespaceFind
         case None       => CreationFailures.noUserInfoFound(authUser.id).raiseError[F, UserInfo]
       }
 
-  private def toPayload(newProject: NewProject): (Namespace.WithName, UserInfo) => CoreNewProject = {
-    case (namespace, userInfo) =>
-      CoreNewProject(
-        ProjectRepository.of(gitLabUrl),
-        namespace.name,
-        newProject.slug.toPath.asName,
-        newProject.maybeDescription,
-        newProject.keywords,
-        newProject.template,
-        newProject.branch,
-        userInfo
-      )
+  private def toPayload(newProject: NewProject,
+                        glCreated:  GLCreatedProject
+  ): (Namespace.WithName, UserInfo) => CoreNewProject = { case (namespace, userInfo) =>
+    CoreNewProject(
+      ProjectRepository.of(gitLabUrl),
+      namespace.name,
+      glCreated.slug.toPath.asName,
+      newProject.maybeDescription,
+      newProject.keywords,
+      newProject.template,
+      newProject.branch,
+      userInfo
+    )
   }
 }
