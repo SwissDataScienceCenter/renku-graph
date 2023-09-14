@@ -76,7 +76,7 @@ private class TriplesGeneratorClientImpl[F[_]: Async: Logger](tgUri: Uri)
 
   override def createProject(newProject: NewProject): F[Result[Unit]] =
     send(POST(tgUri / "projects") withEntity newProject.asJson) {
-      case (Ok, _, _) => Result.success(()).pure[F]
+      case (Created, _, _) => Result.success(()).pure[F]
       case (status, req, _) =>
         Result.failure[Unit](s"Creating project in TG failed: ${req.pathInfo.renderString}: $status").pure[F]
     }

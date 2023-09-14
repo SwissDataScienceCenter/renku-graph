@@ -45,14 +45,14 @@ class TriplesGeneratorClientSpec
 
   "createProject" should {
 
-    "succeed if sending project creation payload to the TG's Project Create API returned Ok" in {
+    "succeed if sending project creation payload to the TG's Project Create API returned Created" in {
 
       val newProject = newProjectsGen.generateOne
 
       stubFor {
         post(urlEqualTo("/projects"))
           .withRequestBody(equalToJson(newProject.asJson.spaces2))
-          .willReturn(ok())
+          .willReturn(created())
       }
 
       client.createProject(newProject).asserting(_ shouldBe TriplesGeneratorClient.Result.success(()))

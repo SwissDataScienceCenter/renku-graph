@@ -25,13 +25,14 @@ import io.circe.Json
 import io.circe.syntax._
 import io.renku.data.Message
 import io.renku.generators.Generators.Implicits._
+import io.renku.generators.Generators.exceptions
 import io.renku.interpreters.TestLogger
 import io.renku.testtools.CustomAsyncIOSpec
 import io.renku.triplesgenerator.api.Generators.newProjectsGen
 import io.renku.triplesgenerator.api.NewProject
 import org.http4s.MediaType.application
 import org.http4s.Request
-import org.http4s.Status.{BadRequest, Ok}
+import org.http4s.Status.{BadRequest, Created, InternalServerError}
 import org.http4s.circe._
 import org.http4s.headers.`Content-Type`
 import org.scalamock.scalatest.AsyncMockFactory
@@ -46,7 +47,7 @@ class EndpointSpec extends AsyncFlatSpec with CustomAsyncIOSpec with should.Matc
     givenProjectCreation(newProject, returning = ().pure[IO])
 
     endpoint.`POST /projects`(Request[IO]().withEntity(newProject.asJson)) >>= { response =>
-      response.status.pure[IO].asserting(_ shouldBe Ok) >>
+      response.status.pure[IO].asserting(_ shouldBe Created) >>
         response.contentType.pure[IO].asserting(_ shouldBe `Content-Type`(application.json).some) >>
         response.as[Message].asserting(_ shouldBe Message.Info("Project created"))
     }
@@ -60,6 +61,21 @@ class EndpointSpec extends AsyncFlatSpec with CustomAsyncIOSpec with should.Matc
       response.status.pure[IO].asserting(_ shouldBe BadRequest) >>
         response.contentType.pure[IO].asserting(_ shouldBe `Content-Type`(application.json).some) >>
         response.as[Message].asserting(_ shouldBe Message.Error("Invalid payload"))
+    }
+  }
+
+  it should "return InternalServerError if project creation fails" in {
+
+    val newProject = newProjectsGen.generateOne
+    val exception  = exceptions.generateOne
+    givenProjectCreation(newProject, returning = exception.raiseError[IO, Nothing])
+
+    endpoint.`POST /projects`(Request[IO]().withEntity(newProject.asJson)) >>= { response =>
+      response.status.pure[IO].asserting(_ shouldBe InternalServerError) >>
+        response.contentType.pure[IO].asserting(_ shouldBe `Content-Type`(application.json).some) >>
+        response
+          .as[Message]
+          .asserting(_ shouldBe Message.Error.fromMessageAndStackTraceUnsafe("Project creation failed", exception))
     }
   }
 

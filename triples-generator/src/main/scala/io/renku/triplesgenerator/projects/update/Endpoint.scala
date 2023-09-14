@@ -54,6 +54,7 @@ private class EndpointImpl[F[_]: Async: Logger](projectUpdater: ProjectUpdater[F
       }
       .map(toHttpResult)
       .merge
+      .handleErrorWith(errorHttpResult(slug))
 
   private def decodePayload: Request[F] => F[Either[Response[F], ProjectUpdates]] =
     _.as[ProjectUpdates].map(_.asRight[Response[F]]).handleError(badRequest)
@@ -66,4 +67,8 @@ private class EndpointImpl[F[_]: Async: Logger](projectUpdater: ProjectUpdater[F
     case ProjectUpdater.Result.Updated   => Response[F](Ok).withEntity(Message.Info("Project updated"))
     case ProjectUpdater.Result.NotExists => Response[F](NotFound).withEntity(Message.Info("Project not found"))
   }
+
+  private def errorHttpResult(slug: projects.Slug): Throwable => F[Response[F]] = ex =>
+    Logger[F].error(ex)(s"Project $slug update failed") >>
+      InternalServerError(Message.Error.fromMessageAndStackTraceUnsafe("Project update failed", ex))
 }

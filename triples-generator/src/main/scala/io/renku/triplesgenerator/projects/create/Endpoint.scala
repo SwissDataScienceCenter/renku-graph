@@ -48,8 +48,9 @@ private class EndpointImpl[F[_]: Async: Logger](projectCreator: ProjectCreator[F
     EitherT(decodePayload(request))
       .semiflatTap(projectCreator.createProject)
       .semiflatTap(project => Logger[F].info(show"""project $project created"""))
-      .as(Response[F](Ok).withEntity(Message.Info("Project created")))
+      .as(Response[F](Created).withEntity(Message.Info("Project created")))
       .merge
+      .handleErrorWith(errorHttpResult)
 
   private def decodePayload: Request[F] => F[Either[Response[F], NewProject]] =
     _.as[NewProject].map(_.asRight[Response[F]]).handleError(badRequest)
@@ -57,4 +58,8 @@ private class EndpointImpl[F[_]: Async: Logger](projectCreator: ProjectCreator[F
   private lazy val badRequest: Throwable => Either[Response[F], NewProject] = { _ =>
     Response[F](BadRequest).withEntity(Message.Error("Invalid payload")).asLeft[NewProject]
   }
+
+  private lazy val errorHttpResult: Throwable => F[Response[F]] = ex =>
+    Logger[F].error(ex)("Project creation failure") >>
+      InternalServerError(Message.Error.fromMessageAndStackTraceUnsafe("Project creation failed", ex))
 }
