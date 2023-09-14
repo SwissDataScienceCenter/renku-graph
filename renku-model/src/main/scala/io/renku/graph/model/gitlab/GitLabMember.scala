@@ -22,15 +22,24 @@ import io.renku.graph.model.persons._
 import io.renku.graph.model.projects.Role
 
 final case class GitLabMember(
-    name:        Name,
-    username:    Username,
-    gitLabId:    GitLabId,
-    email:       Option[Email],
+    user:        GitLabUser,
     accessLevel: Int
 ) {
 
-  def asUser: GitLabUser = GitLabUser(name, username, gitLabId, email)
-  def withEmail(email: Email): GitLabMember = copy(email = Some(email))
+  def withEmail(email: Email): GitLabMember = copy(user = user.withEmail(email))
 
   def role: Role = Role.fromGitLabAccessLevel(accessLevel)
+}
+
+object GitLabMember {
+  def apply(
+      name:        Name,
+      username:    Username,
+      gitLabId:    GitLabId,
+      email:       Option[Email],
+      accessLevel: Int
+  ): GitLabMember = GitLabMember(
+    GitLabUser(name, username, gitLabId, email),
+    accessLevel
+  )
 }

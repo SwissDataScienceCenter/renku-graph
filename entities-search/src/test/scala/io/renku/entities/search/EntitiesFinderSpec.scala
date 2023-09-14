@@ -557,7 +557,7 @@ class EntitiesFinderSpec
         .withDatasets(datasetEntities(provenanceNonModified))
         .generateOne
 
-      val member = personEntities(personGitLabIds.toGeneratorOfSomes).generateOne
+      val member = projectMemberEntities(personGitLabIds.toGeneratorOfSomes).generateOne
       val privateProject = renkuProjectEntities(fixed(projects.Visibility.Private))
         .modify(replaceMembers(to = Set(member)))
         .withActivities(activityEntities(stepPlanEntities()))
@@ -570,7 +570,7 @@ class EntitiesFinderSpec
             .findEntities(
               Criteria(
                 Filters(visibilities = Set(projects.Visibility.Public, projects.Visibility.Private)),
-                maybeUser = member.toAuthUser.some,
+                maybeUser = member.person.toAuthUser.some,
                 paging = PagingRequest(Page.first, PerPage(50))
               )
             )
@@ -1146,7 +1146,7 @@ class EntitiesFinderSpec
 
   "findEntities - security" should {
 
-    val member = personEntities(personGitLabIds.toGeneratorOfSomes).generateOne
+    val member = projectMemberEntities(personGitLabIds.toGeneratorOfSomes).generateOne
 
     val privateProject = renkuProjectEntities(fixed(Visibility.Private))
       .modify(replaceMembers(to = Set(member)))
@@ -1205,7 +1205,9 @@ class EntitiesFinderSpec
         List(privateProject, internalProject, publicProject).traverse_(provisionTestProject) *>
           finder
             .findEntities(
-              Criteria(maybeUser = member.toAuthUser.some, paging = PagingRequest.default.copy(perPage = PerPage(50)))
+              Criteria(maybeUser = member.person.toAuthUser.some,
+                       paging = PagingRequest.default.copy(perPage = PerPage(50))
+              )
             )
       }
 

@@ -24,7 +24,9 @@ import io.renku.generators.Generators.Implicits._
 import io.renku.generators.Generators._
 import io.renku.graph.model.GraphModelGenerators._
 import io.renku.graph.model._
+import io.renku.graph.model.gitlab.{GitLabMember, GitLabUser}
 import io.renku.graph.model.persons.{Email, GitLabId}
+import io.renku.graph.model.projects.Role
 import org.scalacheck.Gen
 
 object EntitiesGenerators extends EntitiesGenerators {
@@ -79,6 +81,26 @@ trait EntitiesGenerators
 
   val cliShapedPersons: Gen[Person] = personEntities(withoutGitLabId)
 
+  def gitLabUserGen(
+      gitLabIds:   Gen[GitLabId] = personGitLabIds,
+      maybeEmails: Gen[Option[Email]] = personEmails.toGeneratorOfOptions
+  ): Gen[GitLabUser] =
+    for {
+      name     <- personNames
+      mail     <- maybeEmails
+      id       <- gitLabIds
+      username <- personUsernames
+    } yield GitLabUser(name, username, id, mail)
+
+  def gitLabMemberGen(
+      gitLabIds:   Gen[GitLabId] = personGitLabIds,
+      maybeEmails: Gen[Option[Email]] = personEmails.toGeneratorOfOptions
+  ): Gen[GitLabMember] =
+    for {
+      user <- gitLabUserGen(gitLabIds, maybeEmails)
+      role <- roleGen
+    } yield GitLabMember(user, Role.toGitLabAccessLevel(role))
+
   def personEntities(
       maybeGitLabIds: Gen[Option[GitLabId]] = personGitLabIds.toGeneratorOfOptions,
       maybeEmails:    Gen[Option[Email]] = personEmails.toGeneratorOfOptions
@@ -89,6 +111,15 @@ trait EntitiesGenerators
     maybeOrcidId     <- personOrcidIds.toGeneratorOfOptions
     maybeAffiliation <- personAffiliations.toGeneratorOfOptions
   } yield Person(name, maybeEmail, maybeGitLabId, maybeOrcidId, maybeAffiliation)
+
+  def projectMemberEntities(
+      maybeGitLabIds: Gen[Option[GitLabId]] = personGitLabIds.toGeneratorOfOptions,
+      maybeEmails:    Gen[Option[Email]] = personEmails.toGeneratorOfOptions
+  ): Gen[Project.Member] =
+    for {
+      p    <- personEntities(maybeGitLabIds, maybeEmails)
+      role <- roleGen
+    } yield Project.Member(p, role)
 
   def replacePersonName(to: persons.Name): Person => Person = _.copy(name = to)
 }

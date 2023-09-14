@@ -135,7 +135,7 @@ private class EntityBuilderImpl[F[_]: MonadThrow](projectInfoFinder: ProjectInfo
     )
 
   private def toMember(projectMember: GitLabMember): Project.Member =
-    Project.Member(toPerson(projectMember.asUser), projectMember.role)
+    Project.Member(toPerson(projectMember.user), projectMember.role)
 }
 
 private object EntityBuilder {

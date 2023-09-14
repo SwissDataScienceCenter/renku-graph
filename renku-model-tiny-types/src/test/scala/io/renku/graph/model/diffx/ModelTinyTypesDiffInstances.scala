@@ -60,6 +60,9 @@ trait ModelTinyTypesDiffInstances extends TinyTypeDiffInstances {
     Diff.derived[commandParameters.IOStream.StdErr]
 
   implicit val visibilityDiff: Diff[projects.Visibility] = Diff.derived[projects.Visibility]
+
+  implicit val roleDiff: Diff[projects.Role] =
+    Diff.derived[projects.Role]
 }
 
 object ModelTinyTypesDiffInstances extends ModelTinyTypesDiffInstances

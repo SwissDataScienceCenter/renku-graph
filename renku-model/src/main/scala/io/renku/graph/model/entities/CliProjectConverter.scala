@@ -194,7 +194,7 @@ private[entities] object CliProjectConverter {
   )(gitLabInfo: GitLabProjectInfo)(implicit renkuUrl: RenkuUrl): Set[Project.Member] =
     gitLabInfo.members.map(member =>
       allJsonLdPersons
-        .find(byEmailOrUsername(member.asUser))
+        .find(byEmailOrUsername(member.user))
         .map(merge(member))
         .getOrElse(toMember(member))
     )
@@ -213,7 +213,7 @@ private[entities] object CliProjectConverter {
     _.add(user.gitLabId).copy(name = user.name, maybeEmail = user.email)
 
   private def merge(member: GitLabMember)(implicit renkuUrl: RenkuUrl): Person => Project.Member = { p =>
-    Project.Member(merge(member.asUser).apply(p), member.role)
+    Project.Member(merge(member.user).apply(p), member.role)
   }
 
   private def toPerson(user: GitLabUser)(implicit renkuUrl: RenkuUrl): Person =
@@ -227,5 +227,5 @@ private[entities] object CliProjectConverter {
     )
 
   private def toMember(projectMember: GitLabMember)(implicit renkuUrl: RenkuUrl): Project.Member =
-    Project.Member(toPerson(projectMember.asUser), projectMember.role)
+    Project.Member(toPerson(projectMember.user), projectMember.role)
 }

@@ -49,6 +49,11 @@ trait ModelOps extends Dataset.ProvenanceOps {
     def toMaybe[T](implicit convert: Person => Option[T]): Option[T] = convert(person)
   }
 
+  implicit class MemberOps(m: Project.Member) {
+    def to[T](implicit convert:      Project.Member => T):         T         = convert(m)
+    def toMaybe[T](implicit convert: Project.Member => Option[T]): Option[T] = convert(m)
+  }
+
   implicit class ProjectOps(project: Project)(implicit
       renkuUrl: RenkuUrl
   ) extends AbstractProjectOps[Project](project)
