@@ -31,7 +31,7 @@ import io.renku.http.client.GitLabClient
 import io.renku.http.server.security.model.AuthUser
 import io.renku.knowledgegraph.Failure
 import io.renku.metrics.MetricsRegistry
-import org.http4s.Status.{Accepted, BadRequest, Conflict, Forbidden, InternalServerError}
+import org.http4s.Status.{BadRequest, Conflict, Created, Forbidden, InternalServerError}
 import org.http4s.multipart.Multipart
 import org.http4s.{Request, Response}
 import org.typelevel.log4cats.Logger
@@ -70,7 +70,7 @@ private class EndpointImpl[F[_]: Async: Logger](projectCreator: ProjectCreator[F
   }
 
   private def toAccepted(slug: projects.Slug): Response[F] =
-    Response[F](Accepted).withEntity {
+    Response[F](Created).withEntity {
       Message.Info.fromJsonUnsafe {
         json"""{
           "message": "Project created",

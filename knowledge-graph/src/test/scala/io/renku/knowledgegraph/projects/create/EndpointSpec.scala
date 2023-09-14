@@ -50,7 +50,7 @@ class EndpointSpec extends AsyncFlatSpec with CustomAsyncIOSpec with should.Matc
 
     MultipartRequestEncoder[IO].encode(newProject).map(mp => Request[IO]().withEntity(mp).putHeaders(mp.headers)) >>=
       (req => endpoint.`POST /projects`(req, authUser)) >>= { response =>
-      response.pure[IO].asserting(_.status shouldBe Status.Accepted) >>
+      response.pure[IO].asserting(_.status shouldBe Status.Created) >>
         response
           .as[Message]
           .asserting {
