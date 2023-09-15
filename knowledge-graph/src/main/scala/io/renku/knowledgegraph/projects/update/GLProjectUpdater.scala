@@ -18,17 +18,19 @@
 
 package io.renku.knowledgegraph.projects.update
 
-import ProjectUpdates.Image
 import cats.MonadThrow
 import cats.effect.Async
 import cats.syntax.all._
 import eu.timepit.refined.auto._
-import fs2.Chunk
 import io.circe.{Decoder, Json}
 import io.renku.data.Message
 import io.renku.graph.model.projects
 import io.renku.http.client.{AccessToken, GitLabClient}
 import io.renku.http.tinytypes.TinyTypeURIEncoder._
+import io.renku.knowledgegraph.Failure
+import io.renku.knowledgegraph.multipart.syntax._
+import io.renku.knowledgegraph.projects.images.Image
+import io.renku.knowledgegraph.projects.images.MultipartImageCodecs.imagePartEncoder
 import org.http4s.Status._
 import org.http4s.circe.CirceEntityDecoder._
 import org.http4s.circe.jsonOf
@@ -73,7 +75,7 @@ private class GLProjectUpdaterImpl[F[_]: Async: GitLabClient] extends GLProjectU
   }
 
   private def maybeVisibilityPart(newVisibility: Option[projects.Visibility]) =
-    newVisibility.map(v => Part.formData[F]("visibility", v.value))
+    newVisibility.map(_.asPart[F]("visibility"))
 
   private def maybeAvatarPart(newImage: Option[Option[Image]]) =
     newImage.map(
@@ -82,9 +84,7 @@ private class GLProjectUpdaterImpl[F[_]: Async: GitLabClient] extends GLProjectU
           Headers(`Content-Disposition`("form-data", Map(ci"name" -> "avatar")), `Content-Type`(MediaType.image.jpeg)),
           fs2.Stream.empty
         )
-      ) { case Image(name, mediaType, data) =>
-        Part.fileData[F]("avatar", name, fs2.Stream.chunk(Chunk.byteVector(data)), `Content-Type`(mediaType))
-      }
+      )(_.asPart[F]("avatar"))
     )
 
   private lazy val mapResponse
@@ -95,13 +95,13 @@ private class GLProjectUpdaterImpl[F[_]: Async: GitLabClient] extends GLProjectU
       resp
         .as[Json](MonadThrow[F], jsonOf(Async[F], errorDecoder))
         .map(Message.Error.fromJsonUnsafe)
-        .map(Failure.badRequestOnGLUpdate)
+        .map(UpdateFailures.badRequestOnGLUpdate)
         .map(_.asLeft)
     case (Forbidden, _, resp) =>
       resp
         .as[Json](MonadThrow[F], jsonOf(Async[F], errorDecoder))
         .map(Message.Error.fromJsonUnsafe)
-        .map(Failure.forbiddenOnGLUpdate)
+        .map(UpdateFailures.forbiddenOnGLUpdate)
         .map(_.asLeft)
   }
 

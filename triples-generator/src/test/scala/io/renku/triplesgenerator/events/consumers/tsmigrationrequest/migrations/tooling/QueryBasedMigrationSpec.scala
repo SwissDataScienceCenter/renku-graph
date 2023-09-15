@@ -33,7 +33,7 @@ import io.renku.graph.model.GraphModelGenerators.projectSlugs
 import io.renku.graph.model.projects
 import io.renku.interpreters.TestLogger
 import io.renku.testtools.IOSpec
-import io.renku.triplesgenerator.generators.ErrorGenerators._
+import io.renku.triplesgenerator.errors.ErrorGenerators._
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec

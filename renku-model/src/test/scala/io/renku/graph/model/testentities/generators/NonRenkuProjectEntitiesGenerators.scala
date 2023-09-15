@@ -44,7 +44,7 @@ trait NonRenkuProjectEntitiesGenerators {
       forksCountGen:  Gen[ForksCount] = anyForksCount
   ): Gen[NonRenkuProject.WithoutParent] = for {
     slug             <- projectSlugs
-    name             <- Gen.const(slug.toName)
+    name             <- Gen.const(slug.toPath.asName)
     maybeDescription <- projectDescriptions.toGeneratorOfOptions
     dateCreated      <- projectCreatedDates(minDateCreated.value)
     dateModified     <- projectModifiedDates(dateCreated.value)

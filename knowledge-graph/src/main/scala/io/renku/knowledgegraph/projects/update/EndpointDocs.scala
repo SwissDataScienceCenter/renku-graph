@@ -111,6 +111,10 @@ object EndpointDocs extends docs.EndpointDocs {
         "Unauthorized",
         Contents(MediaType.`application/json`("Invalid token", Message.Info("Unauthorized")))
       ),
+      Status.Forbidden -> Response(
+        "Forbidden",
+        Contents(MediaType.`application/json`("User not authorized to update the project", Message.Info("Forbidden")))
+      ),
       Status.NotFound -> Response(
         "Project not found",
         Contents(MediaType.`application/json`("Reason", Message.Info("Project does not exist")))
@@ -120,10 +124,10 @@ object EndpointDocs extends docs.EndpointDocs {
         Contents(
           MediaType.`application/json`(
             "Reason",
-            Failure
+            UpdateFailures
               .corePushedToNonDefaultBranch(io.renku.triplesgenerator.api.ProjectUpdates.empty,
                                             DefaultBranch.PushProtected(Branch("main")).some,
-                                            Branch("main/351bb74")
+                                            corePushBranch = Branch("main/351bb74")
               )
               .message
               .asJson

@@ -26,8 +26,8 @@ import io.renku.generators.CommonGraphGenerators._
 import io.renku.generators.Generators.Implicits._
 import io.renku.generators.Generators._
 import io.renku.testtools.IOSpec
-import io.renku.triplesgenerator.events.consumers.ProcessingNonRecoverableError
-import io.renku.triplesgenerator.events.consumers.ProcessingRecoverableError._
+import io.renku.triplesgenerator.errors.ProcessingNonRecoverableError
+import io.renku.triplesgenerator.errors.ProcessingRecoverableError._
 import io.renku.triplesgenerator.events.consumers.awaitinggeneration.triplesgeneration.renkulog.Commands._
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.matchers.should

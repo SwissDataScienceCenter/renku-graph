@@ -38,9 +38,8 @@ import io.renku.http.client.RestClient.ResponseMappingF
 import io.renku.http.client.{AccessToken, GitLabClient}
 import io.renku.http.tinytypes.TinyTypeURIEncoder._
 import io.renku.testtools.GitLabClientTools
-import org.http4s.Method.PUT
 import org.http4s.Status.{BadRequest, Forbidden, Ok}
-import org.http4s.circe.CirceEntityEncoder._
+import org.http4s.circe.jsonEncoder
 import org.http4s.implicits._
 import org.http4s.multipart.Multipart
 import org.http4s.{Request, Response, Uri}
@@ -49,7 +48,6 @@ import org.scalamock.scalatest.AsyncMockFactory
 import org.scalatest.flatspec.AsyncFlatSpec
 import org.scalatest.matchers.should
 import org.scalatest.{EitherValues, OptionValues, Succeeded}
-import scodec.bits.ByteVector
 
 class GLProjectUpdaterSpec
     extends AsyncFlatSpec
@@ -108,7 +106,7 @@ class GLProjectUpdaterSpec
 
     mapResponse(BadRequest, Request[IO](), Response[IO](BadRequest).withEntity(json"""{"error": $error}"""))
       .asserting(
-        _.left.value shouldBe Failure.badRequestOnGLUpdate(Message.Error.fromJsonUnsafe(Json.fromString(error)))
+        _.left.value shouldBe UpdateFailures.badRequestOnGLUpdate(Message.Error.fromJsonUnsafe(Json.fromString(error)))
       )
   }
 
@@ -117,7 +115,7 @@ class GLProjectUpdaterSpec
     val message = jsons.generateOne
 
     mapResponse(BadRequest, Request[IO](), Response[IO](BadRequest).withEntity(json"""{"message": $message}"""))
-      .asserting(_.left.value shouldBe Failure.badRequestOnGLUpdate(Message.Error.fromJsonUnsafe(message)))
+      .asserting(_.left.value shouldBe UpdateFailures.badRequestOnGLUpdate(Message.Error.fromJsonUnsafe(message)))
   }
 
   it should "return left if PUT gl/projects/:slug returns 403 FORBIDDEN with a message" in {
@@ -125,7 +123,7 @@ class GLProjectUpdaterSpec
     val message = jsons.generateOne
 
     mapResponse(Forbidden, Request[IO](), Response[IO](Forbidden).withEntity(json"""{"message": $message}"""))
-      .asserting(_.left.value shouldBe Failure.forbiddenOnGLUpdate(Message.Error.fromJsonUnsafe(message)))
+      .asserting(_.left.value shouldBe UpdateFailures.forbiddenOnGLUpdate(Message.Error.fromJsonUnsafe(message)))
   }
 
   private implicit val glClient: GitLabClient[IO] = mock[GitLabClient[IO]]
@@ -155,10 +153,13 @@ class GLProjectUpdaterSpec
         )
         .unsafeRunSync(),
       glUpdatedProjectsGen.generateOne.asRight[Message],
-      method = PUT
+      underlyingMethod = Put
     )
 
   private def verifyRequest(multipartCaptor: CaptureOne[Multipart[IO]], newValues: ProjectUpdates) = {
+    import io.renku.knowledgegraph.multipart.syntax._
+    import io.renku.knowledgegraph.projects.images.Image
+    import io.renku.knowledgegraph.projects.images.MultipartImageCodecs.imagePartDecoder
 
     val parts = multipartCaptor.value.parts
 
@@ -168,16 +169,11 @@ class GLProjectUpdaterSpec
         .getOrElse(fail(s"No '$name' part"))
 
     val visCheck = newValues.newVisibility
-      .map(v => findPart("visibility").as[String].asserting(_ shouldBe v.value))
+      .map(v => findPart("visibility").as[projects.Visibility].asserting(_ shouldBe v))
       .getOrElse(Succeeded.pure[IO])
 
     val imageCheck = newValues.newImage
-      .map {
-        case None =>
-          findPart("avatar").body.covary[IO].compile.toList.asserting(_ shouldBe Nil)
-        case Some(v) =>
-          findPart("avatar").as[ByteVector].asserting(_ shouldBe v.data)
-      }
+      .map(v => findPart("avatar").as[Option[Image]].asserting(_ shouldBe v))
       .getOrElse(Succeeded.pure[IO])
 
     visCheck >> imageCheck

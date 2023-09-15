@@ -31,9 +31,10 @@ import io.renku.jsonld.JsonLD
 import io.renku.logging.ExecutionTimeRecorder
 import io.renku.logging.ExecutionTimeRecorder.ElapsedTime
 import io.renku.metrics.{Histogram, MetricsRegistry}
-import io.renku.triplesgenerator.events.consumers.{EventStatusUpdater, ProcessingNonRecoverableError, ProcessingRecoverableError}
+import io.renku.triplesgenerator.errors.{ProcessingNonRecoverableError, ProcessingRecoverableError}
+import io.renku.triplesgenerator.events.consumers.EventStatusUpdater
 import io.renku.triplesgenerator.events.consumers.EventStatusUpdater._
-import io.renku.triplesgenerator.events.consumers.ProcessingRecoverableError._
+import io.renku.triplesgenerator.errors.ProcessingRecoverableError._
 import io.renku.triplesgenerator.events.consumers.awaitinggeneration.triplesgeneration.TriplesGenerator
 import org.typelevel.log4cats.Logger
 

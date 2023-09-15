@@ -33,6 +33,8 @@ import io.renku.graph.model.events.EventStatus
 import io.renku.graph.model.projects
 import io.renku.http.client.{AccessToken, UserAccessToken}
 import io.renku.interpreters.TestLogger
+import io.renku.knowledgegraph.Failure
+import io.renku.knowledgegraph.gitlab.UserInfoFinder
 import io.renku.testtools.CustomAsyncIOSpec
 import io.renku.triplesgenerator.api.Generators.{projectUpdatesGen => tgUpdatesGen}
 import io.renku.triplesgenerator.api.{TriplesGeneratorClient, ProjectUpdates => TGProjectUpdates}
@@ -114,7 +116,7 @@ class ProjectUpdaterSpec extends AsyncFlatSpec with CustomAsyncIOSpec with shoul
 
       updater
         .updateProject(slug, updates, authUser)
-        .assertThrowsError[Exception](_ shouldBe Failure.onProvisioningNotHealthy(slug, provisioningStatus))
+        .assertThrowsError[Exception](_ shouldBe UpdateFailures.onProvisioningNotHealthy(slug, provisioningStatus))
     }
 
   it should "if core update needed, " +
@@ -135,7 +137,7 @@ class ProjectUpdaterSpec extends AsyncFlatSpec with CustomAsyncIOSpec with shoul
 
       updater
         .updateProject(slug, updates, authUser)
-        .assertThrowsError[Exception](_ shouldBe Failure.onProvisioningStatusCheck(slug, exception))
+        .assertThrowsError[Exception](_ shouldBe UpdateFailures.onProvisioningStatusCheck(slug, exception))
     }
 
   it should "if core update needed, " +
@@ -174,7 +176,7 @@ class ProjectUpdaterSpec extends AsyncFlatSpec with CustomAsyncIOSpec with shoul
       updater
         .updateProject(slug, updates, authUser)
         .assertThrowsError[Exception](
-          _ shouldBe Failure.corePushedToNonDefaultBranch(tgUpdates, defaultBranch, corePushBranch)
+          _ shouldBe UpdateFailures.corePushedToNonDefaultBranch(tgUpdates, defaultBranch, corePushBranch)
         )
     }
 
@@ -191,7 +193,7 @@ class ProjectUpdaterSpec extends AsyncFlatSpec with CustomAsyncIOSpec with shoul
 
       updater
         .updateProject(slug, updates, authUser)
-        .assertThrowsError[Exception](_ shouldBe Failure.onBranchAccessCheck(slug, authUser.id, exception))
+        .assertThrowsError[Exception](_ shouldBe UpdateFailures.onBranchAccessCheck(slug, authUser.id, exception))
     }
 
   it should "if core update needed, " +
@@ -212,7 +214,7 @@ class ProjectUpdaterSpec extends AsyncFlatSpec with CustomAsyncIOSpec with shoul
 
       updater
         .updateProject(slug, updates, authUser)
-        .assertThrowsError[Exception](_ shouldBe Failure.onFindingProjectGitUrl(slug, exception))
+        .assertThrowsError[Exception](_ shouldBe UpdateFailures.onFindingProjectGitUrl(slug, exception))
     }
 
   it should "if core update needed, " +
@@ -232,7 +234,7 @@ class ProjectUpdaterSpec extends AsyncFlatSpec with CustomAsyncIOSpec with shoul
 
       updater
         .updateProject(slug, updates, authUser)
-        .assertThrowsError[Exception](_ shouldBe Failure.cannotFindProjectGitUrl)
+        .assertThrowsError[Exception](_ shouldBe UpdateFailures.cannotFindProjectGitUrl)
     }
 
   it should "if core update needed, " +
@@ -253,7 +255,7 @@ class ProjectUpdaterSpec extends AsyncFlatSpec with CustomAsyncIOSpec with shoul
 
       updater
         .updateProject(slug, updates, authUser)
-        .assertThrowsError[Exception](_ shouldBe Failure.onFindingUserInfo(authUser.id, exception))
+        .assertThrowsError[Exception](_ shouldBe UpdateFailures.onFindingUserInfo(authUser.id, exception))
     }
 
   it should "if core update needed, " +
@@ -273,7 +275,7 @@ class ProjectUpdaterSpec extends AsyncFlatSpec with CustomAsyncIOSpec with shoul
 
       updater
         .updateProject(slug, updates, authUser)
-        .assertThrowsError[Exception](_ shouldBe Failure.cannotFindUserInfo(authUser.id))
+        .assertThrowsError[Exception](_ shouldBe UpdateFailures.cannotFindUserInfo(authUser.id))
     }
 
   it should "if core update needed, " +
@@ -297,7 +299,7 @@ class ProjectUpdaterSpec extends AsyncFlatSpec with CustomAsyncIOSpec with shoul
 
       updater
         .updateProject(slug, updates, authUser)
-        .assertThrowsError[Exception](_ shouldBe Failure.onFindingCoreUri(failedResult))
+        .assertThrowsError[Exception](_ shouldBe UpdateFailures.onFindingCoreUri(failedResult))
     }
 
   it should "if core update needed, " +
@@ -327,7 +329,7 @@ class ProjectUpdaterSpec extends AsyncFlatSpec with CustomAsyncIOSpec with shoul
 
       updater
         .updateProject(slug, updates, authUser)
-        .assertThrowsError[Exception](_ shouldBe Failure.onCoreUpdate(slug, failedResult))
+        .assertThrowsError[Exception](_ shouldBe UpdateFailures.onCoreUpdate(slug, failedResult))
     }
 
   it should "fail if updating GL returns an error" in {
@@ -339,7 +341,7 @@ class ProjectUpdaterSpec extends AsyncFlatSpec with CustomAsyncIOSpec with shoul
       .suchThat(_.onlyGLUpdateNeeded)
       .generateOne
 
-    val failure = Failure.badRequestOnGLUpdate(Message.Error.fromJsonUnsafe(jsons.generateOne))
+    val failure = UpdateFailures.badRequestOnGLUpdate(Message.Error.fromJsonUnsafe(jsons.generateOne))
     givenUpdatingProjectInGL(slug, updates, authUser.accessToken, returning = failure.asLeft.pure[IO])
 
     updater.updateProject(slug, updates, authUser).assertThrowsError[Exception](_ shouldBe failure)
@@ -363,7 +365,7 @@ class ProjectUpdaterSpec extends AsyncFlatSpec with CustomAsyncIOSpec with shoul
 
     updater
       .updateProject(slug, updates, authUser)
-      .assertThrowsError[Exception](_ shouldBe Failure.onGLUpdate(slug, exception))
+      .assertThrowsError[Exception](_ shouldBe UpdateFailures.onGLUpdate(slug, exception))
   }
 
   it should "fail if finding TG updates fails" in {
@@ -383,7 +385,7 @@ class ProjectUpdaterSpec extends AsyncFlatSpec with CustomAsyncIOSpec with shoul
 
     updater
       .updateProject(slug, updates, authUser)
-      .assertThrowsError[Exception](_ shouldBe Failure.onTGUpdatesFinding(slug, exception))
+      .assertThrowsError[Exception](_ shouldBe UpdateFailures.onTGUpdatesFinding(slug, exception))
   }
 
   it should "fail if updating TG fails" in {
@@ -404,7 +406,7 @@ class ProjectUpdaterSpec extends AsyncFlatSpec with CustomAsyncIOSpec with shoul
 
     updater
       .updateProject(slug, updates, authUser)
-      .assertThrowsError[Exception](_ shouldBe Failure.onTSUpdate(slug, exception))
+      .assertThrowsError[Exception](_ shouldBe UpdateFailures.onTSUpdate(slug, exception))
   }
 
   private implicit lazy val logger: TestLogger[IO] = TestLogger[IO]()

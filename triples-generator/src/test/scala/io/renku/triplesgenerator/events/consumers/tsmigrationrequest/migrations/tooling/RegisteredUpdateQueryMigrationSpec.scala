@@ -28,7 +28,7 @@ import io.renku.generators.Generators.Implicits._
 import io.renku.generators.Generators.exceptions
 import io.renku.interpreters.TestLogger
 import io.renku.testtools.CustomAsyncIOSpec
-import io.renku.triplesgenerator.generators.ErrorGenerators.processingRecoverableErrors
+import io.renku.triplesgenerator.errors.ErrorGenerators.processingRecoverableErrors
 import org.scalamock.scalatest.AsyncMockFactory
 import org.scalatest.EitherValues
 import org.scalatest.matchers.should

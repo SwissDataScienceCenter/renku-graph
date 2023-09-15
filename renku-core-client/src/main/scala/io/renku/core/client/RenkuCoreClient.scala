@@ -31,8 +31,9 @@ import org.http4s.dsl.Http4sDsl
 import org.typelevel.log4cats.Logger
 
 trait RenkuCoreClient[F[_]] {
-  def findCoreUri(projectUrl:    projects.GitHttpUrl, accessToken: AccessToken): F[Result[RenkuCoreUri.Versioned]]
+  def findCoreUri(projectUrl:    projects.GitHttpUrl, accessToken: AccessToken):     F[Result[RenkuCoreUri.Versioned]]
   def findCoreUri(schemaVersion: SchemaVersion): F[Result[RenkuCoreUri.Versioned]]
+  def createProject(newProject:  NewProject, accessToken:          UserAccessToken): F[Result[Unit]]
   def updateProject(coreUri:     RenkuCoreUri.Versioned,
                     updates:     ProjectUpdates,
                     accessToken: UserAccessToken
@@ -54,8 +55,8 @@ private class RenkuCoreClientImpl[F[_]: Async: Logger](coreUriForSchemaLoader: R
     with Http4sDsl[F]
     with Http4sClientDsl[F] {
 
-  private val nestedF = NestedF[F]
-  import nestedF._
+  private val nestedResult = NestedResult[F]
+  import nestedResult._
 
   override def findCoreUri(projectUrl:  projects.GitHttpUrl,
                            accessToken: AccessToken
@@ -86,6 +87,9 @@ private class RenkuCoreClientImpl[F[_]: Async: Logger](coreUriForSchemaLoader: R
       uriForSchema   <- coreUriForSchemaLoader.loadFromConfig[F](schemaVersion, config)
       apiVersionsRes <- lowLevelApis.getApiVersion(uriForSchema)
     } yield apiVersionsRes.map(_.max).map(RenkuCoreUri.Versioned(uriForSchema, _))
+
+  override def createProject(newProject: NewProject, accessToken: UserAccessToken): F[Result[Unit]] =
+    lowLevelApis.postProjectCreate(newProject, accessToken)
 
   override def updateProject(coreUri:     RenkuCoreUri.Versioned,
                              updates:     ProjectUpdates,

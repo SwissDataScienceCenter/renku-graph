@@ -55,6 +55,9 @@ object Message extends MessageCodecs {
         .getOrElse(throw new IllegalArgumentException("Message cannot be instantiated with a blank String"))
     }
 
+  def fromJsonUnsafe(message: Json, severity: Severity): Message =
+    JsonMessage(message, severity)
+
   object Info {
 
     def apply(value: String Refined NonEmpty): Message =
@@ -66,15 +69,15 @@ object Message extends MessageCodecs {
           .map(toSingleLine)
           .getOrElse(throw new IllegalArgumentException("Message cannot be instantiated with a blank String"))
       }
+
+    def fromJsonUnsafe(message: Json): Message =
+      JsonMessage(failIfEmpty(message), Severity.Info)
   }
 
   object Error {
 
-    def fromJsonUnsafe(errorMessage: Json): Message =
-      if (errorMessage.isNull || errorMessage == Json.obj())
-        throw new IllegalArgumentException("Message cannot be an empty Json")
-      else
-        JsonMessage(errorMessage, Severity.Error)
+    def fromJsonUnsafe(message: Json): Message =
+      JsonMessage(failIfEmpty(message), Severity.Error)
 
     def apply(value: String Refined NonEmpty): Message =
       StringMessage(value.value, Severity.Error)
@@ -113,6 +116,13 @@ object Message extends MessageCodecs {
           }
           .fold(ifEmpty = message)(toSingleLine)
       }
+  }
+
+  private def failIfEmpty(message: Json): Json = {
+    val sanitized = message.deepDropNullValues
+    if (sanitized.isNull || sanitized == Json.obj() || sanitized == Json.arr())
+      throw new IllegalArgumentException("Message cannot be an empty Json")
+    message
   }
 
   private def blankToNone(message: String): Option[String] =

@@ -106,6 +106,26 @@ class LowLevelApisSpec
     }
   }
 
+  "postProjectCreate" should {
+
+    "do POST /renku/templates.create_project with a relevant payload" in {
+
+      val accessToken = userAccessTokens.generateOne
+      val newProject  = newProjectsGen.generateOne
+
+      stubFor {
+        post(s"/renku/templates.create_project")
+          .withRequestBody(equalToJson(newProject.asJson.spaces2))
+          .withAccessToken(accessToken.some)
+          .withHeader("renku-user-email", equalTo(newProject.userInfo.email.value))
+          .withHeader("renku-user-fullname", equalTo(newProject.userInfo.name.value))
+          .willReturn(ok(Result.success(json"""{"name": ${newProject.name}}""").asJson.spaces2))
+      }
+
+      client.postProjectCreate(newProject, accessToken).asserting(_ shouldBe Result.success(()))
+    }
+  }
+
   "postProjectUpdate" should {
 
     "do POST /renku/project.edit with a relevant payload" in {

@@ -28,17 +28,16 @@ import io.renku.generators.CommonGraphGenerators._
 import io.renku.generators.Generators.Implicits._
 import io.renku.generators.Generators.nonEmptyStrings
 import io.renku.graph.model.GraphModelGenerators._
-import io.renku.http.client.{AccessToken, GitLabClient}
 import io.renku.http.client.RestClient.ResponseMappingF
 import io.renku.http.client.RestClientError.UnauthorizedException
+import io.renku.http.client.{AccessToken, GitLabClient}
 import io.renku.interpreters.TestLogger
 import io.renku.stubbing.ExternalServiceStubbing
 import io.renku.testtools.{GitLabClientTools, IOSpec}
 import io.renku.webhookservice.WebhookServiceGenerators.{projectHookUrls, serializedHookTokens}
 import io.renku.webhookservice.hookcreation.ProjectHookCreator.ProjectHook
-import org.http4s.{Request, Response, Status, Uri}
-import org.http4s.Method.POST
 import org.http4s.implicits.http4sLiteralsSyntax
+import org.http4s.{Request, Response, Status, Uri}
 import org.scalacheck.Gen
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.matchers.should
@@ -128,7 +127,7 @@ class ProjectHookCreatorSpec
     lazy val mapResponse = captureMapping(gitLabClient)(
       hookCreator.create(projectHook, accessToken).unsafeRunSync(),
       resultGenerator = Gen.const(()),
-      method = POST
+      underlyingMethod = PostJson
     )
   }
 

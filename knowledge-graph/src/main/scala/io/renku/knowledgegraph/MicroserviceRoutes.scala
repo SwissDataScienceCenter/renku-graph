@@ -19,11 +19,12 @@
 package io.renku.knowledgegraph
 
 import QueryParamDecoders._
-import cats.Parallel
 import cats.data.Validated.Valid
 import cats.data.{EitherT, Validated, ValidatedNel}
 import cats.effect.{Async, Resource}
 import cats.syntax.all._
+import cats.{MonadThrow, Parallel}
+import com.typesafe.config.ConfigFactory
 import eu.timepit.refined.auto._
 import io.renku.data.Message
 import io.renku.entities.search.{Criteria => EntitiesSearchCriteria}
@@ -42,8 +43,8 @@ import io.renku.http.server.QueryParameterTools._
 import io.renku.http.server.security.Authentication
 import io.renku.http.server.security.model.{AuthUser, MaybeAuthUser}
 import io.renku.http.server.version
-import io.renku.knowledgegraph.datasets.{DatasetIdRecordsFinder, DatasetSameAsRecordsFinder}
 import io.renku.knowledgegraph.datasets.details.RequestedDataset
+import io.renku.knowledgegraph.datasets.{DatasetIdRecordsFinder, DatasetSameAsRecordsFinder}
 import io.renku.metrics.{MetricsRegistry, RoutesMetrics}
 import io.renku.triplesstore.{ProjectSparqlClient, ProjectsConnectionConfig, SparqlQueryTimeRecorder}
 import org.http4s.dsl.Http4sDsl
@@ -58,6 +59,7 @@ private class MicroserviceRoutes[F[_]: Async](
     ontologyEndpoint:           ontology.Endpoint[F],
     projectDeleteEndpoint:      projects.delete.Endpoint[F],
     projectDetailsEndpoint:     projects.details.Endpoint[F],
+    projectCreateEndpoint:      projects.create.Endpoint[F],
     projectUpdateEndpoint:      projects.update.Endpoint[F],
     projectDatasetsEndpoint:    projects.datasets.Endpoint[F],
     projectDatasetTagsEndpoint: projects.datasets.tags.Endpoint[F],
@@ -81,6 +83,7 @@ private class MicroserviceRoutes[F[_]: Async](
   import lineageEndpoint._
   import ontologyEndpoint._
   import org.http4s.HttpRoutes
+  import projectCreateEndpoint._
   import projectDatasetTagsEndpoint._
   import projectDeleteEndpoint._
   import projectDetailsEndpoint._
@@ -162,6 +165,11 @@ private class MicroserviceRoutes[F[_]: Async](
   }
 
   private lazy val `GET /projects/*` : AuthedRoutes[MaybeAuthUser, F] = AuthedRoutes.of {
+
+    case authReq @ POST -> Root / "knowledge-graph" / "projects" as maybeUser =>
+      maybeUser.withUserOrNotFound {
+        `POST /projects`(authReq.req, _)
+      }
 
     case DELETE -> "knowledge-graph" /: "projects" /: path as maybeUser =>
       maybeUser.withUserOrNotFound { user =>
@@ -343,6 +351,7 @@ private object MicroserviceRoutes {
       projectConnConfig:   ProjectsConnectionConfig,
       projectSparqlClient: ProjectSparqlClient[F]
   ): F[MicroserviceRoutes[F]] = for {
+    config                               <- MonadThrow[F].catchNonFatal(ConfigFactory.load())
     implicit0(gv: GitLabClient[F])       <- GitLabClient[F]()
     implicit0(atf: AccessTokenFinder[F]) <- AccessTokenFinder[F]()
     implicit0(ru: RenkuUrl)              <- RenkuUrlLoader[F]()
@@ -354,6 +363,7 @@ private object MicroserviceRoutes {
     ontologyEndpoint           <- ontology.Endpoint[F]
     projectDeleteEndpoint      <- projects.delete.Endpoint[F]
     projectDetailsEndpoint     <- projects.details.Endpoint[F]
+    projectCreateEndpoint      <- projects.create.Endpoint[F](config)
     projectUpdateEndpoint      <- projects.update.Endpoint[F]
     projectDatasetsEndpoint    <- projects.datasets.Endpoint[F]
     projectDatasetTagsEndpoint <- projects.datasets.tags.Endpoint[F]
@@ -373,6 +383,7 @@ private object MicroserviceRoutes {
     ontologyEndpoint,
     projectDeleteEndpoint,
     projectDetailsEndpoint,
+    projectCreateEndpoint,
     projectUpdateEndpoint,
     projectDatasetsEndpoint,
     projectDatasetTagsEndpoint,

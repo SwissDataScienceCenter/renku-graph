@@ -21,9 +21,7 @@ package io.renku.core.client
 import cats.syntax.all._
 import io.circe.syntax._
 import io.circe.{Encoder, Json}
-import io.renku.graph.model.{persons, projects}
-
-final case class UserInfo(name: persons.Name, email: persons.Email)
+import io.renku.graph.model.projects
 
 final case class ProjectUpdates(projectUrl:       projects.GitHttpUrl,
                                 userInfo:         UserInfo,

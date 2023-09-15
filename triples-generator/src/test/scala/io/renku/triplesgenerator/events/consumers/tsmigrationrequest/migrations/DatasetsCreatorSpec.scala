@@ -29,7 +29,7 @@ import io.renku.interpreters.TestLogger
 import io.renku.interpreters.TestLogger.Level.Info
 import io.renku.testtools.IOSpec
 import io.renku.triplesgenerator.events.consumers.tsmigrationrequest.migrations.tooling.RecoverableErrorsRecovery
-import io.renku.triplesgenerator.generators.ErrorGenerators.processingRecoverableErrors
+import io.renku.triplesgenerator.errors.ErrorGenerators.processingRecoverableErrors
 import io.renku.triplesstore.TSAdminClient.CreationResult
 import io.renku.triplesstore.{DatasetConfigFile, DatasetName, TSAdminClient}
 import org.scalacheck.Gen

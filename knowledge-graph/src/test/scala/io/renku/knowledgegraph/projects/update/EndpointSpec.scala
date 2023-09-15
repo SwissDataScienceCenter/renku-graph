@@ -27,15 +27,15 @@ import io.circe.syntax._
 import io.renku.data.Message
 import io.renku.generators.CommonGraphGenerators.authUsers
 import io.renku.generators.Generators.Implicits._
-import io.renku.generators.Generators.{exceptions, nonBlankStrings}
+import io.renku.generators.Generators.exceptions
 import io.renku.graph.model.RenkuTinyTypeGenerators.projectSlugs
 import io.renku.graph.model.projects
 import io.renku.http.server.EndpointTester._
 import io.renku.http.server.security.model.AuthUser
 import io.renku.interpreters.TestLogger
+import io.renku.knowledgegraph
 import io.renku.testtools.CustomAsyncIOSpec
 import org.http4s.{Request, Status}
-import org.scalacheck.Gen
 import org.scalamock.scalatest.AsyncMockFactory
 import org.scalatest.flatspec.AsyncFlatSpec
 import org.scalatest.matchers.should
@@ -91,14 +91,7 @@ class EndpointSpec extends AsyncFlatSpec with CustomAsyncIOSpec with should.Matc
     val slug     = projectSlugs.generateOne
     val updates  = projectUpdatesGen.suchThat(_.newImage.isEmpty).generateOne
 
-    val failure = Gen
-      .oneOf(
-        Failure.badRequestOnGLUpdate(Message.Error(nonBlankStrings().generateOne)),
-        Failure.forbiddenOnGLUpdate(Message.Error(nonBlankStrings().generateOne)),
-        Failure.onGLUpdate(slug, exceptions.generateOne),
-        Failure.onFindingCoreUri(exceptions.generateOne)
-      )
-      .generateOne
+    val failure = knowledgegraph.Generators.failures.generateOne
     givenUpdatingProject(slug, updates, authUser, returning = failure.raiseError[IO, Nothing])
 
     endpoint.`PATCH /projects/:slug`(slug, Request[IO]().withEntity(updates.asJson), authUser) >>= { response =>

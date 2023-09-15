@@ -26,6 +26,7 @@ import io.renku.lock.Lock
 import io.renku.lock.syntax._
 import io.renku.triplesgenerator.TgLockDB.TsWriteLock
 import io.renku.triplesgenerator.api.ProjectUpdates
+import io.renku.triplesgenerator.projects.ProjectExistenceChecker
 import io.renku.triplesstore.{ProjectsConnectionConfig, SparqlQueryTimeRecorder, TSClient}
 import org.typelevel.log4cats.Logger
 

@@ -164,7 +164,8 @@ class BranchProtectionCheckSpec
       finder
         .findDefaultBranchInfo(projectSlugs.generateOne, accessTokens.generateOne)
         .unsafeRunSync(),
-      branchInfos.toGeneratorOfList()
+      branchInfos.toGeneratorOfList(),
+      underlyingMethod = Get
     )
 
   private implicit lazy val itemEncoder: Encoder[BranchInfo] = Encoder.instance {

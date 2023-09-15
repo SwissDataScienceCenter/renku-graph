@@ -208,6 +208,20 @@ class RenkuCoreClientSpec
     }
   }
 
+  "createProject" should {
+
+    "call the Core's postProjectCreate API" in {
+
+      val newProject  = newProjectsGen.generateOne
+      val accessToken = userAccessTokens.generateOne
+
+      val result = resultsGen(()).generateOne
+      givenPostingProjectCreate(newProject, accessToken, returning = result)
+
+      client.createProject(newProject, accessToken).asserting(_ shouldBe result)
+    }
+  }
+
   "updateProject" should {
 
     "call the Core's postProjectUpdate API" in {
@@ -269,6 +283,11 @@ class RenkuCoreClientSpec
       .loadFromConfig[IO](_: SchemaVersion, _: Config)(_: MonadThrow[IO]))
       .expects(*, config, *)
       .returning(failsWith.raiseError[IO, Nothing])
+
+  private def givenPostingProjectCreate(newProject: NewProject, accessToken: UserAccessToken, returning: Result[Unit]) =
+    (lowLevelApis.postProjectCreate _)
+      .expects(newProject, accessToken)
+      .returning(returning.pure[IO])
 
   private def givenPostingProjectUpdate(coreUri:     RenkuCoreUri.Versioned,
                                         updates:     ProjectUpdates,

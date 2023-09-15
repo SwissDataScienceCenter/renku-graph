@@ -24,8 +24,8 @@ import io.renku.generators.Generators.Implicits._
 import io.renku.generators.Generators._
 import io.renku.generators.jsonld.JsonLDGenerators.jsonLDEntities
 import io.renku.testtools.IOSpec
-import io.renku.triplesgenerator.events.consumers.ProcessingNonRecoverableError
-import io.renku.triplesgenerator.events.consumers.ProcessingRecoverableError._
+import io.renku.triplesgenerator.errors.ProcessingNonRecoverableError
+import io.renku.triplesgenerator.errors.ProcessingRecoverableError._
 import io.renku.triplesgenerator.events.consumers.awaitinggeneration.EventProcessingGenerators.commitEvents
 import io.renku.triplesgenerator.events.consumers.awaitinggeneration.triplesgeneration.renkulog.Commands.{RenkuImpl, RepositoryPath}
 import org.scalamock.scalatest.MockFactory

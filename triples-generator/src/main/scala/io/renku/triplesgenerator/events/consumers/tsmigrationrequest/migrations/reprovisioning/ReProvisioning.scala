@@ -34,7 +34,7 @@ import io.renku.metrics.MetricsRegistry
 import io.renku.microservices.MicroserviceUrlFinder
 import io.renku.triplesgenerator.Microservice
 import io.renku.triplesgenerator.config.VersionCompatibilityConfig
-import io.renku.triplesgenerator.events.consumers.ProcessingRecoverableError
+import io.renku.triplesgenerator.errors.ProcessingRecoverableError
 import io.renku.triplesgenerator.events.consumers.tsmigrationrequest.ConditionedMigration.MigrationRequired
 import io.renku.triplesstore.{MigrationsConnectionConfig, SparqlQueryTimeRecorder}
 import org.typelevel.log4cats.Logger

@@ -105,6 +105,7 @@ class ProjectInfoFinderSpec
 
   private lazy val mapResponse = captureMapping(gitLabClient)(
     projectInfoFinder.findProjectInfo(projectId).unsafeRunSync(),
-    consumerProjects.generateSome
+    consumerProjects.generateSome,
+    underlyingMethod = Get
   )
 }

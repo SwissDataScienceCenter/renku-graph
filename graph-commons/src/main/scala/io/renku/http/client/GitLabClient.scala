@@ -56,6 +56,10 @@ trait GitLabClient[F[_]] {
       mapResponse: ResponseMappingF[F, ResultType]
   )(implicit maybeAccessToken: Option[AccessToken]): F[ResultType]
 
+  def postMultipart[ResultType](path: Uri, endpointName: String Refined NonEmpty, payload: Multipart[F])(
+      mapResponse: ResponseMappingF[F, ResultType]
+  )(implicit accessToken: AccessToken): F[ResultType]
+
   def put[ResultType](path: Uri, endpointName: String Refined NonEmpty, payload: Multipart[F])(
       mapResponse: ResponseMappingF[F, ResultType]
   )(implicit maybeAccessToken: Option[AccessToken]): F[ResultType]
@@ -105,17 +109,19 @@ final class GitLabClientImpl[F[_]: Async: Logger](
     result  <- super.send(request)(mapResponse)
   } yield result
 
+  override def postMultipart[ResultType](path: Uri, endpointName: String Refined NonEmpty, payload: Multipart[F])(
+      mapResponse: ResponseMappingF[F, ResultType]
+  )(implicit accessToken: AccessToken): F[ResultType] =
+    validateUri(show"$gitLabApiUrl/$path")
+      .flatMap(secureNamedRequest(POST, _, endpointName, payload)(accessToken.some))
+      .flatMap(super.send(_: NamedRequest[F])(mapResponse))
+
   override def put[ResultType](path: Uri, endpointName: String Refined NonEmpty, payload: Multipart[F])(
       mapResponse: ResponseMappingF[F, ResultType]
   )(implicit maybeAccessToken: Option[AccessToken]): F[ResultType] =
     validateUri(show"$gitLabApiUrl/$path")
-      .flatMap(
-        secureNamedRequest(PUT, _, endpointName)
-          .map(req => req.copy(request = req.request.withEntity(payload).putHeaders(payload.headers)))
-      )
-      .flatMap(
-        send(_: NamedRequest[F])(mapResponse)
-      )
+      .flatMap(secureNamedRequest(PUT, _, endpointName, payload))
+      .flatMap(send(_: NamedRequest[F])(mapResponse))
 
   override def delete[ResultType](path: Uri, endpointName: Refined[String, NonEmpty])(
       mapResponse: ResponseMappingF[F, ResultType]
@@ -134,13 +140,23 @@ final class GitLabClientImpl[F[_]: Async: Logger](
     endpointName
   ).pure[F]
 
-  private def secureNamedRequest[T](method: Method, uri: Uri, endpointName: String Refined NonEmpty, payload: T)(
-      implicit
-      maybeAccessToken: Option[AccessToken],
-      eEnc:             EntityEncoder[F, T]
+  private def secureNamedRequest(method: Method, uri: Uri, endpointName: String Refined NonEmpty, payload: Json)(
+      implicit maybeAccessToken: Option[AccessToken]
   ): F[NamedRequest[F]] =
     secureNamedRequest(method, uri, endpointName)
       .map(originalRequest => originalRequest.copy(request = originalRequest.request.withEntity(payload)))
+
+  private def secureNamedRequest(method:       Method,
+                                 uri:          Uri,
+                                 endpointName: String Refined NonEmpty,
+                                 payload:      Multipart[F]
+  )(implicit
+      maybeAccessToken: Option[AccessToken]
+  ): F[NamedRequest[F]] =
+    secureNamedRequest(method, uri, endpointName)
+      .map(originalRequest =>
+        originalRequest.copy(request = originalRequest.request.withEntity(payload).putHeaders(payload.headers))
+      )
 }
 
 object GitLabClient {

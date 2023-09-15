@@ -124,7 +124,8 @@ class GLProjectMembersFinderSpec
         override val mapResponse =
           captureMapping(gitLabClient)(
             finder.findProjectMembers(slug)(maybeAccessToken).unsafeRunSync(),
-            Gen.const((Set.empty[GitLabProjectMember], Option.empty[Int]))
+            Gen.const((Set.empty[GitLabProjectMember], Option.empty[Int])),
+            underlyingMethod = Get
           )
 
         setGitLabClientExpectation(slug, maybePage = None, maybeAccessTokenOverride = None, returning = (members, None))
@@ -139,7 +140,8 @@ class GLProjectMembersFinderSpec
         override val mapResponse =
           captureMapping(gitLabClient)(
             finder.findProjectMembers(slug)(maybeAccessToken).unsafeRunSync(),
-            Gen.const((Set.empty[GitLabProjectMember], Option.empty[Int]))
+            Gen.const((Set.empty[GitLabProjectMember], Option.empty[Int])),
+            underlyingMethod = Get
           )
 
         val actual   = mapResponse(status, Request(), Response()).unsafeRunSync()
@@ -184,7 +186,8 @@ class GLProjectMembersFinderSpec
     val mapResponse =
       captureMapping(gitLabClient)(
         finder.findProjectMembers(slug)(maybeAccessToken).unsafeRunSync(),
-        Gen.const((Set.empty[GitLabProjectMember], Option.empty[Int]))
+        Gen.const((Set.empty[GitLabProjectMember], Option.empty[Int])),
+        underlyingMethod = Get
       )
   }
 

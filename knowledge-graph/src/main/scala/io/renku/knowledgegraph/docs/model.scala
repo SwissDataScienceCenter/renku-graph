@@ -209,6 +209,22 @@ object model {
       )
     }
 
+    def POST(summary:           String,
+             description:       String,
+             uri:               Uri,
+             requestBody:       RequestBody,
+             statusAndResponse: (Status, Response)*
+    ): OpMapping = {
+      val parameters = uri.parts.flatMap {
+        case ParameterPart(parameter) => Some(parameter)
+        case _                        => None
+      }
+
+      OpMapping(Uri.getTemplate(uri.parts),
+                Post(summary.some, description.some, parameters, requestBody.some, statusAndResponse.toMap, Nil)
+      )
+    }
+
     def PUT(summary:           String,
             description:       String,
             uri:               Uri,
@@ -239,6 +255,14 @@ object model {
                    requestBody: Option[RequestBody],
                    responses:   Map[Status, Response],
                    security:    List[SecurityRequirement]
+    ) extends Operation
+
+    case class Post(summary:     Option[String],
+                    description: Option[String],
+                    parameters:  List[Parameter],
+                    requestBody: Option[RequestBody],
+                    responses:   Map[Status, Response],
+                    security:    List[SecurityRequirement]
     ) extends Operation
 
     case class Patch(summary:     Option[String],
@@ -368,6 +392,7 @@ object model {
 
     case object BadRequest   extends Status(400, "Bad Request")
     case object Unauthorized extends Status(401, "Unauthorized")
+    case object Forbidden    extends Status(403, "Forbidden")
     case object NotFound     extends Status(404, "Not Found")
     case object Conflict     extends Status(409, "Conflict")
 
