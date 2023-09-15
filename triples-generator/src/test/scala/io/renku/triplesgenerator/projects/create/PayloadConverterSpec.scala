@@ -19,7 +19,6 @@
 package io.renku.triplesgenerator.projects.create
 
 import io.renku.generators.Generators.Implicits._
-import io.renku.generators.Generators.countingGen
 import io.renku.graph.model.RenkuTinyTypeGenerators.renkuUrls
 import io.renku.graph.model.images.Image
 import io.renku.graph.model.{RenkuUrl, entities, projects}
@@ -33,9 +32,8 @@ class PayloadConverterSpec extends AnyFlatSpec with should.Matchers with ScalaCh
   private implicit val renkuUrl: RenkuUrl = renkuUrls.generateOne
   private val converter = new PayloadConverterImpl
 
-  forAll(newProjectsGen, countingGen) { (newProject, cnt) =>
-    it should s"turn the NewProject into a Project entity #$cnt" in {
-
+  it should s"turn the NewProject into a Project entity" in {
+    forAll(newProjectsGen) { newProject =>
       val resourceId = projects.ResourceId(newProject.slug)
       val creator    = entities.Person(newProject.creator.name, newProject.creator.id)
 
