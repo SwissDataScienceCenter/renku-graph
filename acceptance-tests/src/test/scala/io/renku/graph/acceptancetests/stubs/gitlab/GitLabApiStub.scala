@@ -128,7 +128,7 @@ final class GitLabApiStub[F[_]: Async: Logger](private val stateRef: Ref[F, Stat
 
         case GET -> Root / ProjectId(projectId) / "members" / "all" / UserGitLabId(userId) =>
           query(findProjectById(projectId, maybeAuthedReq))
-            .map(_.toList.flatMap(_.members.toList).find(_.gitLabId == userId))
+            .map(_.toList.flatMap(_.members.toList).find(_.user.gitLabId == userId))
             .flatMap(OkOrNotFound(_))
 
         case GET -> Root / ProjectId(id) / "repository" / "commits" =>

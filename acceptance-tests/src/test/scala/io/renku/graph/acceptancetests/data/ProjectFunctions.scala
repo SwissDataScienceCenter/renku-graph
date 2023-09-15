@@ -22,9 +22,10 @@ import cats.syntax.all._
 import io.renku.cli.model.CliProject
 import io.renku.generators.Generators.Implicits._
 import io.renku.graph.model.RenkuTinyTypeGenerators._
-import io.renku.graph.model.entities.Project.ProjectMember
 import io.renku.graph.model.testentities.generators.EntitiesGenerators.replaceProjectCreator
 import io.renku.graph.model._
+import io.renku.graph.model.gitlab.GitLabMember
+import io.renku.graph.model.projects.Role
 import io.renku.jsonld.JsonLD
 import io.renku.jsonld.syntax._
 
@@ -32,15 +33,24 @@ trait ProjectFunctions {
 
   def replaceCreatorFrom(creator: testentities.Person, gitLabId: persons.GitLabId): Project => Project = p =>
     p.copy(
-      maybeCreator = toProjectMember(creator, gitLabId).some,
+      maybeCreator = toProjectMember(creator, gitLabId, Role.Owner).user.some,
       entitiesProject = replaceProjectCreator(creator.some)(p.entitiesProject)
     )
 
-  def addMemberWithId(gitLabId: persons.GitLabId): Project => Project =
-    p => p.copy(members = p.members :+ ProjectMember(personNames.generateOne, personUsernames.generateOne, gitLabId))
+  def addMemberWithId(gitLabId: persons.GitLabId, role: Role): Project => Project =
+    p =>
+      p.copy(members =
+        p.members :+ GitLabMember(
+          personNames.generateOne,
+          personUsernames.generateOne,
+          gitLabId,
+          None,
+          Role.toGitLabAccessLevel(role)
+        )
+      )
 
-  def addMemberFrom(person: testentities.Person, gitLabId: persons.GitLabId): Project => Project =
-    p => p.copy(members = p.members :+ toProjectMember(person, gitLabId))
+  def addMemberFrom(person: testentities.Person, gitLabId: persons.GitLabId, role: Role): Project => Project =
+    p => p.copy(members = p.members :+ toProjectMember(person, gitLabId, role))
 
   def toPayloadJsonLD(p: Project)(implicit renkuUrl: RenkuUrl): JsonLD =
     toPayloadJsonLD(p.entitiesProject)
@@ -48,8 +58,8 @@ trait ProjectFunctions {
   def toPayloadJsonLD(p: testentities.RenkuProject)(implicit renkuUrl: RenkuUrl): JsonLD =
     p.to[CliProject].asJsonLD(CliProject.flatJsonLDEncoder)
 
-  private def toProjectMember(p: testentities.Person, gitLabId: persons.GitLabId): ProjectMember =
-    ProjectMember(p.name, persons.Username(p.name.show), gitLabId)
+  private def toProjectMember(p: testentities.Person, gitLabId: persons.GitLabId, role: Role): GitLabMember =
+    GitLabMember(p.name, persons.Username(p.name.show), gitLabId, None, Role.toGitLabAccessLevel(role))
 }
 
 object ProjectFunctions extends ProjectFunctions

@@ -31,6 +31,7 @@ import io.renku.graph.model
 import io.renku.graph.model.EventsGenerators.commitIds
 import io.renku.graph.model.Schemas.prov
 import io.renku.graph.model.projects
+import io.renku.graph.model.projects.Role
 import io.renku.graph.model.testentities.LineageExemplarData.ExemplarData
 import io.renku.graph.model.testentities.generators.EntitiesGenerators.{renkuProjectEntities, visibilityPublic}
 import io.renku.graph.model.testentities.{LineageExemplarData, NodeDef, cliShapedPersons, removeMembers, replaceProjectCreator, visibilityPrivate}
@@ -58,7 +59,7 @@ class LineageResourcesSpec extends AcceptanceSpec with ApplicationServices with 
           .generateOne,
         personGen = cliShapedPersons
       )
-      (lineageData, dataProjects(lineageData.project).map(addMemberWithId(user.id)).generateOne)
+      (lineageData, dataProjects(lineageData.project).map(addMemberWithId(user.id, Role.Owner)).generateOne)
     }
 
     /** Expected data structure when looking for the grid_plot file
@@ -110,7 +111,7 @@ class LineageResourcesSpec extends AcceptanceSpec with ApplicationServices with 
 
       Given("some data in the Triples Store with a project I am a member of")
       val commitId = commitIds.generateOne
-      val project  = dataProjects(accessibleExemplarData.project).map(addMemberWithId(user.id)).generateOne
+      val project  = dataProjects(accessibleExemplarData.project).map(addMemberWithId(user.id, Role.Owner)).generateOne
       mockCommitDataOnTripleGenerator(project, toPayloadJsonLD(project), commitId)
       gitLabStub.setupProject(project, commitId)
       gitLabStub.addAuthenticated(user)
@@ -145,7 +146,7 @@ class LineageResourcesSpec extends AcceptanceSpec with ApplicationServices with 
       val project =
         dataProjects(privateExemplarData.project)
           .map(replaceCreatorFrom(creatorPerson, creator.id))
-          .map(addMemberFrom(creatorPerson, creator.id))
+          .map(addMemberFrom(creatorPerson, creator.id, Role.Owner))
           .generateOne
 
       Given("I am authenticated")

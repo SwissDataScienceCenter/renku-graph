@@ -92,13 +92,13 @@ trait GitLabStateQueries {
   def projectsFor(userId: Option[persons.GitLabId]): StateQuery[List[Project]] =
     _.projects.filter { p =>
       p.entitiesProject.visibility == projects.Visibility.Public ||
-      userId.exists(p.members.map(_.gitLabId).contains_) ||
+      userId.exists(p.members.map(_.user.gitLabId).contains_) ||
       p.maybeCreator.map(_.gitLabId) == userId
     }
 
   def projectsWhereUserIsMember(userId: persons.GitLabId): StateQuery[List[Project]] =
     _.projects.filter { p =>
-      p.members.map(_.gitLabId).contains_(userId) || p.maybeCreator.forall(_.gitLabId == userId)
+      p.members.map(_.user.gitLabId).contains_(userId) || p.maybeCreator.forall(_.gitLabId == userId)
     }
 
   def findCallerProjects: Option[AuthedReq] => StateQuery[List[Project]] = {
