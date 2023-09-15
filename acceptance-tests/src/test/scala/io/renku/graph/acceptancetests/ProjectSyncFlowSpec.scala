@@ -28,6 +28,7 @@ import io.renku.generators.CommonGraphGenerators.authUsers
 import io.renku.generators.Generators.Implicits._
 import io.renku.graph.model.EventsGenerators.commitIds
 import io.renku.graph.model.GraphModelGenerators.projectSlugs
+import io.renku.graph.model.projects.Role
 import io.renku.graph.model.testentities.cliShapedPersons
 import io.renku.graph.model.testentities.generators.EntitiesGenerators.{removeMembers, renkuProjectEntities, visibilityPublic}
 import org.http4s.Status.{NotFound, Ok}
@@ -45,7 +46,7 @@ class ProjectSyncFlowSpec extends AcceptanceSpec with ApplicationServices with T
       val user = authUsers.generateOne
       val testProject =
         renkuProjectEntities(visibilityPublic, creatorGen = cliShapedPersons).modify(removeMembers()).generateOne
-      val project = dataProjects(testProject).map(addMemberWithId(user.id)).generateOne
+      val project = dataProjects(testProject).map(addMemberWithId(user.id, Role.Owner)).generateOne
 
       Given("repository data in the Triples Store")
       val commitId = commitIds.generateOne

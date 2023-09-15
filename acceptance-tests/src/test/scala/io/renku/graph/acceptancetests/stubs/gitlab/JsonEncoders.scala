@@ -27,7 +27,7 @@ import io.renku.graph.acceptancetests.data.Project.{Permissions, Statistics}
 import io.renku.graph.acceptancetests.stubs.gitlab.GitLabApiStub._
 import io.renku.graph.acceptancetests.stubs.gitlab.GitLabAuth.AuthedReq
 import io.renku.graph.acceptancetests.stubs.gitlab.GitLabAuth.AuthedReq.{AuthedProject, AuthedUser}
-import io.renku.graph.model.entities.Project.ProjectMember
+import io.renku.graph.model.gitlab.GitLabMember
 import io.renku.graph.model.testentities.{Parent, Person}
 import org.http4s.Uri
 
@@ -41,12 +41,13 @@ trait JsonEncoders {
     Map("id" -> person.maybeGitLabId.asJson, "username" -> person.name.asJson, "name" -> person.name.asJson).asJson
   }
 
-  implicit val projectMemberEncoder: Encoder[ProjectMember] = Encoder.instance { pm =>
-    Map("id"           -> pm.gitLabId.asJson,
-        "username"     -> pm.username.asJson,
-        "name"         -> pm.name.asJson,
-        "access_level" -> 40.asJson,
-        "state"        -> "active".asJson
+  implicit val projectMemberEncoder: Encoder[GitLabMember] = Encoder.instance { pm =>
+    Map(
+      "id"           -> pm.user.gitLabId.asJson,
+      "username"     -> pm.user.username.asJson,
+      "name"         -> pm.user.name.asJson,
+      "access_level" -> pm.accessLevel.asJson,
+      "state"        -> "active".asJson
     ).asJson
   }
 

@@ -28,8 +28,8 @@ import io.renku.graph.acceptancetests.data.Project.Urls._
 import io.renku.graph.acceptancetests.data.Project._
 import io.renku.graph.model.GraphModelGenerators._
 import io.renku.graph.model._
-import io.renku.graph.model.entities.Project.ProjectMember
-import io.renku.graph.model.testentities.projectMembers
+import io.renku.graph.model.gitlab.GitLabUser
+import io.renku.graph.model.testentities.generators.EntitiesGenerators
 import io.renku.graph.model.versions.CliVersion
 import org.scalacheck.Gen
 
@@ -44,7 +44,7 @@ package object data extends TSData with ProjectFunctions {
   ): Gen[Project] = for {
     project     <- projectGen
     id          <- projectIds
-    members     <- projectMembers.toGeneratorOfNonEmptyList(max = 3)
+    members     <- EntitiesGenerators.gitLabMemberGen().toGeneratorOfNonEmptyList(max = 3)
     urls        <- urlsObjects
     starsCount  <- starsCounts
     permissions <- permissionsObjects
@@ -55,7 +55,7 @@ package object data extends TSData with ProjectFunctions {
           throw new Exception(show"Test project creator with GitLab id")
   } yield Project(project,
                   id,
-                  maybeCreator = project.maybeCreator.map(_.to[ProjectMember]),
+                  maybeCreator = project.maybeCreator.map(_.to[GitLabUser]),
                   members,
                   urls,
                   starsCount,
@@ -63,9 +63,8 @@ package object data extends TSData with ProjectFunctions {
                   statistics
   )
 
-  private implicit lazy val testPersonToProjectMember: testentities.Person => ProjectMember = { p =>
-    val m = ProjectMember(p.name, persons.Username(p.name.value), personGitLabIds.generateOne)
-    p.maybeEmail.map(m.add).getOrElse(m)
+  private implicit lazy val testPersonToProjectMember: testentities.Person => GitLabUser = { p =>
+    GitLabUser(p.name, persons.Username(p.name.value), personGitLabIds.generateOne, p.maybeEmail)
   }
 
   def dataProjects(project: testentities.RenkuProject): Gen[Project] = dataProjects(fixed(project))

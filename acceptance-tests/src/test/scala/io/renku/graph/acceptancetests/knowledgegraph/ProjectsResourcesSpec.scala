@@ -27,7 +27,7 @@ import io.renku.graph.acceptancetests.flows.TSProvisioning
 import io.renku.graph.acceptancetests.tooling.{AcceptanceSpec, ApplicationServices}
 import io.renku.graph.model.EventsGenerators.commitIds
 import io.renku.graph.model.RenkuTinyTypeGenerators.{personEmails, personGitLabIds}
-import io.renku.graph.model.projects.Visibility
+import io.renku.graph.model.projects.{Role, Visibility}
 import io.renku.graph.model.testentities._
 import io.renku.http.rest.Links
 import io.renku.http.server.EndpointTester.{JsonOps, jsonEntityDecoder}
@@ -57,12 +57,12 @@ class ProjectsResourcesSpec
 
     val parentDataProject = dataProjects(parent)
       .map(replaceCreatorFrom(creator, creatorGitLabId))
-      .map(addMemberFrom(creator, creatorGitLabId) >>> addMemberWithId(user.id))
+      .map(addMemberFrom(creator, creatorGitLabId, Role.Owner) >>> addMemberWithId(user.id, Role.Maintainer))
       .generateOne
 
     val childDataProject =
       dataProjects(child.copy(visibility = Visibility.Private, parent = parentDataProject.entitiesProject))
-        .map(addMemberWithId(user.id))
+        .map(addMemberWithId(user.id, Role.Owner))
         .generateOne
 
     parentDataProject -> childDataProject

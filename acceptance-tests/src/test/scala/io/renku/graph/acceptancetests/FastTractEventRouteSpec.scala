@@ -24,6 +24,7 @@ import flows.TSProvisioning
 import io.renku.generators.CommonGraphGenerators.authUsers
 import io.renku.generators.Generators.Implicits._
 import io.renku.graph.model.EventsGenerators.commitIds
+import io.renku.graph.model.projects.Role
 import io.renku.graph.model.testentities.{cliShapedPersons, removeMembers}
 import io.renku.graph.model.testentities.generators.EntitiesGenerators.{renkuProjectEntities, visibilityPublic}
 import io.renku.webhookservice.model.HookToken
@@ -48,7 +49,7 @@ class FastTractEventRouteSpec
       val user = authUsers.generateOne
       val project = dataProjects(
         renkuProjectEntities(visibilityPublic, creatorGen = cliShapedPersons).modify(removeMembers())
-      ).map(addMemberWithId(user.id)).generateOne
+      ).map(addMemberWithId(user.id, Role.Owner)).generateOne
 
       Given("commit with the commit id matching Push Event's 'after' exists on the project in GitLab")
       gitLabStub.addAuthenticated(user)
