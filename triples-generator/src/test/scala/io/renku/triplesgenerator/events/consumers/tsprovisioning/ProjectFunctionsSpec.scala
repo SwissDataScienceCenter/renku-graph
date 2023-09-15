@@ -37,35 +37,36 @@ class ProjectFunctionsSpec extends AnyWordSpec with should.Matchers with ScalaCh
   import ProjectFunctions._
 
   "update - person" should {
-    val oldPerson = personEntities().generateOne
+    val oldMember = projectMemberEntities().generateOne
+    val oldPerson = oldMember.person
 
     "replace the old person with the new on project" in {
       Set(
         renkuProjectEntities(anyVisibility)
           .modify(
-            _.copy(maybeCreator = Some(oldPerson), members = Set(oldPerson, personEntities.generateOne))
+            _.copy(maybeCreator = Some(oldPerson), members = Set(oldMember, projectMemberEntities().generateOne))
           ),
         renkuProjectWithParentEntities(anyVisibility)
           .modify(
-            _.copy(maybeCreator = Some(oldPerson), members = Set(oldPerson, personEntities.generateOne))
+            _.copy(maybeCreator = Some(oldPerson), members = Set(oldMember, projectMemberEntities().generateOne))
           ),
         nonRenkuProjectEntities(anyVisibility)
           .modify(
-            _.copy(maybeCreator = Some(oldPerson), members = Set(oldPerson, personEntities.generateOne))
+            _.copy(maybeCreator = Some(oldPerson), members = Set(oldMember, projectMemberEntities().generateOne))
           ),
         nonRenkuProjectWithParentEntities(anyVisibility)
           .modify(
-            _.copy(maybeCreator = Some(oldPerson), members = Set(oldPerson, personEntities.generateOne))
+            _.copy(maybeCreator = Some(oldPerson), members = Set(oldMember, projectMemberEntities().generateOne))
           )
       ) foreach { projectGen =>
         val project           = projectGen.generateOne.to[entities.Project]
-        val entitiesOldPerson = oldPerson.to[entities.Person]
+        val entitiesOldMember = oldMember.to[entities.Project.Member]
 
         val newPerson = personEntities().generateOne.to[entities.Person]
 
-        val updatedProject = update(entitiesOldPerson, newPerson)(project)
+        val updatedProject = update(entitiesOldMember.person, newPerson)(project)
 
-        updatedProject.members      shouldBe project.members - entitiesOldPerson + newPerson
+        updatedProject.members      shouldBe project.members - entitiesOldMember + entitiesOldMember.copy(person = newPerson)
         updatedProject.maybeCreator shouldBe Some(newPerson)
       }
     }
