@@ -33,6 +33,7 @@ import io.renku.graph.model.testentities.generators.EntitiesGenerators
 import io.renku.graph.model.versions.CliVersion
 import org.scalacheck.Gen
 
+// remove me, trying to trick github
 package object data extends TSData with ProjectFunctions {
 
   implicit val cliVersion: CliVersion   = currentVersionPair.cliVersion
