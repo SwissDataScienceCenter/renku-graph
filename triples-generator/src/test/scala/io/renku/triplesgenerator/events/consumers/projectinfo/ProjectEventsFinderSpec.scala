@@ -32,8 +32,8 @@ import io.renku.generators.Generators.Implicits._
 import io.renku.generators.Generators._
 import io.renku.graph.model.EventsGenerators.commitIds
 import io.renku.graph.model.GraphModelGenerators.{personGitLabIds, personNames, projectIds, projectSlugs}
-import io.renku.graph.model.gitlab.{GitLabMember, GitLabUser}
 import io.renku.graph.model.events.CommitId
+import io.renku.graph.model.gitlab.GitLabUser
 import io.renku.graph.model.testentities.generators.EntitiesGenerators.projectMembersNoEmail
 import io.renku.graph.model.{persons, projects}
 import io.renku.http.client.RestClient.ResponseMappingF

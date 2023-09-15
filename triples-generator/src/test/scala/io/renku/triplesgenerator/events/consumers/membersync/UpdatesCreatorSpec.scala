@@ -18,7 +18,6 @@
 
 package io.renku.triplesgenerator.events.consumers.membersync
 
-import Generators._
 import cats.syntax.all._
 import eu.timepit.refined.auto._
 import io.renku.generators.Generators.Implicits._
@@ -30,6 +29,7 @@ import io.renku.graph.model.testentities._
 import io.renku.graph.model.views.RdfResource
 import io.renku.graph.model.{GraphClass, persons, projects}
 import io.renku.testtools.IOSpec
+import io.renku.triplesgenerator.events.consumers.membersync.Generators._
 import io.renku.triplesgenerator.events.consumers.membersync.PersonOps._
 import io.renku.triplesstore.SparqlQuery.Prefixes
 import io.renku.triplesstore.{InMemoryJenaForSpec, ProjectsDataset, SparqlQuery}
@@ -70,7 +70,7 @@ class UpdatesCreatorSpec
   "insertion" should {
 
     "prepare queries to insert links for members existing in KG" in {
-      val member     = gitLabProjectMembers.generateOne
+      val member     = Generators.gitLabProjectMembers.generateOne
       val personInKG = personEntities(fixed(member.gitLabId.some), withEmail).generateOne
       val project    = anyRenkuProjectEntities.modify(membersLens.modify(_ => Set.empty)).generateOne
 
@@ -97,7 +97,7 @@ class UpdatesCreatorSpec
 
       findMembers(project.slug) shouldBe Set.empty
 
-      val member = gitLabProjectMembers.generateOne
+      val member = Generators.gitLabProjectMembers.generateOne
       val queries = updatesCreator.insertion(
         project.slug,
         Set(member -> Option.empty[persons.ResourceId])
@@ -114,7 +114,7 @@ class UpdatesCreatorSpec
 
       findMembers(projectSlug) shouldBe Set.empty
 
-      val member = gitLabProjectMembers.generateOne
+      val member = Generators.gitLabProjectMembers.generateOne
       val queries = updatesCreator.insertion(
         projectSlug,
         Set(member -> Option.empty[persons.ResourceId])
@@ -129,7 +129,7 @@ class UpdatesCreatorSpec
 
     "prepare queries to insert a project and attach a member already in KG when the project didn't previously exist" in {
 
-      val member     = gitLabProjectMembers.generateOne
+      val member     = Generators.gitLabProjectMembers.generateOne
       val personInKG = personEntities(fixed(member.gitLabId.some), withEmail).generateOne
 
       upload(to = projectsDataset, personInKG)
