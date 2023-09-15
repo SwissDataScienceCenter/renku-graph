@@ -47,7 +47,7 @@ private class EndpointImpl[F[_]: Async: Logger](projectCreator: ProjectCreator[F
   override def `POST /projects`(request: Request[F]): F[Response[F]] =
     EitherT(decodePayload(request))
       .semiflatTap(projectCreator.createProject)
-      .semiflatTap(project => Logger[F].info(show"""project $project created"""))
+      .semiflatTap(project => Logger[F].info(show"""$reportingPrefix: project $project created"""))
       .as(Response[F](Created).withEntity(Message.Info("Project created")))
       .merge
       .handleErrorWith(errorHttpResult)
@@ -60,6 +60,6 @@ private class EndpointImpl[F[_]: Async: Logger](projectCreator: ProjectCreator[F
   }
 
   private lazy val errorHttpResult: Throwable => F[Response[F]] = ex =>
-    Logger[F].error(ex)("Project creation failure") >>
+    Logger[F].error(ex)(show"$reportingPrefix: project creation failed") >>
       InternalServerError(Message.Error.fromMessageAndStackTraceUnsafe("Project creation failed", ex))
 }

@@ -50,7 +50,7 @@ private class EndpointImpl[F[_]: Async: Logger](projectUpdater: ProjectUpdater[F
     EitherT(decodePayload(request))
       .semiflatMap(updates => projectUpdater.updateProject(slug, updates).map(updates -> _))
       .semiflatMap { case (updates, result) =>
-        Logger[F].info(show"""project $slug updated with $updates""").as(result)
+        Logger[F].info(show"""$reportingPrefix: project $slug updated with $updates""").as(result)
       }
       .map(toHttpResult)
       .merge
@@ -69,6 +69,6 @@ private class EndpointImpl[F[_]: Async: Logger](projectUpdater: ProjectUpdater[F
   }
 
   private def errorHttpResult(slug: projects.Slug): Throwable => F[Response[F]] = ex =>
-    Logger[F].error(ex)(s"Project $slug update failed") >>
+    Logger[F].error(ex)(s"$reportingPrefix: Project $slug update failed") >>
       InternalServerError(Message.Error.fromMessageAndStackTraceUnsafe("Project update failed", ex))
 }
