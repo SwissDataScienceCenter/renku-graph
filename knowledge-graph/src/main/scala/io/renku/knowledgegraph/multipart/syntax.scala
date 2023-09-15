@@ -54,7 +54,7 @@ object syntax {
     def findPart(partName: String): Option[Part[F]] =
       multipart.parts.find(_.name contains partName)
 
-    def findParts(partName: String): List[Part[F]] =
+    def filterParts(partName: String): List[Part[F]] =
       multipart.parts.filter(_.name exists (_ startsWith partName)).toList
   }
 

@@ -98,7 +98,7 @@ private class MultipartRequestDecoderImpl[F[_]: Async] extends MultipartRequestD
     (multipart.part(PartName.name).flatMap(_.as[projects.Name]),
      multipart.part(PartName.namespaceId).flatMap(_.as[NamespaceId]).map(Namespace(_)),
      multipart.findPart(PartName.description).map(_.as[Option[projects.Description]]).sequence.map(_.flatten),
-     multipart.findParts(PartName.keywords).map(_.as[projects.Keyword]).sequence.map(_.toSet),
+     multipart.filterParts(PartName.keywords).map(_.as[projects.Keyword]).sequence.map(_.toSet),
      multipart.part(PartName.visibility).flatMap(_.as[projects.Visibility]),
      templateDecoder(multipart),
      multipart.findPart(PartName.image).map(_.as[Option[Image]]).sequence.map(_.flatten),
