@@ -49,7 +49,7 @@ private class PayloadConverterImpl(implicit renkuUrl: RenkuUrl) extends PayloadC
       Some(creator),
       newProject.visibility,
       newProject.keywords,
-      members = Set(creator),
+      members = Set(entities.Project.Member(creator, newProject.creator.role)),
       Image.projectImage(resourceId, newProject.images)
     )
   }
