@@ -214,11 +214,11 @@ class DatasetFinderSpec
 
       val authUser = authUsers.generateOne
       val (dataset, project) = renkuProjectEntities(visibilityNonPublic)
-        .map(replaceMembers(Set(personEntities(authUser.id.some).generateOne)))
+        .map(replaceMembers(Set(projectMemberEntities(authUser.id.some).generateOne)))
         .addDataset(datasetEntities(provenanceInternal))
         .generateOne
       val (_, otherProject) = renkuProjectEntities(visibilityNonPublic)
-        .map(replaceMembers(Set(personEntities(withGitLabId).generateOne)))
+        .map(replaceMembers(Set(projectMemberEntities(withGitLabId).generateOne)))
         .importDataset(dataset)
         .generateOne
 
@@ -233,11 +233,11 @@ class DatasetFinderSpec
 
       val authUser = authUsers.generateOne
       val (dataset, project) = renkuProjectEntities(visibilityNonPublic)
-        .map(replaceMembers(Set(personEntities(authUser.id.some).generateOne)))
+        .map(replaceMembers(Set(projectMemberEntities(authUser.id.some).generateOne)))
         .addDataset(datasetEntities(provenanceInternal))
         .generateOne
       val (otherDS, otherProject) = renkuProjectEntities(visibilityNonPublic)
-        .map(replaceMembers(personEntities(withGitLabId).generateSet() ++ project.members))
+        .map(replaceMembers(projectMemberEntities(withGitLabId).generateSet() ++ project.members))
         .importDataset(dataset)
         .generateOne
 
