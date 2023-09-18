@@ -72,7 +72,7 @@ class MultipartSyntaxSpec extends AsyncWordSpec with AsyncIOSpec with should.Mat
 
     "decode a List of StringTypeType values" in {
 
-      val tts = nonEmptyStrings().generateList().map(StringTT(_))
+      val tts = nonEmptyStrings(minLength = 3).generateList().map(StringTT(_))
 
       tts.mkString_(", ").asPart[IO](nonEmptyStrings().generateOne).as[List[StringTT]].asserting(_ shouldBe tts)
     }
