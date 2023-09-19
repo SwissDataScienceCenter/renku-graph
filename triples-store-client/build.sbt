@@ -30,5 +30,7 @@ libraryDependencies ++=
   (Dependencies.scalacheck ++
     Dependencies.scalatest ++
     Dependencies.catsEffectScalaTest ++
+    Dependencies.catsEffectMunit ++
+    Dependencies.scalacheckEffectMunit ++
     Dependencies.testContainersScalaTest ++
     Dependencies.scalatestScalaCheck).map(_ % Test)

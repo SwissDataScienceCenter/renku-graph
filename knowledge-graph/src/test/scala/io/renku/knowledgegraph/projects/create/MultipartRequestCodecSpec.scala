@@ -20,32 +20,26 @@ package io.renku.knowledgegraph.projects.create
 
 import Generators.newProjects
 import cats.effect.IO
-import cats.effect.testing.scalatest.AsyncIOSpec
-import cats.syntax.all._
 import io.renku.generators.Generators.Implicits._
-import io.renku.generators.Generators.countingGen
-import org.scalatest.flatspec.AsyncFlatSpec
-import org.scalatest.matchers.should
-import org.scalatestplus.scalacheck.ScalaCheckPropertyChecks
+import munit.{CatsEffectSuite, ScalaCheckEffectSuite}
+import org.scalacheck.effect.PropF
 
-class MultipartRequestCodecSpec
-    extends AsyncFlatSpec
-    with AsyncIOSpec
-    with should.Matchers
-    with ScalaCheckPropertyChecks {
+class MultipartRequestCodecSpec extends CatsEffectSuite with ScalaCheckEffectSuite {
 
   private val codec: MultipartRequestCodec[IO] = MultipartRequestCodec[IO]
 
-  forAll(newProjects, countingGen) { (newProject, cnt) =>
-    it should s"decode/encode the multipart request with multiple values #$cnt" in {
-      (codec.encode(newProject) >>= (MultipartRequestCodec[IO].decode(_))).asserting(_ shouldBe newProject)
+  test("decode/encode the multipart request with multiple values") {
+    PropF.forAllF(newProjects) { newProject =>
+      (codec.encode(newProject) flatMap (MultipartRequestCodec[IO].decode(_)))
+        .map(assertEquals(_, newProject))
     }
   }
 
-  it should "decode/encode new value for the image if set" in {
+  test("decode/encode new value for the image if set") {
 
     val newProject = newProjects.suchThat(_.maybeImage.isDefined).generateOne
 
-    (codec.encode(newProject) >>= (MultipartRequestCodec[IO].decode(_))).asserting(_ shouldBe newProject)
+    (codec.encode(newProject) flatMap (MultipartRequestCodec[IO].decode(_)))
+      .map(assertEquals(_, newProject))
   }
 }
