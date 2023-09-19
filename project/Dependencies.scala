@@ -37,7 +37,7 @@ object Dependencies {
     val swaggerParser          = "2.1.16"
     val testContainersScala    = "0.41.0"
     val widoco                 = "1.4.20"
-    val wiremock               = "3.0.4"
+    val wiremock               = "3.1.0"
   }
 
   val ip4s = Seq(
