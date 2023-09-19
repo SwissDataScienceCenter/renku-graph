@@ -47,13 +47,12 @@ class ProjectInfoFinderSpec
     with should.Matchers
     with ScalaCheckPropertyChecks {
 
+  val gitlabMemberNoEmail: Gen[GitLabMember] = projectMembersNoEmail
+
   "findProjectInfo" should {
 
     "return info about the project, its creator and members with matched emails" in new TestCase {
-      implicit val gitLabMemberNoEmail:    Gen[GitLabMember]      = gitLabMemberGen(maybeEmails = Gen.const(None))
-      implicit val gitLabMemberNoEmailSet: Gen[Set[GitLabMember]] = gitLabMemberNoEmail.toGeneratorOfSet()
-
-      forAll(gitLabProjectInfos, gitLabMemberNoEmail, gitLabMemberNoEmailSet) {
+      forAll(gitLabProjectInfos, projectMembersNoEmail, projectMembersNoEmail.toGeneratorOfSet()) {
         (info: GitLabProjectInfo, creator: GitLabMember, members: Set[GitLabMember]) =>
           val infoWithCreator = info.copy(maybeCreator = creator.user.some, members = Set.empty)
           (projectFinder
@@ -66,7 +65,7 @@ class ProjectInfoFinderSpec
             .returning(rightT[IO, ProcessingRecoverableError](members))
           val updatedMembers = members map { member =>
             val updatedMember =
-              gitLabMemberGen().modify(memberGitLabIdLens.modify(_ => member.user.gitLabId)).generateOne
+              gitLabProjectMembers.modify(memberGitLabIdLens.modify(_ => member.user.gitLabId)).generateOne
             (memberEmailFinder
               .findMemberEmail(_: GitLabMember, _: Project)(_: Option[AccessToken]))
               .expects(member, Project(infoWithCreator.id, infoWithCreator.slug), maybeAccessToken)
@@ -74,7 +73,7 @@ class ProjectInfoFinderSpec
             updatedMember
           }
           val updatedCreator =
-            gitLabMemberGen().modify(memberGitLabIdLens.modify(_ => creator.user.gitLabId)).generateOne
+            gitLabProjectMembers.modify(memberGitLabIdLens.modify(_ => creator.user.gitLabId)).generateOne
           (memberEmailFinder
             .findMemberEmail(_: GitLabMember, _: Project)(_: Option[AccessToken]))
             .expects(creator, Project(infoWithCreator.id, infoWithCreator.slug), maybeAccessToken)
@@ -139,7 +138,8 @@ class ProjectInfoFinderSpec
         .expects(projectInfo.slug, maybeAccessToken)
         .returning(rightT[IO, ProcessingRecoverableError](members))
       val updatedMembers = members map { member =>
-        val updatedMember = gitLabMemberGen().modify(memberGitLabIdLens.modify(_ => member.user.gitLabId)).generateOne
+        val updatedMember =
+          gitLabProjectMembers.modify(memberGitLabIdLens.modify(_ => member.user.gitLabId)).generateOne
         (memberEmailFinder
           .findMemberEmail(_: GitLabMember, _: Project)(_: Option[AccessToken]))
           .expects(member, Project(projectInfo.id, projectInfo.slug), maybeAccessToken)
@@ -320,7 +320,7 @@ class ProjectInfoFinderSpec
     }
   }
 
-  private trait TestCase {
+  private class TestCase {
     implicit val maybeAccessToken: Option[AccessToken] = accessTokens.generateOption
 
     private implicit val logger: TestLogger[IO] = TestLogger[IO]()
