@@ -30,8 +30,8 @@ import io.renku.graph.model.gitlab.GitLabProjectInfo
 import io.renku.graph.model.images.Image
 import io.renku.graph.model.projects._
 import io.renku.graph.model.versions.{CliVersion, SchemaVersion}
+import io.renku.jsonld.Property
 import io.renku.jsonld.ontology._
-import io.renku.jsonld.{JsonLDEncoder, Property}
 import io.renku.tinytypes.InstantTinyType
 import monocle.{Lens, Traversal}
 
@@ -585,12 +585,6 @@ object RenkuProject {
 
 object Project {
   final case class Member(person: Person, role: Role)
-  object Member {
-    implicit def jsonLDEncoder(implicit glUrl: GitLabApiUrl, graph: GraphClass): JsonLDEncoder[Member] =
-      JsonLDEncoder.instance { _ =>
-        ??? // TODO hm, this changes the ontology of a project. need a new entity that points to person and stores role
-      }
-  }
 
   import io.renku.jsonld.{EntityTypes, JsonLD, JsonLDEncoder}
 
@@ -639,7 +633,7 @@ object Project {
           schema / "creator"          -> project.maybeCreator.asJsonLD,
           renku / "projectVisibility" -> project.visibility.asJsonLD,
           schema / "keywords"         -> project.keywords.asJsonLD,
-          schema / "member"           -> project.members.toList.asJsonLD,
+          schema / "member"           -> project.members.map(_.person).toList.asJsonLD,
           schema / "schemaVersion"    -> project.version.asJsonLD,
           renku / "hasActivity"       -> project.activities.asJsonLD,
           renku / "hasPlan"           -> project.plans.asJsonLD,
@@ -669,7 +663,7 @@ object Project {
           schema / "creator"          -> project.maybeCreator.asJsonLD,
           renku / "projectVisibility" -> project.visibility.asJsonLD,
           schema / "keywords"         -> project.keywords.asJsonLD,
-          schema / "member"           -> project.members.toList.asJsonLD,
+          schema / "member"           -> project.members.map(_.person).toList.asJsonLD,
           prov / "wasDerivedFrom"     -> maybeDerivedFrom.asJsonLD,
           schema / "image"            -> project.images.asJsonLD
         )
