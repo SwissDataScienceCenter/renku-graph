@@ -114,6 +114,14 @@ lazy val graphCommons = project
   )
   .enablePlugins(AutomateHeaderPlugin)
 
+lazy val eventQueue = project
+  .in(file("event-queue"))
+  .settings(commonSettings)
+  .dependsOn(
+    graphCommons % "compile->compile; test->test"
+  )
+  .enablePlugins(AutomateHeaderPlugin)
+
 lazy val eventLogApi = project
   .in(file("event-log-api"))
   .withId("event-log-api")
