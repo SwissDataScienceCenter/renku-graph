@@ -64,7 +64,15 @@ private class ProjectInfoFinderImpl[F[_]: MonadThrow: Parallel: Logger](
   private def addMembers(project: GitLabProjectInfo)(implicit maybeAccessToken: Option[AccessToken]) =
     findProjectMembers(project.slug).map(members => project.copy(members = members))
 
-  private def addEmails(project: GitLabProjectInfo)(implicit maybeAccessToken: Option[AccessToken]) = {
+  private def addEmails(project: GitLabProjectInfo)(implicit maybeAccessToken: Option[AccessToken]) = EitherT {
+    (project.members ++ project.maybeCreator.map(_.toMember(Role.Owner))).toList
+      .map(memberEmailFinder.findMemberEmail(_, Project(project.id, project.slug)).value)
+      .parSequence
+      .map(_.sequence)
+  }.map(deduplicateSameIdMembers)
+    .map(members => (updateCreator(members) andThen updateMembers(members))(project))
+
+  private def addEmails2(project: GitLabProjectInfo)(implicit maybeAccessToken: Option[AccessToken]) = {
     val proj = Project(project.id, project.slug)
     val forMembers = project.members.toList
       .parTraverse(memberEmailFinder.findMemberEmail(_, proj))
@@ -76,7 +84,7 @@ private class ProjectInfoFinderImpl[F[_]: MonadThrow: Parallel: Logger](
         .map(_.map(_.user))
 
     forCreator
-      .map(user => user.map(u => project.copy(maybeCreator = u.some)).getOrElse(project))
+      .map(user => user.fold(project)(u => project.copy(maybeCreator = u.some)))
       .flatMap(p => forMembers.map(members => updateCreator(members).andThen(updateMembers(members))(p)))
   }
 

@@ -58,6 +58,7 @@ trait ProjectFunctions {
   def toPayloadJsonLD(p: testentities.RenkuProject)(implicit renkuUrl: RenkuUrl): JsonLD =
     p.to[CliProject].asJsonLD(CliProject.flatJsonLDEncoder)
 
+  // here we assume GitLab doesn't return an email
   private def toProjectMember(p: testentities.Person, gitLabId: persons.GitLabId, role: Role): GitLabMember =
     GitLabMember(p.name, persons.Username(p.name.show), gitLabId, None, Role.toGitLabAccessLevel(role))
 }

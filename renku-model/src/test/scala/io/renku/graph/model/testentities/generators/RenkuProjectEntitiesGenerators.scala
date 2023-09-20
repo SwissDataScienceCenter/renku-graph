@@ -138,7 +138,7 @@ trait RenkuProjectEntitiesGenerators {
                             maybeDescription,
                             maybeCreator.map(_.user),
                             keywords,
-                            members,
+                            members ++ maybeCreator,
                             visibility,
                             maybeParentSlug,
                             avatarUri

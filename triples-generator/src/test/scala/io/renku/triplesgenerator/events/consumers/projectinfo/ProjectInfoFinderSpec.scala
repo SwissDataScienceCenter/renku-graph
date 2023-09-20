@@ -75,7 +75,7 @@ class ProjectInfoFinderSpec
           val updatedCreator = memberGitLabEmailLens.set(Some(personEmails.generateOne))(creator)
           (memberEmailFinder
             .findMemberEmail(_: GitLabMember, _: Project)(_: Option[AccessToken]))
-            .expects(creator.withReaderLevel, Project(infoWithCreator.id, infoWithCreator.slug), maybeAccessToken)
+            .expects(creator.withOwnerLevel, Project(infoWithCreator.id, infoWithCreator.slug), maybeAccessToken)
             .returning(rightT[IO, ProcessingRecoverableError](updatedCreator))
 
           finder
@@ -115,7 +115,7 @@ class ProjectInfoFinderSpec
         gitLabProjectMembers.map(memberGitLabIdLens.modify(_ => creator.user.gitLabId)).generateOne
       (memberEmailFinder
         .findMemberEmail(_: GitLabMember, _: Project)(_: Option[AccessToken]))
-        .expects(creator.withReaderLevel, Project(projectInfo.id, projectInfo.slug), maybeAccessToken)
+        .expects(creator.withOwnerLevel, Project(projectInfo.id, projectInfo.slug), maybeAccessToken)
         .returning(rightT[IO, ProcessingRecoverableError](updatedCreator))
 
       finder.findProjectInfo(projectInfo.slug).value.unsafeRunSync() shouldBe projectInfo
@@ -329,7 +329,7 @@ class ProjectInfoFinderSpec
     lazy val finder       = new ProjectInfoFinderImpl[IO](projectFinder, membersFinder, memberEmailFinder)
 
     implicit class GitLabMemberOps(m: GitLabMember) {
-      def withReaderLevel: GitLabMember = m.copy(accessLevel = Role.toGitLabAccessLevel(Role.Reader))
+      def withOwnerLevel: GitLabMember = m.copy(accessLevel = Role.toGitLabAccessLevel(Role.Owner))
     }
   }
 }
