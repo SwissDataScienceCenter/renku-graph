@@ -79,7 +79,7 @@ class ProjectUpdaterSpec extends AsyncFlatSpec with CustomAsyncIOSpec with shoul
       val userInfo = userInfos.generateOne
       givenUserInfoFinding(authUser.accessToken, returning = userInfo.some.pure[IO])
       val coreUri = coreUrisVersioned.generateOne
-      givenFindingCoreUri(projectGitUrl, authUser.accessToken, returning = Result.success(coreUri))
+      givenFindingCoreUri(projectGitUrl, userInfo, authUser.accessToken, returning = Result.success(coreUri))
 
       val updates = projectUpdatesGen.suchThat(_.coreUpdateNeeded).generateOne
       givenUpdatingProjectInCore(
@@ -156,7 +156,7 @@ class ProjectUpdaterSpec extends AsyncFlatSpec with CustomAsyncIOSpec with shoul
       val userInfo = userInfos.generateOne
       givenUserInfoFinding(authUser.accessToken, returning = userInfo.some.pure[IO])
       val coreUri = coreUrisVersioned.generateOne
-      givenFindingCoreUri(projectGitUrl, authUser.accessToken, returning = Result.success(coreUri))
+      givenFindingCoreUri(projectGitUrl, userInfo, authUser.accessToken, returning = Result.success(coreUri))
 
       val updates        = projectUpdatesGen.suchThat(_.coreUpdateNeeded).generateOne
       val corePushBranch = branches.generateOne
@@ -292,10 +292,11 @@ class ProjectUpdaterSpec extends AsyncFlatSpec with CustomAsyncIOSpec with shoul
 
       val projectGitUrl = projectGitHttpUrls.generateOne
       givenProjectGitUrlFinding(slug, authUser.accessToken, returning = projectGitUrl.some.pure[IO])
-      givenUserInfoFinding(authUser.accessToken, returning = userInfos.generateSome.pure[IO])
+      val userInfo = userInfos.generateOne
+      givenUserInfoFinding(authUser.accessToken, returning = userInfo.some.pure[IO])
 
       val failedResult = resultDetailedFailures.generateOne
-      givenFindingCoreUri(projectGitUrl, authUser.accessToken, returning = failedResult)
+      givenFindingCoreUri(projectGitUrl, userInfo, authUser.accessToken, returning = failedResult)
 
       updater
         .updateProject(slug, updates, authUser)
@@ -317,7 +318,7 @@ class ProjectUpdaterSpec extends AsyncFlatSpec with CustomAsyncIOSpec with shoul
       val userInfo = userInfos.generateOne
       givenUserInfoFinding(authUser.accessToken, returning = userInfo.some.pure[IO])
       val coreUri = coreUrisVersioned.generateOne
-      givenFindingCoreUri(projectGitUrl, authUser.accessToken, returning = Result.success(coreUri))
+      givenFindingCoreUri(projectGitUrl, userInfo, authUser.accessToken, returning = Result.success(coreUri))
 
       val failedResult = resultDetailedFailures.generateOne
       givenUpdatingProjectInCore(
@@ -477,11 +478,12 @@ class ProjectUpdaterSpec extends AsyncFlatSpec with CustomAsyncIOSpec with shoul
     .returning(returning)
 
   private def givenFindingCoreUri(gitUrl:    projects.GitHttpUrl,
+                                  userInfo:  UserInfo,
                                   at:        UserAccessToken,
                                   returning: Result[RenkuCoreUri.Versioned]
   ) = (renkuCoreClient
-    .findCoreUri(_: projects.GitHttpUrl, _: AccessToken))
-    .expects(gitUrl, at)
+    .findCoreUri(_: projects.GitHttpUrl, _: UserInfo, _: AccessToken))
+    .expects(gitUrl, userInfo, at)
     .returning(returning.pure[IO])
 
   private def givenUpdatingProjectInCore(coreUri:   RenkuCoreUri.Versioned,

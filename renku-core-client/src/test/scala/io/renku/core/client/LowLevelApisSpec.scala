@@ -72,20 +72,23 @@ class LowLevelApisSpec
 
       val accessToken       = userAccessTokens.generateOne
       val projectGitHttpUrl = projectGitHttpUrls.generateOne
+      val userInfo          = userInfos.generateOne
       val migrationCheck    = projectMigrationChecks.generateOne
 
       otherWireMockResource.evalMap { server =>
         server.stubFor {
           get(urlPathEqualTo("/renku/cache.migrations_check"))
             .withQueryParam("git_url", equalTo(projectGitHttpUrl.value))
-            .withHeader("gitlab-token", equalTo(accessToken.value))
+            .withAccessToken(accessToken.some)
+            .withHeader("renku-user-email", equalTo(userInfo.email.value))
+            .withHeader("renku-user-fullname", equalTo(userInfo.name.value))
             .willReturn(ok(Result.success(migrationCheck).asJson.spaces2))
         }
 
         val uriForSchema = RenkuCoreUri.ForSchema(server.baseUri, projectSchemaVersions.generateOne)
 
         client
-          .getMigrationCheck(uriForSchema, projectGitHttpUrl, accessToken)
+          .getMigrationCheck(uriForSchema, projectGitHttpUrl, userInfo, accessToken)
           .asserting(_ shouldBe Result.success(migrationCheck))
       }.use_
     }

@@ -151,7 +151,7 @@ private class ProjectUpdaterImpl[F[_]: Async: NonEmptyParallel: Logger](
 
   private def findCoreUri(updates: CoreProjectUpdates, authUser: AuthUser): F[RenkuCoreUri.Versioned] =
     renkuCoreClient
-      .findCoreUri(updates.projectUrl, authUser.accessToken)
+      .findCoreUri(updates.projectUrl, updates.userInfo, authUser.accessToken)
       .map(_.toEither)
       .handleError(_.asLeft)
       .flatMap(_.fold(UpdateFailures.onFindingCoreUri(_).raiseError[F, RenkuCoreUri.Versioned], _.pure[F]))
