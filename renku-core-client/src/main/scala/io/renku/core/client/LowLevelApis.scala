@@ -40,6 +40,7 @@ private trait LowLevelApis[F[_]] {
   def getApiVersion(uri: RenkuCoreUri.ForSchema): F[Result[SchemaApiVersions]]
   def getMigrationCheck(coreUri:           RenkuCoreUri,
                         projectGitHttpUrl: projects.GitHttpUrl,
+                        userInfo:          UserInfo,
                         accessToken:       AccessToken
   ):               F[Result[ProjectMigrationCheck]]
   def getVersions: F[Result[List[SchemaVersion]]]
@@ -75,13 +76,18 @@ private class LowLevelApisImpl[F[_]: Async: Logger](coreLatestUri: RenkuCoreUri.
 
   override def getMigrationCheck(coreUri:           RenkuCoreUri,
                                  projectGitHttpUrl: projects.GitHttpUrl,
+                                 userInfo:          UserInfo,
                                  accessToken:       AccessToken
   ): F[Result[ProjectMigrationCheck]] = {
 
     val uri = (coreUri.uri / "renku" / "cache.migrations_check")
       .withQueryParam("git_url", projectGitHttpUrl.value)
 
-    send(GET(uri).withHeaders(Header.Raw(ci"gitlab-token", accessToken.value))) {
+    send(
+      request(GET, uri, accessToken)
+        .putHeaders(Header.Raw(ci"renku-user-email", userInfo.email.value))
+        .putHeaders(Header.Raw(ci"renku-user-fullname", userInfo.name.value))
+    ) {
       case (Ok, _, resp) =>
         toResult[ProjectMigrationCheck](resp)
       case reqInfo =>

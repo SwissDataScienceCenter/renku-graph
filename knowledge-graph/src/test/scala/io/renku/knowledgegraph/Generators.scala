@@ -18,6 +18,7 @@
 
 package io.renku.knowledgegraph
 
+import cats.syntax.all._
 import io.renku.generators.CommonGraphGenerators.{clientErrorHttpStatuses, messages, serverErrorHttpStatuses}
 import io.renku.generators.Generators.Implicits._
 import io.renku.generators.Generators.exceptions
@@ -25,12 +26,14 @@ import org.scalacheck.Gen
 
 private object Generators {
 
+  val simpleFailures: Gen[Failure] =
+    (Gen.oneOf(clientErrorHttpStatuses, serverErrorHttpStatuses), messages)
+      .mapN(Failure(_, _))
+
+  def withCauseFailures(causeGen: Gen[Throwable] = exceptions): Gen[Failure] =
+    (Gen.oneOf(clientErrorHttpStatuses, serverErrorHttpStatuses), messages, causeGen)
+      .mapN(Failure(_, _, _))
+
   val failures: Gen[Failure] =
-    for {
-      status         <- Gen.oneOf(clientErrorHttpStatuses, serverErrorHttpStatuses)
-      message        <- messages
-      maybeException <- exceptions.toGeneratorOfOptions
-    } yield maybeException
-      .map(Failure(status, message, _))
-      .getOrElse(Failure(status, message))
+    Gen.oneOf(simpleFailures, withCauseFailures())
 }

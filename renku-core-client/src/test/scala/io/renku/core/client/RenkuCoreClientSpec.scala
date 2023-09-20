@@ -61,11 +61,13 @@ class RenkuCoreClientSpec
         givenCoreUriForSchemaInConfig(coreUriForSchema)
 
         val projectUrl     = projectGitHttpUrls.generateOne
+        val userInfo       = userInfos.generateOne
         val accessToken    = accessTokens.generateOne
         val migrationCheck = ProjectMigrationCheck(schemaVersion, MigrationRequired.no)
 
         givenMigrationCheckFetching(coreUriForSchema,
                                     projectUrl,
+                                    userInfo,
                                     accessToken,
                                     returning = Result.success(migrationCheck)
         )
@@ -73,7 +75,7 @@ class RenkuCoreClientSpec
         val coreUriVersioned = givenFindCoreUri(migrationCheck.schemaVersion)
 
         client
-          .findCoreUri(projectUrl, accessToken)
+          .findCoreUri(projectUrl, userInfo, accessToken)
           .asserting(_ shouldBe Result.success(coreUriVersioned))
       }
 
@@ -95,12 +97,14 @@ class RenkuCoreClientSpec
         givenCoreUriForSchemaInConfig(coreUriForSchema3)
 
         val projectUrl  = projectGitHttpUrls.generateOne
+        val userInfo    = userInfos.generateOne
         val accessToken = accessTokens.generateOne
 
         // case when Migration not required by different schema version - a weird case
         val migrationCheck1 = ProjectMigrationCheck(projectSchemaVersions.generateOne, MigrationRequired.no)
         givenMigrationCheckFetching(coreUriForSchema1,
                                     projectUrl,
+                                    userInfo,
                                     accessToken,
                                     returning = Result.success(migrationCheck1)
         )
@@ -109,6 +113,7 @@ class RenkuCoreClientSpec
         val migrationCheck2 = ProjectMigrationCheck(schemaVersion2, MigrationRequired.yes)
         givenMigrationCheckFetching(coreUriForSchema2,
                                     projectUrl,
+                                    userInfo,
                                     accessToken,
                                     returning = Result.success(migrationCheck2)
         )
@@ -116,6 +121,7 @@ class RenkuCoreClientSpec
         val migrationCheck3 = ProjectMigrationCheck(schemaVersion3, MigrationRequired.no)
         givenMigrationCheckFetching(coreUriForSchema3,
                                     projectUrl,
+                                    userInfo,
                                     accessToken,
                                     returning = Result.success(migrationCheck3)
         )
@@ -123,7 +129,7 @@ class RenkuCoreClientSpec
         val coreUriVersioned = givenFindCoreUri(migrationCheck3.schemaVersion)
 
         client
-          .findCoreUri(projectUrl, accessToken)
+          .findCoreUri(projectUrl, userInfo, accessToken)
           .asserting(_ shouldBe Result.success(coreUriVersioned))
       }
 
@@ -133,6 +139,7 @@ class RenkuCoreClientSpec
       givenVersionsFinding(returning = Result.success(schemaVersions))
 
       val projectUrl  = projectGitHttpUrls.generateOne
+      val userInfo    = userInfos.generateOne
       val accessToken = accessTokens.generateOne
 
       schemaVersions foreach { sv =>
@@ -141,13 +148,14 @@ class RenkuCoreClientSpec
 
         givenMigrationCheckFetching(coreUriForSchema,
                                     projectUrl,
+                                    userInfo,
                                     accessToken,
                                     returning = Result.success(projectMigrationChecks.generateOne)
         )
       }
 
       client
-        .findCoreUri(projectUrl, accessToken)
+        .findCoreUri(projectUrl, userInfo, accessToken)
         .asserting(_ shouldBe Result.failure("Project in unsupported version. Quite likely migration required"))
     }
 
@@ -160,12 +168,13 @@ class RenkuCoreClientSpec
       givenCoreUriForSchemaInConfig(coreUriForSchema)
 
       val projectUrl  = projectGitHttpUrls.generateOne
+      val userInfo    = userInfos.generateOne
       val accessToken = accessTokens.generateOne
 
       val failure = resultDetailedFailures.generateOne
-      givenMigrationCheckFetching(coreUriForSchema, projectUrl, accessToken, returning = failure)
+      givenMigrationCheckFetching(coreUriForSchema, projectUrl, userInfo, accessToken, returning = failure)
 
-      client.findCoreUri(projectUrl, accessToken).asserting(_ shouldBe failure)
+      client.findCoreUri(projectUrl, userInfo, accessToken).asserting(_ shouldBe failure)
     }
   }
 
@@ -261,10 +270,11 @@ class RenkuCoreClientSpec
 
   private def givenMigrationCheckFetching(coreUri:     RenkuCoreUri,
                                           projectUrl:  projects.GitHttpUrl,
+                                          userInfo:    UserInfo,
                                           accessToken: AccessToken,
                                           returning:   Result[ProjectMigrationCheck]
   ) = (lowLevelApis.getMigrationCheck _)
-    .expects(coreUri, projectUrl, accessToken)
+    .expects(coreUri, projectUrl, userInfo, accessToken)
     .returning(returning.pure[IO])
 
   private def givenVersionsFinding(returning: Result[List[SchemaVersion]]) =

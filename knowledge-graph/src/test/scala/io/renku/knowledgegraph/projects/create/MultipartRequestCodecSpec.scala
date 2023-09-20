@@ -22,14 +22,14 @@ import Generators.newProjects
 import cats.effect.IO
 import io.renku.generators.Generators.Implicits._
 import munit.{CatsEffectSuite, ScalaCheckEffectSuite}
-import org.scalacheck.effect.PropF
+import org.scalacheck.effect.PropF.forAllF
 
 class MultipartRequestCodecSpec extends CatsEffectSuite with ScalaCheckEffectSuite {
 
   private val codec: MultipartRequestCodec[IO] = MultipartRequestCodec[IO]
 
   test("decode/encode the multipart request with multiple values") {
-    PropF.forAllF(newProjects) { newProject =>
+    forAllF(newProjects) { newProject =>
       (codec.encode(newProject) flatMap (MultipartRequestCodec[IO].decode(_)))
         .map(assertEquals(_, newProject))
     }

@@ -18,12 +18,14 @@
 
 package io.renku.knowledgegraph
 
+import io.renku.core.client.Result.{Failure => CoreFailure}
 import io.renku.data.Message
 import org.http4s.{Response, Status}
 
 private sealed trait Failure extends Exception {
   val status:  Status
   val message: Message
+  def detailedMessage: String
 
   def toResponse[F[_]]: Response[F] =
     Response[F](status).withEntity(message)
@@ -31,11 +33,19 @@ private sealed trait Failure extends Exception {
 
 private object Failure {
 
-  final case class Simple(status: Status, message: Message) extends Exception(message.show) with Failure
+  final case class Simple(status: Status, message: Message) extends Exception(message.show) with Failure {
+    override lazy val detailedMessage: String = getMessage
+  }
 
   final case class WithCause(status: Status, message: Message, cause: Throwable)
       extends Exception(message.show, cause)
-      with Failure
+      with Failure {
+
+    override lazy val detailedMessage: String = cause match {
+      case f: CoreFailure => s"$getMessage; ${f.detailedMessage}"
+      case _ => getMessage
+    }
+  }
 
   def apply(status: Status, message: Message): Failure =
     Failure.Simple(status, message)

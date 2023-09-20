@@ -31,9 +31,12 @@ import org.http4s.dsl.Http4sDsl
 import org.typelevel.log4cats.Logger
 
 trait RenkuCoreClient[F[_]] {
-  def findCoreUri(projectUrl:    projects.GitHttpUrl, accessToken: AccessToken):     F[Result[RenkuCoreUri.Versioned]]
+  def findCoreUri(projectUrl:  projects.GitHttpUrl,
+                  userInfo:    UserInfo,
+                  accessToken: AccessToken
+  ): F[Result[RenkuCoreUri.Versioned]]
   def findCoreUri(schemaVersion: SchemaVersion): F[Result[RenkuCoreUri.Versioned]]
-  def createProject(newProject:  NewProject, accessToken:          UserAccessToken): F[Result[Unit]]
+  def createProject(newProject:  NewProject, accessToken: UserAccessToken): F[Result[Unit]]
   def updateProject(coreUri:     RenkuCoreUri.Versioned,
                     updates:     ProjectUpdates,
                     accessToken: UserAccessToken
@@ -59,10 +62,11 @@ private class RenkuCoreClientImpl[F[_]: Async: Logger](coreUriForSchemaLoader: R
   import nestedResult._
 
   override def findCoreUri(projectUrl:  projects.GitHttpUrl,
+                           userInfo:    UserInfo,
                            accessToken: AccessToken
   ): F[Result[RenkuCoreUri.Versioned]] =
     Nested(lowLevelApis.getVersions)
-      .flatMap(_.findM(migratedAndMatchingSchema(projectUrl, accessToken)))
+      .flatMap(_.findM(migratedAndMatchingSchema(projectUrl, userInfo, accessToken)))
       .flatMapF[RenkuCoreUri.Versioned] {
         case Some(sv) => findCoreUri(sv)
         case None     => Result.failure("Project in unsupported version. Quite likely migration required").pure[F].widen
@@ -70,13 +74,14 @@ private class RenkuCoreClientImpl[F[_]: Async: Logger](coreUriForSchemaLoader: R
       .value
 
   private def migratedAndMatchingSchema(projectUrl:  projects.GitHttpUrl,
+                                        userInfo:    UserInfo,
                                         accessToken: AccessToken
   ): SchemaVersion => Nested[F, Result, Boolean] =
     schemaVersion =>
       Nested {
         coreUriForSchemaLoader
           .loadFromConfig[F](schemaVersion, config)
-          .flatMap(lowLevelApis.getMigrationCheck(_, projectUrl, accessToken))
+          .flatMap(lowLevelApis.getMigrationCheck(_, projectUrl, userInfo, accessToken))
       }.subflatMap {
         case ProjectMigrationCheck(`schemaVersion`, MigrationRequired.no) => Result.success(true)
         case _                                                            => Result.success(false)
