@@ -1,4 +1,4 @@
-import sbt._
+import sbt.*
 
 //noinspection TypeAnnotation
 object Dependencies {
@@ -8,6 +8,8 @@ object Dependencies {
     val catsCore               = "2.10.0"
     val catsEffect             = "3.5.1"
     val catsEffectScalaTest    = "1.5.0"
+    val catsEffectMunit        = "1.0.7"
+    val scalacheckEffectMunit  = "1.0.4"
     val circeCore              = "0.14.6"
     val circeGenericExtras     = "0.14.3"
     val circeOptics            = "0.14.1"
@@ -126,6 +128,14 @@ object Dependencies {
 
   val catsEffectScalaTest = Seq(
     "org.typelevel" %% "cats-effect-testing-scalatest" % V.catsEffectScalaTest
+  )
+
+  val catsEffectMunit = Seq(
+    "org.typelevel" %% "munit-cats-effect-3" % V.catsEffectMunit
+  )
+
+  val scalacheckEffectMunit = Seq(
+    "org.typelevel" %% "scalacheck-effect-munit" % V.scalacheckEffectMunit
   )
 
   val log4Cats = Seq(
