@@ -95,10 +95,10 @@ private class EndpointImpl[F[_]: Async: Logger](projectUpdater: ProjectUpdater[F
 
   private def logFailure(slug: projects.Slug): Failure => F[Unit] = {
     case f if f.status == BadRequest || f.status == Conflict =>
-      Logger[F].info(show"Updating project $slug failed: ${f.getMessage}")
+      Logger[F].info(show"Updating project $slug failed: ${f.detailedMessage}")
     case f if f.status == Forbidden =>
       ().pure[F]
     case f =>
-      Logger[F].error(f)(show"Updating project $slug failed")
+      Logger[F].error(f)(show"Updating project $slug failed: ${f.detailedMessage}")
   }
 }

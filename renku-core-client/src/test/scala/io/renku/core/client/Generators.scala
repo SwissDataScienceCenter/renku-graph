@@ -33,9 +33,15 @@ object Generators {
   def resultSuccesses[T](payloadGen: Gen[T]): Gen[Result[T]] =
     payloadGen.map(Result.success)
 
+  implicit lazy val resultSimpleFailures: Gen[Result.Failure.Simple] =
+    sentences().map(_.value).map(Result.Failure.Simple(_))
+
   implicit lazy val resultDetailedFailures: Gen[Result.Failure.Detailed] =
-    (positiveInts().map(_.value) -> sentences().map(_.value))
-      .mapN(Result.Failure.Detailed(_, _))
+    (positiveInts().map(_.value), sentences().map(_.value), sentences().map(_.value).toGeneratorOfOptions)
+      .mapN(Result.Failure.Detailed(_, _, _))
+
+  implicit lazy val resultFailures: Gen[Result.Failure] =
+    Gen.oneOf(resultSimpleFailures, resultDetailedFailures)
 
   implicit lazy val apiVersions: Gen[ApiVersion] =
     (positiveInts(), positiveInts()).mapN((major, minor) => ApiVersion(s"$major.$minor"))

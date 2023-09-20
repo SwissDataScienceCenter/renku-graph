@@ -18,7 +18,7 @@
 
 package io.renku.core.client
 
-import cats.FlatMap
+import cats.{FlatMap, Show}
 import io.circe.Decoder
 
 sealed trait Result[+A] {
@@ -31,19 +31,34 @@ object Result {
   }
 
   sealed trait Failure extends RuntimeException with Result[Nothing] {
-    def toEither: Either[Throwable, Nothing] = Left(this)
+    def detailedMessage: String
+    def toEither:        Either[Throwable, Nothing] = Left(this)
   }
 
   object Failure {
 
-    final case class Simple(error: String) extends RuntimeException(error) with Failure
-    final case class Detailed(code: Int, userMessage: String)
+    final case class Simple(error: String) extends RuntimeException(error) with Failure {
+      override lazy val detailedMessage: String = getMessage
+    }
+
+    object Simple {
+      implicit lazy val show: Show[Simple] = Show.show(_.detailedMessage)
+    }
+
+    final case class Detailed(code: Int, userMessage: String, maybeDevMessage: Option[String])
         extends RuntimeException(s"$userMessage: $code")
-        with Failure
+        with Failure {
+      override lazy val detailedMessage: String = {
+        val devMessage = maybeDevMessage.map(m => s"; devMessage: $m").getOrElse("")
+        s"$getMessage$devMessage"
+      }
+    }
 
     object Detailed {
       implicit val decoder: Decoder[Detailed] =
-        Decoder.forProduct2("code", "userMessage")(Detailed.apply)
+        Decoder.forProduct3("code", "userMessage", "devMessage")(Detailed.apply)
+
+      implicit lazy val show: Show[Detailed] = Show.show(_.detailedMessage)
     }
   }
 
@@ -51,7 +66,10 @@ object Result {
 
   def failure[A](error: String): Result[A] = Failure.Simple(error)
 
-  def failure[A](code: Int, userMessage: String): Result[A] = Failure.Detailed(code, userMessage)
+  def failure[A](code: Int, userMessage: String): Result[A] =
+    Failure.Detailed(code, userMessage, maybeDevMessage = None)
+
+  implicit def show[F <: Failure]: Show[F] = Show.show(_.detailedMessage)
 
   implicit lazy val flatMapOps: FlatMap[Result] = new FlatMap[Result] {
 

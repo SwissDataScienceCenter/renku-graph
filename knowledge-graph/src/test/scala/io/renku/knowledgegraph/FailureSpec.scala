@@ -19,26 +19,51 @@
 package io.renku.knowledgegraph
 
 import cats.effect.IO
-import cats.effect.testing.scalatest.AsyncIOSpec
+import cats.syntax.all._
+import io.renku.core.client.Generators.{resultFailures => coreResultFailures}
 import io.renku.data.Message
 import io.renku.data.Message._
-import io.renku.generators.Generators.countingGen
-import org.scalatest.matchers.should
-import org.scalatest.wordspec.AsyncWordSpec
-import org.scalatestplus.scalacheck.ScalaCheckPropertyChecks
+import io.renku.generators.Generators.Implicits._
+import io.renku.generators.Generators.exceptions
+import munit.{CatsEffectSuite, ScalaCheckEffectSuite}
+import org.scalacheck.effect.PropF.forAllF
 
-class FailureSpec extends AsyncWordSpec with AsyncIOSpec with should.Matchers with ScalaCheckPropertyChecks {
+class FailureSpec extends CatsEffectSuite with ScalaCheckEffectSuite {
 
-  "toResponse" should {
+  test("toResponse should turn the failure into a Response with failure's status and message in the body") {
+    forAllF(Generators.failures) { failure =>
+      val response = failure.toResponse[IO]
 
-    forAll(Generators.failures, countingGen) { (failure, cnt) =>
-      s"turn the failure into a Response with failure's status and message in the body #$cnt" in {
-
-        val response = failure.toResponse[IO]
-
-        IO(response.status).asserting(_ shouldBe failure.status) >>
-          response.as[Message].asserting(_ shouldBe failure.message)
-      }
+      IO(response.status).map(assertEquals(_, failure.status)) >>
+        response.as[Message].map(assertEquals(_, failure.message))
     }
+  }
+
+  test("Simple.detailedMessage should return the message") {
+
+    val failure = Generators.simpleFailures.generateOne
+
+    assertEquals(failure.detailedMessage, failure.message.show)
+    assertEquals(failure.detailedMessage, failure.getMessage)
+  }
+
+  test("WithCause.detailedMessage should return the message") {
+
+    val failure = Generators.withCauseFailures(causeGen = exceptions).generateOne
+
+    assertEquals(failure.detailedMessage, failure.message.show)
+    assertEquals(failure.detailedMessage, failure.getMessage)
+  }
+
+  test {
+    "WithCause.detailedMessage should " +
+      "return the message with the detailedMessage from the cause if it's a Core Result.Failure"
+  } {
+
+    val coreResultFailure = coreResultFailures.generateOne
+    val failure           = Generators.withCauseFailures(causeGen = coreResultFailure).generateOne
+
+    assertEquals(failure.detailedMessage, show"${failure.message}; ${coreResultFailure.detailedMessage}")
+    assertEquals(failure.getMessage, failure.message.show)
   }
 }

@@ -47,6 +47,10 @@ class TestLogger[F[_]: Async] extends Logger[F] with should.Matchers {
     invocations(of = severity).toList.map(_.message)
   }
 
+  def getMessagesF: F[List[LogMessage]] = F.delay {
+    invocations.asScala.toList.map(_.message)
+  }
+
   private def invocations(of: Level): Iterable[LogEntry] =
     invocations.asScala.filter(_.level === of)
 
