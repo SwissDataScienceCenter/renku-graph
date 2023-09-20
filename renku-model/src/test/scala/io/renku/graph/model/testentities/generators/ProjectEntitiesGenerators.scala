@@ -53,8 +53,14 @@ trait ProjectEntitiesGenerators {
   lazy val gitLabUserIdLens: Lens[GitLabUser, persons.GitLabId] =
     Lens[GitLabUser, persons.GitLabId](_.gitLabId)(a => b => b.copy(gitLabId = a))
 
+  lazy val gitLabUserEmailLens: Lens[GitLabUser, Option[persons.Email]] =
+    Lens[GitLabUser, Option[persons.Email]](_.email)(a => b => b.copy(email = a))
+
   lazy val memberGitLabIdLens: Lens[GitLabMember, persons.GitLabId] =
     memberGitLabUserLens.andThen(gitLabUserIdLens)
+
+  lazy val memberGitLabEmailLens: Lens[GitLabMember, Option[persons.Email]] =
+    memberGitLabUserLens.composeLens(gitLabUserEmailLens)
 
   def membersLens[P <: Project]: Lens[P, Set[Project.Member]] =
     Lens[P, Set[Project.Member]](_.members) { members =>

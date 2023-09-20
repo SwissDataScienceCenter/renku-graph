@@ -28,6 +28,7 @@ import io.renku.generators.Generators.exceptions
 import io.renku.graph.model.GraphModelGenerators.{personEmails, personNames, projectSlugs}
 import io.renku.graph.model.gitlab.{GitLabMember, GitLabProjectInfo}
 import io.renku.graph.model.projects
+import io.renku.graph.model.projects.Role
 import io.renku.graph.model.testentities.generators.EntitiesGenerators._
 import io.renku.http.client.AccessToken
 import io.renku.interpreters.TestLogger
@@ -64,19 +65,17 @@ class ProjectInfoFinderSpec
             .expects(infoWithCreator.slug, maybeAccessToken)
             .returning(rightT[IO, ProcessingRecoverableError](members))
           val updatedMembers = members map { member =>
-            val updatedMember =
-              gitLabProjectMembers.modify(memberGitLabIdLens.modify(_ => member.user.gitLabId)).generateOne
+            val updatedMember = memberGitLabEmailLens.set(Some(personEmails.generateOne))(member)
             (memberEmailFinder
               .findMemberEmail(_: GitLabMember, _: Project)(_: Option[AccessToken]))
               .expects(member, Project(infoWithCreator.id, infoWithCreator.slug), maybeAccessToken)
               .returning(rightT[IO, ProcessingRecoverableError](updatedMember))
             updatedMember
           }
-          val updatedCreator =
-            gitLabProjectMembers.modify(memberGitLabIdLens.modify(_ => creator.user.gitLabId)).generateOne
+          val updatedCreator = memberGitLabEmailLens.set(Some(personEmails.generateOne))(creator)
           (memberEmailFinder
             .findMemberEmail(_: GitLabMember, _: Project)(_: Option[AccessToken]))
-            .expects(creator, Project(infoWithCreator.id, infoWithCreator.slug), maybeAccessToken)
+            .expects(creator.withReaderLevel, Project(infoWithCreator.id, infoWithCreator.slug), maybeAccessToken)
             .returning(rightT[IO, ProcessingRecoverableError](updatedCreator))
 
           finder
@@ -113,10 +112,10 @@ class ProjectInfoFinderSpec
         .expects(projectInfo.slug, maybeAccessToken)
         .returning(rightT[IO, ProcessingRecoverableError](Set.empty))
       val updatedCreator =
-        gitLabProjectMembers.modify(memberGitLabIdLens.modify(_ => creator.user.gitLabId)).generateOne
+        gitLabProjectMembers.map(memberGitLabIdLens.modify(_ => creator.user.gitLabId)).generateOne
       (memberEmailFinder
         .findMemberEmail(_: GitLabMember, _: Project)(_: Option[AccessToken]))
-        .expects(creator, Project(projectInfo.id, projectInfo.slug), maybeAccessToken)
+        .expects(creator.withReaderLevel, Project(projectInfo.id, projectInfo.slug), maybeAccessToken)
         .returning(rightT[IO, ProcessingRecoverableError](updatedCreator))
 
       finder.findProjectInfo(projectInfo.slug).value.unsafeRunSync() shouldBe projectInfo
@@ -139,7 +138,7 @@ class ProjectInfoFinderSpec
         .returning(rightT[IO, ProcessingRecoverableError](members))
       val updatedMembers = members map { member =>
         val updatedMember =
-          gitLabProjectMembers.modify(memberGitLabIdLens.modify(_ => member.user.gitLabId)).generateOne
+          gitLabProjectMembers.map(memberGitLabIdLens.modify(_ => member.user.gitLabId)).generateOne
         (memberEmailFinder
           .findMemberEmail(_: GitLabMember, _: Project)(_: Option[AccessToken]))
           .expects(member, Project(projectInfo.id, projectInfo.slug), maybeAccessToken)
@@ -327,6 +326,10 @@ class ProjectInfoFinderSpec
     val projectFinder     = mock[ProjectFinder[IO]]
     val membersFinder     = mock[ProjectMembersFinder[IO]]
     val memberEmailFinder = mock[MemberEmailFinder[IO]]
-    val finder            = new ProjectInfoFinderImpl[IO](projectFinder, membersFinder, memberEmailFinder)
+    lazy val finder       = new ProjectInfoFinderImpl[IO](projectFinder, membersFinder, memberEmailFinder)
+
+    implicit class GitLabMemberOps(m: GitLabMember) {
+      def withReaderLevel: GitLabMember = m.copy(accessLevel = Role.toGitLabAccessLevel(Role.Reader))
+    }
   }
 }

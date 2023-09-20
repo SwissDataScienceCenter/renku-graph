@@ -49,7 +49,7 @@ private class ProjectInfoFinderImpl[F[_]: MonadThrow: Parallel: Logger](
     memberEmailFinder: MemberEmailFinder[F]
 ) extends ProjectInfoFinder[F] {
 
-  import memberEmailFinder._
+  // import memberEmailFinder._
   import membersFinder._
   import projectFinder._
 
@@ -67,13 +67,13 @@ private class ProjectInfoFinderImpl[F[_]: MonadThrow: Parallel: Logger](
   private def addEmails(project: GitLabProjectInfo)(implicit maybeAccessToken: Option[AccessToken]) = {
     val proj = Project(project.id, project.slug)
     val forMembers = project.members.toList
-      .parTraverse(findMemberEmail(_, proj))
+      .parTraverse(memberEmailFinder.findMemberEmail(_, proj))
       .map(deduplicateSameIdMembers)
 
     val forCreator =
-      project.maybeCreator.toList
-        .traverse(user => findMemberEmail(user.toMember(Role.Reader), proj))
-        .map(_.headOption.map(_.user))
+      project.maybeCreator
+        .traverse(user => memberEmailFinder.findMemberEmail(user.toMember(Role.Reader), proj))
+        .map(_.map(_.user))
 
     forCreator
       .map(user => user.map(u => project.copy(maybeCreator = u.some)).getOrElse(project))
