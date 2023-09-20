@@ -42,7 +42,9 @@ private object Failure {
       with Failure {
 
     override lazy val detailedMessage: String = cause match {
-      case f: CoreFailure => s"$getMessage; ${f.detailedMessage}"
+      case f: CoreFailure =>
+        if (f.detailedMessage startsWith getMessage) f.detailedMessage
+        else s"$getMessage; ${f.detailedMessage}"
       case _ => getMessage
     }
   }

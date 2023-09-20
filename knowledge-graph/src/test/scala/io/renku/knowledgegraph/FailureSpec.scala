@@ -23,6 +23,7 @@ import cats.syntax.all._
 import io.renku.core.client.Generators.{resultFailures => coreResultFailures}
 import io.renku.data.Message
 import io.renku.data.Message._
+import io.renku.generators.CommonGraphGenerators.serverErrorHttpStatuses
 import io.renku.generators.Generators.Implicits._
 import io.renku.generators.Generators.exceptions
 import munit.{CatsEffectSuite, ScalaCheckEffectSuite}
@@ -64,6 +65,21 @@ class FailureSpec extends CatsEffectSuite with ScalaCheckEffectSuite {
     val failure           = Generators.withCauseFailures(causeGen = coreResultFailure).generateOne
 
     assertEquals(failure.detailedMessage, show"${failure.message}; ${coreResultFailure.detailedMessage}")
+    assertEquals(failure.getMessage, failure.message.show)
+  }
+
+  test {
+    "WithCause.detailedMessage should " +
+      "return a message where no repetition of the exception message occurs"
+  } {
+
+    val coreResultFailure = coreResultFailures.generateOne
+    val failure = Failure(serverErrorHttpStatuses.generateOne,
+                          Message.Error.fromExceptionMessage(coreResultFailure),
+                          coreResultFailure
+    )
+
+    assertEquals(failure.detailedMessage, coreResultFailure.detailedMessage)
     assertEquals(failure.getMessage, failure.message.show)
   }
 }
