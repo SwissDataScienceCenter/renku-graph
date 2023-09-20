@@ -1212,7 +1212,7 @@ class ProjectSpec
 
       EntityFunctions[entities.Project].findAllPersons(project) shouldBe
         project.maybeCreator.toSet ++
-        project.members ++
+        project.members.map(_.person) ++
         project.activities.flatMap(EntityFunctions[entities.Activity].findAllPersons).toSet ++
         project.datasets.flatMap(EntityFunctions[entities.Dataset[entities.Dataset.Provenance]].findAllPersons).toSet ++
         project.plans.flatMap(EntityFunctions[entities.Plan].findAllPersons).toSet
