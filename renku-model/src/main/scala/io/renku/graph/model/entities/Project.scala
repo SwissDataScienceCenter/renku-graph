@@ -527,14 +527,14 @@ object RenkuProject {
         (updateAuthors(from) andThen updateAssociationAgents(from))(activities)
 
       private def updateAuthors(from: Set[Person]): List[Activity] => List[Activity] =
-        activitiesLens.composeLens(ActivityLens.activityAuthor).modify { author =>
+        activitiesLens.andThen(ActivityLens.activityAuthor).modify { author =>
           from
             .find(byEmail(author))
             .getOrElse(author)
         }
 
       private def updateAssociationAgents(from: Set[Person]): List[Activity] => List[Activity] =
-        activitiesLens.composeLens(ActivityLens.activityAssociationAgent).modify {
+        activitiesLens.andThen(ActivityLens.activityAssociationAgent).modify {
           case Right(person) =>
             Right(from.find(byEmail(person)).getOrElse(person))
           case other => other
@@ -545,9 +545,9 @@ object RenkuProject {
 
       def updateCreators(from: Set[Person]): List[Dataset[Provenance]] =
         datasetsLens
-          .composeLens(provenanceLens)
-          .composeLens(provCreatorsLens)
-          .composeTraversal(creatorsLens)
+          .andThen(provenanceLens)
+          .andThen(provCreatorsLens)
+          .andThen(creatorsLens)
           .modify(creator => from.find(byEmail(creator)).getOrElse(creator))(datasets)
     }
 
@@ -555,7 +555,7 @@ object RenkuProject {
 
       def updateCreators(from: Set[Person]): List[Plan] =
         plansLens
-          .composeLens(PlanLens.planCreators)
+          .andThen(PlanLens.planCreators)
           .modify(_.map(p => from.find(byEmail(p)).getOrElse(p)))(plans)
     }
 

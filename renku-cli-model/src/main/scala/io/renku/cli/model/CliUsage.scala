@@ -52,6 +52,6 @@ object CliUsage {
       Lens[CliUsage, CliEntity](_.entity)(e => u => u.copy(entity = e))
 
     val entityPath: Lens[CliUsage, EntityPath] =
-      entity.composeLens(CliEntity.Lenses.entityPath)
+      entity.andThen(CliEntity.Lenses.entityPath)
   }
 }

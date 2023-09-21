@@ -78,9 +78,9 @@ object CliGeneration {
       Lens[CliGeneration, CliEntity](_.entity)(e => _.copy(entity = e))
 
     val entityPath: Lens[CliGeneration, EntityPath] =
-      entity.composeLens(CliEntity.Lenses.entityPath)
+      entity.andThen(CliEntity.Lenses.entityPath)
 
     val entityGenerationIds: Lens[CliGeneration, List[generations.ResourceId]] =
-      entity.composeLens(CliEntity.Lenses.generationIds)
+      entity.andThen(CliEntity.Lenses.generationIds)
   }
 }

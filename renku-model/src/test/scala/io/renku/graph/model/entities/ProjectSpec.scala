@@ -81,7 +81,7 @@ class ProjectSpec
 
     "add images from gitlab project avatar" in new TestCase {
       val projectInfo =
-        gitLabProjectInfos.map(projectInfoMaybeParent.set(None)).suchThat(_.avatarUrl.isDefined).generateOne
+        gitLabProjectInfos.map(projectInfoMaybeParent.replace(None)).suchThat(_.avatarUrl.isDefined).generateOne
       val testProject: testentities.Project =
         createRenkuProject(projectInfo, cliVersion, schemaVersion)
           .asInstanceOf[testentities.RenkuProject.WithoutParent]
@@ -101,7 +101,7 @@ class ProjectSpec
     }
 
     "turn CliProject entity without parent into the Project object" in new TestCase {
-      forAll(gitLabProjectInfos.map(projectInfoMaybeParent.set(None))) { projectInfo =>
+      forAll(gitLabProjectInfos.map(projectInfoMaybeParent.replace(None))) { projectInfo =>
         val creator            = projectMembersWithEmail.generateOne
         val member1            = projectMembersNoEmail.generateOne
         val member2            = projectMembersWithEmail.generateOne
@@ -157,7 +157,7 @@ class ProjectSpec
     }
 
     "turn CliProject entity with parent into the Project object" in new TestCase {
-      forAll(gitLabProjectInfos.map(projectInfoMaybeParent.set(projectSlugs.generateSome))) { projectInfo =>
+      forAll(gitLabProjectInfos.map(projectInfoMaybeParent.replace(projectSlugs.generateSome))) { projectInfo =>
         val creator            = projectMembersWithEmail.generateOne
         val member1            = projectMembersNoEmail.generateOne
         val member2            = projectMembersWithEmail.generateOne
@@ -211,7 +211,7 @@ class ProjectSpec
     }
 
     "turn non-renku CliProject entity without parent into the NonRenkuProject object" in {
-      forAll(gitLabProjectInfos.map(projectInfoMaybeParent.set(None))) { projectInfo =>
+      forAll(gitLabProjectInfos.map(projectInfoMaybeParent.replace(None))) { projectInfo =>
         val creator = projectMembersWithEmail.generateOne
         val members = projectMembers.generateSet()
         val info    = projectInfo.copy(maybeCreator = creator.some, members = members)
@@ -232,7 +232,7 @@ class ProjectSpec
     }
 
     "turn non-renku CliProject entity with parent into the NonRenkuProject object" in {
-      forAll(gitLabProjectInfos.map(projectInfoMaybeParent.set(projectSlugs.generateSome))) { projectInfo =>
+      forAll(gitLabProjectInfos.map(projectInfoMaybeParent.replace(projectSlugs.generateSome))) { projectInfo =>
         val creator = projectMembersWithEmail.generateOne
         val members = projectMembers.generateSet()
         val info    = projectInfo.copy(maybeCreator = creator.some, members = members)
@@ -252,8 +252,8 @@ class ProjectSpec
     forAll {
       Table(
         "Project type"   -> "Project Info",
-        "without parent" -> gitLabProjectInfos.map(projectInfoMaybeParent.set(None)).generateOne,
-        "with parent"    -> gitLabProjectInfos.map(projectInfoMaybeParent.set(projectSlugs.generateSome)).generateOne
+        "without parent" -> gitLabProjectInfos.map(projectInfoMaybeParent.replace(None)).generateOne,
+        "with parent"    -> gitLabProjectInfos.map(projectInfoMaybeParent.replace(projectSlugs.generateSome)).generateOne
       )
     } { (projectType, info) =>
       s"match persons in plan.creators for project $projectType" in new TestCase {
@@ -264,7 +264,7 @@ class ProjectSpec
         val projectInfo        = info.copy(maybeCreator = creator.some, members = Set(member2))
         val creatorAsCliPerson = creator.toTestPerson.copy(maybeGitLabId = None)
         val activity =
-          testentities.Activity.Lenses.planCreators.set(List(creatorAsCliPerson))(
+          testentities.Activity.Lenses.planCreators.replace(List(creatorAsCliPerson))(
             activityWith(member2.toTestPerson.copy(maybeGitLabId = None))(projectInfo.dateCreated)
           )
 
@@ -284,10 +284,10 @@ class ProjectSpec
 
         actual.maybeCreator shouldBe mergedCreator.to[entities.Person].some
         actual.members      shouldBe Set(mergedMember2.to[entities.Person])
-        actual.activities shouldBe ActivityLens.activityAuthor.set(mergedMember2.to[entities.Person])(
+        actual.activities shouldBe ActivityLens.activityAuthor.replace(mergedMember2.to[entities.Person])(
           activity.to[entities.Activity]
         ) :: Nil
-        actual.plans shouldBe PlanLens.planCreators.set(List(mergedCreator.to[entities.Person]))(
+        actual.plans shouldBe PlanLens.planCreators.replace(List(mergedCreator.to[entities.Person]))(
           activity.plan.to[entities.Plan]
         ) :: Nil
       }
@@ -321,7 +321,7 @@ class ProjectSpec
         actualPlan1 shouldBe entitiesPlan
         actualPlan2 shouldBe entitiesPlanModification1
         actualPlan3 shouldBe (modifiedPlanDerivation >>> planDerivationOriginalId)
-          .set(entitiesPlan.resourceId)(entitiesPlanModification2)
+          .replace(entitiesPlan.resourceId)(entitiesPlanModification2)
       }
     }
 
@@ -512,7 +512,7 @@ class ProjectSpec
 
     "return Invalid when there's a Dataset entity that cannot be decoded" in new TestCase {
 
-      val projectInfo = gitLabProjectInfos.map(projectInfoMaybeParent.set(None)).generateOne
+      val projectInfo = gitLabProjectInfos.map(projectInfoMaybeParent.replace(None)).generateOne
 
       val testProject = createRenkuProject(projectInfo, cliVersion, schemaVersion)
 
@@ -532,7 +532,7 @@ class ProjectSpec
 
     "return Invalid when there's an Activity entity created before project creation" in new TestCase {
 
-      val projectInfo       = gitLabProjectInfos.map(projectInfoMaybeParent.set(None)).generateOne
+      val projectInfo       = gitLabProjectInfos.map(projectInfoMaybeParent.replace(None)).generateOne
       val dateBeforeProject = timestamps(max = projectInfo.dateCreated.value.minusSeconds(1)).generateOne
       val activity = activityEntities(
         stepPlanEntities(planCommands, cliShapedPersons).map(
@@ -565,7 +565,7 @@ class ProjectSpec
 
     "return Invalid when there's an internal Dataset entity created before project without parent" in new TestCase {
 
-      val projectInfo = gitLabProjectInfos.map(projectInfoMaybeParent.set(None)).generateOne
+      val projectInfo = gitLabProjectInfos.map(projectInfoMaybeParent.replace(None)).generateOne
       val dataset =
         datasetEntities(provenanceInternal(cliShapedPersons)).withDateBefore(projectInfo.dateCreated).generateOne
       val entitiesDataset = dataset.to[entities.Dataset[entities.Dataset.Provenance.Internal]]
@@ -587,7 +587,7 @@ class ProjectSpec
 
     "return Invalid when there's a Plan entity created before project without parent" in new TestCase {
 
-      val projectInfo = gitLabProjectInfos.map(projectInfoMaybeParent.set(None)).generateOne
+      val projectInfo = gitLabProjectInfos.map(projectInfoMaybeParent.replace(None)).generateOne
       val plan = stepPlanEntities(planCommands, cliShapedPersons)(projectInfo.dateCreated).generateOne
         .replacePlanDateCreated(timestamps(max = projectInfo.dateCreated.value).generateAs[plans.DateCreated])
       val entitiesPlan = plan.to[entities.Plan]
@@ -608,7 +608,7 @@ class ProjectSpec
     "convert project when there's an internal or modified Dataset entity created before project with parent" in new TestCase {
 
       val parentSlug  = projectSlugs.generateOne
-      val projectInfo = gitLabProjectInfos.map(projectInfoMaybeParent.set(parentSlug.some)).generateOne
+      val projectInfo = gitLabProjectInfos.map(projectInfoMaybeParent.replace(parentSlug.some)).generateOne
       val dataset1 = datasetEntities(provenanceInternal(cliShapedPersons))
         .withDateBefore(projectInfo.dateCreated)
         .generateOne
@@ -642,7 +642,7 @@ class ProjectSpec
 
     "return Invalid when there's a modified Dataset entity created before project without parent" in new TestCase {
 
-      val projectInfo = gitLabProjectInfos.map(projectInfoMaybeParent.set(None)).generateOne
+      val projectInfo = gitLabProjectInfos.map(projectInfoMaybeParent.replace(None)).generateOne
       val (dataset, modifiedDataset) =
         datasetAndModificationEntities(provenanceImportedExternal(creatorsGen = cliShapedPersons),
                                        modificationCreatorGen = cliShapedPersons
@@ -674,7 +674,7 @@ class ProjectSpec
 
     "convert project when there's a Dataset (neither internal nor modified) created before project creation" in new TestCase {
 
-      val projectInfo = gitLabProjectInfos.map(projectInfoMaybeParent.set(None)).generateOne
+      val projectInfo = gitLabProjectInfos.map(projectInfoMaybeParent.replace(None)).generateOne
       val dataset1 = datasetEntities(provenanceImportedExternal(creatorsGen = cliShapedPersons))
         .withDateBefore(projectInfo.dateCreated)
         .generateOne
@@ -702,8 +702,8 @@ class ProjectSpec
 
     "return Invalid when there's a modified Dataset that is derived from a non-existing dataset" in new TestCase {
       Set(
-        gitLabProjectInfos.map(projectInfoMaybeParent.set(None)).generateOne,
-        gitLabProjectInfos.map(projectInfoMaybeParent.set(projectSlugs.generateSome)).generateOne
+        gitLabProjectInfos.map(projectInfoMaybeParent.replace(None)).generateOne,
+        gitLabProjectInfos.map(projectInfoMaybeParent.replace(projectSlugs.generateSome)).generateOne
       ) foreach { projectInfo =>
         val (original, modified) = datasetAndModificationEntities(provenanceInternal(cliShapedPersons),
                                                                   projectInfo.dateCreated,
@@ -1436,7 +1436,7 @@ class ProjectSpec
     })
 
   private def replaceAgent(activity: testentities.Activity, newAgent: testentities.Person): testentities.Activity =
-    testentities.Activity.Lenses.associationAgent.set(Right(newAgent))(activity)
+    testentities.Activity.Lenses.associationAgent.replace(Right(newAgent))(activity)
 
   private def byEmail(member: ProjectMemberWithEmail): testentities.Person => Boolean =
     _.maybeEmail.exists(_ == member.email)

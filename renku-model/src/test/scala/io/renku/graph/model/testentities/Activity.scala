@@ -123,12 +123,12 @@ object Activity {
       Lens[Activity, Association](_.association)(assoc => a => a.copy(associationFactory = _ => assoc))
 
     val plan: Lens[Activity, StepPlan] =
-      association.composeLens(Association.Lenses.plan)
+      association.andThen(Association.Lenses.plan)
 
     val planCreators: Lens[Activity, List[Person]] =
-      plan.composeLens(StepPlan.Lenses.creators)
+      plan.andThen(StepPlan.Lenses.creators)
 
     val associationAgent: Lens[Activity, Either[Agent, Person]] =
-      association.composeLens(Association.Lenses.agent)
+      association.andThen(Association.Lenses.agent)
   }
 }
