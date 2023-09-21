@@ -158,10 +158,6 @@ trait RenkuProjectEntitiesGenerators {
 
   lazy val gitLabProjectMembers: Gen[GitLabMember] = Gen.oneOf(projectMembersNoEmail, projectMembersWithEmail)
 
-  implicit class ProjectMemberGenOps(membersGen: Gen[GitLabMember]) {
-    def modify(f: GitLabMember => GitLabMember): Gen[GitLabMember] = membersGen.map(f)
-  }
-
   implicit class RenkuProjectGenFactoryOps(projectGen: Gen[RenkuProject])(implicit renkuUrl: RenkuUrl) {
 
     def withDatasets[P <: Dataset.Provenance](factories: DatasetGenFactory[P]*): Gen[RenkuProject] = for {

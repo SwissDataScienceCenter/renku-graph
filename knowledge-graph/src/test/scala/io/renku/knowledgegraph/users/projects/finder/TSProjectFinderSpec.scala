@@ -51,7 +51,7 @@ class TSProjectFinderSpec
       }
 
       val matchingMember =
-        memberPersonGitLabIdLens.set(criteria.userId.some)(
+        memberPersonGitLabIdLens.replace(criteria.userId.some)(
           projectMemberEntities(withGitLabId).generateOne
         )
       val project1WithMatchingMember = anyProjectEntities
@@ -78,7 +78,7 @@ class TSProjectFinderSpec
       )
 
       val matchingMember =
-        memberPersonGitLabIdLens.set(criteria.userId.some)(
+        memberPersonGitLabIdLens.replace(criteria.userId.some)(
           projectMemberEntities(withGitLabId).generateOne
         )
       val privateProjectWithMatchingMemberAndAuthUser = projectEntities(visibilityPrivate)

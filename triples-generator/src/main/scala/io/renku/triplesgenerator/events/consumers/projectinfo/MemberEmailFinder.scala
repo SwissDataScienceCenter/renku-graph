@@ -69,17 +69,24 @@ private class MemberEmailFinderImpl[F[_]: Async: Logger](
       case None => rightT[F, ProcessingRecoverableError](member)
       case Some(nextPage) =>
         for {
-          (pushEvents, pagingInfo) <- projectEventsFinder.find(project, nextPage).map(filterEventsFor(member))
-          maybeEmail               <- matchEmailFromCommits(pushEvents, project)
-          updatedMember            <- addEmailOrCheckNextPage(member, maybeEmail, project, pagingInfo)
+          (allEvents, pagingInfo) <- projectEventsFinder.find(project, nextPage)
+          pushEvents = allEvents.filter(eventForMember(member))
+          maybeEmail <- matchEmailFromCommits(pushEvents, project)
+          _ = {
+            println("-----findCommitsAndEvents------------------------------")
+            println(s"Member: $member")
+            println(s"AllEvents: $allEvents")
+            println(s"Owned: $pushEvents")
+            println(s"Found E-Mail: $maybeEmail")
+            ()
+          }
+
+          updatedMember <- addEmailOrCheckNextPage(member, maybeEmail, project, pagingInfo)
         } yield updatedMember
     }
 
-  private def filterEventsFor(
-      member: GitLabMember
-  ): ((List[PushEvent], PagingInfo)) => (List[PushEvent], PagingInfo) = { case (events, paging) =>
-    events.filter(ev => ev.authorId == member.user.gitLabId) -> paging
-  }
+  private def eventForMember(member: GitLabMember)(event: PushEvent): Boolean =
+    event.authorId == member.user.gitLabId
 
   private def addEmailOrCheckNextPage(member:     GitLabMember,
                                       maybeEmail: Option[persons.Email],

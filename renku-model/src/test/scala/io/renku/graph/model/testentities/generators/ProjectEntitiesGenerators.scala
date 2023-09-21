@@ -60,7 +60,7 @@ trait ProjectEntitiesGenerators {
     memberGitLabUserLens.andThen(gitLabUserIdLens)
 
   lazy val memberGitLabEmailLens: Lens[GitLabMember, Option[persons.Email]] =
-    memberGitLabUserLens.composeLens(gitLabUserEmailLens)
+    memberGitLabUserLens.andThen(gitLabUserEmailLens)
 
   def membersLens[P <: Project]: Lens[P, Set[Project.Member]] =
     Lens[P, Set[Project.Member]](_.members) { members =>
@@ -88,10 +88,10 @@ trait ProjectEntitiesGenerators {
     Lens[Person, Option[persons.GitLabId]](_.maybeGitLabId)(a => b => b.copy(maybeGitLabId = a))
 
   def memberPersonNameLens: Lens[Project.Member, persons.Name] =
-    memberPersonLens.composeLens(personNameLens)
+    memberPersonLens.andThen(personNameLens)
 
   def memberPersonGitLabIdLens: Lens[Project.Member, Option[persons.GitLabId]] =
-    memberPersonLens.composeLens(personGitLabIdLens)
+    memberPersonLens.andThen(personGitLabIdLens)
 
   def projectMembersPersonLens[P <: Project]: Traversal[P, Person] = {
     val t = Traversal.fromTraverse[List, Project.Member]

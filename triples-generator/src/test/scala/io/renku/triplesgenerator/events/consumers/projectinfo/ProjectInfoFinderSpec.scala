@@ -65,14 +65,14 @@ class ProjectInfoFinderSpec
             .expects(infoWithCreator.slug, maybeAccessToken)
             .returning(rightT[IO, ProcessingRecoverableError](members))
           val updatedMembers = members map { member =>
-            val updatedMember = memberGitLabEmailLens.set(Some(personEmails.generateOne))(member)
+            val updatedMember = memberGitLabEmailLens.replace(Some(personEmails.generateOne))(member)
             (memberEmailFinder
               .findMemberEmail(_: GitLabMember, _: Project)(_: Option[AccessToken]))
               .expects(member, Project(infoWithCreator.id, infoWithCreator.slug), maybeAccessToken)
               .returning(rightT[IO, ProcessingRecoverableError](updatedMember))
             updatedMember
           }
-          val updatedCreator = memberGitLabEmailLens.set(Some(personEmails.generateOne))(creator)
+          val updatedCreator = memberGitLabEmailLens.replace(Some(personEmails.generateOne))(creator)
           (memberEmailFinder
             .findMemberEmail(_: GitLabMember, _: Project)(_: Option[AccessToken]))
             .expects(creator.withOwnerLevel, Project(infoWithCreator.id, infoWithCreator.slug), maybeAccessToken)

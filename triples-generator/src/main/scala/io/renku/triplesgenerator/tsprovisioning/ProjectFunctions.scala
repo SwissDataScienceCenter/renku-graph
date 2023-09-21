@@ -130,7 +130,7 @@ private object ProjectFunctions extends ProjectFunctions {
 
     def updateMember(person: Person, f: Project.Member => Project.Member): Project =
       projectMembersLens
-        .composeTraversal(membersLens)
+        .andThen(membersLens)
         .modify { member =>
           if (member.person == person) f(member)
           else member

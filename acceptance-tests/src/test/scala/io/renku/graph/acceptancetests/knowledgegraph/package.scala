@@ -113,10 +113,10 @@ package object knowledgegraph {
     }"""
   }
 
+  //TODO email removed here
   private implicit lazy val personEncoder: Encoder[Person] = Encoder.instance {
-    case Person(name, Some(email), _, _, maybeAffiliation) => json"""{
-      "name":  $name,
-      "email": $email
+    case Person(name, Some(_), _, _, maybeAffiliation) => json"""{
+      "name":  $name
     }""" addIfDefined ("affiliation" -> maybeAffiliation)
     case Person(name, _, _, _, maybeAffiliation) => json"""{
       "name": $name

@@ -44,7 +44,7 @@ package object data extends TSData with ProjectFunctions {
   ): Gen[Project] = for {
     project     <- projectGen
     id          <- projectIds
-    members     <- EntitiesGenerators.gitLabMemberGen().toGeneratorOfNonEmptyList(max = 3)
+    members     <- EntitiesGenerators.gitLabProjectMembers.toGeneratorOfNonEmptyList(max = 3)
     urls        <- urlsObjects
     starsCount  <- starsCounts
     permissions <- permissionsObjects
@@ -63,7 +63,7 @@ package object data extends TSData with ProjectFunctions {
                   statistics
   )
 
-  private implicit lazy val testPersonToProjectMember: testentities.Person => GitLabUser = { p =>
+  private implicit lazy val testPersonToGitLabUser: testentities.Person => GitLabUser = { p =>
     GitLabUser(p.name, persons.Username(p.name.value), personGitLabIds.generateOne, p.maybeEmail)
   }
 

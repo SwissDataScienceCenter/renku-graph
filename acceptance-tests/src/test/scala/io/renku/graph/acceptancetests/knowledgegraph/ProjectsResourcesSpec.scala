@@ -26,7 +26,8 @@ import io.renku.graph.acceptancetests.data._
 import io.renku.graph.acceptancetests.flows.TSProvisioning
 import io.renku.graph.acceptancetests.tooling.{AcceptanceSpec, ApplicationServices}
 import io.renku.graph.model.EventsGenerators.commitIds
-import io.renku.graph.model.RenkuTinyTypeGenerators.{personEmails, personGitLabIds}
+//import io.renku.graph.model.RenkuTinyTypeGenerators.{personEmails, personGitLabIds}
+import io.renku.graph.model.persons
 import io.renku.graph.model.projects.{Role, Visibility}
 import io.renku.graph.model.testentities._
 import io.renku.http.rest.Links
@@ -45,9 +46,12 @@ class ProjectsResourcesSpec
   private val accessToken = user.accessToken
 
   private val parentProject -> project = {
-    val creatorGitLabId = personGitLabIds.generateOne
-    val creatorEmail    = personEmails.generateOne
-    val creator         = cliShapedPersons.generateOne.copy(maybeEmail = creatorEmail.some)
+    val creatorGitLabId = persons.GitLabId(999999)
+    val creatorEmail    = persons.Email("creator@theemail.ch")
+    val creator = cliShapedPersons.generateOne.copy(
+      name = persons.Name("Parent Creator"),
+      maybeEmail = creatorEmail.some
+    )
 
     val (parent, child) = renkuProjectEntities(visibilityPublic, creatorGen = cliShapedPersons)
       .withDatasets(datasetEntities(provenanceInternal(cliShapedPersons)))
@@ -71,6 +75,15 @@ class ProjectsResourcesSpec
   Feature("GET knowledge-graph/projects/<namespace>/<name> to find project's details") {
 
     Scenario("As a user I would like to find project's details by calling a REST endpoint") {
+      println("---------TEST DATA--------------------")
+      println(s"Parent Project: id=${parentProject.id}, slug=${parentProject.slug}")
+      println(s"           +++: slug*=${parentProject.entitiesProject.slug}")
+      println(s"ParentProject Creator (GitLabUser): ${parentProject.maybeCreator}")
+      println(s"ParentProject Creator (entitiesProject): ${parentProject.entitiesProject.maybeCreator}")
+      println(s"Child Project: id=${project.id}, slug=${project.slug}")
+      println(s"           +++: slug*=${project.entitiesProject.slug}")
+      println(s"ChildProject Creator (GitLabUser): ${project.maybeCreator}")
+      println(s"ChildProject Creator (entitiesProject): ${project.entitiesProject.maybeCreator}")
 
       Given("the user is authenticated")
       gitLabStub.addAuthenticated(user)
@@ -79,11 +92,12 @@ class ProjectsResourcesSpec
       val parentCommitId = commitIds.generateOne
       mockCommitDataOnTripleGenerator(parentProject, toPayloadJsonLD(parentProject), parentCommitId)
       gitLabStub.setupProject(parentProject, parentCommitId)
-
       `data in the Triples Store`(parentProject, parentCommitId, accessToken)
+      waitForAllEventsInFinalState(parentProject.id)
 
-      val commitId = commitIds.generateOne
-      mockCommitDataOnTripleGenerator(project, toPayloadJsonLD(project.entitiesProject), commitId)
+      val commitId    = commitIds.generateOne
+      val jsonPayload = toPayloadJsonLD(project.entitiesProject)
+      mockCommitDataOnTripleGenerator(project, jsonPayload, commitId)
       gitLabStub.setupProject(project, commitId)
       `data in the Triples Store`(project, commitId, accessToken)
       waitForAllEventsInFinalState(project.id)

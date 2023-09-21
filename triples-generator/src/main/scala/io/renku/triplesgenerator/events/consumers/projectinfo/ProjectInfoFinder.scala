@@ -43,7 +43,7 @@ private[consumers] object ProjectInfoFinder {
   } yield new ProjectInfoFinderImpl(projectFinder, membersFinder, memberEmailFinder)
 }
 
-private class ProjectInfoFinderImpl[F[_]: MonadThrow: Parallel: Logger](
+private class ProjectInfoFinderImpl[F[_]: Async: MonadThrow: Parallel: Logger](
     projectFinder:     ProjectFinder[F],
     membersFinder:     ProjectMembersFinder[F],
     memberEmailFinder: MemberEmailFinder[F]
@@ -65,10 +65,22 @@ private class ProjectInfoFinderImpl[F[_]: MonadThrow: Parallel: Logger](
     findProjectMembers(project.slug).map(members => project.copy(members = members))
 
   private def addEmails(project: GitLabProjectInfo)(implicit maybeAccessToken: Option[AccessToken]) = EitherT {
-    (project.members ++ project.maybeCreator.map(_.toMember(Role.Owner))).toList
-      .map(memberEmailFinder.findMemberEmail(_, Project(project.id, project.slug)).value)
+    val allMembers = (project.members ++ project.maybeCreator.map(_.toMember(Role.Owner))).toList
+    val allMembersWithMail = allMembers
+      .map { member =>
+        memberEmailFinder
+          .findMemberEmail(member, Project(project.id, project.slug))
+          .value
+          .flatTap { res =>
+            val msg = s"Mail for: ${member}  -->  ${res.map(_.user.email.map(_.value))}"
+            Async[F].blocking(println(msg))
+          }
+      }
       .parSequence
       .map(_.sequence)
+    Async[F].blocking(
+      println("------------------------ProjectInfoFinder:addEmails-------------------------")
+    ) >> allMembersWithMail
   }.map(deduplicateSameIdMembers)
     .map(members => (updateCreator(members) andThen updateMembers(members))(project))
 
