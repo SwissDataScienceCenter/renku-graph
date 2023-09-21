@@ -22,7 +22,7 @@ import cats.data.Kleisli
 import cats.effect.{IO, Resource}
 import com.dimafeng.testcontainers.{ForAllTestContainer, PostgreSQLContainer}
 import eu.timepit.refined.auto._
-import io.renku.db.TestDbConfig.newDbConfig
+import io.renku.db.TestDbConfig.create
 import io.renku.metrics.{LabeledHistogram, TestLabeledHistogram}
 import io.renku.testtools.IOSpec
 import natchez.Trace.Implicits.noop
@@ -82,7 +82,7 @@ trait ContainerTestDb extends ForAllTestContainer {
 
   private trait TestDB
 
-  private val dbConfig: DBConfigProvider.DBConfig[TestDB] = newDbConfig[TestDB]
+  private val dbConfig: DBConfigProvider.DBConfig[TestDB] = create[TestDB]
 
   override val container: PostgreSQLContainer = PostgresContainer.container(dbConfig)
 

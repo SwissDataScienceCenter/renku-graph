@@ -16,22 +16,18 @@
  * limitations under the License.
  */
 
-package io.renku.db
+package io.renku.eventsqueue
 
-import eu.timepit.refined.api.Refined
-import eu.timepit.refined.auto._
-import io.renku.db.DBConfigProvider.DBConfig
-import io.renku.generators.Generators.Implicits._
-import io.renku.generators.Generators.nonEmptyStrings
+private object DBInfra {
 
-object TestDbConfig {
+  object QueueTable {
+    val name: String = "enqueued_event"
 
-  def create[TargetDb]: DBConfig[TargetDb] = DBConfig[TargetDb](
-    name = Refined.unsafeApply(nonEmptyStrings().map(suffix => s"db_$suffix").generateOne),
-    host = "localhost",
-    port = 5432,
-    user = "user",
-    pass = "test",
-    connectionPool = 20
-  )
+    object Column {
+      val payload: String = "payload"
+      val created: String = "created"
+      val status:  String = "status"
+      val updated: String = "updated"
+    }
+  }
 }

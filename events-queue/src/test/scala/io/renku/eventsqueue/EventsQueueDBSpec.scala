@@ -16,22 +16,8 @@
  * limitations under the License.
  */
 
-package io.renku.db
+package io.renku.eventsqueue
 
-import eu.timepit.refined.api.Refined
-import eu.timepit.refined.auto._
-import io.renku.db.DBConfigProvider.DBConfig
-import io.renku.generators.Generators.Implicits._
-import io.renku.generators.Generators.nonEmptyStrings
+import org.scalatest.Suite
 
-object TestDbConfig {
-
-  def create[TargetDb]: DBConfig[TargetDb] = DBConfig[TargetDb](
-    name = Refined.unsafeApply(nonEmptyStrings().map(suffix => s"db_$suffix").generateOne),
-    host = "localhost",
-    port = 5432,
-    user = "user",
-    pass = "test",
-    connectionPool = 20
-  )
-}
+trait EventsQueueDBSpec extends ContainerDB { self: Suite => }

@@ -16,5 +16,19 @@
  * limitations under the License.
  */
 
-organization := "io.renku"
-name := "event-queue"
+package io.renku.eventsqueue
+
+import cats.Show
+
+private sealed trait EnqueueStatus {
+  val value: String
+  override lazy val toString: String        = value
+  lazy val widen:             EnqueueStatus = this
+}
+
+private object EnqueueStatus {
+  case object New        extends EnqueueStatus { override val value: String = "NEW" }
+  case object Processing extends EnqueueStatus { override val value: String = "PROCESSING" }
+
+  implicit def show[S <: EnqueueStatus]: Show[S] = Show.fromToString
+}

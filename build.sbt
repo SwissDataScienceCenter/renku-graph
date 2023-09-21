@@ -42,6 +42,7 @@ lazy val root = project
     renkuCliModel,
     renkuModel,
     graphCommons,
+    eventsQueue,
     eventLogApi,
     eventLog,
     tokenRepository,
@@ -114,8 +115,8 @@ lazy val graphCommons = project
   )
   .enablePlugins(AutomateHeaderPlugin)
 
-lazy val eventQueue = project
-  .in(file("event-queue"))
+lazy val eventsQueue = project
+  .in(file("events-queue"))
   .settings(commonSettings)
   .dependsOn(
     graphCommons % "compile->compile; test->test"
