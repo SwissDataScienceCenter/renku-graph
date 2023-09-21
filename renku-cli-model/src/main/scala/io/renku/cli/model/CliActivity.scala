@@ -98,15 +98,15 @@ object CliActivity {
       Lens[CliActivity, List[CliGeneration]](_.generations)(gens => _.copy(generations = gens))
 
     val usagesEntities: Traversal[CliActivity, CliUsage] =
-      usages.composeTraversal(Traversal.fromTraverse[List, CliUsage])
+      usages.andThen(Traversal.fromTraverse[List, CliUsage])
 
     val generationEntities: Traversal[CliActivity, CliGeneration] =
-      generations.composeTraversal(Traversal.fromTraverse[List, CliGeneration])
+      generations.andThen(Traversal.fromTraverse[List, CliGeneration])
 
     val usageEntityPaths: Traversal[CliActivity, EntityPath] =
-      usagesEntities.composeLens(CliUsage.Lenses.entityPath)
+      usagesEntities.andThen(CliUsage.Lenses.entityPath)
 
     val generationEntityPaths: Traversal[CliActivity, EntityPath] =
-      generationEntities.composeLens(CliGeneration.Lenses.entityPath)
+      generationEntities.andThen(CliGeneration.Lenses.entityPath)
   }
 }

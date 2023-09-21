@@ -32,7 +32,7 @@ class PlanLensSpec extends AnyWordSpec with should.Matchers with EntitiesGenerat
       val p2 = createPlan
 
       PlanLens.planCreators.get(p1) shouldBe p1.creators
-      PlanLens.planCreators.set(p2.creators)(p1) shouldBe {
+      PlanLens.planCreators.replace(p2.creators)(p1) shouldBe {
         p1 match {
           case p: StepPlan.NonModified      => p.copy(creators = p2.creators)
           case p: StepPlan.Modified         => p.copy(creators = p2.creators)

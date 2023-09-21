@@ -61,7 +61,7 @@ private object Generators {
       searchInfoLinks
         .modify { _ =>
           val linkedProjects = NonEmptyList.of(withLinkTo, and: _*)
-          linkedProjects.map(linkProjectId.set(_)(linkObjectsGen(i.topmostSameAs).generateOne))
+          linkedProjects.map(linkProjectId.replace(_)(linkObjectsGen(i.topmostSameAs).generateOne))
         }(i)
     }
 

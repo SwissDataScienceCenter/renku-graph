@@ -125,7 +125,7 @@ class ProjectFunctionsSpec extends AnyWordSpec with should.Matchers with ScalaCh
 
       val updated = update(entitiesOldPerson, newPerson)(project)
 
-      updated.plans shouldBe project.plans.map(PlanLens.planCreators.set(List(newPerson)))
+      updated.plans shouldBe project.plans.map(PlanLens.planCreators.replace(List(newPerson)))
     }
 
     "replace the old person with the new on all datasets" in {

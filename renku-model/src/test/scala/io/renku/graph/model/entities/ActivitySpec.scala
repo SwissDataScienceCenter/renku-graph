@@ -71,7 +71,7 @@ class ActivitySpec
 
       val cliActivity =
         CliActivity.Lenses.usageEntityPaths
-          .set(BaseGenerators.entityPathGen.generateOne)
+          .replace(BaseGenerators.entityPathGen.generateOne)
           .apply(activity.to[CliActivity])
 
       val result = entities.Activity.fromCli(cliActivity, createDependencyLinks(activity.association.plan))
@@ -90,7 +90,7 @@ class ActivitySpec
 
       val cliActivity =
         CliActivity.Lenses.generationEntityPaths
-          .set(BaseGenerators.entityPathGen.generateOne)
+          .replace(BaseGenerators.entityPathGen.generateOne)
           .apply(activity.to[CliActivity])
 
       val result = entities.Activity.fromCli(cliActivity, createDependencyLinks(activity.association.plan))

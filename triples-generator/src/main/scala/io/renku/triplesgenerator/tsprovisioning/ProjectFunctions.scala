@@ -122,7 +122,7 @@ private object ProjectFunctions extends ProjectFunctions {
 
     def updateMember(oldPerson: Person, newPerson: Person): Project =
       projectMembersLens
-        .composeTraversal(membersLens)
+        .andThen(membersLens)
         .modify {
           case `oldPerson` => newPerson
           case p           => p
@@ -167,8 +167,8 @@ private object ProjectFunctions extends ProjectFunctions {
                                     newPerson: Person
   ): List[Dataset[Provenance]] => List[Dataset[Provenance]] =
     datasetsLens
-      .composeLens(provenanceLens >>> provCreatorsLens)
-      .composeTraversal(creatorsLens)
+      .andThen(provenanceLens >>> provCreatorsLens)
+      .andThen(creatorsLens)
       .modify {
         case `oldPerson` => newPerson
         case p           => p
@@ -176,8 +176,8 @@ private object ProjectFunctions extends ProjectFunctions {
 
   private def updatePlanCreators(oldPerson: Person, newPerson: Person): List[Plan] => List[Plan] =
     plansLens
-      .composeLens(PlanLens.planCreators)
-      .composeTraversal(Traversal.fromTraverse[List, Person])
+      .andThen(PlanLens.planCreators)
+      .andThen(Traversal.fromTraverse[List, Person])
       .modify {
         case `oldPerson` => newPerson
         case p           => p

@@ -68,7 +68,7 @@ class UpdatesCreatorSpec
 
       val dateCreated = DateCreated(Instant.parse("2022-12-09T13:45:13Z"))
       val project1 =
-        projectCreatedLens.set(dateCreated)(
+        projectCreatedLens.replace(dateCreated)(
           anyProjectEntities.generateOne.to[entities.Project]
         )
       val project2 = projectCreatedLens.modify(_ - 1.days).apply(project1)
@@ -87,7 +87,7 @@ class UpdatesCreatorSpec
 
       val dateCreated = DateCreated(Instant.parse("2022-12-09T13:45:13Z"))
       val project =
-        projectCreatedLens.set(dateCreated)(
+        projectCreatedLens.replace(dateCreated)(
           anyProjectEntities.generateOne.to[entities.Project]
         )
       upload(to = projectsDataset, project)
@@ -104,7 +104,7 @@ class UpdatesCreatorSpec
 
       val dateCreated = DateCreated(Instant.parse("2022-12-09T13:45:13Z"))
       val project1 =
-        projectCreatedLens.set(dateCreated)(
+        projectCreatedLens.replace(dateCreated)(
           anyProjectEntities.generateOne.to[entities.Project]
         )
       val project2 = projectCreatedLens.modify(_ - 1.days).apply(project1)
