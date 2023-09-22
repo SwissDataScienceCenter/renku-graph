@@ -31,6 +31,7 @@ sealed trait Histogram[F[_]] extends MetricsCollector
 
 trait SingleValueHistogram[F[_]] extends Histogram[F] {
   def startTimer(): F[Histogram.Timer[F]]
+  def observe(amt: Double): F[Unit]
 }
 
 object SingleValueHistogram {
@@ -62,6 +63,10 @@ class SingleValueHistogramImpl[F[_]: MonadThrow](val name: String Refined NonEmp
 
   override def startTimer(): F[Histogram.Timer[F]] = MonadThrow[F].catchNonFatal {
     new metrics.SingleValueHistogram.NoThresholdTimerImpl(wrappedCollector.startTimer())
+  }
+
+  override def observe(amt: Double): F[Unit] = MonadThrow[F].catchNonFatal {
+    wrappedCollector.observe(amt)
   }
 }
 
@@ -120,7 +125,9 @@ class LabeledHistogramImpl[F[_]: MonadThrow](val name: String Refined NonEmpty,
 
   def observe(labelValue: String, amt: Double): F[Unit] =
     MonadThrow[F].catchNonFatal {
-      wrappedCollector.labels(labelValue).observe(amt)
+      if (maybeThresholdMillis.fold(ifEmpty = true)((amt * 1000d) >= _))
+        wrappedCollector.labels(labelValue).observe(amt)
+      else ()
     }
 
   override def startTimer(labelValue: String): F[Histogram.Timer[F]] = MonadThrow[F].catchNonFatal {

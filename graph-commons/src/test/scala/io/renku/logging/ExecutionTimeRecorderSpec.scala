@@ -70,15 +70,11 @@ class ExecutionTimeRecorderSpec
       executionTimeRecorder
         .measureExecutionTime[String](block())
         .assertThrowsError[Exception](_ shouldBe exception)
-        .unsafeRunSync()
     }
 
-    "made the given histogram to collect process execution time - case without a label" in {
+    "put the given histogram to collect process execution time - case without a label" in {
 
-      val histogram      = mock[SingleValueHistogram[IO]]
-      val histogramTimer = mock[Histogram.Timer[IO]]
-      (histogram.startTimer _).expects().returning(histogramTimer.pure[IO])
-      (() => histogramTimer.observeDuration).expects().returning(nonNegativeDoubles().generateOne.value.pure[IO])
+      val histogram = mock[SingleValueHistogram[IO]]
 
       val executionTimeRecorder = new ExecutionTimeRecorderImpl(loggingThreshold, Some(histogram))
 
@@ -86,6 +82,10 @@ class ExecutionTimeRecorderSpec
       block.expects().returning(blockOut.pure[IO])
 
       val blockExecutionTime = positiveInts(max = 100).generateOne.value
+      (histogram.observe _)
+        .expects(where((amt: Double) => amt >= blockExecutionTime.toDouble))
+        .returning(().pure[IO])
+
       executionTimeRecorder
         .measureExecutionTime[String] {
           Temporal[IO].delayBy(block(), blockExecutionTime millis)
@@ -96,10 +96,7 @@ class ExecutionTimeRecorderSpec
     "made the given histogram to collect process execution time - case with a label" in {
 
       val label: String Refined NonEmpty = "label"
-      val histogram      = mock[LabeledHistogram[IO]]
-      val histogramTimer = mock[Histogram.Timer[IO]]
-      (histogram.startTimer _).expects(label.value).returning(histogramTimer.pure[IO])
-      (() => histogramTimer.observeDuration).expects().returning(nonNegativeDoubles().generateOne.value.pure[IO])
+      val histogram = mock[LabeledHistogram[IO]]
 
       val executionTimeRecorder = new ExecutionTimeRecorderImpl(loggingThreshold, Some(histogram))
 
@@ -107,6 +104,10 @@ class ExecutionTimeRecorderSpec
       block.expects().returning(blockOut.pure[IO])
 
       val blockExecutionTime = positiveInts(max = 100).generateOne.value
+      (histogram.observe _)
+        .expects(where((l: String, amt: Double) => l == label.value && amt >= blockExecutionTime.toDouble))
+        .returning(().pure[IO])
+
       executionTimeRecorder
         .measureExecutionTime[String](
           Temporal[IO].delayBy(block(), blockExecutionTime millis),
@@ -139,7 +140,7 @@ class ExecutionTimeRecorderSpec
           Temporal[IO].delayBy(block(), blockExecutionTime millis)
         }
         .assertNoException >>
-        IO(logger.expectNoLogs())
+        logger.expectNoLogsF()
     }
   }
 
@@ -159,7 +160,7 @@ class ExecutionTimeRecorderSpec
             blockExecutionMessage
           })
           .asserting(_ shouldBe blockOut) >>
-          IO(logger.loggedOnly(Warn(s"$blockExecutionMessage in ${elapsedTime}ms")))
+          logger.loggedOnlyF(Warn(s"$blockExecutionMessage in ${elapsedTime}ms"))
       }
 
     "not log a message if the given partial function does get applied " +
@@ -176,7 +177,7 @@ class ExecutionTimeRecorderSpec
             blockExecutionMessage
           })
           .asserting(_ shouldBe blockOut) >>
-          IO(logger.expectNoLogs())
+          logger.expectNoLogsF()
       }
 
     "not log a message if the given partial function does not get applied" in {
@@ -192,7 +193,7 @@ class ExecutionTimeRecorderSpec
           blockExecutionMessage
         })
         .asserting(_ shouldBe blockOut) >>
-        IO(logger.expectNoLogs())
+        logger.expectNoLogsF()
     }
   }
 
@@ -209,7 +210,7 @@ class ExecutionTimeRecorderSpec
         .pure[IO]
         .flatMap(logExecutionTime(blockExecutionMessage))
         .asserting(_ shouldBe blockOut) >>
-        IO(logger.loggedOnly(Warn(s"$blockExecutionMessage in ${elapsedTime}ms")))
+        logger.loggedOnlyF(Warn(s"$blockExecutionMessage in ${elapsedTime}ms"))
     }
 
     "not log a message if the elapsed time is < threshold" in {
@@ -223,7 +224,7 @@ class ExecutionTimeRecorderSpec
         .pure[IO]
         .flatMap(logExecutionTime(blockExecutionMessage))
         .asserting(_ shouldBe blockOut) >>
-        IO(logger.expectNoLogs())
+        logger.expectNoLogsF()
     }
   }
 
@@ -251,7 +252,7 @@ class ExecutionTimeRecorderSpec
         .pure[IO]
         .flatMap(executionTimeRecorder.logExecutionTimeWhen { case _ => blockExecutionMessage })
         .asserting(_ shouldBe blockOut) >>
-        IO(logger.loggedOnly(Warn(s"$blockExecutionMessage in ${elapsedTime}ms")))
+        logger.loggedOnlyF(Warn(s"$blockExecutionMessage in ${elapsedTime}ms"))
     }
   }
 
