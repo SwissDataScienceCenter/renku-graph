@@ -69,10 +69,11 @@ class SingleValueHistogramSpec extends AnyWordSpec with MockFactory with should.
   }
 
   "observe" should {
+
     "call the underlying impl" in new TestCase {
-      val histogram = new LabeledHistogramImpl[Try](name, help, "label", Seq(0.1))
-      histogram.observe("label", 101d)
-      histogram.wrappedCollector.labels("label").get().sum shouldBe 101d
+      val histogram = new SingleValueHistogramImpl[Try](name, help, Seq(0.1))
+      histogram.observe(101d)
+      histogram.wrappedCollector.collectAllSamples.last._3 shouldBe 1d
     }
   }
 
@@ -193,6 +194,36 @@ class LabeledHistogramSpec extends AnyWordSpec with MockFactory with should.Matc
       histogram.simulateDuration(simulatedDuration3, value)
 
       underlying.collectValuesFor(label.value, value) shouldBe Nil
+    }
+  }
+
+  "observe" should {
+
+    "store the value if no threshold given" in new TestCase {
+
+      val histogram = new LabeledHistogramImpl[Try](name, help, "label", Seq(0.1))
+
+      histogram.observe("label", 101d)
+
+      histogram.wrappedCollector.labels("label").get().sum shouldBe 101d
+    }
+
+    "store the value if threshold given but the value >= the threshold" in new TestCase {
+
+      val histogram = new LabeledHistogramImpl[Try](name, help, "label", Seq(0.1), maybeThreshold = (1 second).some)
+
+      histogram.observe("label", 101d)
+
+      histogram.wrappedCollector.labels("label").get().sum shouldBe 101d
+    }
+
+    "not store the value if threshold given and the value < the threshold" in new TestCase {
+
+      val histogram = new LabeledHistogramImpl[Try](name, help, "label", Seq(0.1), maybeThreshold = (1 second).some)
+
+      histogram.observe("label", .999d)
+
+      histogram.wrappedCollector.labels("label").get().sum shouldBe 0d
     }
   }
 
