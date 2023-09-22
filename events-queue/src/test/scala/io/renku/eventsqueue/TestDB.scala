@@ -18,8 +18,8 @@
 
 package io.renku.eventsqueue
 
-private sealed trait TestDB
+sealed trait TestDB
 
-private object TestDB {
+object TestDB {
   type SessionResource[F[_]] = io.renku.db.SessionResource[F, TestDB]
 }

@@ -1,19 +1,19 @@
-package io.renku.eventlog
+package io.renku.eventsqueue
 
 import cats.data.Kleisli
 import cats.effect.testing.scalatest.AsyncIOSpec
 import cats.effect.{Deferred, IO, Temporal}
 import fs2.Stream
 import org.scalatest.Succeeded
+import org.scalatest.flatspec.AsyncFlatSpec
 import org.scalatest.matchers.should
-import org.scalatest.wordspec.AsyncWordSpec
 import skunk._
 import skunk.implicits._
 
 import scala.concurrent.duration._
 import scala.util.Random
 
-class ChannelsSpec extends AsyncWordSpec with AsyncIOSpec with InMemoryEventLogDbSpec with should.Matchers {
+class ChannelsSpec extends AsyncFlatSpec with AsyncIOSpec with EventsQueueDBSpec with should.Matchers {
 
   // Questions:
   // * what to do to prevent losing an event?
@@ -22,8 +22,7 @@ class ChannelsSpec extends AsyncWordSpec with AsyncIOSpec with InMemoryEventLogD
   // * how to react on batches not a single insert into the table?
   //   Should the listener count the events and fetch the rows after the count reaches a certain number (or a certain amount of time has elapsed)?
 
-
-  "use pg async notification mechanism for pub/sub purposes" in {
+  it should "use pg async notification mechanism for pub/sub purposes" in {
     val sentAll = Deferred.unsafe[IO, Unit]
     for {
       _ <- keepNotifying(sentAll).start
@@ -38,7 +37,7 @@ class ChannelsSpec extends AsyncWordSpec with AsyncIOSpec with InMemoryEventLogD
   type Ch = Channel[IO, String, String]
 
   private def withChannel(f: Ch => IO[Unit]): IO[Unit] =
-    executeIO {
+    execute {
       Kleisli.fromFunction[IO, Session[IO]](_.channel(channelId)).flatMapF(f)
     }
 

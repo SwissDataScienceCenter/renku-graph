@@ -16,18 +16,20 @@
  * limitations under the License.
  */
 
-package io.renku.db
+package io.renku.eventsqueue
 
-import cats.effect.kernel.Async
-import skunk.PreparedQuery
+import io.renku.generators.Generators.nonEmptyStrings
+import org.scalacheck.Gen
+import skunk.data.Identifier
 
-object implicits extends implicits
+private object Generators {
 
-trait implicits {
+  val events: Gen[TestEvent] =
+    nonEmptyStrings().map(TestEvent(_))
 
-  implicit class PreparedQueryOps[F[_], In, Out](preparedQuery: PreparedQuery[F, In, Out]) {
-
-    def toList(implicit sync: Async[F]): In => F[List[Out]] = args =>
-      preparedQuery.stream(args, chunkSize = 32).compile.toList
-  }
+  def channelIds: Gen[Identifier] =
+    nonEmptyStrings()
+      .map(_.toLowerCase)
+      .map(Identifier.fromString)
+      .map(_.fold(err => throw new Exception(s"Error when generating Channel identifier: $err"), identity))
 }

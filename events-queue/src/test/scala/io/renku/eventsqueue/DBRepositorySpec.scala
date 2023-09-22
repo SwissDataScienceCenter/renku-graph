@@ -16,18 +16,14 @@
  * limitations under the License.
  */
 
-package io.renku.db
+package io.renku.eventsqueue
 
-import cats.effect.kernel.Async
-import skunk.PreparedQuery
+import org.scalatest.flatspec.AnyFlatSpec
+import org.scalatest.matchers.should
 
-object implicits extends implicits
+class DBRepositorySpec extends AnyFlatSpec with should.Matchers {
 
-trait implicits {
-
-  implicit class PreparedQueryOps[F[_], In, Out](preparedQuery: PreparedQuery[F, In, Out]) {
-
-    def toList(implicit sync: Async[F]): In => F[List[Out]] = args =>
-      preparedQuery.stream(args, chunkSize = 32).compile.toList
+  it should "fail" in {
+    fail("boom!")
   }
 }

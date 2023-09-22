@@ -16,18 +16,23 @@
  * limitations under the License.
  */
 
-package io.renku.db
+package io.renku.eventsqueue
 
-import cats.effect.kernel.Async
-import skunk.PreparedQuery
+import io.circe.Json
+import io.renku.db.SessionResource
+import io.renku.db.syntax._
 
-object implicits extends implicits
+private trait DBRepository[F[_]] {
+  def insert(payload: Json): CommandDef[F]
+}
 
-trait implicits {
+private object DBRepository {
+  def apply[F[_], DB](implicit sr: SessionResource[F, DB]): DBRepository[F] =
+    new DBRepositoryImpl[F, DB]
+}
 
-  implicit class PreparedQueryOps[F[_], In, Out](preparedQuery: PreparedQuery[F, In, Out]) {
+private class DBRepositoryImpl[F[_], DB](implicit sr: SessionResource[F, DB]) extends DBRepository[F] {
 
-    def toList(implicit sync: Async[F]): In => F[List[Out]] = args =>
-      preparedQuery.stream(args, chunkSize = 32).compile.toList
-  }
+  println(sr)
+  override def insert(payload: Json): CommandDef[F] = ???
 }

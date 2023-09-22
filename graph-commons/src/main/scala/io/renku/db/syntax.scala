@@ -18,16 +18,23 @@
 
 package io.renku.db
 
-import cats.effect.kernel.Async
-import skunk.PreparedQuery
+import cats.Applicative
+import cats.data.Kleisli
+import skunk.Session
 
-object implicits extends implicits
+object syntax extends implicits {
 
-trait implicits {
+  type QueryDef[F[_], R] = Kleisli[F, Session[F], R]
+  type CommandDef[F[_]]  = Kleisli[F, Session[F], Unit]
 
-  implicit class PreparedQueryOps[F[_], In, Out](preparedQuery: PreparedQuery[F, In, Out]) {
+  object CommandDef {
+    def apply[F[_]](f: Session[F] => F[Unit]): CommandDef[F] =
+      Kleisli(f)
 
-    def toList(implicit sync: Async[F]): In => F[List[Out]] = args =>
-      preparedQuery.stream(args, chunkSize = 32).compile.toList
+    def liftF[F[_]: Applicative](result: F[Unit]): CommandDef[F] =
+      Kleisli.liftF[F, Session[F], Unit](result)
+
+    def pure[F[_]: Applicative]: CommandDef[F] =
+      Kleisli.pure[F, Session[F], Unit](())
   }
 }

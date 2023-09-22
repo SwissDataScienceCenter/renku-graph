@@ -23,23 +23,26 @@ import cats.data.Kleisli
 import cats.effect.kernel.MonadCancelThrow
 import cats.syntax.all._
 import io.renku.db.SessionResource
+import io.renku.db.syntax._
 import io.renku.eventsqueue.DBInfra.QueueTable.Column
 import org.typelevel.log4cats.Logger
 import skunk.codec.all.bool
 import skunk.implicits._
-import skunk.{Command, Query, Session, Void}
+import skunk.{Command, Query, Void}
 
 trait DBInfraCreator[F[_]] {
-  def createDBInfra[DB](sr: SessionResource[F, DB]): F[Unit]
+  def createDBInfra(): F[Unit]
 }
 
 object DBInfraCreator {
-  def apply[F[_]: MonadCancelThrow: Logger]: DBInfraCreator[F] = new DBInfraCreatorImpl[F]
+  def apply[F[_]: MonadCancelThrow: Logger, DB](implicit sr: SessionResource[F, DB]): DBInfraCreator[F] =
+    new DBInfraCreatorImpl[F, DB]
 }
 
-private class DBInfraCreatorImpl[F[_]: MonadCancelThrow: Logger] extends DBInfraCreator[F] {
+private class DBInfraCreatorImpl[F[_]: MonadCancelThrow: Logger, DB](implicit sr: SessionResource[F, DB])
+    extends DBInfraCreator[F] {
 
-  override def createDBInfra[DB](sr: SessionResource[F, DB]): F[Unit] =
+  override def createDBInfra(): F[Unit] =
     sr.useK {
       checkTableExists() >>= {
         case true  => Kleisli.liftF(Logger[F].info(s"'${QueueTable.name}' already exists"))
@@ -56,7 +59,7 @@ private class DBInfraCreatorImpl[F[_]: MonadCancelThrow: Logger] extends DBInfra
     _ <- run(createIndexSql("idx_enqueued_event_status", Column.status))
   } yield ()
 
-  private def checkTableExists(): Kleisli[F, Session[F], Boolean] = {
+  private def checkTableExists(): QueryDef[F, Boolean] = {
     val query: Query[Void, Boolean] =
       sql"SELECT EXISTS (SELECT 1 FROM pg_tables WHERE tablename = '#${QueueTable.name}')"
         .query(bool)
@@ -82,6 +85,6 @@ private class DBInfraCreatorImpl[F[_]: MonadCancelThrow: Logger] extends DBInfra
   private def createIndexSql(index: String, column: String): Command[Void] =
     sql"CREATE INDEX IF NOT EXISTS #$index ON #${QueueTable.name}(#$column)".command
 
-  private def run(sql: Command[Void]): Kleisli[F, Session[F], Unit] =
+  private def run(sql: Command[Void]): CommandDef[F] =
     Kleisli(_.execute(sql).void)
 }

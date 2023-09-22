@@ -36,7 +36,7 @@ class DBInfraCreatorSpec extends AsyncFlatSpec with AsyncIOSpec with should.Matc
     for {
       _ <- checkTableExists(QueueTable.name).asserting(_ shouldBe false)
 
-      _ <- dbInfraCreator.createDBInfra(sessionResource).assertNoException
+      _ <- dbInfraCreator.createDBInfra().assertNoException
 
       _ <- checkTableExists(QueueTable.name).asserting(_ shouldBe true)
       _ <- verifyIndexExists(QueueTable.name, "idx_enqueued_event_payload").assertNoException
@@ -47,7 +47,7 @@ class DBInfraCreatorSpec extends AsyncFlatSpec with AsyncIOSpec with should.Matc
   }
 
   private implicit lazy val logger: TestLogger[IO] = TestLogger()
-  private lazy val dbInfraCreator = new DBInfraCreatorImpl[IO]
+  private lazy val dbInfraCreator = new DBInfraCreatorImpl[IO, TestDB]
 
   private def checkTableExists(table: String): IO[Boolean] = execute[Boolean] {
     val query: Query[String, Boolean] =
