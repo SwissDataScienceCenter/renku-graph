@@ -16,12 +16,18 @@
  * limitations under the License.
  */
 
-package io.renku.triplesgenerator.events.consumers.membersync
+package io.renku.graph.model.gitlab
 
-import io.renku.graph.model.testentities.Project
+import io.renku.graph.model.persons.{Email, GitLabId, Name, Username}
+import io.renku.graph.model.projects.Role
 
-private object PersonOps {
-
-  implicit lazy val toKGProjectMember: Project.Member => Option[KGProjectMember] =
-    member => member.person.maybeGitLabId.map(gitLabId => KGProjectMember(member.person.resourceId, gitLabId))
+final case class GitLabUser(
+    name:     Name,
+    username: Username,
+    gitLabId: GitLabId,
+    email:    Option[Email]
+) {
+  def withEmail(email:      Email): GitLabUser   = copy(email = Some(email))
+  def toMember(accessLevel: Int):   GitLabMember = GitLabMember(name, username, gitLabId, email, accessLevel)
+  def toMember(role:        Role):  GitLabMember = toMember(Role.toGitLabAccessLevel(role))
 }

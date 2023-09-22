@@ -25,13 +25,12 @@ import cats.syntax.all._
 import eu.timepit.refined.api.Refined
 import eu.timepit.refined.auto._
 import eu.timepit.refined.collection.NonEmpty
-import io.circe.Decoder
-import io.renku.graph.model.entities.Project.ProjectMember
-import io.renku.graph.model.{persons, projects}
+import io.renku.graph.model.gitlab.GitLabMember
+import io.renku.graph.model.projects
 import io.renku.http.client.{AccessToken, GitLabClient}
 import io.renku.triplesgenerator.errors.{ProcessingRecoverableError, RecoverableErrorsRecovery}
 import org.http4s._
-import org.http4s.circe.jsonOf
+import org.http4s.circe.CirceEntityDecoder._
 import org.http4s.dsl.io.{NotFound, Ok}
 import org.http4s.implicits.http4sLiteralsSyntax
 import org.typelevel.ci._
@@ -40,7 +39,7 @@ import org.typelevel.log4cats.Logger
 private trait ProjectMembersFinder[F[_]] {
   def findProjectMembers(slug: projects.Slug)(implicit
       maybeAccessToken: Option[AccessToken]
-  ): EitherT[F, ProcessingRecoverableError, Set[ProjectMember]]
+  ): EitherT[F, ProcessingRecoverableError, Set[GitLabMember]]
 }
 
 private object ProjectMembersFinder {
@@ -50,35 +49,26 @@ private object ProjectMembersFinder {
 
 private class ProjectMembersFinderImpl[F[_]: Async: NonEmptyParallel: GitLabClient: Logger](
     recoveryStrategy: RecoverableErrorsRecovery = RecoverableErrorsRecovery
-) extends ProjectMembersFinder[F] {
+) extends ProjectMembersFinder[F]
+    with GitlabJsonDecoder {
 
   import io.renku.http.tinytypes.TinyTypeURIEncoder._
-  import io.renku.tinytypes.json.TinyTypeDecoders._
 
   override def findProjectMembers(
       slug: projects.Slug
-  )(implicit mat: Option[AccessToken]): EitherT[F, ProcessingRecoverableError, Set[ProjectMember]] = EitherT {
+  )(implicit mat: Option[AccessToken]): EitherT[F, ProcessingRecoverableError, Set[GitLabMember]] = EitherT {
     fetch(uri"projects" / slug / "members" / "all")
       .map(_.asRight[ProcessingRecoverableError])
       .recoverWith(recoveryStrategy.maybeRecoverableError)
   }
-
-  private implicit val memberDecoder: Decoder[ProjectMember] = cursor =>
-    for {
-      gitLabId <- cursor.downField("id").as[persons.GitLabId]
-      name     <- cursor.downField("name").as[persons.Name]
-      username <- cursor.downField("username").as[persons.Username]
-    } yield ProjectMember(name, username, gitLabId)
-
-  private implicit lazy val membersDecoder: EntityDecoder[F, List[ProjectMember]] = jsonOf[F, List[ProjectMember]]
 
   private val endpointName: String Refined NonEmpty = "project-members"
 
   private def fetch(
       uri:        Uri,
       maybePage:  Option[Int] = None,
-      allMembers: Set[ProjectMember] = Set.empty
-  )(implicit maybeAccessToken: Option[AccessToken]): F[Set[ProjectMember]] = for {
+      allMembers: Set[GitLabMember] = Set.empty
+  )(implicit maybeAccessToken: Option[AccessToken]): F[Set[GitLabMember]] = for {
     uri                     <- uriWithPage(uri, maybePage).pure[F]
     fetchedUsersAndNextPage <- GitLabClient[F].get(uri, endpointName)(mapResponse)
     allMembers              <- addNextPage(uri, allMembers, fetchedUsersAndNextPage)
@@ -90,18 +80,18 @@ private class ProjectMembersFinderImpl[F[_]: Async: NonEmptyParallel: GitLabClie
   }
 
   private lazy val mapResponse
-      : PartialFunction[(Status, Request[F], Response[F]), F[(Set[ProjectMember], Option[Int])]] = {
+      : PartialFunction[(Status, Request[F], Response[F]), F[(Set[GitLabMember], Option[Int])]] = {
     case (Ok, _, response) =>
       lazy val maybeNextPage: Option[Int] = response.headers.get(ci"X-Next-Page").flatMap(_.head.value.toIntOption)
-      response.as[List[ProjectMember]].map(_.toSet -> maybeNextPage)
-    case (NotFound, _, _) => (Set.empty[ProjectMember] -> Option.empty[Int]).pure[F]
+      response.as[List[GitLabMember]].map(_.toSet -> maybeNextPage)
+    case (NotFound, _, _) => (Set.empty[GitLabMember] -> Option.empty[Int]).pure[F]
   }
 
   private def addNextPage(
       url:                          Uri,
-      allMembers:                   Set[ProjectMember],
-      fetchedUsersAndMaybeNextPage: (Set[ProjectMember], Option[Int])
-  )(implicit maybeAccessToken: Option[AccessToken]): F[Set[ProjectMember]] =
+      allMembers:                   Set[GitLabMember],
+      fetchedUsersAndMaybeNextPage: (Set[GitLabMember], Option[Int])
+  )(implicit maybeAccessToken: Option[AccessToken]): F[Set[GitLabMember]] =
     fetchedUsersAndMaybeNextPage match {
       case (fetchedUsers, maybeNextPage @ Some(_)) => fetch(url, maybeNextPage, allMembers ++ fetchedUsers)
       case (fetchedUsers, None)                    => (allMembers ++ fetchedUsers).pure[F]

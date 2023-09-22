@@ -68,7 +68,8 @@ class KGProjectFinderSpec
 
     "return details of the project with the given slug if it has a parent project - non-public projects" in new TestCase {
       val user         = authUsers.generateOne
-      val userAsMember = personEntities.generateOne.copy(maybeGitLabId = user.id.some)
+      val userAsMember = projectMemberEntities(Gen.const(user.id.some)).generateOne
+
       val project = Gen
         .oneOf(
           renkuProjectWithParentEntities(visibilityNonPublic).modify(replaceMembers(Set(userAsMember))),
@@ -90,9 +91,9 @@ class KGProjectFinderSpec
         val project = Gen
           .oneOf(
             renkuProjectWithParentEntities(visibilityNonPublic)
-              .modify(replaceMembers(Set(personEntities.generateOne.copy(maybeGitLabId = user.id.some)))),
+              .modify(replaceMembers(Set(projectMemberEntities(Gen.const(user.id.some)).generateOne))),
             nonRenkuProjectWithParentEntities(visibilityNonPublic)
-              .modify(replaceMembers(Set(personEntities.generateOne.copy(maybeGitLabId = user.id.some))))
+              .modify(replaceMembers(Set(projectMemberEntities(Gen.const(user.id.some)).generateOne)))
           )
           .generateOne
 

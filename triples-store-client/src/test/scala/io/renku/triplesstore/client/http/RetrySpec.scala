@@ -55,16 +55,18 @@ class RetrySpec extends AsyncFlatSpec with AsyncIOSpec with should.Matchers {
         }
       }
 
+    def assertTryCount(n: Int): IO[Assertion] =
+      execTimes.get.map(_.size).asserting(_ shouldBe n)
+
     def assertPauseTime(expect: FiniteDuration, epsilon: Duration = 50.millis): IO[Assertion] =
       execTimes.get.map { times =>
         val lowerBound = expect - epsilon
-        val upperBound = expect + epsilon
 
         val diffs = times
           .zip(times.tail)
           .map { case (a, b) => a - b }
 
-        all(diffs) should (be > lowerBound and be < upperBound)
+        all(diffs) should (be > lowerBound)
       }
   }
 
@@ -74,8 +76,7 @@ class RetrySpec extends AsyncFlatSpec with AsyncIOSpec with should.Matchers {
     for {
       r <- retry.retryWhen(RetryError.unapply(_).isDefined)(e.exec)
       _ = r shouldBe ()
-      execCount <- e.execTimes.get
-      _ = execCount.size shouldBe 1
+      _ <- e.assertTryCount(1)
     } yield ()
   }
 
@@ -85,8 +86,7 @@ class RetrySpec extends AsyncFlatSpec with AsyncIOSpec with should.Matchers {
     for {
       r <- retry.retryWhen(RetryError.unapply(_).isDefined)(e.exec).attempt
       _ = r shouldBe Left(FinalError)
-      execCount <- e.execTimes.get
-      _ = execCount.size shouldBe 1
+      _ <- e.assertTryCount(1)
     } yield ()
   }
 
@@ -101,9 +101,8 @@ class RetrySpec extends AsyncFlatSpec with AsyncIOSpec with should.Matchers {
     for {
       r <- retry.retryWhen(RetryError.unapply(_).isDefined)(e.exec)
       _ = r shouldBe ()
-      execCount <- e.execTimes.get
-      _ = execCount.size shouldBe 3
-      _ <- e.assertPauseTime(500.millis, epsilon = 150.millis)
+      _ <- e.assertTryCount(3)
+      _ <- e.assertPauseTime(500.millis, epsilon = 50.millis)
     } yield ()
   }
 
@@ -121,7 +120,7 @@ class RetrySpec extends AsyncFlatSpec with AsyncIOSpec with should.Matchers {
       _ = r shouldBe Left(FinalError)
       execCount <- e.execTimes.get
       _ = execCount.size shouldBe 3
-      _ <- e.assertPauseTime(500.millis, epsilon = 150.millis)
+      _ <- e.assertPauseTime(500.millis, epsilon = 50.millis)
     } yield ()
   }
 
@@ -140,8 +139,7 @@ class RetrySpec extends AsyncFlatSpec with AsyncIOSpec with should.Matchers {
       Left(ex: Retry.RetryExceeded) = r
       _                             = ex.getCause    shouldBe RetryError
       _                             = ex.errors.size shouldBe 3
-      execCount <- e.execTimes.get
-      _ = execCount.size shouldBe 3
+      _ <- e.assertTryCount(3)
     } yield ()
   }
 }

@@ -95,7 +95,7 @@ trait FinderSpecOps {
     }.distinct
 
     def addAllPersonsFrom(project: RenkuProject): List[model.Entity] =
-      addPersons((project.members ++ project.maybeCreator).toList)
+      addPersons((project.members.map(_.person) ++ project.maybeCreator).toList)
         .addPersons(project.datasets.flatMap(_.provenance.creators.toList))
         .addPersons(project.activities.map(_.author))
         .addPersons(project.plans.flatMap(_.creators))

@@ -16,12 +16,24 @@
  * limitations under the License.
  */
 
-package io.renku.triplesgenerator.events.consumers.membersync
+package io.renku.graph.model.gitlab
 
-import io.renku.graph.model.testentities.Project
+import io.renku.graph.model.images.ImageUri
+import io.renku.graph.model.projects._
 
-private object PersonOps {
+final case class GitLabProjectInfo(
+    id:               GitLabId,
+    name:             Name,
+    slug:             Slug,
+    dateCreated:      DateCreated,
+    dateModified:     DateModified,
+    maybeDescription: Option[Description],
+    maybeCreator:     Option[GitLabUser],
+    keywords:         Set[Keyword],
+    members:          Set[GitLabMember],
+    visibility:       Visibility,
+    maybeParentSlug:  Option[Slug],
+    avatarUrl:        Option[ImageUri]
+)
 
-  implicit lazy val toKGProjectMember: Project.Member => Option[KGProjectMember] =
-    member => member.person.maybeGitLabId.map(gitLabId => KGProjectMember(member.person.resourceId, gitLabId))
-}
+object GitLabProjectInfo {}

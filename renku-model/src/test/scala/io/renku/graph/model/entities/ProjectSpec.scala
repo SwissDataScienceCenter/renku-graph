@@ -31,8 +31,7 @@ import io.renku.graph.model.GraphModelGenerators._
 import io.renku.graph.model.Schemas.{prov, renku, schema}
 import io.renku.graph.model._
 import io.renku.graph.model.entities.Generators.{compositePlanNonEmptyMappings, stepPlanGenFactory}
-import io.renku.graph.model.entities.Project.ProjectMember.{ProjectMemberNoEmail, ProjectMemberWithEmail}
-import io.renku.graph.model.entities.Project.{GitLabProjectInfo, ProjectMember}
+import io.renku.graph.model.gitlab.{GitLabMember, GitLabProjectInfo, GitLabUser}
 import io.renku.graph.model.images.Image
 import io.renku.graph.model.projects.ForksCount
 import io.renku.graph.model.testentities.RenkuProject.CreateCompositePlan
@@ -69,10 +68,12 @@ class ProjectSpec
       val member = projectMembersNoEmail.generateOne
       val email  = personEmails.generateOne
 
-      (member add email) shouldBe ProjectMember.ProjectMemberWithEmail(member.name,
-                                                                       member.username,
-                                                                       member.gitLabId,
-                                                                       email
+      (member withEmail email) shouldBe GitLabMember(
+        member.user.name,
+        member.user.username,
+        member.user.gitLabId,
+        email.some,
+        member.accessLevel
       )
     }
   }
@@ -102,11 +103,12 @@ class ProjectSpec
 
     "turn CliProject entity without parent into the Project object" in new TestCase {
       forAll(gitLabProjectInfos.map(projectInfoMaybeParent.replace(None))) { projectInfo =>
-        val creator            = projectMembersWithEmail.generateOne
-        val member1            = projectMembersNoEmail.generateOne
-        val member2            = projectMembersWithEmail.generateOne
-        val member3            = projectMembersWithEmail.generateOne
-        val info               = projectInfo.copy(maybeCreator = creator.some, members = Set(member1, member2, member3))
+        val creator = projectMembersWithEmail.generateOne
+        val member1 = projectMembersNoEmail.generateOne
+        val member2 = projectMembersWithEmail.generateOne
+        val member3 = projectMembersWithEmail.generateOne
+        val info    = projectInfo.copy(maybeCreator = creator.user.some, members = Set(member1, member2, member3))
+
         val creatorAsCliPerson = creator.toTestPerson.copy(maybeGitLabId = None)
         val activity1          = activityWith(member2.toTestPerson.copy(maybeGitLabId = None))(info.dateCreated)
         val activity2          = activityWith(cliShapedPersons.generateOne)(info.dateCreated)
@@ -131,10 +133,12 @@ class ProjectSpec
         val mergedMember3 = dataset1.provenance.creators
           .find(byEmail(member3))
           .map(merge(_, member3))
-          .getOrElse(fail(show"No dataset1 creator with ${member3.email}"))
+          .getOrElse(fail(show"No dataset1 creator with ${member3.user.email}"))
 
         val expectedActivities: List[testentities.Activity] =
-          (activity1.copy(author = mergedMember2) :: activity2 :: replaceAgent(activity3, mergedCreator) :: Nil)
+          (activity1.copy(author = mergedMember2.person) :: activity2 :: replaceAgent(activity3,
+                                                                                      mergedCreator.person
+          ) :: Nil)
             .sortBy(_.startTime)
 
         val decoded = Project.fromCli(cliProject, allPersons, info)
@@ -144,25 +148,29 @@ class ProjectSpec
           .copy(
             dateModified = List(cliProject.dateModified, info.dateModified).max,
             activities = expectedActivities.map(_.to[entities.Activity]),
-            maybeCreator = mergedCreator.to[entities.Person].some,
+            maybeCreator = mergedCreator.to[entities.Project.Member].person.some,
             datasets = List(
-              addTo(dataset1, NonEmptyList.one(mergedMember3))
+              addTo(dataset1, NonEmptyList.one(mergedMember3.person))
                 .to[entities.Dataset[entities.Dataset.Provenance]],
               dataset2
                 .to[entities.Dataset[entities.Dataset.Provenance]]
             ),
-            members = Set(member1.toPerson, mergedMember2.to[entities.Person], mergedMember3.to[entities.Person])
+            members = Set(member1.toMember,
+                          mergedMember2.to[entities.Project.Member],
+                          mergedMember3.to[entities.Project.Member]
+            )
           )
       }
     }
 
     "turn CliProject entity with parent into the Project object" in new TestCase {
       forAll(gitLabProjectInfos.map(projectInfoMaybeParent.replace(projectSlugs.generateSome))) { projectInfo =>
-        val creator            = projectMembersWithEmail.generateOne
-        val member1            = projectMembersNoEmail.generateOne
-        val member2            = projectMembersWithEmail.generateOne
-        val member3            = projectMembersWithEmail.generateOne
-        val info               = projectInfo.copy(maybeCreator = creator.some, members = Set(member1, member2, member3))
+        val creator = projectMembersWithEmail.generateOne
+        val member1 = projectMembersNoEmail.generateOne
+        val member2 = projectMembersWithEmail.generateOne
+        val member3 = projectMembersWithEmail.generateOne
+        val info    = projectInfo.copy(maybeCreator = creator.user.some, members = Set(member1, member2, member3))
+
         val creatorAsCliPerson = creator.toTestPerson.copy(maybeGitLabId = None)
         val activity1          = activityWith(member2.toTestPerson.copy(maybeGitLabId = None))(info.dateCreated)
         val activity2          = activityWith(cliShapedPersons.generateOne)(info.dateCreated)
@@ -186,10 +194,12 @@ class ProjectSpec
         val mergedMember3 = dataset1.provenance.creators
           .find(byEmail(member3))
           .map(merge(_, member3))
-          .getOrElse(fail(show"No dataset1 creator with ${member3.email}"))
+          .getOrElse(fail(show"No dataset1 creator with ${member3.user.email}"))
 
         val expectedActivities: List[testentities.Activity] =
-          (activity1.copy(author = mergedMember2) :: activity2 :: replaceAgent(activity3, mergedCreator) :: Nil)
+          (activity1.copy(author = mergedMember2.person) :: activity2 :: replaceAgent(activity3,
+                                                                                      mergedCreator.person
+          ) :: Nil)
             .sortBy(_.startTime)
 
         val decoded = Project.fromCli(cliProject, allPersons, info)
@@ -199,11 +209,14 @@ class ProjectSpec
           .asInstanceOf[entities.RenkuProject.WithParent]
           .copy(
             dateModified = List(cliProject.dateModified, info.dateModified).max,
-            members = Set(member1.toPerson, mergedMember2.to[entities.Person], mergedMember3.to[entities.Person]),
-            maybeCreator = mergedCreator.to[entities.Person].some,
+            members = Set(member1.toMember,
+                          mergedMember2.to[entities.Project.Member],
+                          mergedMember3.to[entities.Project.Member]
+            ),
+            maybeCreator = mergedCreator.to[entities.Project.Member].person.some,
             activities = expectedActivities.map(_.to[entities.Activity]),
             datasets = List(
-              addTo(dataset1, NonEmptyList.one(mergedMember3)).to[entities.Dataset[entities.Dataset.Provenance]],
+              addTo(dataset1, NonEmptyList.one(mergedMember3.person)).to[entities.Dataset[entities.Dataset.Provenance]],
               dataset2.to[entities.Dataset[entities.Dataset.Provenance]]
             )
           )
@@ -213,8 +226,8 @@ class ProjectSpec
     "turn non-renku CliProject entity without parent into the NonRenkuProject object" in {
       forAll(gitLabProjectInfos.map(projectInfoMaybeParent.replace(None))) { projectInfo =>
         val creator = projectMembersWithEmail.generateOne
-        val members = projectMembers.generateSet()
-        val info    = projectInfo.copy(maybeCreator = creator.some, members = members)
+        val members = gitLabProjectMembers.generateSet()
+        val info    = projectInfo.copy(maybeCreator = creator.user.some, members = members)
         val testProject: testentities.Project = createNonRenkuProject(info)
 
         val cliProject = testProject.to[CliProject]
@@ -225,7 +238,7 @@ class ProjectSpec
             .to[entities.Project]
             .asInstanceOf[entities.NonRenkuProject.WithoutParent]
             .copy(
-              members = members.map(_.toPerson),
+              members = members.map(_.toMember),
               maybeCreator = creator.toPerson.some
             )
       }
@@ -234,8 +247,8 @@ class ProjectSpec
     "turn non-renku CliProject entity with parent into the NonRenkuProject object" in {
       forAll(gitLabProjectInfos.map(projectInfoMaybeParent.replace(projectSlugs.generateSome))) { projectInfo =>
         val creator = projectMembersWithEmail.generateOne
-        val members = projectMembers.generateSet()
-        val info    = projectInfo.copy(maybeCreator = creator.some, members = members)
+        val members = gitLabProjectMembers.generateSet()
+        val info    = projectInfo.copy(maybeCreator = creator.user.some, members = members)
         val testProject: testentities.Project = createNonRenkuProject(info)
 
         val cliProject = testProject.to[CliProject]
@@ -245,7 +258,7 @@ class ProjectSpec
           testProject
             .to[entities.Project]
             .asInstanceOf[entities.NonRenkuProject.WithParent]
-            .copy(members = members.map(_.toPerson), maybeCreator = creator.toPerson.some)
+            .copy(members = members.map(_.toMember), maybeCreator = creator.toPerson.some)
       }
     }
 
@@ -253,7 +266,7 @@ class ProjectSpec
       Table(
         "Project type"   -> "Project Info",
         "without parent" -> gitLabProjectInfos.map(projectInfoMaybeParent.replace(None)).generateOne,
-        "with parent"    -> gitLabProjectInfos.map(projectInfoMaybeParent.replace(projectSlugs.generateSome)).generateOne
+        "with parent" -> gitLabProjectInfos.map(projectInfoMaybeParent.replace(projectSlugs.generateSome)).generateOne
       )
     } { (projectType, info) =>
       s"match persons in plan.creators for project $projectType" in new TestCase {
@@ -261,7 +274,7 @@ class ProjectSpec
         val creator = projectMembersWithEmail.generateOne
         val member2 = projectMembersWithEmail.generateOne
 
-        val projectInfo        = info.copy(maybeCreator = creator.some, members = Set(member2))
+        val projectInfo        = info.copy(maybeCreator = creator.user.some, members = Set(member2))
         val creatorAsCliPerson = creator.toTestPerson.copy(maybeGitLabId = None)
         val activity =
           testentities.Activity.Lenses.planCreators.replace(List(creatorAsCliPerson))(
@@ -282,12 +295,14 @@ class ProjectSpec
         val actual =
           Project.fromCli(cliProject, allPersons, projectInfo).fold(errs => fail(errs.intercalate("; ")), identity)
 
-        actual.maybeCreator shouldBe mergedCreator.to[entities.Person].some
-        actual.members      shouldBe Set(mergedMember2.to[entities.Person])
-        actual.activities shouldBe ActivityLens.activityAuthor.replace(mergedMember2.to[entities.Person])(
+        actual.maybeCreator shouldBe mergedCreator.to[entities.Project.Member].person.some
+        actual.members      shouldBe Set(mergedMember2.to[entities.Project.Member])
+        actual.activities shouldBe ActivityLens.activityAuthor.replace(
+          mergedMember2.to[entities.Project.Member].person
+        )(
           activity.to[entities.Activity]
         ) :: Nil
-        actual.plans shouldBe PlanLens.planCreators.replace(List(mergedCreator.to[entities.Person]))(
+        actual.plans shouldBe PlanLens.planCreators.replace(List(mergedCreator.to[entities.Project.Member].person))(
           activity.plan.to[entities.Plan]
         ) :: Nil
       }
@@ -635,7 +650,7 @@ class ProjectSpec
       Project.fromCli(cliProject, allPersons, projectInfo) shouldMatchToValid testProject
         .to[entities.RenkuProject.WithParent]
         .copy(
-          members = projectInfo.members.map(_.toPerson),
+          members = projectInfo.members.map(_.toMember),
           maybeCreator = projectInfo.maybeCreator.map(_.toPerson)
         )
     }
@@ -695,7 +710,7 @@ class ProjectSpec
       Project.fromCli(cliProject, allPersons, projectInfo) shouldMatchToValid testProject
         .to[entities.RenkuProject.WithoutParent]
         .copy(
-          members = projectInfo.members.map(_.toPerson),
+          members = projectInfo.members.map(_.toMember),
           maybeCreator = projectInfo.maybeCreator.map(_.toPerson)
         )
     }
@@ -751,7 +766,7 @@ class ProjectSpec
       Project.fromCli(cliProject, allPersons, projectInfo) shouldMatchToValid testProject
         .to[entities.RenkuProject.WithoutParent]
         .copy(
-          members = projectInfo.members.map(_.toPerson),
+          members = projectInfo.members.map(_.toMember),
           maybeCreator = projectInfo.maybeCreator.map(_.toPerson),
           dateCreated = earliestDate,
           dateModified = List(cliProject.dateModified, projectInfo.dateModified).max
@@ -787,7 +802,7 @@ class ProjectSpec
       Project.fromCli(cliProject, allPersons, projectInfo) shouldMatchToValid testProject
         .to[entities.RenkuProject.WithoutParent]
         .copy(
-          members = projectInfo.members.map(_.toPerson),
+          members = projectInfo.members.map(_.toMember),
           maybeCreator = projectInfo.maybeCreator.map(_.toPerson),
           dateCreated = earliestDate,
           dateModified = List(projectInfo.dateModified, cliProject.dateModified).max
@@ -820,7 +835,7 @@ class ProjectSpec
       Project.fromCli(cliProject, allPersons, projectInfo) shouldMatchToValid testProject
         .to[entities.RenkuProject.WithoutParent]
         .copy(
-          members = projectInfo.members.map(_.toPerson),
+          members = projectInfo.members.map(_.toMember),
           maybeCreator = projectInfo.maybeCreator.map(_.toPerson),
           dateCreated = earliestDate,
           dateModified = List(projectInfo.dateModified, cliProject.dateModified).max,
@@ -857,7 +872,7 @@ class ProjectSpec
       Project.fromCli(cliProject, allPersons, projectInfo) shouldMatchToValid testProject
         .to[entities.RenkuProject.WithoutParent]
         .copy(
-          members = projectInfo.members.map(_.toPerson),
+          members = projectInfo.members.map(_.toMember),
           maybeCreator = projectInfo.maybeCreator.map(_.toPerson),
           dateCreated = earliestDate,
           dateModified = List(projectInfo.dateModified, cliProject.dateModified).max,
@@ -1019,7 +1034,7 @@ class ProjectSpec
               schema / "creator"          -> project.maybeCreator.asJsonLD,
               renku / "projectVisibility" -> project.visibility.asJsonLD,
               schema / "keywords"         -> project.keywords.asJsonLD,
-              schema / "member"           -> project.members.toList.asJsonLD,
+              schema / "member"           -> project.members.map(_.person).toList.asJsonLD,
               schema / "schemaVersion"    -> project.version.asJsonLD,
               renku / "hasActivity"       -> project.activities.asJsonLD,
               renku / "hasPlan"           -> project.plans.asJsonLD,
@@ -1055,7 +1070,7 @@ class ProjectSpec
               schema / "creator"          -> project.maybeCreator.asJsonLD,
               renku / "projectVisibility" -> project.visibility.asJsonLD,
               schema / "keywords"         -> project.keywords.asJsonLD,
-              schema / "member"           -> project.members.toList.asJsonLD,
+              schema / "member"           -> project.members.map(_.person).toList.asJsonLD,
               prov / "wasDerivedFrom"     -> maybeParentId.map(_.asEntityId).asJsonLD,
               schema / "image"            -> project.images.asJsonLD
             )
@@ -1073,7 +1088,7 @@ class ProjectSpec
     "produce JsonLD with all the relevant properties and only links to Person entities" in {
       forAll(
         renkuProjectEntitiesWithDatasetsAndActivities
-          .modify(replaceMembers(personEntities(withoutGitLabId).generateFixedSizeSet(ofSize = 1)))
+          .modify(replaceMembers(projectMemberEntities(withoutGitLabId).generateFixedSizeSet(ofSize = 1)))
           .map(_.to[entities.RenkuProject])
       ) { project =>
         val maybeParentId = project match {
@@ -1098,7 +1113,7 @@ class ProjectSpec
               schema / "creator"          -> project.maybeCreator.map(_.resourceId.asEntityId).asJsonLD,
               renku / "projectVisibility" -> project.visibility.asJsonLD,
               schema / "keywords"         -> project.keywords.asJsonLD,
-              schema / "member"           -> project.members.map(_.resourceId.asEntityId).toList.asJsonLD,
+              schema / "member"           -> project.members.map(_.person.resourceId.asEntityId).toList.asJsonLD,
               schema / "schemaVersion"    -> project.version.asJsonLD,
               renku / "hasActivity"       -> project.activities.asJsonLD,
               renku / "hasPlan"           -> project.plans.asJsonLD,
@@ -1114,7 +1129,7 @@ class ProjectSpec
     "produce JsonLD with all the relevant properties or a non-Renku Project" in {
       forAll(
         anyNonRenkuProjectEntities
-          .modify(replaceMembers(personEntities(withoutGitLabId).generateFixedSizeSet(ofSize = 1)))
+          .modify(replaceMembers(projectMemberEntities(withoutGitLabId).generateFixedSizeSet(ofSize = 1)))
           .map(_.to[entities.NonRenkuProject])
       ) { project =>
         val maybeParentId = project match {
@@ -1138,7 +1153,7 @@ class ProjectSpec
               schema / "creator"          -> project.maybeCreator.map(_.resourceId.asEntityId).asJsonLD,
               renku / "projectVisibility" -> project.visibility.asJsonLD,
               schema / "keywords"         -> project.keywords.asJsonLD,
-              schema / "member"           -> project.members.map(_.resourceId.asEntityId).toList.asJsonLD,
+              schema / "member"           -> project.members.map(_.person.resourceId.asEntityId).toList.asJsonLD,
               prov / "wasDerivedFrom"     -> maybeParentId.map(_.asEntityId).asJsonLD,
               schema / "image"            -> project.images.asJsonLD
             )
@@ -1150,7 +1165,7 @@ class ProjectSpec
     "produce JsonLD with all the relevant properties without images" in {
       forAll(
         anyNonRenkuProjectEntities
-          .modify(replaceMembers(personEntities(withoutGitLabId).generateFixedSizeSet(ofSize = 1)))
+          .modify(replaceMembers(projectMemberEntities(withoutGitLabId).generateFixedSizeSet(ofSize = 1)))
           .modify(replaceImages(Nil))
           .map(_.to[entities.NonRenkuProject])
       ) { project =>
@@ -1182,7 +1197,7 @@ class ProjectSpec
               schema / "creator"          -> project.maybeCreator.map(_.resourceId.asEntityId).asJsonLD,
               renku / "projectVisibility" -> project.visibility.asJsonLD,
               schema / "keywords"         -> project.keywords.asJsonLD,
-              schema / "member"           -> project.members.map(_.resourceId.asEntityId).toList.asJsonLD,
+              schema / "member"           -> project.members.map(_.person.resourceId.asEntityId).toList.asJsonLD,
               prov / "wasDerivedFrom"     -> maybeParentId.map(_.asEntityId).asJsonLD
             )
           )
@@ -1199,7 +1214,7 @@ class ProjectSpec
 
       EntityFunctions[entities.Project].findAllPersons(project) shouldBe
         project.maybeCreator.toSet ++
-        project.members ++
+        project.members.map(_.person) ++
         project.activities.flatMap(EntityFunctions[entities.Activity].findAllPersons).toSet ++
         project.datasets.flatMap(EntityFunctions[entities.Dataset[entities.Dataset.Provenance]].findAllPersons).toSet ++
         project.plans.flatMap(EntityFunctions[entities.Plan].findAllPersons).toSet
@@ -1345,44 +1360,36 @@ class ProjectSpec
         )
     }
 
-  private implicit class ProjectMemberOps(gitLabPerson: ProjectMember) {
+  private implicit class GitLabMemberOps(gitLabPerson: GitLabMember) {
+    lazy val toPerson: entities.Person =
+      gitLabPerson.user.toPerson
 
-    lazy val toPerson: entities.Person = gitLabPerson match {
-      case ProjectMemberNoEmail(name, _, gitLabId) =>
-        entities.Person.WithGitLabId(persons.ResourceId(gitLabId),
-                                     gitLabId,
-                                     name,
-                                     maybeEmail = None,
-                                     maybeOrcidId = None,
-                                     maybeAffiliation = None
-        )
-      case ProjectMemberWithEmail(name, _, gitLabId, email) =>
-        entities.Person.WithGitLabId(persons.ResourceId(gitLabId),
-                                     gitLabId,
-                                     name,
-                                     email.some,
-                                     maybeOrcidId = None,
-                                     maybeAffiliation = None
-        )
-    }
+    lazy val toTestPerson: testentities.Person =
+      gitLabPerson.user.toTestPerson
 
-    lazy val toTestPerson: testentities.Person = gitLabPerson match {
-      case ProjectMemberNoEmail(_, username, gitLabId) =>
-        testentities.Person(
-          persons.Name(username.value),
-          maybeEmail = None,
-          gitLabId.some,
-          maybeOrcidId = None,
-          maybeAffiliation = None
-        )
-      case ProjectMemberWithEmail(_, username, gitLabId, email) =>
-        testentities.Person(persons.Name(username.value),
-                            email.some,
-                            gitLabId.some,
-                            maybeOrcidId = None,
-                            maybeAffiliation = None
-        )
-    }
+    lazy val toMember: entities.Project.Member =
+      entities.Project.Member(toPerson, gitLabPerson.role)
+
+    lazy val toTestMember: testentities.Project.Member =
+      testentities.Project.Member(toTestPerson, gitLabPerson.role)
+  }
+
+  private implicit class GitLabUserOps(gitLabUser: GitLabUser) {
+    lazy val toPerson: entities.Person = entities.Person.WithGitLabId(
+      persons.ResourceId(gitLabUser.gitLabId),
+      gitLabUser.gitLabId,
+      gitLabUser.name,
+      maybeEmail = gitLabUser.email,
+      maybeOrcidId = None,
+      maybeAffiliation = None
+    )
+    lazy val toTestPerson: testentities.Person = testentities.Person(
+      persons.Name(gitLabUser.username.value),
+      gitLabUser.email,
+      gitLabUser.gitLabId.some,
+      maybeOrcidId = None,
+      maybeAffiliation = None
+    )
   }
 
   private implicit class CliProjectOps(self: CliProject) {
@@ -1438,11 +1445,18 @@ class ProjectSpec
   private def replaceAgent(activity: testentities.Activity, newAgent: testentities.Person): testentities.Activity =
     testentities.Activity.Lenses.associationAgent.replace(Right(newAgent))(activity)
 
-  private def byEmail(member: ProjectMemberWithEmail): testentities.Person => Boolean =
-    _.maybeEmail.exists(_ == member.email)
+  private def byEmail(member: GitLabMember): testentities.Person => Boolean =
+    p => (p.maybeEmail, member.user.email).mapN(_ == _).getOrElse(false)
 
-  private def merge(person: testentities.Person, member: ProjectMemberWithEmail): testentities.Person =
-    person.copy(maybeGitLabId = member.gitLabId.some, name = member.name, maybeEmail = member.email.some)
+  private def merge(person: testentities.Person, member: GitLabMember): testentities.Project.Member = {
+    val p =
+      person.copy(
+        maybeGitLabId = member.user.gitLabId.some,
+        name = member.user.name,
+        maybeEmail = member.user.email.orElse(person.maybeEmail)
+      )
+    testentities.Project.Member(p, member.role)
+  }
 
   private lazy val projectInfoMaybeParent: Lens[GitLabProjectInfo, Option[projects.Slug]] =
     Lens[GitLabProjectInfo, Option[projects.Slug]](_.maybeParentSlug)(mpp => _.copy(maybeParentSlug = mpp))

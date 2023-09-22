@@ -41,7 +41,7 @@ trait DatasetProvision extends SearchInfoDatasets { self: ProjectsDataset with I
     implicit val sparqlQueryTimeRecorder: SparqlQueryTimeRecorder[IO] =
       new SparqlQueryTimeRecorder[IO](execTimeRecorder)
     val ps      = ProjectSparqlClient[IO](projectsDSConnectionInfo).map(ProjectAuthSync[IO](_))
-    val members = project.members.flatMap(p => p.maybeGitLabId.map(id => ProjectMember(id, Role.Reader)))
+    val members = project.members.flatMap(p => p.person.maybeGitLabId.map(id => ProjectMember(id, Role.Reader)))
     super.provisionProject(project) *> ps.use(_.syncProject(ProjectAuthData(project.slug, members, project.visibility)))
   }
 }

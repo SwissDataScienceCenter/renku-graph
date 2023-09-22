@@ -21,8 +21,7 @@ package io.renku.knowledgegraph
 import cats.effect.IO
 import io.renku.entities.searchgraphs.SearchInfoDatasets
 import io.renku.graph.model.entities.EntityFunctions
-import io.renku.graph.model.projects.Role
-import io.renku.graph.model.{RenkuUrl, entities, testentities}
+import io.renku.graph.model.{RenkuUrl, entities}
 import io.renku.projectauth.{ProjectAuthData, ProjectAuthService, ProjectMember}
 import io.renku.triplesstore._
 
@@ -38,38 +37,9 @@ trait DatasetProvision extends SearchInfoDatasets { self: ProjectsDataset with I
       graphsProducer:  GraphsProducer[entities.Project],
       renkuUrl:        RenkuUrl
   ): IO[Unit] = {
-    val members  = project.members.flatMap(p => p.maybeGitLabId.map(id => ProjectMember(id, Role.Reader)))
+    val members  = project.members.flatMap(p => p.person.maybeGitLabId.map(gid => ProjectMember(gid, p.role)))
     val authData = ProjectAuthData(project.slug, members, project.visibility)
     super.provisionProject(project) *> projectAuthServiceR.use(_.update(authData))
   }
 
-  def provisionProjectAndMembers(
-      project:    entities.Project,
-      memberRole: PartialFunction[entities.Person, Role] = PartialFunction.empty
-  )(implicit
-      entityFunctions: EntityFunctions[entities.Project],
-      graphsProducer:  GraphsProducer[entities.Project],
-      renkuUrl:        RenkuUrl
-  ) = {
-    val members = project.members.flatMap(p =>
-      p.maybeGitLabId.map(gid => ProjectMember(gid, memberRole.lift.apply(p).getOrElse(Role.Reader)))
-    )
-    val authData = ProjectAuthData(project.slug, members, project.visibility)
-    super.provisionProject(project) *> projectAuthServiceR.use(_.update(authData))
-  }
-
-  def provisionTestProjectAndMembers(
-      project:    testentities.Project,
-      memberRole: PartialFunction[testentities.Person, Role] = PartialFunction.empty
-  )(implicit
-      entityFunctions: EntityFunctions[entities.Project],
-      graphsProducer:  GraphsProducer[entities.Project],
-      renkuUrl:        RenkuUrl
-  ) = {
-    val members = project.members.flatMap(p =>
-      p.maybeGitLabId.map(gid => ProjectMember(gid, memberRole.lift.apply(p).getOrElse(Role.Reader)))
-    )
-    val authData = ProjectAuthData(project.slug, members, project.visibility)
-    super.provisionTestProject(project) *> projectAuthServiceR.use(_.update(authData))
-  }
 }

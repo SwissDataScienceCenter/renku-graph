@@ -20,8 +20,6 @@ package io.renku.knowledgegraph.datasets
 
 import cats.effect.IO
 import io.renku.generators.Generators.Implicits._
-import io.renku.graph.model.projects.Role
-import io.renku.graph.model.testentities.Person
 import io.renku.graph.model.testentities.generators.EntitiesGenerators
 import io.renku.triplesstore.ProjectSparqlClient
 
@@ -31,14 +29,10 @@ class DatasetIdRecordsFinderSpec extends SecurityRecordFinderSupport {
   it should "find security records for a simple project with one dataset" in {
     val project = projectWithDatasetAndMembers.generateOne
 
-    val memberDef: PartialFunction[Person, Role] = {
-      case p if p == project.members.head => Role.Owner
-    }
-
     val dsId = project.datasets.head.identification.identifier
 
     for {
-      _ <- provisionTestProjectAndMembers(project, memberDef)
+      _ <- provisionTestProject(project)
       r <- finder.use(_.apply(dsId, None))
       _ = r shouldBe List(project).map(toSecRecord)
     } yield ()
@@ -48,7 +42,7 @@ class DatasetIdRecordsFinderSpec extends SecurityRecordFinderSupport {
     val project = projectWithDatasetAndNoMembers.generateOne
     val dsId    = project.datasets.head.identification.identifier
     for {
-      _ <- provisionTestProjectAndMembers(project)
+      _ <- provisionTestProject(project)
       r <- finder.use(_.apply(dsId, None))
       _ = r shouldBe List(project).map(toSecRecord)
     } yield ()
@@ -60,8 +54,7 @@ class DatasetIdRecordsFinderSpec extends SecurityRecordFinderSupport {
     val dsId = dataset.identification.identifier
 
     for {
-      _ <- provisionTestProjectAndMembers(project)
-      _ <- provisionTestProjectAndMembers(parentProject)
+      _ <- provisionTestProjects(project, parentProject)
       r <- finder.use(_.apply(dsId, None))
       _ = r shouldBe List(project, parentProject).map(toSecRecord).sortBy(_.projectSlug.value)
     } yield ()
@@ -69,7 +62,7 @@ class DatasetIdRecordsFinderSpec extends SecurityRecordFinderSupport {
 
   it should "find security records for the project that has the dataset" in {
     val createProjects = projectWithDatasetAndMembers.asStream.toIO
-      .evalTap(provisionTestProjectAndMembers(_))
+      .evalTap(provisionTestProject(_))
       .take(3)
       .compile
       .toList
@@ -89,7 +82,7 @@ class DatasetIdRecordsFinderSpec extends SecurityRecordFinderSupport {
       .generateOne
 
     for {
-      _ <- provisionTestProjectAndMembers(project)
+      _ <- provisionTestProject(project)
       r <- finder.use(_.apply(dsId, None))
       _ = r shouldBe Nil
     } yield ()

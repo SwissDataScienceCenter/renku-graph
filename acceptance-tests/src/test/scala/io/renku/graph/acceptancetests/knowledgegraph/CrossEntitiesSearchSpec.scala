@@ -29,6 +29,7 @@ import io.renku.generators.Generators.Implicits._
 import io.renku.generators.Generators.{nonBlankStrings, sentenceContaining}
 import io.renku.graph.model.EventsGenerators.commitIds
 import io.renku.graph.model._
+import io.renku.graph.model.projects.Role
 import io.renku.graph.model.testentities._
 import io.renku.http.client.UrlEncoder._
 import org.http4s.Status.Ok
@@ -65,7 +66,7 @@ class CrossEntitiesSearchSpec extends AcceptanceSpec with ApplicationServices wi
             .modify(replaceDSName(sentenceContaining(commonPhrase).generateAs[datasets.Name]))
         )
         .generateOne
-    val project = dataProjects(testProject).map(addMemberWithId(user.id)).generateOne
+    val project = dataProjects(testProject).map(addMemberWithId(user.id, Role.Owner)).generateOne
 
     Scenario("As a user I would like to be able to do cross-entity search by calling a REST endpoint") {
 

@@ -26,7 +26,7 @@ import io.renku.graph.model.projects.Role
 import io.renku.graph.model.{RenkuTinyTypeGenerators, RenkuUrl}
 import org.scalacheck.Gen
 
-private object Generators {
+private trait Generators {
 
   implicit def kgProjectMembers(implicit renkuUrl: RenkuUrl): Gen[KGProjectMember] = for {
     memberId <- personResourceIds
@@ -42,3 +42,5 @@ private object Generators {
     role <- RenkuTinyTypeGenerators.roleGen
   } yield GitLabProjectMember(id, name, Role.toGitLabAccessLevel(role))
 }
+
+private object Generators extends Generators

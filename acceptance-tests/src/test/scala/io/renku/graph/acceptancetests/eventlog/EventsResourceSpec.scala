@@ -28,6 +28,7 @@ import io.renku.generators.CommonGraphGenerators.authUsers
 import io.renku.generators.Generators.Implicits._
 import io.renku.graph.model.EventsGenerators.commitIds
 import io.renku.graph.model.events.{EventId, EventProcessingTime, EventStatus}
+import io.renku.graph.model.projects.Role
 import io.renku.graph.model.testentities.cliShapedPersons
 import io.renku.graph.model.testentities.generators.EntitiesGenerators.{anyVisibility, removeMembers, renkuProjectEntities}
 import io.renku.http.client.UrlEncoder.urlEncode
@@ -46,7 +47,7 @@ class EventsResourceSpec extends AcceptanceSpec with ApplicationServices with TS
         renkuProjectEntities(anyVisibility, creatorGen = cliShapedPersons).modify(removeMembers()),
         CommitsCount(commits.size)
       ).map(replaceCreatorFrom(cliShapedPersons.generateOne, user.id))
-        .map(addMemberWithId(user.id))
+        .map(addMemberWithId(user.id, Role.Owner))
         .generateOne
 
       Given("there are no events for the given project in EL")

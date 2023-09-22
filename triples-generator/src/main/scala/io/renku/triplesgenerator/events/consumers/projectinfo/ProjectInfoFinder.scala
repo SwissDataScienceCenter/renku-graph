@@ -22,9 +22,9 @@ import cats.data.EitherT
 import cats.effect.Async
 import cats.syntax.all._
 import cats.{MonadThrow, NonEmptyParallel, Parallel}
-import io.renku.graph.model.entities.Project.ProjectMember.{ProjectMemberNoEmail, ProjectMemberWithEmail}
-import io.renku.graph.model.entities.Project.{GitLabProjectInfo, ProjectMember}
+import io.renku.graph.model.gitlab.{GitLabMember, GitLabProjectInfo}
 import io.renku.graph.model.projects
+import io.renku.graph.model.projects.Role
 import io.renku.http.client.{AccessToken, GitLabClient}
 import io.renku.triplesgenerator.errors.ProcessingRecoverableError
 import org.typelevel.log4cats.Logger
@@ -43,13 +43,12 @@ private[consumers] object ProjectInfoFinder {
   } yield new ProjectInfoFinderImpl(projectFinder, membersFinder, memberEmailFinder)
 }
 
-private class ProjectInfoFinderImpl[F[_]: MonadThrow: Parallel: Logger](
+private class ProjectInfoFinderImpl[F[_]: Async: MonadThrow: Parallel: Logger](
     projectFinder:     ProjectFinder[F],
     membersFinder:     ProjectMembersFinder[F],
     memberEmailFinder: MemberEmailFinder[F]
 ) extends ProjectInfoFinder[F] {
 
-  import memberEmailFinder._
   import membersFinder._
   import projectFinder._
 
@@ -65,31 +64,36 @@ private class ProjectInfoFinderImpl[F[_]: MonadThrow: Parallel: Logger](
     findProjectMembers(project.slug).map(members => project.copy(members = members))
 
   private def addEmails(project: GitLabProjectInfo)(implicit maybeAccessToken: Option[AccessToken]) = EitherT {
-    (project.members ++ project.maybeCreator).toList
-      .map(findMemberEmail(_, Project(project.id, project.slug)).value)
+    val allMembers = (project.members ++ project.maybeCreator.map(_.toMember(Role.Owner))).toList
+    allMembers
+      .map { member =>
+        memberEmailFinder
+          .findMemberEmail(member, Project(project.id, project.slug))
+          .value
+      }
       .parSequence
       .map(_.sequence)
   }.map(deduplicateSameIdMembers)
     .map(members => (updateCreator(members) andThen updateMembers(members))(project))
 
-  private lazy val deduplicateSameIdMembers: List[ProjectMember] => List[ProjectMember] =
-    _.foldLeft(List.empty[ProjectMember]) { (deduplicated, member) =>
-      deduplicated.find(_.gitLabId == member.gitLabId) match {
-        case None                                 => member :: deduplicated
-        case Some(_: ProjectMemberWithEmail)      => deduplicated
-        case Some(existing: ProjectMemberNoEmail) => member :: deduplicated.filterNot(_ == existing)
+  private lazy val deduplicateSameIdMembers: List[GitLabMember] => List[GitLabMember] =
+    _.foldLeft(List.empty[GitLabMember]) { (deduplicated, member) =>
+      deduplicated.find(_.user.gitLabId == member.user.gitLabId) match {
+        case None                              => member :: deduplicated
+        case Some(p) if p.user.email.isDefined => deduplicated
+        case Some(existing)                    => member :: deduplicated.filterNot(_ == existing)
       }
     }
 
-  private def updateCreator(members: List[ProjectMember]): GitLabProjectInfo => GitLabProjectInfo = project =>
+  private def updateCreator(members: List[GitLabMember]): GitLabProjectInfo => GitLabProjectInfo = project =>
     project.maybeCreator
       .flatMap(creator =>
-        members.find(_.gitLabId == creator.gitLabId).map(member => project.copy(maybeCreator = member.some))
+        members.find(_.user.gitLabId == creator.gitLabId).map(member => project.copy(maybeCreator = member.user.some))
       )
       .getOrElse(project)
 
-  private def updateMembers(members: List[ProjectMember]): GitLabProjectInfo => GitLabProjectInfo = project =>
+  private def updateMembers(members: List[GitLabMember]): GitLabProjectInfo => GitLabProjectInfo = project =>
     project.copy(
-      members = members.filter(member => project.members.exists(_.gitLabId == member.gitLabId)).toSet
+      members = members.filter(member => project.members.exists(_.user.gitLabId == member.user.gitLabId)).toSet
     )
 }

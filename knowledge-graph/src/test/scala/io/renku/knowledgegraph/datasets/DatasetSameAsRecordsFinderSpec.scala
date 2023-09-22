@@ -21,8 +21,6 @@ package io.renku.knowledgegraph.datasets
 import cats.effect.IO
 import io.renku.generators.Generators.Implicits._
 import io.renku.graph.model.datasets.SameAs
-import io.renku.graph.model.projects.Role
-import io.renku.graph.model.testentities.Person
 import io.renku.graph.model.testentities.generators.EntitiesGenerators
 import io.renku.triplesstore.ProjectSparqlClient
 
@@ -33,14 +31,10 @@ class DatasetSameAsRecordsFinderSpec extends SecurityRecordFinderSupport {
   it should "find security records for a simple project with one dataset" in {
     val project = projectWithDatasetAndMembers.generateOne
 
-    val memberDef: PartialFunction[Person, Role] = {
-      case p if p == project.members.head => Role.Owner
-    }
-
     val dsSameAs = SameAs(project.datasets.head.provenance.topmostSameAs.value)
 
     for {
-      _ <- provisionTestProjectAndMembers(project, memberDef)
+      _ <- provisionTestProject(project)
       r <- finder.use(_.apply(dsSameAs, None))
       _ = r shouldBe List(project).map(toSecRecord)
     } yield ()
@@ -50,7 +44,7 @@ class DatasetSameAsRecordsFinderSpec extends SecurityRecordFinderSupport {
     val project  = projectWithDatasetAndNoMembers.generateOne
     val dsSameAs = SameAs(project.datasets.head.provenance.topmostSameAs.value)
     for {
-      _ <- provisionTestProjectAndMembers(project)
+      _ <- provisionTestProject(project)
       r <- finder.use(_.apply(dsSameAs, None))
       _ = r shouldBe List(project).map(toSecRecord)
     } yield ()
@@ -62,8 +56,7 @@ class DatasetSameAsRecordsFinderSpec extends SecurityRecordFinderSupport {
     val dsSameAs = SameAs(dataset.provenance.topmostSameAs.value)
 
     for {
-      _ <- provisionTestProjectAndMembers(project)
-      _ <- provisionTestProjectAndMembers(parentProject)
+      _ <- provisionTestProjects(project, parentProject)
       r <- finder.use(_.apply(dsSameAs, None))
       _ = r shouldBe List(project, parentProject).map(toSecRecord).sortBy(_.projectSlug.value)
     } yield ()
@@ -71,7 +64,7 @@ class DatasetSameAsRecordsFinderSpec extends SecurityRecordFinderSupport {
 
   it should "find security records for the project that has the dataset" in {
     val createProjects = projectWithDatasetAndMembers.asStream.toIO
-      .evalTap(provisionTestProjectAndMembers(_))
+      .evalTap(provisionTestProject(_))
       .take(3)
       .compile
       .toList
@@ -91,7 +84,7 @@ class DatasetSameAsRecordsFinderSpec extends SecurityRecordFinderSupport {
       .generateOne
 
     for {
-      _ <- provisionTestProjectAndMembers(project)
+      _ <- provisionTestProject(project)
       r <- finder.use(_.apply(dsSameAs, None))
       _ = r shouldBe Nil
     } yield ()

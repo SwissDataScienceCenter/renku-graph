@@ -22,7 +22,7 @@ import cats.syntax.all._
 import io.renku.cli.model.CliProject
 import io.renku.graph.model.RenkuUrl
 import io.renku.graph.model.entities.Project
-import io.renku.graph.model.entities.Project.GitLabProjectInfo
+import io.renku.graph.model.gitlab.GitLabProjectInfo
 import io.renku.jsonld.JsonLDDecoder
 
 trait ProjectJsonLDDecoder {

@@ -47,7 +47,7 @@ class PayloadConverterSpec extends AnyFlatSpec with should.Matchers with ScalaCh
         Some(creator),
         newProject.visibility,
         newProject.keywords,
-        members = Set(creator),
+        members = Set(entities.Project.Member(creator, newProject.creator.role)),
         Image.projectImage(resourceId, newProject.images)
       )
     }
