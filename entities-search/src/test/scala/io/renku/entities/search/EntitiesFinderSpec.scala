@@ -1221,7 +1221,7 @@ class EntitiesFinderSpec
 
     "not return private projects/datasets of different user" in new TestCase {
       val otherMember = personEntities(
-        personGitLabIds.suchThat(id => !member.maybeGitLabId.contains(id)).toGeneratorOfSomes
+        personGitLabIds.suchThat(id => !member.person.maybeGitLabId.contains(id)).toGeneratorOfSomes
       ).generateOne
       val results = IOBody {
         provisionTestProjects(privateProject, internalProject, publicProject) >>

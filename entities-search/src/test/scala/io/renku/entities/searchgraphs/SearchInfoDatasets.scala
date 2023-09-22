@@ -69,7 +69,7 @@ trait SearchInfoDatasets {
     implicit val sparqlQueryTimeRecorder: SparqlQueryTimeRecorder[IO] =
       new SparqlQueryTimeRecorder[IO](execTimeRecorder)
     val ps      = ProjectSparqlClient[IO](projectsDSConnectionInfo).map(ProjectAuthService[IO](_, renkuUrl))
-    val members = project.members.flatMap(p => p.maybeGitLabId.map(id => ProjectMember(id, Role.Reader)))
+    val members = project.members.flatMap(p => p.person.maybeGitLabId.map(id => ProjectMember(id, Role.Reader)))
     ps.use(_.update(ProjectAuthData(project.slug, members, project.visibility)))
   }
 
