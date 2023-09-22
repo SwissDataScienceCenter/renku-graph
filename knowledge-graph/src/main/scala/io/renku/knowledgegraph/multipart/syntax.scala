@@ -89,14 +89,17 @@ object syntax {
       ttFactory: From[TT]
   ): EntityDecoder[F, List[TT]] =
     EntityDecoder.text[F].flatMapR {
-      _.split(",").toList
-        .map(_.trim)
-        .map(ttFactory.from)
-        .sequence
-        .fold(
-          err => DecodeResult.failureT(MalformedMessageBodyFailure(err.getMessage)),
-          DecodeResult.successT(_)
-        )
+      case t if t.isEmpty => DecodeResult.successT(List.empty[TT])
+      case t =>
+        t.split(",")
+          .toList
+          .map(_.trim)
+          .map(ttFactory.from)
+          .sequence
+          .fold(
+            err => DecodeResult.failureT(MalformedMessageBodyFailure(err.getMessage)),
+            DecodeResult.successT(_)
+          )
     }
 
   implicit def stringTinyTypeEntityDecoder[F[_]: Concurrent, TT <: TinyType { type V = String }](implicit
