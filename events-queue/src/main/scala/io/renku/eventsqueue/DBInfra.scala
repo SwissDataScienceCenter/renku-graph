@@ -24,6 +24,7 @@ private object DBInfra {
     val name: String = "enqueued_event"
 
     object Column {
+      val typ:     String = "type"
       val payload: String = "payload"
       val created: String = "created"
       val status:  String = "status"

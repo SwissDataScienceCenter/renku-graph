@@ -53,6 +53,7 @@ private class DBInfraCreatorImpl[F[_]: MonadCancelThrow: Logger, DB](implicit sr
   private def createTable() = for {
     _ <- run(createEnqueueStatusTypeSql)
     _ <- run(createTableSql)
+    _ <- run(createIndexSql("idx_enqueued_event_type", Column.payload))
     _ <- run(createIndexSql("idx_enqueued_event_payload", Column.payload))
     _ <- run(createIndexSql("idx_enqueued_event_created", Column.created))
     _ <- run(createIndexSql("idx_enqueued_event_updated", Column.updated))
@@ -74,7 +75,8 @@ private class DBInfraCreatorImpl[F[_]: MonadCancelThrow: Logger, DB](implicit sr
 
   private lazy val createTableSql: Command[Void] = sql"""
     CREATE TABLE IF NOT EXISTS #${QueueTable.name}(
-      id                            SERIAL                   PRIMARY KEY,
+      id                 SERIAL                   PRIMARY KEY,
+      #${Column.typ}     VARCHAR                  NOT NULL,
       #${Column.payload} TEXT                     NOT NULL,
       #${Column.created} TIMESTAMP WITH TIME ZONE NOT NULL,
       #${Column.updated} TIMESTAMP WITH TIME ZONE NOT NULL,
