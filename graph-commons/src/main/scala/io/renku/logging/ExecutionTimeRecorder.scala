@@ -85,8 +85,8 @@ class ExecutionTimeRecorderImpl[F[_]: Sync: Clock: Logger](
   private def updateHistogram[A](maybeLabel: Option[String Refined NonEmpty]): ((FiniteDuration, A)) => F[Unit] = {
     case (duration, _) =>
       (maybeHistogram, maybeLabel) match {
-        case Some(h: SingleValueHistogram[F]) -> None    => h.observe(duration.toMillis.toDouble)
-        case Some(h: LabeledHistogram[F]) -> Some(label) => h.observe(label.value, duration.toMillis.toDouble)
+        case Some(h: SingleValueHistogram[F]) -> None    => h.observe(duration)
+        case Some(h: LabeledHistogram[F]) -> Some(label) => h.observe(label.value, duration)
         case Some(h: SingleValueHistogram[F]) -> Some(label) =>
           Logger[F].error(s"Label $label sent for a Single Value Histogram ${h.name}")
         case _ => ().pure[F]

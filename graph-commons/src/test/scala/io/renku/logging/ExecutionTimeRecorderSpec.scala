@@ -30,7 +30,7 @@ import io.renku.generators.Generators._
 import io.renku.interpreters.TestLogger
 import io.renku.interpreters.TestLogger.Level.Warn
 import io.renku.logging.ExecutionTimeRecorder.ElapsedTime
-import io.renku.metrics.{Histogram, LabeledHistogram, SingleValueHistogram}
+import io.renku.metrics.{LabeledHistogram, SingleValueHistogram}
 import io.renku.testtools.CustomAsyncIOSpec
 import org.scalacheck.Gen.finiteDuration
 import org.scalamock.scalatest.AsyncMockFactory
@@ -82,8 +82,9 @@ class ExecutionTimeRecorderSpec
       block.expects().returning(blockOut.pure[IO])
 
       val blockExecutionTime = positiveInts(max = 100).generateOne.value
-      (histogram.observe _)
-        .expects(where((amt: Double) => amt >= blockExecutionTime.toDouble))
+      (histogram
+        .observe(_: FiniteDuration))
+        .expects(where((amt: FiniteDuration) => amt.toMillis >= blockExecutionTime))
         .returning(().pure[IO])
 
       executionTimeRecorder
@@ -104,8 +105,9 @@ class ExecutionTimeRecorderSpec
       block.expects().returning(blockOut.pure[IO])
 
       val blockExecutionTime = positiveInts(max = 100).generateOne.value
-      (histogram.observe _)
-        .expects(where((l: String, amt: Double) => l == label.value && amt >= blockExecutionTime.toDouble))
+      (histogram
+        .observe(_: String, _: FiniteDuration))
+        .expects(where((l: String, amt: FiniteDuration) => l == label.value && amt.toMillis >= blockExecutionTime))
         .returning(().pure[IO])
 
       executionTimeRecorder
@@ -119,15 +121,7 @@ class ExecutionTimeRecorderSpec
 
     "made the given labelled histogram not to collect the process execution time when no label given" in {
 
-      val histogram = new LabeledHistogram[IO] {
-        override val name = "metric"
-        override val help = "help"
-        override def startTimer(labelValue: String) = {
-          labelValue shouldBe "label"
-          mock[Histogram.Timer[IO]].pure[IO]
-        }
-        override def observe(labelValue: String, amt: Double): IO[Unit] = ???
-      }
+      val histogram = mock[LabeledHistogram[IO]]
 
       val executionTimeRecorder = new ExecutionTimeRecorderImpl(loggingThreshold, Some(histogram))
 
