@@ -23,10 +23,11 @@ import cats.syntax.all._
 import io.circe.Encoder
 import io.renku.db.SessionResource
 import io.renku.db.syntax.CommandDef
+import io.renku.events.CategoryName
 import skunk.data.Identifier
 
 trait EventsEnqueuer[F[_]] {
-  def enqueue[E](event: E, channel: Identifier)(implicit enc: Encoder[E]): F[Unit]
+  def enqueue[E](category: CategoryName, event: E, channel: Identifier)(implicit enc: Encoder[E]): F[Unit]
 }
 
 object EventsEnqueuer {
@@ -38,9 +39,9 @@ private class EventsEnqueuerImpl[F[_]: Async, DB](repository: DBRepository[F])(i
     extends EventsEnqueuer[F] {
 
   println(repository)
-  override def enqueue[E](event: E, channel: Identifier)(implicit enc: Encoder[E]): F[Unit] =
+  override def enqueue[E](category: CategoryName, event: E, channel: Identifier)(implicit enc: Encoder[E]): F[Unit] =
     sr.useK {
-      repository.insert(enc(event)) >> notify(channel)
+      repository.insert(category, enc(event)) >> notify(channel)
     }
 
   private def notify(channel: Identifier): CommandDef[F] = CommandDef[F] {

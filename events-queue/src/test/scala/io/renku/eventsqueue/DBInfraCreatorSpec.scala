@@ -39,7 +39,7 @@ class DBInfraCreatorSpec extends AsyncFlatSpec with AsyncIOSpec with should.Matc
       _ <- dbInfraCreator.createDBInfra().assertNoException
 
       _ <- checkTableExists(QueueTable.name).asserting(_ shouldBe true)
-      _ <- verifyIndexExists(QueueTable.name, "idx_enqueued_event_type").assertNoException
+      _ <- verifyIndexExists(QueueTable.name, "idx_enqueued_event_category").assertNoException
       _ <- verifyIndexExists(QueueTable.name, "idx_enqueued_event_payload").assertNoException
       _ <- verifyIndexExists(QueueTable.name, "idx_enqueued_event_created").assertNoException
       _ <- verifyIndexExists(QueueTable.name, "idx_enqueued_event_updated").assertNoException

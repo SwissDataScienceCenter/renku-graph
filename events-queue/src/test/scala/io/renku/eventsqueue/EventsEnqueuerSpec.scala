@@ -24,6 +24,8 @@ import cats.effect.testing.scalatest.AsyncIOSpec
 import io.circe.Json
 import io.circe.syntax._
 import io.renku.db.syntax._
+import io.renku.events.CategoryName
+import io.renku.events.Generators.categoryNames
 import io.renku.generators.Generators.Implicits._
 import org.scalamock.scalatest.AsyncMockFactory
 import org.scalatest.flatspec.AsyncFlatSpec
@@ -40,14 +42,15 @@ class EventsEnqueuerSpec
     "persist it in the DB and " +
     "send a notification over the Channel" in {
 
-      val channel = channelIds.generateOne
-      val event   = events.generateOne
+      val category = categoryNames.generateOne
+      val event    = events.generateOne
+      givenPersisting(category, event.asJson, returning = CommandDef.pure[IO])
 
-      givenPersisting(event.asJson, returning = CommandDef.pure[IO])
+      val channel  = channelIds.generateOne
 
       for {
         conditionMet <- listenOnChannelUntil(channel, notifications => notifications.nonEmpty)
-        _            <- enqueuer.enqueue(event, channel).start
+        _            <- enqueuer.enqueue(category, event, channel).start
         _            <- conditionMet.get.flatten
       } yield ()
     }
@@ -55,8 +58,8 @@ class EventsEnqueuerSpec
   private val dbRepository  = mock[DBRepository[IO]]
   private lazy val enqueuer = new EventsEnqueuerImpl[IO, TestDB](dbRepository)
 
-  private def givenPersisting(payload: Json, returning: CommandDef[IO]) =
+  private def givenPersisting(category: CategoryName, payload: Json, returning: CommandDef[IO]) =
     (dbRepository.insert _)
-      .expects(payload)
+      .expects(category, payload)
       .returning(returning)
 }
