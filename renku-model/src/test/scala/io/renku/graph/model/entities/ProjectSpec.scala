@@ -297,7 +297,9 @@ class ProjectSpec
 
         actual.maybeCreator shouldBe mergedCreator.to[entities.Project.Member].person.some
         actual.members      shouldBe Set(mergedMember2.to[entities.Project.Member])
-        actual.activities shouldBe ActivityLens.activityAuthor.replace(mergedMember2.to[entities.Project.Member].person)(
+        actual.activities shouldBe ActivityLens.activityAuthor.replace(
+          mergedMember2.to[entities.Project.Member].person
+        )(
           activity.to[entities.Activity]
         ) :: Nil
         actual.plans shouldBe PlanLens.planCreators.replace(List(mergedCreator.to[entities.Project.Member].person))(
@@ -1448,7 +1450,11 @@ class ProjectSpec
 
   private def merge(person: testentities.Person, member: GitLabMember): testentities.Project.Member = {
     val p =
-      person.copy(maybeGitLabId = member.user.gitLabId.some, name = member.user.name, maybeEmail = member.user.email)
+      person.copy(
+        maybeGitLabId = member.user.gitLabId.some,
+        name = member.user.name,
+        maybeEmail = member.user.email.orElse(person.maybeEmail)
+      )
     testentities.Project.Member(p, member.role)
   }
 

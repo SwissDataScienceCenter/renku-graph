@@ -49,7 +49,6 @@ private class ProjectInfoFinderImpl[F[_]: Async: MonadThrow: Parallel: Logger](
     memberEmailFinder: MemberEmailFinder[F]
 ) extends ProjectInfoFinder[F] {
 
-  // import memberEmailFinder._
   import membersFinder._
   import projectFinder._
 
@@ -66,39 +65,16 @@ private class ProjectInfoFinderImpl[F[_]: Async: MonadThrow: Parallel: Logger](
 
   private def addEmails(project: GitLabProjectInfo)(implicit maybeAccessToken: Option[AccessToken]) = EitherT {
     val allMembers = (project.members ++ project.maybeCreator.map(_.toMember(Role.Owner))).toList
-    val allMembersWithMail = allMembers
+    allMembers
       .map { member =>
         memberEmailFinder
           .findMemberEmail(member, Project(project.id, project.slug))
           .value
-          .flatTap { res =>
-            val msg = s"Mail for: ${member}  -->  ${res.map(_.user.email.map(_.value))}"
-            Async[F].blocking(println(msg))
-          }
       }
       .parSequence
       .map(_.sequence)
-    Async[F].blocking(
-      println("------------------------ProjectInfoFinder:addEmails-------------------------")
-    ) >> allMembersWithMail
   }.map(deduplicateSameIdMembers)
     .map(members => (updateCreator(members) andThen updateMembers(members))(project))
-
-  private def addEmails2(project: GitLabProjectInfo)(implicit maybeAccessToken: Option[AccessToken]) = {
-    val proj = Project(project.id, project.slug)
-    val forMembers = project.members.toList
-      .parTraverse(memberEmailFinder.findMemberEmail(_, proj))
-      .map(deduplicateSameIdMembers)
-
-    val forCreator =
-      project.maybeCreator
-        .traverse(user => memberEmailFinder.findMemberEmail(user.toMember(Role.Reader), proj))
-        .map(_.map(_.user))
-
-    forCreator
-      .map(user => user.fold(project)(u => project.copy(maybeCreator = u.some)))
-      .flatMap(p => forMembers.map(members => updateCreator(members).andThen(updateMembers(members))(p)))
-  }
 
   private lazy val deduplicateSameIdMembers: List[GitLabMember] => List[GitLabMember] =
     _.foldLeft(List.empty[GitLabMember]) { (deduplicated, member) =>

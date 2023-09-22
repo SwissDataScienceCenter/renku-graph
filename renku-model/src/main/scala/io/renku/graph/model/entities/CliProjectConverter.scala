@@ -210,7 +210,7 @@ private[entities] object CliProjectConverter {
   }
 
   private def merge(user: GitLabUser)(implicit renkuUrl: RenkuUrl): Person => Person =
-    _.add(user.gitLabId).copy(name = user.name, maybeEmail = user.email)
+    p => p.add(user.gitLabId).copy(name = user.name, maybeEmail = user.email.orElse(p.maybeEmail))
 
   private def merge(member: GitLabMember)(implicit renkuUrl: RenkuUrl): Person => Project.Member = { p =>
     Project.Member(merge(member.user).apply(p), member.role)

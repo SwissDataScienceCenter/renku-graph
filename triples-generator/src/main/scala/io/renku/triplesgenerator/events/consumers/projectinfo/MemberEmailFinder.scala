@@ -71,16 +71,7 @@ private class MemberEmailFinderImpl[F[_]: Async: Logger](
         for {
           (allEvents, pagingInfo) <- projectEventsFinder.find(project, nextPage)
           pushEvents = allEvents.filter(eventForMember(member))
-          maybeEmail <- matchEmailFromCommits(pushEvents, project)
-          _ = {
-            println("-----findCommitsAndEvents------------------------------")
-            println(s"Member: $member")
-            println(s"AllEvents: $allEvents")
-            println(s"Owned: $pushEvents")
-            println(s"Found E-Mail: $maybeEmail")
-            ()
-          }
-
+          maybeEmail    <- matchEmailFromCommits(pushEvents, project)
           updatedMember <- addEmailOrCheckNextPage(member, maybeEmail, project, pagingInfo)
         } yield updatedMember
     }
