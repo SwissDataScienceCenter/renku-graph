@@ -47,7 +47,8 @@ private class TransformationStepsRunnerImpl[F[_]: MonadThrow](
       executeAllPreDataUploadQueries >>=
       encodeAndSendProject >>=
       executeAllPostDataUploadQueries >>=
-      provisionSearchGraphs
+      provisionSearchGraphs >>=
+      provisionProjectAuthGraph
   }
     .leftMap(RecoverableFailure)
     .map(_ => DeliverySuccess)
@@ -83,6 +84,9 @@ private class TransformationStepsRunnerImpl[F[_]: MonadThrow](
     case projectAndQueries @ (project, _) =>
       searchGraphsProvisioner.provisionSearchGraphs(project).map(_ => projectAndQueries)
   }
+
+  private def provisionProjectAuthGraph: ((Project, Queries)) => ProjectWithQueries[F] =
+    ???
 
   private def execute(queries: List[SparqlQuery]): EitherT[F, ProcessingRecoverableError, Unit] =
     queries.foldLeft(EitherT.rightT[F, ProcessingRecoverableError](())) { (previousResult, query) =>
