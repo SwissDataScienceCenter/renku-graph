@@ -20,7 +20,7 @@ package io.renku.eventsqueue
 
 import cats.effect.Async
 import cats.syntax.all._
-import io.circe.Encoder
+import io.circe.{Encoder, Json}
 import io.renku.db.SessionResource
 import io.renku.db.syntax.CommandDef
 import io.renku.events.CategoryName
@@ -38,13 +38,14 @@ object EventsEnqueuer {
 private class EventsEnqueuerImpl[F[_]: Async, DB](repository: DBRepository[F])(implicit sr: SessionResource[F, DB])
     extends EventsEnqueuer[F] {
 
-  println(repository)
-  override def enqueue[E](category: CategoryName, event: E, channel: Identifier)(implicit enc: Encoder[E]): F[Unit] =
+  override def enqueue[E](category: CategoryName, event: E, channel: Identifier)(implicit enc: Encoder[E]): F[Unit] = {
+    val encodedEvent = enc(event)
     sr.useK {
-      repository.insert(category, enc(event)) >> notify(channel)
+      repository.insert(category, encodedEvent) >> notify(channel, encodedEvent)
     }
+  }
 
-  private def notify(channel: Identifier): CommandDef[F] = CommandDef[F] {
-    _.channel(channel).notify("dd").map(_ => println("sent"))
+  private def notify(channel: Identifier, event: Json): CommandDef[F] = CommandDef[F] {
+    _.channel(channel).notify(event.noSpaces)
   }
 }

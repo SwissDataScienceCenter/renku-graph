@@ -32,15 +32,28 @@ trait EventsQueueDBSpec extends ContainerDB { self: Suite =>
 
   private type IOChannel = Channel[IO, String, String]
 
-  private val timeout = 20 seconds
+  private val timeout     = 10 seconds
+  private val warmUpEvent = "warmup"
 
   def listenOnChannelUntil(channel: Identifier, condition: List[String] => Boolean): IO[Deferred[IO, IO[Unit]]] =
-    Deferred.apply[IO, IO[Unit]].flatTap { conditionMet =>
-      IO.race(
-        waitForNotifications(channel, condition, conditionMet),
-        failWithTimeout(conditionMet)
-      ).start
-    }
+    for {
+      conditionMet  <- Deferred.apply[IO, IO[Unit]]
+      warmedUp      <- Deferred.apply[IO, Unit]
+      warmUpProcess <- sendWarmUps(channel).start
+      _ <- IO.race(
+             waitForNotifications(channel, warmedUp, condition, conditionMet),
+             failWithTimeout(conditionMet)
+           ).start
+      _ <- warmedUp.get
+      _ <- warmUpProcess.cancel
+    } yield conditionMet
+
+  private def sendWarmUps(channel: Identifier) =
+    fs2.Stream
+      .iterate(1)(_ + 1)
+      .evalMap(_ => Temporal[IO].delayBy(withChannel(channel)(_.notify(warmUpEvent)), 100 millis))
+      .compile
+      .drain
 
   private def failWithTimeout(conditionMet: Deferred[IO, IO[Unit]]) =
     Temporal[IO].delayBy(
@@ -51,17 +64,22 @@ trait EventsQueueDBSpec extends ContainerDB { self: Suite =>
     )
 
   private def waitForNotifications(channel:      Identifier,
+                                   warmedUp:     Deferred[IO, Unit],
                                    condition:    List[String] => Boolean,
                                    conditionMet: Deferred[IO, IO[Unit]]
   ) = withChannel(channel) { ch =>
-    val accu = Ref.unsafe[IO, List[String]](List.empty)
-    ch.listen(20)
-      .evalMap(n => accu.updateAndGet(old => (n.value :: old.reverse).reverse))
-      .map(condition)
-      .takeThrough(!_)
-      .evalMap(Applicative[IO].whenA(_)(conditionMet.complete(().pure[IO])))
-      .compile
-      .drain
+    Ref.of[IO, List[String]](List.empty[String]) >>= { accu =>
+      ch.listen(1)
+        .evalMap {
+          case n if n.value == warmUpEvent => warmedUp.complete(()) >> accu.get
+          case n                           => accu.updateAndGet(old => (n.value :: old.reverse).reverse)
+        }
+        .map(condition)
+        .takeThrough(!_)
+        .evalMap(Applicative[IO].whenA(_)(conditionMet.complete(().pure[IO])))
+        .compile
+        .drain
+    }
   }
 
   private def withChannel(channel: Identifier)(f: IOChannel => IO[Unit]): IO[Unit] =

@@ -50,7 +50,7 @@ class EventsEnqueuerSpec
 
       for {
         conditionMet <- listenOnChannelUntil(channel, notifications => notifications.nonEmpty)
-        _            <- enqueuer.enqueue(category, event, channel).start
+        _            <- enqueuer.enqueue(category, event, channel)
         _            <- conditionMet.get.flatten
       } yield ()
     }
