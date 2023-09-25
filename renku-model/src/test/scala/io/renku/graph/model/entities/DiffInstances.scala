@@ -117,6 +117,9 @@ trait DiffInstances extends CliDiffInstances {
 
   implicit def datasetDiff: Diff[Dataset[Provenance]] = Diff.derived[Dataset[Provenance]]
 
+  implicit val projectMemberDiff: Diff[Project.Member] =
+    Diff.derived[Project.Member]
+
   implicit val renkuProjectWithParentDiff: Diff[RenkuProject.WithParent] =
     Diff.derived[RenkuProject.WithParent]
 

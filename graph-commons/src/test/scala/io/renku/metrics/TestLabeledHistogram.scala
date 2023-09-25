@@ -26,6 +26,8 @@ import eu.timepit.refined.collection.NonEmpty
 import io.prometheus.client.{Histogram => LibHistogram}
 import org.scalatest.Assertions.fail
 
+import scala.concurrent.duration.FiniteDuration
+
 class TestLabeledHistogram(labelName: String) extends LabeledHistogram[IO] with PrometheusCollector {
 
   import MetricsTools._
@@ -64,6 +66,9 @@ class TestLabeledHistogram(labelName: String) extends LabeledHistogram[IO] with 
   override def startTimer(labelValue: String): IO[Histogram.Timer[IO]] = IO {
     new LabeledHistogram.NoThresholdTimerImpl[IO](wrappedCollector.labels(labelValue).startTimer())
   }
+
+  override def observe(labelValue: String, amt: FiniteDuration): IO[Unit] =
+    observe(labelValue, amt.toSeconds.toDouble)
 
   override def observe(labelValue: String, amt: Double): IO[Unit] =
     IO {

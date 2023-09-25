@@ -37,11 +37,12 @@ import io.renku.jsonld.JsonLD
 import io.renku.logging.TestExecutionTimeRecorder
 import io.renku.testtools.IOSpec
 import io.renku.triplesgenerator.events.consumers.EventStatusUpdater.{ExecutionDelay, RollbackStatus}
-import io.renku.triplesgenerator.events.consumers.ProcessingRecoverableError._
+import io.renku.triplesgenerator.errors.ProcessingRecoverableError._
+import io.renku.triplesgenerator.errors.ProcessingRecoverableError
 import io.renku.triplesgenerator.events.consumers.awaitinggeneration.EventProcessingGenerators._
 import io.renku.triplesgenerator.events.consumers.awaitinggeneration.triplesgeneration.TriplesGenerator
-import io.renku.triplesgenerator.events.consumers.{EventStatusUpdater, ProcessingRecoverableError}
-import io.renku.triplesgenerator.generators.ErrorGenerators.{logWorthyRecoverableErrors, nonRecoverableMalformedRepoErrors, silentRecoverableErrors}
+import io.renku.triplesgenerator.events.consumers.EventStatusUpdater
+import io.renku.triplesgenerator.errors.ErrorGenerators.{logWorthyRecoverableErrors, nonRecoverableMalformedRepoErrors, silentRecoverableErrors}
 import org.scalacheck.Gen
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.concurrent.{Eventually, IntegrationPatience}

@@ -16,8 +16,7 @@
  * limitations under the License.
  */
 
-package io.renku.triplesgenerator.events.consumers
-package tsmigrationrequest
+package io.renku.triplesgenerator.events.consumers.tsmigrationrequest
 package migrations
 package projectsgraph
 
@@ -26,6 +25,7 @@ import cats.effect.Async
 import cats.syntax.all._
 import io.renku.entities.searchgraphs.projects.ProjectsGraphProvisioner
 import io.renku.metrics.MetricsRegistry
+import io.renku.triplesgenerator.errors.ProcessingRecoverableError
 import io.renku.triplesstore._
 import org.typelevel.log4cats.Logger
 import tooling._

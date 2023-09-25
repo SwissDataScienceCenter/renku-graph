@@ -179,7 +179,7 @@ class DatasetsEntitiesFinderSpec
         .importDataset(externalDS)
         .generateOne
 
-      val member = personEntities(personGitLabIds.toGeneratorOfSomes).generateOne
+      val member = projectMemberEntities(personGitLabIds.toGeneratorOfSomes).generateOne
       val original -> fork = {
         val original -> fork = publicProject.forkOnce()
         original -> fork.copy(visibility = visibilityNonPublic.generateOne, members = Set(member))
@@ -189,7 +189,7 @@ class DatasetsEntitiesFinderSpec
         provisionTestProjects(original, fork) >> finder
           .findEntities(
             Criteria(filters = Filters(entityTypes = Set(Filters.EntityType.Dataset)),
-                     maybeUser = member.toAuthUser.some
+                     maybeUser = member.person.toAuthUser.some
             )
           )
       }
@@ -200,7 +200,7 @@ class DatasetsEntitiesFinderSpec
     "favour dataset on internal projects over private projects if exist" in new TestCase {
       val externalDS = datasetEntities(provenanceImportedExternal).decoupledFromProject.generateOne
 
-      val member = personEntities(personGitLabIds.toGeneratorOfSomes).generateOne
+      val member = projectMemberEntities(personGitLabIds.toGeneratorOfSomes).generateOne
       val dsAndInternalProject @ _ -> internalProject = renkuProjectEntities(fixed(projects.Visibility.Internal))
         .modify(replaceMembers(to = Set(member)))
         .importDataset(externalDS)
@@ -215,7 +215,7 @@ class DatasetsEntitiesFinderSpec
         provisionTestProjects(original, fork) >> finder
           .findEntities(
             Criteria(filters = Filters(entityTypes = Set(Filters.EntityType.Dataset)),
-                     maybeUser = member.toAuthUser.some
+                     maybeUser = member.person.toAuthUser.some
             )
           )
       }
@@ -226,7 +226,7 @@ class DatasetsEntitiesFinderSpec
     "select dataset on private project if there's no project with broader visibility" in new TestCase {
       val externalDS = datasetEntities(provenanceImportedExternal).decoupledFromProject.generateOne
 
-      val member = personEntities(personGitLabIds.toGeneratorOfSomes).generateOne
+      val member = projectMemberEntities(personGitLabIds.toGeneratorOfSomes).generateOne
       val dsAndProject @ _ -> privateProject = renkuProjectEntities(fixed(projects.Visibility.Private))
         .modify(replaceMembers(to = Set(member)))
         .importDataset(externalDS)
@@ -236,7 +236,7 @@ class DatasetsEntitiesFinderSpec
         provisionTestProjects(privateProject) >> finder
           .findEntities(
             Criteria(filters = Filters(entityTypes = Set(Filters.EntityType.Dataset)),
-                     maybeUser = member.toAuthUser.some
+                     maybeUser = member.person.toAuthUser.some
             )
           )
       }

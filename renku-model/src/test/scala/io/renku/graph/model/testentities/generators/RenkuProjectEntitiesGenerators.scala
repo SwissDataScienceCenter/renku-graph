@@ -24,9 +24,8 @@ import eu.timepit.refined.api.Refined
 import eu.timepit.refined.numeric.Positive
 import io.renku.generators.Generators.Implicits._
 import io.renku.generators.Generators.{fixed, nonNegativeInts, positiveInts}
-import io.renku.graph.model.entities.Project.ProjectMember.{ProjectMemberNoEmail, ProjectMemberWithEmail}
-import io.renku.graph.model.entities.Project.{GitLabProjectInfo, ProjectMember}
-import io.renku.graph.model.projects.{ForksCount, Visibility}
+import io.renku.graph.model.gitlab.{GitLabMember, GitLabProjectInfo}
+import io.renku.graph.model.projects.{ForksCount, Role, Visibility}
 import io.renku.graph.model.testentities.generators.EntitiesGenerators.{ActivityGenFactory, DatasetGenFactory}
 import io.renku.graph.model.{RenkuUrl, projects}
 import org.scalacheck.Gen
@@ -74,7 +73,7 @@ trait RenkuProjectEntitiesGenerators {
       forksCountGen:         Gen[ForksCount] = anyForksCount
   ): Gen[RenkuProject.WithoutParent] = for {
     slug             <- projectSlugs
-    name             <- Gen.const(slug.toName)
+    name             <- Gen.const(slug.toPath.asName)
     maybeDescription <- projectDescriptions.toGeneratorOfOptions
     agent            <- cliVersions
     dateCreated      <- projectDateCreatedGen
@@ -83,7 +82,7 @@ trait RenkuProjectEntitiesGenerators {
     visibility       <- visibilityGen
     forksCount       <- forksCountGen
     keywords         <- projectKeywords.toGeneratorOfSet(min = 0)
-    members          <- personEntities(withGitLabId).toGeneratorOfSet(min = 0)
+    members          <- projectMemberEntities(withGitLabId).toGeneratorOfSet(min = 0)
     version          <- projectSchemaVersions
     activities       <- activityFactories.map(_.apply(dateCreated)).sequence
     datasets         <- datasetFactories.map(_.apply(dateCreated)).sequence
@@ -99,7 +98,7 @@ trait RenkuProjectEntitiesGenerators {
     visibility,
     forksCount,
     keywords,
-    members ++ maybeCreator,
+    members ++ maybeCreator.map(p => Project.Member(p, Role.Owner)),
     version,
     activities,
     datasets,
@@ -125,9 +124,9 @@ trait RenkuProjectEntitiesGenerators {
     maybeDescription <- projectDescriptions.toGeneratorOfOptions
     dateCreated      <- projectCreatedDates()
     dateModified     <- projectModifiedDates(dateCreated.value)
-    maybeCreator     <- projectMembers.toGeneratorOfOptions
+    maybeCreator     <- gitLabProjectMembers.toGeneratorOfOptions
     keywords         <- projectKeywords.toGeneratorOfSet(min = 0)
-    members          <- projectMembers.toGeneratorOfList(min = 1).map(_.toSet)
+    members          <- gitLabProjectMembers.toGeneratorOfList(min = 1).map(_.toSet)
     visibility       <- projectVisibilities
     maybeParentSlug  <- projectSlugs.toGeneratorOfOptions
     avatarUri        <- imageUris.toGeneratorOfOptions
@@ -137,30 +136,27 @@ trait RenkuProjectEntitiesGenerators {
                             dateCreated,
                             dateModified,
                             maybeDescription,
-                            maybeCreator,
+                            maybeCreator.map(_.user),
                             keywords,
-                            members,
+                            members ++ maybeCreator,
                             visibility,
                             maybeParentSlug,
                             avatarUri
   )
 
-  implicit lazy val projectMembersNoEmail: Gen[ProjectMemberNoEmail] = for {
+  implicit lazy val projectMembersNoEmail: Gen[GitLabMember] = for {
     name     <- personNames
     username <- personUsernames
     gitLabId <- personGitLabIds
-  } yield ProjectMemberNoEmail(name, username, gitLabId)
+    role     <- roleGen
+  } yield GitLabMember(name, username, gitLabId, None, Role.toGitLabAccessLevel(role))
 
-  implicit lazy val projectMembersWithEmail: Gen[ProjectMemberWithEmail] = for {
+  implicit lazy val projectMembersWithEmail: Gen[GitLabMember] = for {
     memberNoEmail <- projectMembersNoEmail
     email         <- personEmails
-  } yield memberNoEmail add email
+  } yield memberNoEmail withEmail email
 
-  lazy val projectMembers: Gen[ProjectMember] = Gen.oneOf(projectMembersNoEmail, projectMembersWithEmail)
-
-  implicit class ProjectMemberGenOps(membersGen: Gen[ProjectMember]) {
-    def modify(f: ProjectMember => ProjectMember): Gen[ProjectMember] = membersGen.map(f)
-  }
+  lazy val gitLabProjectMembers: Gen[GitLabMember] = Gen.oneOf(projectMembersNoEmail, projectMembersWithEmail)
 
   implicit class RenkuProjectGenFactoryOps(projectGen: Gen[RenkuProject])(implicit renkuUrl: RenkuUrl) {
 
@@ -244,7 +240,7 @@ trait RenkuProjectEntitiesGenerators {
     }
 
     def noEmailsOnMembers: Gen[RenkuProject] =
-      modify(membersLens.modify(_.map(_.copy(maybeEmail = None))))
+      modify(projectMembersPersonLens.modify(_.copy(maybeEmail = None)))
         .modify(creatorLens[RenkuProject].modify(_.map(_.copy(maybeEmail = None))))
 
     def forkOnce(): Gen[(RenkuProject, RenkuProject.WithParent)] = projectGen.map(_.forkOnce())

@@ -26,8 +26,7 @@ import io.renku.graph.acceptancetests.data._
 import io.renku.graph.acceptancetests.flows.TSProvisioning
 import io.renku.graph.acceptancetests.tooling.{AcceptanceSpec, ApplicationServices}
 import io.renku.graph.model.EventsGenerators.commitIds
-import io.renku.graph.model.RenkuTinyTypeGenerators.{personEmails, personGitLabIds}
-import io.renku.graph.model.projects.Visibility
+import io.renku.graph.model.projects.{Role, Visibility}
 import io.renku.graph.model.testentities._
 import io.renku.http.rest.Links
 import io.renku.http.server.EndpointTester.{JsonOps, jsonEntityDecoder}
@@ -57,12 +56,12 @@ class ProjectsResourcesSpec
 
     val parentDataProject = dataProjects(parent)
       .map(replaceCreatorFrom(creator, creatorGitLabId))
-      .map(addMemberFrom(creator, creatorGitLabId) >>> addMemberWithId(user.id))
+      .map(addMemberFrom(creator, creatorGitLabId, Role.Owner) >>> addMemberWithId(user.id, Role.Maintainer))
       .generateOne
 
     val childDataProject =
       dataProjects(child.copy(visibility = Visibility.Private, parent = parentDataProject.entitiesProject))
-        .map(addMemberWithId(user.id))
+        .map(addMemberWithId(user.id, Role.Owner))
         .generateOne
 
     parentDataProject -> childDataProject
@@ -71,7 +70,6 @@ class ProjectsResourcesSpec
   Feature("GET knowledge-graph/projects/<namespace>/<name> to find project's details") {
 
     Scenario("As a user I would like to find project's details by calling a REST endpoint") {
-
       Given("the user is authenticated")
       gitLabStub.addAuthenticated(user)
 
@@ -79,11 +77,12 @@ class ProjectsResourcesSpec
       val parentCommitId = commitIds.generateOne
       mockCommitDataOnTripleGenerator(parentProject, toPayloadJsonLD(parentProject), parentCommitId)
       gitLabStub.setupProject(parentProject, parentCommitId)
-
       `data in the Triples Store`(parentProject, parentCommitId, accessToken)
+      waitForAllEventsInFinalState(parentProject.id)
 
-      val commitId = commitIds.generateOne
-      mockCommitDataOnTripleGenerator(project, toPayloadJsonLD(project.entitiesProject), commitId)
+      val commitId    = commitIds.generateOne
+      val jsonPayload = toPayloadJsonLD(project.entitiesProject)
+      mockCommitDataOnTripleGenerator(project, jsonPayload, commitId)
       gitLabStub.setupProject(project, commitId)
       `data in the Triples Store`(project, commitId, accessToken)
       waitForAllEventsInFinalState(project.id)

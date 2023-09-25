@@ -113,6 +113,7 @@ class ProjectSlugFinderSpec
 
   private lazy val mapResponse = captureMapping(gitLabClient)(
     findingMethod = slugFinder.findProjectSlug(projectIds.generateOne, accessTokens.generateOne).unsafeRunSync(),
-    resultGenerator = projectSlugs.generateOption
+    resultGenerator = projectSlugs.generateOption,
+    underlyingMethod = Get
   )
 }

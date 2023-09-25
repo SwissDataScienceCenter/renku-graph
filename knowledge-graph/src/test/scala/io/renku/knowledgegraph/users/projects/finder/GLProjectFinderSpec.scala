@@ -137,7 +137,8 @@ class GLProjectFinderSpec
          .map(p => p.maybeCreator.map(_ => p -> personGitLabIds.generateOption).getOrElse(p -> Total(1).some))
          .toGeneratorOfList(),
        fixed(Option(Total(1)))
-      ).mapN(_ -> _)
+      ).mapN(_ -> _),
+      underlyingMethod = Get
     )
 
     def totalFrom(projects: List[model.Project.NotActivated]) =

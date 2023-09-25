@@ -130,7 +130,8 @@ class RevokeCandidatesFinderSpec
         .compile
         .toList
         .unsafeRunSync(),
-      resultGenerator = tokenInfos().generateList() -> Option.empty[Page]
+      resultGenerator = tokenInfos().generateList() -> Option.empty[Page],
+      underlyingMethod = Get
     )
 
     def fetchProjectTokens(page: Page, returning: IO[(List[TokenInfo], Option[Page])]) =

@@ -27,6 +27,7 @@ import io.renku.data.Message
 import io.renku.graph.model.projects
 import io.renku.http.client.GitLabClient
 import io.renku.http.server.security.model.AuthUser
+import io.renku.knowledgegraph.Failure
 import io.renku.metrics.MetricsRegistry
 import org.http4s.MediaType.{application, multipartType}
 import org.http4s.circe.CirceEntityDecoder._
@@ -85,8 +86,7 @@ private class EndpointImpl[F[_]: Async: Logger](projectUpdater: ProjectUpdater[F
 
   private def relevantError(slug: projects.Slug): Throwable => F[Response[F]] = {
     case f: Failure =>
-      logFailure(slug)(f)
-        .as(Response[F](f.status).withEntity(f.message))
+      logFailure(slug)(f).as(f.toResponse[F])
     case ex: Exception =>
       Logger[F]
         .error(ex)(show"Updating project $slug failed")
@@ -95,10 +95,10 @@ private class EndpointImpl[F[_]: Async: Logger](projectUpdater: ProjectUpdater[F
 
   private def logFailure(slug: projects.Slug): Failure => F[Unit] = {
     case f if f.status == BadRequest || f.status == Conflict =>
-      Logger[F].info(show"Updating project $slug failed: ${f.getMessage}")
+      Logger[F].info(show"Updating project $slug failed: ${f.detailedMessage}")
     case f if f.status == Forbidden =>
       ().pure[F]
     case f =>
-      Logger[F].error(f)(show"Updating project $slug failed")
+      Logger[F].error(f)(show"Updating project $slug failed: ${f.detailedMessage}")
   }
 }

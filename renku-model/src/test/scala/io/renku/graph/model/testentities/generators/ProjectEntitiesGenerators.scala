@@ -21,13 +21,13 @@ package generators
 
 import cats.syntax.all._
 import io.renku.generators.Generators.Implicits._
-import io.renku.graph.model.entities.Project.ProjectMember
 import io.renku.graph.model.entities.ProjectIdentification
+import io.renku.graph.model.gitlab.{GitLabMember, GitLabUser}
 import io.renku.graph.model.images.ImageUri
 import io.renku.graph.model.projects.Visibility
 import io.renku.graph.model.versions.SchemaVersion
 import io.renku.graph.model.{persons, projects}
-import monocle.Lens
+import monocle.{Lens, Traversal}
 import org.scalacheck.Gen
 
 trait ProjectEntitiesGenerators {
@@ -47,26 +47,63 @@ trait ProjectEntitiesGenerators {
     nonRenkuProjectWithParentEntities(visibilityGen, creatorGen = creatorGen)
   )
 
-  lazy val memberGitLabIdLens: Lens[ProjectMember, persons.GitLabId] =
-    Lens[ProjectMember, persons.GitLabId](_.gitLabId) { gitLabId =>
-      {
-        case member: ProjectMember.ProjectMemberNoEmail   => member.copy(gitLabId = gitLabId)
-        case member: ProjectMember.ProjectMemberWithEmail => member.copy(gitLabId = gitLabId)
-      }
-    }
+  lazy val memberGitLabUserLens: Lens[GitLabMember, GitLabUser] =
+    Lens[GitLabMember, GitLabUser](_.user)(a => b => b.copy(user = a))
 
-  def membersLens[P <: Project]: Lens[P, Set[Person]] =
-    Lens[P, Set[Person]](_.members) { members =>
+  lazy val gitLabUserIdLens: Lens[GitLabUser, persons.GitLabId] =
+    Lens[GitLabUser, persons.GitLabId](_.gitLabId)(a => b => b.copy(gitLabId = a))
+
+  lazy val gitLabUserEmailLens: Lens[GitLabUser, Option[persons.Email]] =
+    Lens[GitLabUser, Option[persons.Email]](_.email)(a => b => b.copy(email = a))
+
+  lazy val memberGitLabIdLens: Lens[GitLabMember, persons.GitLabId] =
+    memberGitLabUserLens.andThen(gitLabUserIdLens)
+
+  lazy val memberGitLabEmailLens: Lens[GitLabMember, Option[persons.Email]] =
+    memberGitLabUserLens.andThen(gitLabUserEmailLens)
+
+  def membersLens[P <: Project]: Lens[P, Set[Project.Member]] =
+    Lens[P, Set[Project.Member]](_.members) { members =>
       _.fold(_.copy(members = members), _.copy(members = members), _.copy(members = members), _.copy(members = members))
         .asInstanceOf[P]
     }
 
+  def membersLensAsList[P <: Project]: Lens[P, List[Project.Member]] =
+    Lens[P, List[Project.Member]](_.members.toList.sortBy(_.person.name.value)) { members =>
+      _.fold(_.copy(members = members.toSet),
+             _.copy(members = members.toSet),
+             _.copy(members = members.toSet),
+             _.copy(members = members.toSet)
+      )
+        .asInstanceOf[P]
+    }
+
+  def memberPersonLens: Lens[Project.Member, Person] =
+    Lens[Project.Member, Person](_.person)(a => b => b.copy(person = a))
+
+  def personNameLens: Lens[Person, persons.Name] =
+    Lens[Person, persons.Name](_.name)(a => b => b.copy(name = a))
+
+  def personGitLabIdLens: Lens[Person, Option[persons.GitLabId]] =
+    Lens[Person, Option[persons.GitLabId]](_.maybeGitLabId)(a => b => b.copy(maybeGitLabId = a))
+
+  def memberPersonNameLens: Lens[Project.Member, persons.Name] =
+    memberPersonLens.andThen(personNameLens)
+
+  def memberPersonGitLabIdLens: Lens[Project.Member, Option[persons.GitLabId]] =
+    memberPersonLens.andThen(personGitLabIdLens)
+
+  def projectMembersPersonLens[P <: Project]: Traversal[P, Person] = {
+    val t = Traversal.fromTraverse[List, Project.Member]
+    membersLensAsList.andThen(t).andThen(memberPersonLens)
+  }
+
   def creatorLens[P <: Project]: Lens[P, Option[Person]] =
     Lens[P, Option[Person]](_.maybeCreator) { maybeCreator =>
       _.fold(_.copy(maybeCreator = maybeCreator),
-        _.copy(maybeCreator = maybeCreator),
-        _.copy(maybeCreator = maybeCreator),
-        _.copy(maybeCreator = maybeCreator)
+             _.copy(maybeCreator = maybeCreator),
+             _.copy(maybeCreator = maybeCreator),
+             _.copy(maybeCreator = maybeCreator)
       ).asInstanceOf[P]
     }
 
@@ -82,7 +119,7 @@ trait ProjectEntitiesGenerators {
 
   def removeMembers[P <: Project](): P => P = membersLens.modify(_ => Set.empty)
 
-  def replaceMembers[P <: Project](to: Set[Person]): P => P =
+  def replaceMembers[P <: Project](to: Set[Project.Member]): P => P =
     _.fold(_.copy(members = to), _.copy(members = to), _.copy(members = to), _.copy(members = to)).asInstanceOf[P]
 
   def replaceProjectName[P <: Project](to: projects.Name): P => P =

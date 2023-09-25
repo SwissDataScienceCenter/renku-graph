@@ -40,7 +40,7 @@ class GenerationSpec
   "fromCli" should {
     "fail on input entities" in {
       val cliGeneration = GenerationGenerators.generationGen(activityResourceIdGen).generateOne
-      val invalidGen    = CliGeneration.Lenses.entityGenerationIds.set(Nil)(cliGeneration)
+      val invalidGen    = CliGeneration.Lenses.entityGenerationIds.replace(Nil)(cliGeneration)
       val result        = entities.Generation.fromCli(invalidGen)
       result should beInvalidWithMessageIncluding(
         "Expected output entity for a Generation, but got: InputEntity"

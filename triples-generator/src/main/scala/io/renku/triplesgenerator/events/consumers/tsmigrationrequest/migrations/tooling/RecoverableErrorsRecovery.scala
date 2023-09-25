@@ -21,8 +21,8 @@ package io.renku.triplesgenerator.events.consumers.tsmigrationrequest.migrations
 import cats.MonadThrow
 import cats.syntax.all._
 import io.renku.http.client.RestClientError.{ClientException, ConnectivityException, UnexpectedResponseException}
-import io.renku.triplesgenerator.events.consumers.ProcessingRecoverableError
-import io.renku.triplesgenerator.events.consumers.ProcessingRecoverableError.LogWorthyRecoverableError
+import io.renku.triplesgenerator.errors.ProcessingRecoverableError
+import io.renku.triplesgenerator.errors.ProcessingRecoverableError.LogWorthyRecoverableError
 import org.http4s.Status.{Forbidden, InternalServerError, Unauthorized}
 
 private[migrations] object RecoverableErrorsRecovery extends RecoverableErrorsRecovery

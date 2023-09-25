@@ -25,14 +25,16 @@ import io.circe.Json
 import io.circe.syntax._
 import io.renku.data.Message
 import io.renku.generators.Generators.Implicits._
+import io.renku.generators.Generators.exceptions
 import io.renku.graph.model.RenkuTinyTypeGenerators.projectSlugs
 import io.renku.graph.model.projects
+import io.renku.interpreters.TestLogger
 import io.renku.testtools.CustomAsyncIOSpec
 import io.renku.triplesgenerator.api.Generators.projectUpdatesGen
 import io.renku.triplesgenerator.api.ProjectUpdates
 import org.http4s.MediaType.application
 import org.http4s.Request
-import org.http4s.Status.{BadRequest, NotFound, Ok}
+import org.http4s.Status.{BadRequest, InternalServerError, NotFound, Ok}
 import org.http4s.circe._
 import org.http4s.headers.`Content-Type`
 import org.scalamock.scalatest.AsyncMockFactory
@@ -79,6 +81,23 @@ class EndpointSpec extends AsyncFlatSpec with CustomAsyncIOSpec with should.Matc
     }
   }
 
+  it should "return InternalServerError if project update fails" in {
+
+    val slug      = projectSlugs.generateOne
+    val updates   = projectUpdatesGen.generateOne
+    val exception = exceptions.generateOne
+    givenProjectUpdating(slug, updates, returning = exception.raiseError[IO, Nothing])
+
+    endpoint.`PATCH /projects/:slug`(slug, Request[IO]().withEntity(updates.asJson)) >>= { response =>
+      response.status.pure[IO].asserting(_ shouldBe InternalServerError) >>
+        response.contentType.pure[IO].asserting(_ shouldBe `Content-Type`(application.json).some) >>
+        response
+          .as[Message]
+          .asserting(_ shouldBe Message.Error.fromMessageAndStackTraceUnsafe("Project update failed", exception))
+    }
+  }
+
+  private implicit val logger: TestLogger[IO] = TestLogger[IO]()
   private lazy val projectUpdater = mock[ProjectUpdater[IO]]
   private lazy val endpoint       = new EndpointImpl[IO](projectUpdater)
 

@@ -19,13 +19,14 @@
 package io.renku.knowledgegraph.projects.update
 
 import ProvisioningStatusFinder.ProvisioningStatus.Unhealthy
-import cats.NonEmptyParallel
 import cats.effect.Async
 import cats.syntax.all._
-import io.renku.core.client.{RenkuCoreClient, RenkuCoreUri, UserInfo, ProjectUpdates => CoreProjectUpdates}
+import cats.{Applicative, NonEmptyParallel}
+import io.renku.core.client.{Branch, RenkuCoreClient, RenkuCoreUri, UserInfo, ProjectUpdates => CoreProjectUpdates}
 import io.renku.graph.model.projects
 import io.renku.http.client.GitLabClient
 import io.renku.http.server.security.model.AuthUser
+import io.renku.knowledgegraph.gitlab.UserInfoFinder
 import io.renku.metrics.MetricsRegistry
 import io.renku.triplesgenerator.api.{TriplesGeneratorClient, ProjectUpdates => TGProjectUpdates}
 import org.typelevel.log4cats.Logger
@@ -67,21 +68,22 @@ private class ProjectUpdaterImpl[F[_]: Async: NonEmptyParallel: Logger](
         .flatMap(findTGUpdates(slug, updates, _))
         .flatMap(updateTG(slug, _))
     else
-      checkPrerequisites(slug, authUser) >> {
+      checkPrerequisites(slug, authUser) >>= { defaultBranchInfo =>
         for {
-          coreUpdates <- findCoreProjectUpdates(slug, updates, authUser)
-          coreUri     <- findCoreUri(coreUpdates, authUser)
-          _           <- updateCore(slug, coreUri, coreUpdates, authUser)
-          updated     <- updateGL(slug, updates, authUser)
-          tgUpdates   <- findTGUpdates(slug, updates, updated)
-          _           <- updateTG(slug, tgUpdates)
+          coreUpdates    <- findCoreProjectUpdates(slug, updates, authUser)
+          coreUri        <- findCoreUri(coreUpdates, authUser)
+          corePushBranch <- updateCore(slug, coreUri, coreUpdates, authUser)
+          glUpdated      <- updateGL(slug, updates, authUser)
+          tgUpdates      <- findTGUpdates(slug, updates, glUpdated, defaultBranchInfo, corePushBranch)
+          _              <- updateTG(slug, tgUpdates)
+          _              <- failIfPRNeeded(tgUpdates, defaultBranchInfo, corePushBranch)
         } yield ()
       }
 
   private def updateGL(slug: projects.Slug, updates: ProjectUpdates, authUser: AuthUser): F[Option[GLUpdatedProject]] =
     glProjectUpdater
       .updateProject(slug, updates, authUser.accessToken)
-      .adaptError(Failure.onGLUpdate(slug, _))
+      .adaptError(UpdateFailures.onGLUpdate(slug, _))
       .flatMap(_.fold(_.raiseError[F, Option[GLUpdatedProject]], _.pure[F]))
 
   private def findTGUpdates(slug:                  projects.Slug,
@@ -89,36 +91,41 @@ private class ProjectUpdaterImpl[F[_]: Async: NonEmptyParallel: Logger](
                             maybeGLUpdatedProject: Option[GLUpdatedProject]
   ) = tgUpdatesFinder
     .findTGProjectUpdates(updates, maybeGLUpdatedProject)
-    .adaptError(Failure.onTGUpdatesFinding(slug, _))
+    .adaptError(UpdateFailures.onTGUpdatesFinding(slug, _))
+
+  private def findTGUpdates(slug:                  projects.Slug,
+                            updates:               ProjectUpdates,
+                            maybeGLUpdatedProject: Option[GLUpdatedProject],
+                            maybeDefaultBranch:    Option[DefaultBranch],
+                            corePushBranch:        Branch
+  ) = tgUpdatesFinder
+    .findTGProjectUpdates(updates, maybeGLUpdatedProject, maybeDefaultBranch, corePushBranch)
+    .adaptError(UpdateFailures.onTGUpdatesFinding(slug, _))
 
   private def updateTG(slug: projects.Slug, updates: TGProjectUpdates): F[Unit] =
     tgClient
       .updateProject(slug, updates)
       .map(_.toEither)
       .handleError(_.asLeft)
-      .flatMap(_.fold(Failure.onTSUpdate(slug, _).raiseError[F, Unit], _.pure[F]))
+      .flatMap(_.fold(UpdateFailures.onTSUpdate(slug, _).raiseError[F, Unit], _.pure[F]))
 
-  private def checkPrerequisites(slug: projects.Slug, authUser: AuthUser): F[Unit] =
-    (noProvisioningFailures(slug), canPushToDefaultBranch(slug, authUser))
-      .parMapN((_, _) => ())
+  private def checkPrerequisites(slug: projects.Slug, authUser: AuthUser): F[Option[DefaultBranch]] =
+    (noProvisioningFailures(slug), findDefaultBranchInfo(slug, authUser))
+      .parMapN((_, branchInfo) => branchInfo)
 
   private def noProvisioningFailures(slug: projects.Slug): F[Unit] =
     provisioningStatusFinder
       .checkHealthy(slug)
-      .adaptError(Failure.onProvisioningStatusCheck(slug, _))
+      .adaptError(UpdateFailures.onProvisioningStatusCheck(slug, _))
       .flatMap {
-        case r @ Unhealthy(_) => Failure.onProvisioningNotHealthy(slug, r).raiseError[F, Unit]
+        case r @ Unhealthy(_) => UpdateFailures.onProvisioningNotHealthy(slug, r).raiseError[F, Unit]
         case _                => ().pure[F]
       }
 
-  private def canPushToDefaultBranch(slug: projects.Slug, authUser: AuthUser): F[Unit] =
+  private def findDefaultBranchInfo(slug: projects.Slug, authUser: AuthUser): F[Option[DefaultBranch]] =
     branchProtectionCheck
-      .canPushToDefaultBranch(slug, authUser.accessToken)
-      .adaptError(Failure.onBranchAccessCheck(slug, authUser.id, _))
-      .flatMap {
-        case false => Failure.cannotPushToBranch.raiseError[F, Unit]
-        case true  => ().pure[F]
-      }
+      .findDefaultBranchInfo(slug, authUser.accessToken)
+      .adaptError(UpdateFailures.onBranchAccessCheck(slug, authUser.id, _))
 
   private def findCoreProjectUpdates(slug: projects.Slug, updates: ProjectUpdates, authUser: AuthUser) =
     (findProjectGitUrl(slug, authUser) -> findUserInfo(authUser))
@@ -127,37 +134,44 @@ private class ProjectUpdaterImpl[F[_]: Async: NonEmptyParallel: Logger](
   private def findProjectGitUrl(slug: projects.Slug, authUser: AuthUser): F[projects.GitHttpUrl] =
     projectGitUrlFinder
       .findGitUrl(slug, authUser.accessToken)
-      .adaptError(Failure.onFindingProjectGitUrl(slug, _))
+      .adaptError(UpdateFailures.onFindingProjectGitUrl(slug, _))
       .flatMap {
         case Some(url) => url.pure[F]
-        case None      => Failure.cannotFindProjectGitUrl.raiseError[F, projects.GitHttpUrl]
+        case None      => UpdateFailures.cannotFindProjectGitUrl.raiseError[F, projects.GitHttpUrl]
       }
 
   private def findUserInfo(authUser: AuthUser): F[UserInfo] =
     userInfoFinder
       .findUserInfo(authUser.accessToken)
-      .adaptError(Failure.onFindingUserInfo(authUser.id, _))
+      .adaptError(UpdateFailures.onFindingUserInfo(authUser.id, _))
       .flatMap {
         case Some(info) => info.pure[F]
-        case None       => Failure.cannotFindUserInfo(authUser.id).raiseError[F, UserInfo]
+        case None       => UpdateFailures.cannotFindUserInfo(authUser.id).raiseError[F, UserInfo]
       }
 
   private def findCoreUri(updates: CoreProjectUpdates, authUser: AuthUser): F[RenkuCoreUri.Versioned] =
     renkuCoreClient
-      .findCoreUri(updates.projectUrl, authUser.accessToken)
+      .findCoreUri(updates.projectUrl, updates.userInfo, authUser.accessToken)
       .map(_.toEither)
       .handleError(_.asLeft)
-      .flatMap(_.fold(Failure.onFindingCoreUri(_).raiseError[F, RenkuCoreUri.Versioned], _.pure[F]))
+      .flatMap(_.fold(UpdateFailures.onFindingCoreUri(_).raiseError[F, RenkuCoreUri.Versioned], _.pure[F]))
 
   private def updateCore(slug:     projects.Slug,
                          coreUri:  RenkuCoreUri.Versioned,
                          updates:  CoreProjectUpdates,
                          authUser: AuthUser
-  ): F[Unit] = Async[F].start {
+  ): F[Branch] =
     renkuCoreClient
       .updateProject(coreUri, updates, authUser.accessToken)
       .map(_.toEither)
       .handleError(_.asLeft)
-      .flatMap(_.fold(Logger[F].error(_)(show"Updating project $slug failed"), _.pure[F]))
-  }.void
+      .flatMap(_.fold(UpdateFailures.onCoreUpdate(slug, _).raiseError[F, Branch], _.pure[F]))
+
+  private def failIfPRNeeded(tgUpdates:         TGProjectUpdates,
+                             defaultBranchInfo: Option[DefaultBranch],
+                             pushBranch:        Branch
+  ): F[Unit] =
+    Applicative[F].unlessA(defaultBranchInfo.map(_.branch) contains pushBranch) {
+      UpdateFailures.corePushedToNonDefaultBranch(tgUpdates, defaultBranchInfo, pushBranch).raiseError[F, Unit]
+    }
 }

@@ -111,7 +111,8 @@ class GitLabProjectFinderSpec
 
     val mapResponse: ResponseMappingF[IO, Option[GitLabProject]] =
       captureMapping(gitLabClient)(projectFinder.findProject(projectSlugs.generateOne).unsafeRunSync(),
-                                   gitLabProjects.toGeneratorOfOptions
+                                   gitLabProjects.toGeneratorOfOptions,
+                                   underlyingMethod = Get
       )
   }
 

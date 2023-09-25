@@ -93,7 +93,8 @@ class GLCreatorFinderSpec
 
     lazy val mapResponse = captureMapping(gitLabClient)(
       finder.findCreatorName(creatorId).unsafeRunSync(),
-      personNames.toGeneratorOfOptions
+      personNames.toGeneratorOfOptions,
+      underlyingMethod = Get
     )
   }
 

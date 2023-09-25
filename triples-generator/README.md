@@ -9,6 +9,7 @@ This microservice deals with all Triples Store administrative and provisioning e
 | POST   | ```/events```         | To send an event for processing      |
 | GET    | ```/metrics```        | Serves Prometheus metrics            |
 | GET    | ```/ping```           | To check if service is healthy       |
+| POST   | ```/projects```       | API to create a project in the TS    |
 | PATCH  | ```/projects/:slug``` | API to update project data in the TS |
 | GET    | ```/version```        | Returns info about service version   |
 
@@ -278,6 +279,42 @@ Verifies service health.
 |----------------------------|-------------------------|
 | OK (200)                   | If service is healthy   |
 | INTERNAL SERVER ERROR (500)| Otherwise               |
+
+#### POST /knowledge-graph/projects
+
+API to create a project in the Triples Store.
+
+All of the properties except from `description` and `image` are mandatory.
+Notes:
+* images - an array of either relative or absolute links to the images 
+* visibility - possible values are: `public`, `internal`, `private`
+
+**Request**
+
+```json
+{
+  "name":        "yTAapRBG",
+  "slug":        "kukQDx2-52i/_D107Ch2IAD",
+  "description": "project description",
+  "dateCreated": "2004-09-08T07:53:49.451Z",
+  "keywords":    ["EEgWHeURD", "IJDvEo", "IluFdENW"],
+  "visibility":  "internal",
+  "images":      ["https://KUvxaz:9228/UnHoVd/uTSx"],
+  "creator": {
+    "name": "_JMILU`v cRYpkiJ",
+    "id":   61181175
+  }
+}
+```
+
+        
+**Response**
+
+| Status                      | Description                          |
+|-----------------------------|--------------------------------------|
+| CREATED (201)               | When project is created successfully |
+| BAD_REQUEST (400)           | When the given payload is malformed  |
+| INTERNAL SERVER ERROR (500) | In case of failures                  |
 
 #### PATCH /knowledge-graph/projects/:slug
 

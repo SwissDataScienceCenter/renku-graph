@@ -27,12 +27,12 @@ import io.renku.generators.CommonGraphGenerators._
 import io.renku.generators.Generators.Implicits._
 import io.renku.graph.model.GitLabUrl
 import io.renku.graph.model.GraphModelGenerators._
-import io.renku.knowledgegraph.projects.images.ImagesEncoder
+import io.renku.knowledgegraph.projects.images.ImageUrisEncoder
 import org.scalatest.flatspec.AnyFlatSpec
 import org.scalatest.matchers.should
 import org.scalatestplus.scalacheck.ScalaCheckPropertyChecks
 
-class ProjectDatasetSpec extends AnyFlatSpec with should.Matchers with ScalaCheckPropertyChecks with ImagesEncoder {
+class ProjectDatasetSpec extends AnyFlatSpec with should.Matchers with ScalaCheckPropertyChecks with ImageUrisEncoder {
 
   it should "encode to JSON" in {
     forAll(projectDatasetGen) { datasets =>

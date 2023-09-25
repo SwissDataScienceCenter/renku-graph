@@ -26,6 +26,7 @@ import io.renku.graph.acceptancetests.data._
 import io.renku.graph.acceptancetests.flows.AccessTokenPresence
 import io.renku.graph.acceptancetests.tooling.{AcceptanceSpec, ApplicationServices, ModelImplicits}
 import io.renku.graph.model.EventsGenerators.commitIds
+import io.renku.graph.model.projects.Role
 import io.renku.graph.model.testentities.cliShapedPersons
 import io.renku.graph.model.testentities.generators.EntitiesGenerators._
 import io.renku.http.client.AccessToken
@@ -41,7 +42,7 @@ class WebhookCreationSpec extends AcceptanceSpec with ModelImplicits with Applic
       val project =
         dataProjects(renkuProjectEntities(visibilityPublic, creatorGen = cliShapedPersons).modify(removeMembers()),
                      CommitsCount.one
-        ).map(addMemberWithId(user.id)).generateOne
+        ).map(addMemberWithId(user.id, Role.Owner)).generateOne
 
       Given("api user is authenticated")
       gitLabStub.addAuthenticated(user)
@@ -77,7 +78,7 @@ class WebhookCreationSpec extends AcceptanceSpec with ModelImplicits with Applic
       val project =
         dataProjects(renkuProjectEntities(visibilityPublic, creatorGen = cliShapedPersons).modify(removeMembers()),
                      CommitsCount.zero
-        ).map(addMemberWithId(user.id)).generateOne
+        ).map(addMemberWithId(user.id, Role.Owner)).generateOne
 
       Given("api user is authenticated")
       gitLabStub.addAuthenticated(user)

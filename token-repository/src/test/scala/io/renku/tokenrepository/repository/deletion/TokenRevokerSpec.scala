@@ -32,7 +32,6 @@ import io.renku.http.client.{AccessToken, GitLabClient}
 import io.renku.http.tinytypes.TinyTypeURIEncoder._
 import io.renku.testtools.{GitLabClientTools, IOSpec}
 import io.renku.tokenrepository.repository.RepositoryGenerators.accessTokenIds
-import org.http4s.Method.DELETE
 import org.http4s._
 import org.http4s.implicits._
 import org.scalamock.scalatest.MockFactory
@@ -80,7 +79,7 @@ class TokenRevokerSpec
     lazy val mapResponse = captureMapping(gitLabClient)(
       findingMethod = tokensRevoker.revokeToken(tokenId, projectId, accessTokens.generateOne).unsafeRunSync(),
       resultGenerator = fixed(()),
-      method = DELETE
+      underlyingMethod = Delete
     )
   }
 }

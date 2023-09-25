@@ -27,6 +27,7 @@ import io.renku.generators.CommonGraphGenerators.authUsers
 import io.renku.generators.Generators.Implicits._
 import io.renku.graph.model.EventsGenerators.commitIds
 import io.renku.graph.model.GraphModelGenerators.projectSchemaVersions
+import io.renku.graph.model.projects.Role
 import io.renku.graph.model.testentities.cliShapedPersons
 import io.renku.graph.model.testentities.generators.EntitiesGenerators.{removeMembers, renkuProjectEntities, visibilityPublic}
 import io.renku.graph.model.versions.SchemaVersion
@@ -47,7 +48,7 @@ class ProjectReProvisioningSpec extends AcceptanceSpec with ApplicationServices 
 
       Given("there's data for the project in the TS")
 
-      val project = dataProjects(testProject).map(addMemberWithId(user.id)).generateOne
+      val project = dataProjects(testProject).map(addMemberWithId(user.id, Role.Owner)).generateOne
 
       gitLabStub.addAuthenticated(user)
 

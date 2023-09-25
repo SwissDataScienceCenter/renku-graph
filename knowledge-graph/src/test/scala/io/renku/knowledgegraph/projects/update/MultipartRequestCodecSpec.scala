@@ -18,24 +18,31 @@
 
 package io.renku.knowledgegraph.projects.update
 
+import Generators.projectUpdatesGen
 import cats.effect.IO
 import cats.effect.testing.scalatest.AsyncIOSpec
 import cats.syntax.all._
 import io.renku.generators.Generators.Implicits._
+import io.renku.generators.Generators.countingGen
 import io.renku.graph.model.RenkuTinyTypeGenerators.{projectDescriptions, projectKeywords, projectVisibilities}
 import io.renku.graph.model.projects
+import io.renku.knowledgegraph.projects.images.ImageGenerators
 import org.scalatest.flatspec.AsyncFlatSpec
 import org.scalatest.matchers.should
+import org.scalatestplus.scalacheck.ScalaCheckPropertyChecks
 
-class MultipartRequestCodecSpec extends AsyncFlatSpec with AsyncIOSpec with should.Matchers {
+class MultipartRequestCodecSpec
+    extends AsyncFlatSpec
+    with AsyncIOSpec
+    with should.Matchers
+    with ScalaCheckPropertyChecks {
 
   private val codec: MultipartRequestCodec[IO] = MultipartRequestCodec[IO]
 
-  it should "decode/encode the multipart request with multiple values" in {
-
-    val updates = ProjectUpdates.empty
-
-    (codec.encode(updates) >>= (MultipartRequestCodec[IO].decode(_))).asserting(_ shouldBe updates)
+  forAll(projectUpdatesGen, countingGen) { (updates, cnt) =>
+    it should s"decode/encode the multipart request with multiple values #$cnt" in {
+      (codec.encode(updates) >>= (MultipartRequestCodec[IO].decode(_))).asserting(_ shouldBe updates)
+    }
   }
 
   it should "decode/encode the multipart request for empty updates" in {
@@ -61,7 +68,7 @@ class MultipartRequestCodecSpec extends AsyncFlatSpec with AsyncIOSpec with shou
 
   it should "decode/encode new value for the image if set" in {
 
-    val updates = ProjectUpdates.empty.copy(newImage = Generators.images.generateSome.some)
+    val updates = ProjectUpdates.empty.copy(newImage = ImageGenerators.images.generateSome.some)
 
     (codec.encode(updates) >>= (MultipartRequestCodec[IO].decode(_))).asserting(_ shouldBe updates)
   }

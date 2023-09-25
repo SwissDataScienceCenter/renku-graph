@@ -44,7 +44,7 @@ class ClientToolsSpec extends AsyncWordSpec with CustomAsyncIOSpec with should.M
 
     "decode the failure into Result.Failure.Detailed" in {
 
-      val failure = resultDetailedFailures.generateOne
+      val failure = resultDetailedFailures.suchThat(_.maybeDevMessage.isEmpty).generateOne
 
       val response = Response[IO](Ok)
         .withEntity {
@@ -52,6 +52,24 @@ class ClientToolsSpec extends AsyncWordSpec with CustomAsyncIOSpec with should.M
             "error": {
               "code":        ${failure.code},
               "userMessage": ${failure.userMessage}
+            }
+          }"""
+        }
+
+      ClientTools[IO].toResult[String](response).asserting(_ shouldBe failure)
+    }
+
+    "decode the failure into Result.Failure.Detailed in the presence of devMessage" in {
+
+      val failure = resultDetailedFailures.suchThat(_.maybeDevMessage.isDefined).generateOne
+
+      val response = Response[IO](Ok)
+        .withEntity {
+          json"""{
+            "error": {
+              "code":        ${failure.code},
+              "userMessage": ${failure.userMessage},
+              "devMessage":  ${failure.maybeDevMessage}
             }
           }"""
         }

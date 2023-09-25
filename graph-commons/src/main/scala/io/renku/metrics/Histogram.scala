@@ -25,12 +25,14 @@ import eu.timepit.refined.collection.NonEmpty
 import io.prometheus.client.{Histogram => LibHistogram}
 import io.renku.metrics
 
-import scala.concurrent.duration.Duration
+import scala.concurrent.duration.{Duration, FiniteDuration}
 
 sealed trait Histogram[F[_]] extends MetricsCollector
 
 trait SingleValueHistogram[F[_]] extends Histogram[F] {
   def startTimer(): F[Histogram.Timer[F]]
+  def observe(amt: FiniteDuration): F[Unit]
+  def observe(amt: Double):         F[Unit]
 }
 
 object SingleValueHistogram {
@@ -63,11 +65,19 @@ class SingleValueHistogramImpl[F[_]: MonadThrow](val name: String Refined NonEmp
   override def startTimer(): F[Histogram.Timer[F]] = MonadThrow[F].catchNonFatal {
     new metrics.SingleValueHistogram.NoThresholdTimerImpl(wrappedCollector.startTimer())
   }
+
+  override def observe(amt: FiniteDuration): F[Unit] =
+    observe(amt.toMillis.toDouble / 1000)
+
+  override def observe(amt: Double): F[Unit] = MonadThrow[F].catchNonFatal {
+    wrappedCollector.observe(amt)
+  }
 }
 
 trait LabeledHistogram[F[_]] extends Histogram[F] {
   def startTimer(labelValue: String): F[Histogram.Timer[F]]
-  def observe(labelValue:    String, amt: Double): F[Unit]
+  def observe(labelValue:    String, amt: FiniteDuration): F[Unit]
+  def observe(labelValue:    String, amt: Double):         F[Unit]
 }
 
 object LabeledHistogram {
@@ -118,9 +128,14 @@ class LabeledHistogramImpl[F[_]: MonadThrow](val name: String Refined NonEmpty,
 
   private val maybeThresholdMillis = maybeThreshold.map(_.toMillis.toDouble)
 
-  def observe(labelValue: String, amt: Double): F[Unit] =
+  override def observe(labelValue: String, amt: FiniteDuration): F[Unit] =
+    observe(labelValue, amt.toMillis.toDouble / 1000)
+
+  override def observe(labelValue: String, amt: Double): F[Unit] =
     MonadThrow[F].catchNonFatal {
-      wrappedCollector.labels(labelValue).observe(amt)
+      if (maybeThresholdMillis.fold(ifEmpty = true)((amt * 1000d) >= _))
+        wrappedCollector.labels(labelValue).observe(amt)
+      else ()
     }
 
   override def startTimer(labelValue: String): F[Histogram.Timer[F]] = MonadThrow[F].catchNonFatal {

@@ -28,7 +28,6 @@ object GitLabUrlLoader {
 
   private implicit val gitLabUrlReader: ConfigReader[GitLabUrl] = urlTinyTypeReader(GitLabUrl)
 
-  def apply[F[_]: MonadThrow](
-      config: Config = ConfigFactory.load
-  ): F[GitLabUrl] = find[F, GitLabUrl]("services.gitlab.url", config)
+  def apply[F[_]: MonadThrow](config: Config = ConfigFactory.load): F[GitLabUrl] =
+    find[F, GitLabUrl]("services.gitlab.url", config)
 }

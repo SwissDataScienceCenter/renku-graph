@@ -55,14 +55,14 @@ object Microservice extends IOMicroservice {
       } yield exitCode
     }
 
-  final case class Setup(
+  private final case class Setup(
       projectConnConfig:       ProjectsConnectionConfig,
       metricsRegistry:         MetricsRegistry[IO],
       sparqlQueryTimeRecorder: SparqlQueryTimeRecorder[IO],
       projectSparqlClient:     ProjectSparqlClient[IO]
   )
 
-  object Setup {
+  private object Setup {
     val resource: Resource[IO, Setup] = for {
       pcc <- Resource.eval(ProjectsConnectionConfig[IO]())
 

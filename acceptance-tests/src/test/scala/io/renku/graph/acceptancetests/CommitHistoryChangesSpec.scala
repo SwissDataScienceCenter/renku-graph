@@ -28,6 +28,7 @@ import io.renku.graph.acceptancetests.flows.TSProvisioning
 import io.renku.graph.acceptancetests.knowledgegraph.{DatasetsApiEncoders, fullJson}
 import io.renku.graph.acceptancetests.tooling.{AcceptanceSpec, ApplicationServices}
 import io.renku.graph.model.EventsGenerators.commitIds
+import io.renku.graph.model.projects.Role
 import io.renku.graph.model.testentities._
 import io.renku.http.client.AccessToken
 import io.renku.http.rest.Links
@@ -54,7 +55,7 @@ class CommitHistoryChangesSpec
 
       val project = dataProjects(
         renkuProjectEntities(visibilityPublic, creatorGen = cliShapedPersons).modify(removeMembers())
-      ).map(addMemberWithId(user.id)).generateOne
+      ).map(addMemberWithId(user.id, Role.Owner)).generateOne
       val commits = commitIds.generateNonEmptyList(min = 3)
 
       Given("there is data in the TS")
@@ -92,7 +93,7 @@ class CommitHistoryChangesSpec
 
       val project = dataProjects(
         renkuProjectEntities(visibilityPublic, creatorGen = cliShapedPersons).modify(removeMembers())
-      ).map(addMemberWithId(user.id)).generateOne
+      ).map(addMemberWithId(user.id, Role.Owner)).generateOne
       val commits = commitIds.generateNonEmptyList(min = 3)
 
       Given("There is data in the triple store")

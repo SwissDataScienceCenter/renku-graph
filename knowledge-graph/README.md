@@ -13,6 +13,7 @@ The following routes may be slightly different when accessed via the main Renku 
 | GET    | ```/knowledge-graph/entities```                                          | Returns entities filtered by the given predicates`                                   |
 | GET    | ```/knowledge-graph/entities/current-user/recently-viewed```             | Returns entities recently viewed by the user introducing himself with the token.     |
 | GET    | ```/knowledge-graph/ontology```                                          | Returns ontology used in the Knowledge Graph                                         |
+| POST   | ```/knowledge-graph/projects```                                          | Creates a project from the given payload in GitLab and in the Knowledge Graph        |
 | DELETE | ```/knowledge-graph/projects/:namespace/:name```                         | Deletes the project with the given `namespace/name` from knowledge-graph and GitLab  |
 | GET    | ```/knowledge-graph/projects/:namespace/:name```                         | Returns details of the project with the given `namespace/name`                       |
 | PATCH  | ```/knowledge-graph/projects/:namespace/:name```                         | Updates selected properties of the project with the given `namespace/name`           |
@@ -622,6 +623,83 @@ Response body example for `Accept: application/ld+json`:
 ]
 ```
 
+#### POST /knowledge-graph/projects
+
+API to create a new project from the given payload in both the Triples Store and GitLab
+
+The endpoint requires an authorization token to be passed. Supported headers are:
+
+- `Authorization: Bearer <token>` with OAuth Token obtained from GitLab
+- `PRIVATE-TOKEN: <token>` with user's Personal Access Token in GitLab
+
+**Request**
+
+```
+POST /knowledge-graph/projects HTTP/1.1
+Host: dev.renku.ch
+Authorization: Bearer <XXX>
+Content-Length: 575
+Content-Type: multipart/form-data; boundary=----WebKitFormBoundary7MA4YWxkTrZu0gW
+
+------WebKitFormBoundary7MA4YWxkTrZu0gW
+Content-Disposition: form-data; name="name"
+
+project name
+------WebKitFormBoundary7MA4YWxkTrZu0gW
+Content-Disposition: form-data; name="namespaceId"
+
+15
+------WebKitFormBoundary7MA4YWxkTrZu0gW
+Content-Disposition: form-data; name="description"
+
+project description
+------WebKitFormBoundary7MA4YWxkTrZu0gW
+Content-Disposition: form-data; name="keywords[]"
+
+key1
+------WebKitFormBoundary7MA4YWxkTrZu0gW
+Content-Disposition: form-data; name="keywords[]"
+
+key2
+------WebKitFormBoundary7MA4YWxkTrZu0gW
+Content-Disposition: form-data; name="visibility"
+
+public
+------WebKitFormBoundary7MA4YWxkTrZu0gW
+Content-Disposition: form-data; name="templateRepositoryUrl"
+
+https://github.com/SwissDataScienceCenter/renku-project-template
+------WebKitFormBoundary7MA4YWxkTrZu0gW
+Content-Disposition: form-data; name="templateId"
+
+python-minimal
+------WebKitFormBoundary7MA4YWxkTrZu0gW
+Content-Disposition: form-data; name="image"; filename="image.png"
+Content-Type: image/png
+
+(data)
+------WebKitFormBoundary7MA4YWxkTrZu0gW--
+```
+
+**Response**
+
+| Status                      | Description                                            |
+|-----------------------------|--------------------------------------------------------|
+| CREATED (201)               | If the project is created                              |
+| BAD REQUEST (400)           | If the given payload is invalid                        |
+| UNAUTHORIZED (401)          | If the given auth header cannot be authenticated       |
+| FORBIDDEN (403)             | If the user cannot create the project in the namespace |
+| INTERNAL SERVER ERROR (500) | Otherwise                                              |
+
+Response body example for `CREATED (201)`:
+
+```json
+{
+  "message": "Project created",
+  "slug":    "namespace/project-path"
+}
+```
+
 #### DELETE /knowledge-graph/projects/:namespace/:name
 
 API to remove the project with the given `namespace/name` from both knowledge-graph and GitLab
@@ -838,7 +916,7 @@ The endpoint requires an authorization token to be passed. Supported headers are
 
 * Multipart request (preferred) 
 ```
-PATCH /knowledge-graph/projects/jakub.chrobasik/create-test-10 HTTP/1.1
+PATCH /knowledge-graph/projects/namespace/path HTTP/1.1
 Host: dev.renku.ch
 Authorization: Bearer <XXX>
 Content-Length: 575
@@ -885,9 +963,11 @@ Content-Type: image/png
 | ACCEPTED (202)              | If the update process was successfully scheduled                                                           |
 | BAD_REQUEST (400)           | If the given payload is empty or malformed                                                                 |
 | UNAUTHORIZED (401)          | If given auth header cannot be authenticated                                                               |
+| FORBIDDEN (403)             | If the user is not authorised to update the project                                                        |
 | NOT_FOUND (404)             | If there is no project with the given `namespace/name` or the user is not authorised to access the project |
 | CONFLICT (409)              | If updating the data is not possible, e.g. the user cannot push to the default branch                      |
 | INTERNAL SERVER ERROR (500) | Otherwise                                                                                                  |
+
 
 #### GET /knowledge-graph/projects/:namespace/:name/datasets
 

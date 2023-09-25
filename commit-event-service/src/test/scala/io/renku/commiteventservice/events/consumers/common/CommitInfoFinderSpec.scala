@@ -39,7 +39,7 @@ import org.http4s.{Header, Request, Response, Status, Uri}
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
-import org.typelevel.ci.CIStringSyntax
+import org.typelevel.ci._
 
 import java.time.{LocalDateTime, ZoneOffset}
 
@@ -211,12 +211,14 @@ class CommitInfoFinderSpec
 
     val mapToCommitOrThrow = captureMapping(gitLabClient)(
       findingMethod = finder.findCommitInfo(projectId, commitId)(maybeAccessToken = None).unsafeRunSync(),
-      resultGenerator = commitInfos.generateOne
+      resultGenerator = commitInfos.generateOne,
+      underlyingMethod = Get
     )
 
     val mapToMaybeCommit = captureMapping(gitLabClient)(
       findingMethod = finder.getMaybeCommitInfo(projectId, commitId)(maybeAccessToken = None).unsafeRunSync(),
-      resultGenerator = commitInfos.generateSome
+      resultGenerator = commitInfos.generateSome,
+      underlyingMethod = Get
     )
   }
 }

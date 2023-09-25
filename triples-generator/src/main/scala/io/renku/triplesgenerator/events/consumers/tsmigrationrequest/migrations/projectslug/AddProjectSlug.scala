@@ -16,13 +16,14 @@
  * limitations under the License.
  */
 
-package io.renku.triplesgenerator.events.consumers.tsmigrationrequest.migrations.projectslug
+package io.renku.triplesgenerator.events.consumers.tsmigrationrequest.migrations
+package projectslug
 
 import cats.data.EitherT
 import cats.effect.Async
 import cats.syntax.all._
 import io.renku.metrics.MetricsRegistry
-import io.renku.triplesgenerator.events.consumers.ProcessingRecoverableError
+import io.renku.triplesgenerator.errors.ProcessingRecoverableError
 import io.renku.triplesgenerator.events.consumers.tsmigrationrequest.migrations.tooling.{MigrationExecutionRegister, RecoverableErrorsRecovery}
 import io.renku.triplesgenerator.events.consumers.tsmigrationrequest.{ConditionedMigration, Migration, categoryName}
 import io.renku.triplesstore.{ProjectsConnectionConfig, SparqlQueryTimeRecorder}

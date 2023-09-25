@@ -176,6 +176,6 @@ object CliDataset {
       Lens[CliDataset, List[CliPublicationEvent]](_.publicationEvents)(evs => _.copy(publicationEvents = evs))
 
     val publicationEvents: Traversal[CliDataset, CliPublicationEvent] =
-      publicationEventList.composeTraversal(Traversal.fromTraverse[List, CliPublicationEvent])
+      publicationEventList.andThen(Traversal.fromTraverse[List, CliPublicationEvent])
   }
 }

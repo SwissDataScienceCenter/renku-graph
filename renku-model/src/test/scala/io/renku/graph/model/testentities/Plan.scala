@@ -126,8 +126,8 @@ object Plan {
   object Lenses {
     val creators: Lens[Plan, List[Person]] =
       Lens[Plan, List[Person]](_.creators)(persons => {
-        case sp: StepPlan      => StepPlan.Lenses.creators.set(persons)(sp)
-        case cp: CompositePlan => CompositePlan.Lenses.creators.set(persons)(cp)
+        case sp: StepPlan      => StepPlan.Lenses.creators.replace(persons)(sp)
+        case cp: CompositePlan => CompositePlan.Lenses.creators.replace(persons)(cp)
       })
   }
 }

@@ -31,6 +31,7 @@ import io.renku.graph.acceptancetests.testing.AcceptanceTestPatience
 import io.renku.graph.acceptancetests.tooling.{AcceptanceSpec, ApplicationServices, ModelImplicits}
 import io.renku.graph.model.EventsGenerators.commitIds
 import io.renku.graph.model.events.EventStatusProgress
+import io.renku.graph.model.projects.Role
 import io.renku.graph.model.testentities.generators.EntitiesGenerators._
 import org.http4s.Status._
 import org.scalatest.concurrent.Eventually
@@ -52,7 +53,7 @@ class ProjectStatusResourceSpec
     val project =
       dataProjects(renkuProjectEntities(visibilityPublic, creatorGen = cliShapedPersons).modify(removeMembers()),
                    CommitsCount(numberOfEvents.value)
-      ).map(addMemberWithId(memberUser.id)).generateOne
+      ).map(addMemberWithId(memberUser.id, Role.Owner)).generateOne
 
     Scenario("Call be a user who is not a member of the project") {
 

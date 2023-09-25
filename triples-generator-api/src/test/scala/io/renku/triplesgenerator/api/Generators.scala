@@ -18,6 +18,7 @@
 
 package io.renku.triplesgenerator.api
 
+import cats.syntax.all._
 import io.renku.generators.Generators.Implicits._
 import io.renku.graph.model.RenkuTinyTypeGenerators._
 import org.scalacheck.Gen
@@ -31,4 +32,15 @@ object Generators {
       maybeNewKeywords   <- projectKeywords.toGeneratorOfSet(min = 0).toGeneratorOfOptions
       maybeNewVisibility <- projectVisibilities.toGeneratorOfOptions
     } yield ProjectUpdates(maybeNewDesc, maybeNewImages, maybeNewKeywords, maybeNewVisibility)
+
+  val newProjectsGen: Gen[NewProject] =
+    (projectNames,
+     projectSlugs,
+     projectDescriptions.toGeneratorOfOptions,
+     projectCreatedDates(),
+     (personNames, personGitLabIds).mapN(NewProject.Creator.apply),
+     projectKeywords.toGeneratorOfSet(min = 0),
+     projectVisibilities,
+     imageUris.toGeneratorOfList()
+    ).mapN(NewProject.apply)
 }
