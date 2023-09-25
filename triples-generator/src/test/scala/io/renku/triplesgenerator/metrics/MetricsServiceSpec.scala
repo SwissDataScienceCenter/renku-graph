@@ -46,7 +46,7 @@ class MetricsServiceSpec extends AsyncWordSpec with AsyncIOSpec with should.Matc
 
       for {
         _ <- service(notFailingCollection).collectEvery(500 millis).start.void
-        _ <- Temporal[IO].sleep(pace * cycles)
+        _ <- Temporal[IO].sleep((pace * cycles) + 100.millis)
         _ <- collected.get.asserting(_.size shouldBe >=(cycles))
         res <- collected.get
                  .map(list => list.zip(list.tail).map { case (l, r) => l.toMillis - r.toMillis })
@@ -76,7 +76,7 @@ class MetricsServiceSpec extends AsyncWordSpec with AsyncIOSpec with should.Matc
 
       for {
         _ <- service(failingCollection).collectEvery(500 millis).start.void
-        _ <- Temporal[IO].sleep(pace * cycles)
+        _ <- Temporal[IO].sleep((pace * cycles) + 100.millis)
         _ <- collected.get.asserting(_.isEmpty shouldBe false)
         _ <- collected.get
                .map(list => list.zip(list.tail).map { case (l, r) => l.toMillis - r.toMillis })
