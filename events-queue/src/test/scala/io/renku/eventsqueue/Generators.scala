@@ -28,7 +28,7 @@ private object Generators {
     nonEmptyStrings().map(TestEvent(_))
 
   def channelIds: Gen[Identifier] =
-    nonEmptyStrings()
+    nonEmptyStrings(minLength = 5)
       .map(_.toLowerCase)
       .map(Identifier.fromString)
       .map(_.fold(err => throw new Exception(s"Error when generating Channel identifier: $err"), identity))

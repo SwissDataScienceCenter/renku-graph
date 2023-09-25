@@ -35,7 +35,7 @@ trait EventsQueueDBSpec extends ContainerDB { self: Suite =>
   private val timeout     = 10 seconds
   private val warmUpEvent = "warmup"
 
-  def listenOnChannelUntil(channel: Identifier, condition: List[String] => Boolean): IO[Deferred[IO, IO[Unit]]] =
+  def asssertNotifications(channel: Identifier, condition: List[String] => Boolean): IO[Deferred[IO, IO[Unit]]] =
     for {
       conditionMet  <- Deferred.apply[IO, IO[Unit]]
       warmedUp      <- Deferred.apply[IO, Unit]

@@ -46,10 +46,10 @@ class EventsEnqueuerSpec
       val event    = events.generateOne
       givenPersisting(category, event.asJson, returning = CommandDef.pure[IO])
 
-      val channel  = channelIds.generateOne
+      val channel = channelIds.generateOne
 
       for {
-        conditionMet <- listenOnChannelUntil(channel, notifications => notifications.nonEmpty)
+        conditionMet <- asssertNotifications(channel, notifs => notifs.contains(event.asJson.noSpaces))
         _            <- enqueuer.enqueue(category, event, channel)
         _            <- conditionMet.get.flatten
       } yield ()
