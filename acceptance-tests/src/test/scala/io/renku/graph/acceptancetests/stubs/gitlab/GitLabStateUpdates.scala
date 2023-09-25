@@ -29,7 +29,7 @@ import io.renku.graph.model.entities.EntityFunctions
 import io.renku.graph.model.events.CommitId
 import io.renku.graph.model.testentities.{Person, Project => RenkuProject}
 import io.renku.graph.model._
-import io.renku.graph.model.entities.Project.ProjectMember
+import io.renku.graph.model.gitlab.GitLabUser
 import io.renku.http.client.UserAccessToken
 import org.http4s.Uri
 
@@ -107,7 +107,7 @@ trait GitLabStateUpdates {
     addProject(project, webhook) >>
       addCommits(project.id, commits) >>
       addPersons(EntityFunctions[RenkuProject].findAllPersons(project.entitiesProject).map(toPerson)) >>
-      addPersons((project.members appendList project.maybeCreator.toList).map(memberToPerson).toList)
+      addPersons((project.members.map(_.user) appendList project.maybeCreator.toList).map(userToPerson).toList)
 
   def addProjectAccessToken(projectId: projects.GitLabId, token: ProjectAccessTokenInfo): StateUpdate =
     state => state.copy(projectAccessTokens = state.projectAccessTokens.updated(projectId, token))
@@ -121,11 +121,8 @@ trait GitLabStateUpdates {
       person.maybeAffiliation
     )
 
-  private lazy val memberToPerson: ProjectMember => Person = {
-    case m: ProjectMember.ProjectMemberNoEmail =>
-      Person(m.name, maybeGitLabId = m.gitLabId.some)
-    case m: ProjectMember.ProjectMemberWithEmail =>
-      Person(m.name, maybeEmail = m.email.some, maybeGitLabId = m.gitLabId.some)
+  private lazy val userToPerson: GitLabUser => Person = { m =>
+    Person(m.name, maybeEmail = m.email, maybeGitLabId = m.gitLabId.some)
   }
 
   def removeProject(projectId: projects.GitLabId): StateUpdate =

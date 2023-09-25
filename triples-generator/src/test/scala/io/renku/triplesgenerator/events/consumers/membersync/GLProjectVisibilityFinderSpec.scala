@@ -101,6 +101,7 @@ class GLProjectVisibilityFinderSpec
   private lazy val mapResponse = captureMapping(gitLabClient)(
     findingMethod =
       visibilityFinder.findVisibility(projectSlugs.generateOne)(accessTokens.generateOption).unsafeRunSync(),
-    resultGenerator = projectVisibilities.generateOption
+    resultGenerator = projectVisibilities.generateOption,
+    underlyingMethod = Get
   )
 }

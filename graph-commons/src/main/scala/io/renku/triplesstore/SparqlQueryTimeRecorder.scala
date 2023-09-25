@@ -45,8 +45,8 @@ object SparqlQueryTimeRecorder {
         name = "sparql_execution_times",
         help = "Sparql execution times",
         labelName = "query_id",
-        buckets = Seq(.05, .1, .5, 1, 2.5, 5, 10, 25, 50),
-        maybeThreshold = (750 millis).some
+        buckets = Seq(.05, .1, .5, 1, 2.5, 5, 10, 25, 50, 100),
+        maybeThreshold = (50 millis).some
       )
     }
     .flatMap(histogram => ExecutionTimeRecorder[F](maybeHistogram = Some(histogram)))

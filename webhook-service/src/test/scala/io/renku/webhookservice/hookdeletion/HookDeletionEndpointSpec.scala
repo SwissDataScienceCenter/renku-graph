@@ -58,7 +58,6 @@ class HookDeletionEndpointSpec extends AnyWordSpec with MockFactory with should.
       response.status                      shouldBe Ok
       response.contentType                 shouldBe Some(`Content-Type`(MediaType.application.json))
       response.as[Message].unsafeRunSync() shouldBe Message.Info("Hook deleted")
-
     }
 
     HookNotFound.some :: None :: Nil foreach { deletionResult =>

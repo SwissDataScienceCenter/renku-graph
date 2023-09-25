@@ -38,7 +38,10 @@ class ProjectAuthServiceSpec
   implicit val logger:   Logger[IO] = Slf4jLogger.getLogger[IO]
   implicit val renkuUrl: RenkuUrl   = RenkuUrl("http://localhost/renku")
 
-  def randomData(num: Int) = Generators.projectAuthDataGen.asStream.take(num)
+  private val anyIsGood: ProjectAuthData => Boolean = _ => true
+
+  def randomData(num: Int, suchThat: ProjectAuthData => Boolean = anyIsGood) =
+    Generators.projectAuthDataGen.suchThat(suchThat).asStream.take(num)
 
   it should "add data" in {
     withProjectAuthServiceData(randomData(20)).use { case (s, data) =>
@@ -114,7 +117,7 @@ class ProjectAuthServiceSpec
   }
 
   it should "search by member id" in {
-    withProjectAuthServiceData(randomData(1)).use { case (s, original) =>
+    withProjectAuthServiceData(randomData(1, suchThat = _.members.nonEmpty)).use { case (s, original) =>
       for {
         found <- s.getAll(QueryFilter.all.withMember(original.head.members.head.gitLabId)).compile.lastOrError
 

@@ -24,7 +24,7 @@ import cats.data.EitherT
 import cats.effect.Async
 import cats.syntax.all._
 import io.renku.metrics.MetricsRegistry
-import io.renku.triplesgenerator.events.consumers.ProcessingRecoverableError
+import io.renku.triplesgenerator.errors.ProcessingRecoverableError
 import io.renku.triplesstore.{ProjectsConnectionConfig, SparqlQueryTimeRecorder}
 import org.typelevel.log4cats.Logger
 import tooling.{MigrationExecutionRegister, RecoverableErrorsRecovery}

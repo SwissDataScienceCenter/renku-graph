@@ -18,16 +18,16 @@
 
 package io.renku.graph.acceptancetests.stubs.gitlab
 
-import GitLabApiStub._
 import cats.Monad
 import cats.syntax.all._
+import io.renku.graph.acceptancetests.stubs.gitlab.GitLabApiStub._
 import io.renku.generators.Generators.Implicits._
 import io.renku.graph.acceptancetests.data.Project
 import io.renku.graph.acceptancetests.stubs.gitlab.GitLabAuth.AuthedReq
 import io.renku.graph.acceptancetests.stubs.gitlab.GitLabAuth.AuthedReq.{AuthedProject, AuthedUser}
-import io.renku.graph.model.{persons, projects, GraphModelGenerators}
 import io.renku.graph.model.events.CommitId
 import io.renku.graph.model.testentities.Person
+import io.renku.graph.model.{GraphModelGenerators, persons, projects}
 import io.renku.http.client.AccessToken.ProjectAccessToken
 import io.renku.http.client.UserAccessToken
 
@@ -92,13 +92,13 @@ trait GitLabStateQueries {
   def projectsFor(userId: Option[persons.GitLabId]): StateQuery[List[Project]] =
     _.projects.filter { p =>
       p.entitiesProject.visibility == projects.Visibility.Public ||
-      userId.exists(p.members.map(_.gitLabId).contains_) ||
+      userId.exists(p.members.map(_.user.gitLabId).contains_) ||
       p.maybeCreator.map(_.gitLabId) == userId
     }
 
   def projectsWhereUserIsMember(userId: persons.GitLabId): StateQuery[List[Project]] =
     _.projects.filter { p =>
-      p.members.map(_.gitLabId).contains_(userId) || p.maybeCreator.forall(_.gitLabId == userId)
+      p.members.map(_.user.gitLabId).contains_(userId) || p.maybeCreator.forall(_.gitLabId == userId)
     }
 
   def findCallerProjects: Option[AuthedReq] => StateQuery[List[Project]] = {

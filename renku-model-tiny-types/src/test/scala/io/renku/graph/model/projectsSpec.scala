@@ -90,18 +90,18 @@ class SlugSpec extends AnyWordSpec with ScalaCheckPropertyChecks with should.Mat
     }
   }
 
-  "toName" should {
+  "toPath" should {
     "extract the very last path segment" in {
-      forAll(projectNamespaces.toGeneratorOfNonEmptyList(), projectNames) { (namespaces, name) =>
-        Slug(s"${namespaces.map(_.show).nonEmptyIntercalate("/")}/$name").toName shouldBe name
+      forAll(projectNamespaces.toGeneratorOfNonEmptyList(), projectPaths) { (namespaces, path) =>
+        Slug(s"${namespaces.map(_.show).nonEmptyIntercalate("/")}/$path").toPath shouldBe path
       }
     }
   }
 
   "toNamespaces" should {
     "extract all the slug segments except the last one" in {
-      forAll(projectNamespaces.toGeneratorOfNonEmptyList(), projectNames) { (namespaces, name) =>
-        Slug(s"${namespaces.map(_.show).nonEmptyIntercalate("/")}/$name").toNamespaces shouldBe namespaces.toList
+      forAll(projectNamespaces.toGeneratorOfNonEmptyList(), projectPaths) { (namespaces, path) =>
+        Slug(s"${namespaces.map(_.show).nonEmptyIntercalate("/")}/$path").toNamespaces shouldBe namespaces.toList
       }
     }
   }

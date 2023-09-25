@@ -1,4 +1,4 @@
-import sbt._
+import sbt.*
 
 //noinspection TypeAnnotation
 object Dependencies {
@@ -8,11 +8,13 @@ object Dependencies {
     val catsCore               = "2.10.0"
     val catsEffect             = "3.5.1"
     val catsEffectScalaTest    = "1.5.0"
+    val catsEffectMunit        = "1.0.7"
+    val scalacheckEffectMunit  = "1.0.4"
     val circeCore              = "0.14.6"
     val circeGenericExtras     = "0.14.3"
-    val circeOptics            = "0.14.1"
-    val diffx                  = "0.8.3"
-    val fs2                    = "3.9.1"
+    val circeOptics            = "0.15.0"
+    val diffx                  = "0.9.0"
+    val fs2                    = "3.9.2"
     val http4s                 = "0.23.23"
     val http4sEmber            = "0.23.23"
     val http4sPrometheus       = "0.24.4"
@@ -22,7 +24,6 @@ object Dependencies {
     val log4jCore              = "2.20.0"
     val logback                = "1.4.11"
     val luceneQueryParser      = "9.7.0"
-    val monocle                = "2.1.0"
     val owlapi                 = "5.5.0"
     val pureconfig             = "0.17.4"
     val rdf4jQueryParserSparql = "4.3.6"
@@ -30,14 +31,14 @@ object Dependencies {
     val refinedPureconfig      = "0.11.0"
     val scalacheck             = "1.17.0"
     val scalamock              = "5.2.0"
-    val scalatest              = "3.2.16"
+    val scalatest              = "3.2.17"
     val scalatestScalacheck    = "3.2.14.0"
-    val sentryLogback          = "6.28.0"
+    val sentryLogback          = "6.29.0"
     val skunk                  = "0.6.0"
     val swaggerParser          = "2.1.16"
     val testContainersScala    = "0.41.0"
     val widoco                 = "1.4.20"
-    val wiremock               = "3.0.1"
+    val wiremock               = "3.1.0"
   }
 
   val ip4s = Seq(
@@ -58,11 +59,6 @@ object Dependencies {
 
   val rdf4jQueryParserSparql = Seq(
     "org.eclipse.rdf4j" % "rdf4j-queryparser-sparql" % V.rdf4jQueryParserSparql
-  )
-
-  val monocle = Seq(
-    // libraryDependencies += "dev.optics" %% "monocle-core" % 3.x.x // to be used when circe-optics starts to use is
-    "com.github.julien-truffaut" %% "monocle-core" % V.monocle
   )
 
   val diffx = Seq(
@@ -126,6 +122,14 @@ object Dependencies {
 
   val catsEffectScalaTest = Seq(
     "org.typelevel" %% "cats-effect-testing-scalatest" % V.catsEffectScalaTest
+  )
+
+  val catsEffectMunit = Seq(
+    "org.typelevel" %% "munit-cats-effect-3" % V.catsEffectMunit
+  )
+
+  val scalacheckEffectMunit = Seq(
+    "org.typelevel" %% "scalacheck-effect-munit" % V.scalacheckEffectMunit
   )
 
   val log4Cats = Seq(

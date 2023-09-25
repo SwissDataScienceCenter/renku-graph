@@ -172,7 +172,7 @@ class EdgesFinderSpec
 
           val exemplarData = LineageExemplarData(
             renkuProjectEntities(fixed(visibility)).generateOne.copy(
-              members = Set(personEntities.generateOne.copy(maybeGitLabId = Some(authUser.id)))
+              members = Set(memberPersonGitLabIdLens.replace(Some(authUser.id))(projectMemberEntities().generateOne))
             )
           )
 

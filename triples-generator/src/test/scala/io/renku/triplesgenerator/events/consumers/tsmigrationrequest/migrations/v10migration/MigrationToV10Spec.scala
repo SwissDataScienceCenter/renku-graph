@@ -32,7 +32,7 @@ import cats.MonadThrow
 import io.renku.generators.Generators.{exceptions, nonEmptyStrings, positiveInts}
 import io.renku.interpreters.TestLogger
 import io.renku.testtools.IOSpec
-import io.renku.triplesgenerator.generators.ErrorGenerators.processingRecoverableErrors
+import io.renku.triplesgenerator.errors.ErrorGenerators.processingRecoverableErrors
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec

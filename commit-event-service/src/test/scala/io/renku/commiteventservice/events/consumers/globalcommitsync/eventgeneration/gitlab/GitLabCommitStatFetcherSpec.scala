@@ -123,7 +123,8 @@ class GitLabCommitStatFetcherSpec
 
     lazy val mapResponse = captureMapping(gitLabClient)(
       gitLabCommitStatFetcher.fetchCommitStats(projectId).unsafeRunSync(),
-      commitsCounts.generateOption
+      commitsCounts.generateOption,
+      underlyingMethod = Get
     )
 
     def givenLatestCommitFetcher(returning: IO[Option[CommitId]]) =

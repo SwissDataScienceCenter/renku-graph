@@ -18,13 +18,11 @@
 
 package io.renku.knowledgegraph.projects.update
 
+import io.renku.core.client.Generators.branches
 import io.renku.generators.Generators.Implicits._
-import io.renku.generators.Generators.nonEmptyStrings
 import io.renku.graph.model.RenkuTinyTypeGenerators.{imageUris, projectDescriptions, projectKeywords, projectVisibilities}
-import io.renku.knowledgegraph.projects.update.ProjectUpdates.Image
-import org.http4s.MediaType._
+import io.renku.knowledgegraph.projects.images.ImageGenerators.images
 import org.scalacheck.Gen
-import scodec.bits.ByteVector
 
 private object Generators {
 
@@ -36,16 +34,13 @@ private object Generators {
       maybeNewVisibility <- projectVisibilities.toGeneratorOfOptions
     } yield ProjectUpdates(maybeNewDesc, maybeNewImage, maybeNewKeywords, maybeNewVisibility)
 
-  lazy val images: Gen[Image] =
-    for {
-      name      <- nonEmptyStrings()
-      mediaType <- Gen.oneOf(image.png, image.jpeg, image.gif, image.bmp, image.tiff, image.`vnd.microsoft.icon`)
-      data      <- nonEmptyStrings().map(v => ByteVector(v.getBytes))
-    } yield Image(name, mediaType, data)
-
   val glUpdatedProjectsGen: Gen[GLUpdatedProject] =
     for {
       maybeNewImage      <- imageUris.toGeneratorOfOptions
       maybeNewVisibility <- projectVisibilities
     } yield GLUpdatedProject(maybeNewImage, maybeNewVisibility)
+
+  val defaultBranchInfos: Gen[DefaultBranch] =
+    branches
+      .flatMap(branch => Gen.oneOf(DefaultBranch.PushProtected(branch), DefaultBranch.Unprotected(branch)))
 }

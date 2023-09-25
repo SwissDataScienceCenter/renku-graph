@@ -70,6 +70,23 @@ class MicroserviceRoutesSpec extends AnyWordSpec with IOSpec with MockFactory wi
     }
   }
 
+  "POST /projects" should {
+
+    "return Ok with message in response" in new TestCase {
+
+      val request      = Request[IO](Method.POST, uri"/projects")
+      val responseInfo = Message.Info("Project created")
+
+      givenProjectCreateEndpoint(request, returning = Response[IO](Ok).withEntity(responseInfo))
+
+      val response = routes.call(request)
+
+      response.status        shouldBe Ok
+      response.contentType   shouldBe Some(`Content-Type`(application.json))
+      response.body[Message] shouldBe responseInfo
+    }
+  }
+
   "PATCH /projects/:slug" should {
 
     "return Ok with message in response" in new TestCase {
@@ -110,11 +127,13 @@ class MicroserviceRoutesSpec extends AnyWordSpec with IOSpec with MockFactory wi
   }
 
   private trait TestCase {
-    val eventEndpoint         = mock[EventEndpoint[IO]]
-    val projectUpdateEndpoint = mock[projects.update.Endpoint[IO]]
-    private val routesMetrics = TestRoutesMetrics()
-    private val versionRoutes = mock[version.Routes[IO]]
+    val eventEndpoint                 = mock[EventEndpoint[IO]]
+    private val projectCreateEndpoint = mock[projects.create.Endpoint[IO]]
+    private val projectUpdateEndpoint = mock[projects.update.Endpoint[IO]]
+    private val routesMetrics         = TestRoutesMetrics()
+    private val versionRoutes         = mock[version.Routes[IO]]
     val routes = new MicroserviceRoutes[IO](eventEndpoint,
+                                            projectCreateEndpoint,
                                             projectUpdateEndpoint,
                                             routesMetrics,
                                             versionRoutes,
@@ -133,6 +152,11 @@ class MicroserviceRoutesSpec extends AnyWordSpec with IOSpec with MockFactory wi
     def givenProjectUpdateEndpoint(slug: model.projects.Slug, request: Request[IO], returning: Response[IO]) =
       (projectUpdateEndpoint.`PATCH /projects/:slug` _)
         .expects(slug, request)
+        .returning(returning.pure[IO])
+
+    def givenProjectCreateEndpoint(request: Request[IO], returning: Response[IO]) =
+      (projectCreateEndpoint.`POST /projects` _)
+        .expects(request)
         .returning(returning.pure[IO])
   }
 }

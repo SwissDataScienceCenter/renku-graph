@@ -31,8 +31,8 @@ import io.renku.http.client.AccessToken._
 import io.renku.jsonld.JsonLD
 import io.renku.jsonld.parser._
 import io.renku.tinytypes.{TinyType, TinyTypeFactory}
-import io.renku.triplesgenerator.events.consumers.{ProcessingNonRecoverableError, ProcessingRecoverableError}
-import io.renku.triplesgenerator.events.consumers.ProcessingRecoverableError._
+import io.renku.triplesgenerator.errors.{ProcessingNonRecoverableError, ProcessingRecoverableError}
+import io.renku.triplesgenerator.errors.ProcessingRecoverableError._
 import io.renku.triplesgenerator.events.consumers.awaitinggeneration.CommitEvent
 import org.typelevel.log4cats.Logger
 

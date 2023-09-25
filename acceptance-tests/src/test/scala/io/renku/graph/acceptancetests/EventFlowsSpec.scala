@@ -26,6 +26,7 @@ import io.renku.generators.Generators.Implicits._
 import io.renku.graph.model.EventsGenerators.commitIds
 import io.renku.graph.model.events.{EventId, EventStatus}
 import io.renku.graph.model.events.EventStatus._
+import io.renku.graph.model.projects.Role
 import io.renku.graph.model.testentities.cliShapedPersons
 import io.renku.graph.model.testentities.generators.EntitiesGenerators._
 import io.renku.webhookservice.model.HookToken
@@ -41,7 +42,7 @@ class EventFlowsSpec extends AcceptanceSpec with ApplicationServices with TSProv
       val user = authUsers.generateOne
       val project = dataProjects(
         renkuProjectEntities(visibilityPublic, creatorGen = cliShapedPersons).modify(removeMembers())
-      ).map(addMemberWithId(user.id)).generateOne
+      ).map(addMemberWithId(user.id, Role.Owner)).generateOne
       val commitId = commitIds.generateOne
 
       Given("commit with the commit id matching Push Event's 'after' exists on the project in GitLab")
@@ -71,7 +72,7 @@ class EventFlowsSpec extends AcceptanceSpec with ApplicationServices with TSProv
       val user = authUsers.generateOne
       val project = dataProjects(
         renkuProjectEntities(visibilityPublic, creatorGen = cliShapedPersons).modify(removeMembers())
-      ).map(addMemberWithId(user.id)).generateOne
+      ).map(addMemberWithId(user.id, Role.Owner)).generateOne
       val commitId = commitIds.generateOne
 
       Given("commit with the commit id matching Push Event's 'after' exists on the project in GitLab")
@@ -102,7 +103,7 @@ class EventFlowsSpec extends AcceptanceSpec with ApplicationServices with TSProv
       val user = authUsers.generateOne
       val project = dataProjects(
         renkuProjectEntities(visibilityPublic, creatorGen = cliShapedPersons).modify(removeMembers())
-      ).map(addMemberWithId(user.id)).generateOne
+      ).map(addMemberWithId(user.id, Role.Owner)).generateOne
       val commitId = commitIds.generateOne
 
       Given("commit with the commit id matching Push Event's 'after' exists on the project in GitLab")
@@ -134,7 +135,7 @@ class EventFlowsSpec extends AcceptanceSpec with ApplicationServices with TSProv
       val user = authUsers.generateOne
       val project = dataProjects(
         renkuProjectEntities(visibilityPublic, creatorGen = cliShapedPersons).modify(removeMembers())
-      ).map(addMemberWithId(user.id)).generateOne
+      ).map(addMemberWithId(user.id, Role.Owner)).generateOne
       val commitId = commitIds.generateOne
 
       Given("commit with the commit id matching Push Event's 'after' exists on the project in GitLab")

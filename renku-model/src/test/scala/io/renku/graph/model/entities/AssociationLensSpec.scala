@@ -36,16 +36,16 @@ class AssociationLensSpec extends AnyWordSpec with should.Matchers with Entities
       AssociationLens.associationAgent.get(assoc1) shouldBe Left(assoc1.agent)
       AssociationLens.associationAgent.get(assoc2) shouldBe Right(assoc2.agent)
 
-      AssociationLens.associationAgent.set(assoc1.agent.asLeft)(assoc2) shouldBe
+      AssociationLens.associationAgent.replace(assoc1.agent.asLeft)(assoc2) shouldBe
         Association.WithRenkuAgent(assoc2.resourceId, assoc1.agent, assoc2.planId)
-      AssociationLens.associationAgent.set(assoc2.agent.asRight)(assoc1) shouldBe
+      AssociationLens.associationAgent.replace(assoc2.agent.asRight)(assoc1) shouldBe
         Association.WithPersonAgent(assoc1.resourceId, assoc2.agent, assoc1.planId)
 
       val assoc3 = createAssociationAgent
       val assoc4 = createAssociationPerson
-      AssociationLens.associationAgent.set(assoc1.agent.asLeft)(assoc3) shouldBe
+      AssociationLens.associationAgent.replace(assoc1.agent.asLeft)(assoc3) shouldBe
         assoc3.copy(agent = assoc1.agent)
-      AssociationLens.associationAgent.set(assoc2.agent.asRight)(assoc4) shouldBe
+      AssociationLens.associationAgent.replace(assoc2.agent.asRight)(assoc4) shouldBe
         assoc4.copy(agent = assoc2.agent)
     }
   }

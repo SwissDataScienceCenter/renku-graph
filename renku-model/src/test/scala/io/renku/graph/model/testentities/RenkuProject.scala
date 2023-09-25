@@ -42,7 +42,7 @@ sealed trait RenkuProject extends Project with RenkuProject.RenkuProjectAlg with
   val visibility:           Visibility
   val forksCount:           ForksCount
   val keywords:             Set[Keyword]
-  val members:              Set[Person]
+  val members:              Set[Project.Member]
   val version:              SchemaVersion
   val activities:           List[Activity]
   val datasets:             List[Dataset[Dataset.Provenance]]
@@ -92,7 +92,7 @@ object RenkuProject {
                                  visibility:           Visibility,
                                  forksCount:           ForksCount,
                                  keywords:             Set[Keyword],
-                                 members:              Set[Person],
+                                 members:              Set[Project.Member],
                                  version:              SchemaVersion,
                                  activities:           List[Activity],
                                  datasets:             List[Dataset[Dataset.Provenance]],
@@ -170,7 +170,7 @@ object RenkuProject {
                               visibility:           Visibility,
                               forksCount:           ForksCount,
                               keywords:             Set[Keyword],
-                              members:              Set[Person],
+                              members:              Set[Project.Member],
                               version:              SchemaVersion,
                               activities:           List[Activity],
                               datasets:             List[Dataset[Dataset.Provenance]],
@@ -260,7 +260,7 @@ object RenkuProject {
           project.maybeCreator.map(_.to[entities.Person]),
           project.visibility,
           project.keywords,
-          project.members.map(_.to[entities.Person]),
+          project.members.map(_.to[entities.Project.Member]),
           project.version,
           project.activities.map(_.to[entities.Activity]),
           project.datasets.map(_.to[entities.Dataset[entities.Dataset.Provenance]]),
@@ -285,7 +285,7 @@ object RenkuProject {
           project.maybeCreator.map(_.to[entities.Person]),
           project.visibility,
           project.keywords,
-          project.members.map(_.to[entities.Person]),
+          project.members.map(_.to[entities.Project.Member]),
           project.version,
           project.activities.map(_.to[entities.Activity]),
           project.datasets.map(_.to[entities.Dataset[entities.Dataset.Provenance]]),

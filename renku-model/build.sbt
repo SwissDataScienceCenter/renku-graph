@@ -20,7 +20,4 @@ organization := "io.renku"
 name := "renku-model"
 
 libraryDependencies ++=
-  Dependencies.monocle
-
-libraryDependencies ++=
   Dependencies.diffx.map(_ % Test)

@@ -24,12 +24,12 @@ import cats.MonadThrow
 import cats.data.EitherT
 import cats.effect.Async
 import cats.syntax.all._
-import io.renku.events.{CategoryName, EventRequestContent}
 import io.renku.events.producers.EventSender
+import io.renku.events.{CategoryName, EventRequestContent}
 import io.renku.graph.config.EventLogUrl
 import io.renku.graph.model.projects
 import io.renku.metrics.MetricsRegistry
-import io.renku.triplesgenerator.events.consumers.ProcessingRecoverableError
+import io.renku.triplesgenerator.errors.ProcessingRecoverableError
 import io.renku.triplesstore.{SparqlQuery, SparqlQueryTimeRecorder}
 import org.typelevel.log4cats.Logger
 

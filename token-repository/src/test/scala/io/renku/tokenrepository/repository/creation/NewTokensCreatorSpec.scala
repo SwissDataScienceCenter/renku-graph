@@ -35,7 +35,6 @@ import io.renku.http.client.RestClient.ResponseMappingF
 import io.renku.http.client.{AccessToken, GitLabClient}
 import io.renku.http.server.EndpointTester._
 import io.renku.testtools.{GitLabClientTools, IOSpec}
-import org.http4s.Method.POST
 import org.http4s.Status.{BadRequest, Created, Forbidden, InternalServerError, NotFound}
 import org.http4s.implicits._
 import org.http4s.{Request, Response, Uri}
@@ -109,7 +108,7 @@ class NewTokensCreatorSpec
     lazy val mapResponse = captureMapping(gitLabClient)(
       findingMethod = tokensCreator.createProjectAccessToken(projectId, accessToken).value.unsafeRunSync(),
       resultGenerator = tokenCreationInfos.generateSome,
-      method = POST
+      underlyingMethod = PostJson
     )
   }
 

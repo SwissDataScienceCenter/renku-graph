@@ -23,11 +23,11 @@ import cats.syntax.all._
 import io.renku.graph.model.projects
 import io.renku.http.client.{AccessToken, GitLabClient}
 
-private trait ProjectRemover[F[_]] {
+trait ProjectRemover[F[_]] {
   def deleteProject(id: projects.GitLabId)(implicit at: AccessToken): F[Unit]
 }
 
-private object ProjectRemover {
+object ProjectRemover {
   def apply[F[_]: Async: GitLabClient]: ProjectRemover[F] = new ProjectRemoverImpl[F]
 }
 

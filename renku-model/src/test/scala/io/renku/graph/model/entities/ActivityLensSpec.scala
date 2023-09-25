@@ -31,7 +31,7 @@ class ActivityLensSpec extends AnyWordSpec with should.Matchers with EntitiesGen
       val a1 = createActivity
       val a2 = createActivity
       ActivityLens.activityAssociation.get(a1)                 shouldBe a1.association
-      ActivityLens.activityAssociation.set(a2.association)(a1) shouldBe a1.copy(association = a2.association)
+      ActivityLens.activityAssociation.replace(a2.association)(a1) shouldBe a1.copy(association = a2.association)
     }
   }
 
@@ -40,7 +40,7 @@ class ActivityLensSpec extends AnyWordSpec with should.Matchers with EntitiesGen
       val activity = createActivity
       val person   = createActivity.author
       ActivityLens.activityAuthor.get(activity)         shouldBe activity.author
-      ActivityLens.activityAuthor.set(person)(activity) shouldBe activity.copy(author = person)
+      ActivityLens.activityAuthor.replace(person)(activity) shouldBe activity.copy(author = person)
     }
   }
 

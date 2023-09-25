@@ -72,20 +72,23 @@ class LowLevelApisSpec
 
       val accessToken       = userAccessTokens.generateOne
       val projectGitHttpUrl = projectGitHttpUrls.generateOne
+      val userInfo          = userInfos.generateOne
       val migrationCheck    = projectMigrationChecks.generateOne
 
       otherWireMockResource.evalMap { server =>
         server.stubFor {
           get(urlPathEqualTo("/renku/cache.migrations_check"))
             .withQueryParam("git_url", equalTo(projectGitHttpUrl.value))
-            .withHeader("gitlab-token", equalTo(accessToken.value))
+            .withAccessToken(accessToken.some)
+            .withHeader("renku-user-email", equalTo(userInfo.email.value))
+            .withHeader("renku-user-fullname", equalTo(userInfo.name.value))
             .willReturn(ok(Result.success(migrationCheck).asJson.spaces2))
         }
 
         val uriForSchema = RenkuCoreUri.ForSchema(server.baseUri, projectSchemaVersions.generateOne)
 
         client
-          .getMigrationCheck(uriForSchema, projectGitHttpUrl, accessToken)
+          .getMigrationCheck(uriForSchema, projectGitHttpUrl, userInfo, accessToken)
           .asserting(_ shouldBe Result.success(migrationCheck))
       }.use_
     }
@@ -106,6 +109,26 @@ class LowLevelApisSpec
     }
   }
 
+  "postProjectCreate" should {
+
+    "do POST /renku/templates.create_project with a relevant payload" in {
+
+      val accessToken = userAccessTokens.generateOne
+      val newProject  = newProjectsGen.generateOne
+
+      stubFor {
+        post(s"/renku/templates.create_project")
+          .withRequestBody(equalToJson(newProject.asJson.spaces2))
+          .withAccessToken(accessToken.some)
+          .withHeader("renku-user-email", equalTo(newProject.userInfo.email.value))
+          .withHeader("renku-user-fullname", equalTo(newProject.userInfo.name.value))
+          .willReturn(ok(Result.success(json"""{"name": ${newProject.name}}""").asJson.spaces2))
+      }
+
+      client.postProjectCreate(newProject, accessToken).asserting(_ shouldBe Result.success(()))
+    }
+  }
+
   "postProjectUpdate" should {
 
     "do POST /renku/project.edit with a relevant payload" in {
@@ -115,6 +138,7 @@ class LowLevelApisSpec
 
       otherWireMockResource.evalMap { server =>
         val versionedUri = coreUrisVersioned(server.baseUri).generateOne
+        val remoteBranch = branches.generateOne
 
         server.stubFor {
           post(s"/renku/${versionedUri.apiVersion}/project.edit")
@@ -122,12 +146,12 @@ class LowLevelApisSpec
             .withAccessToken(accessToken.some)
             .withHeader("renku-user-email", equalTo(updates.userInfo.email.value))
             .withHeader("renku-user-fullname", equalTo(updates.userInfo.name.value))
-            .willReturn(ok(Result.success(json"""{"edited": {}}""").asJson.spaces2))
+            .willReturn(ok(Result.success(json"""{"edited": {}, "remote_branch": $remoteBranch}""").asJson.spaces2))
         }
 
         client
           .postProjectUpdate(versionedUri, updates, accessToken)
-          .asserting(_ shouldBe Result.success(()))
+          .asserting(_ shouldBe Result.success(remoteBranch))
       }.use_
     }
   }

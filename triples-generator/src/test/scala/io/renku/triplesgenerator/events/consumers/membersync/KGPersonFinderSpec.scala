@@ -18,7 +18,6 @@
 
 package io.renku.triplesgenerator.events.consumers.membersync
 
-import Generators._
 import cats.effect.IO
 import cats.syntax.all._
 import io.renku.generators.Generators.Implicits._
@@ -44,8 +43,8 @@ class KGPersonFinderSpec
 
     "return person resourceIds if found in the triples store" in new TestCase {
 
-      val memberNonExistingInKG = gitLabProjectMembers.generateOne
-      val memberExistingInKG    = gitLabProjectMembers.generateOne
+      val memberNonExistingInKG = Generators.gitLabProjectMembers.generateOne
+      val memberExistingInKG    = Generators.gitLabProjectMembers.generateOne
       val person                = personEntities(fixed(memberExistingInKG.gitLabId.some)).generateOne
 
       upload(to = projectsDataset, person)

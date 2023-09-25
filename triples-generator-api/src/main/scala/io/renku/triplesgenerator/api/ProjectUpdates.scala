@@ -18,6 +18,7 @@
 
 package io.renku.triplesgenerator.api
 
+import cats.Show
 import cats.syntax.all._
 import io.circe.literal._
 import io.circe.syntax._
@@ -61,5 +62,18 @@ object ProjectUpdates {
       newKeywords   <- cur.downField("keywords").as[Option[List[projects.Keyword]]].map(_.map(_.toSet))
       newVisibility <- cur.downField("visibility").as[Option[projects.Visibility]]
     } yield ProjectUpdates(newDesc, newImages, newKeywords, newVisibility)
+  }
+
+  implicit val show: Show[ProjectUpdates] = Show.show {
+    case ProjectUpdates(newDescription, newImages, newKeywords, newVisibility) =>
+      def showOption[T](opt: Option[T])(implicit show: Show[T]) =
+        opt.fold(ifEmpty = "none")(_.show)
+
+      List(
+        newDescription.map(v => s"description=${showOption(v)}"),
+        newImages.map(v => s"image=[${v.mkString_(", ")}]"),
+        newKeywords.map(v => s"keywords=[${v.toList.mkString_(", ")}]"),
+        newVisibility.map(v => s"visibility=$v")
+      ).flatten.mkString(", ")
   }
 }

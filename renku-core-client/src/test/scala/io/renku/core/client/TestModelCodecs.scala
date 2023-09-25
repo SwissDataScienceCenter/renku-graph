@@ -64,12 +64,13 @@ private object TestModelCodecs {
       case Result.Success(obj) => json"""{
           "result": ${obj.asJson}
         }"""
-      case Result.Failure.Detailed(code, userMessage) => json"""{
+      case Result.Failure.Detailed(code, userMessage, maybeDevMessage) => json"""{
           "error": {
             "code":        $code,
-            "userMessage": $userMessage
+            "userMessage": $userMessage,
+            "devMessage":  $maybeDevMessage
           }
-        }"""
+        }""".deepDropNullValues
       case result => throw new Exception(s"$result shouldn't be in the core API response payload")
     }
 }

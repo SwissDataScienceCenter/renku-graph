@@ -21,6 +21,7 @@ package io.renku.triplesgenerator.api
 import TriplesGeneratorClient.Result
 import cats.effect.Async
 import cats.syntax.all._
+import com.typesafe.config.{Config, ConfigFactory}
 import io.renku.control.Throttler
 import io.renku.graph.config.TriplesGeneratorUrl
 import io.renku.graph.model.projects
@@ -32,13 +33,16 @@ import org.http4s.dsl.Http4sDsl
 import org.typelevel.log4cats.Logger
 
 trait TriplesGeneratorClient[F[_]] {
-  def updateProject(slug: projects.Slug, updates: ProjectUpdates): F[Result[Unit]]
+  def createProject(newProject: NewProject): F[Result[Unit]]
+  def updateProject(slug:       projects.Slug, updates: ProjectUpdates): F[Result[Unit]]
 }
 
 object TriplesGeneratorClient {
 
-  def apply[F[_]: Async: Logger: MetricsRegistry]: F[TriplesGeneratorClient[F]] =
-    TriplesGeneratorUrl[F]()
+  def apply[F[_]: Async: Logger: MetricsRegistry]: F[TriplesGeneratorClient[F]] = apply()
+
+  def apply[F[_]: Async: Logger: MetricsRegistry](config: Config = ConfigFactory.load): F[TriplesGeneratorClient[F]] =
+    TriplesGeneratorUrl[F](config)
       .map(tgUrl => new TriplesGeneratorClientImpl[F](Uri.unsafeFromString(tgUrl.value)))
 
   sealed trait Result[+A] {
@@ -69,6 +73,13 @@ private class TriplesGeneratorClientImpl[F[_]: Async: Logger](tgUri: Uri)
   import io.circe.syntax._
   import io.renku.http.tinytypes.TinyTypeURIEncoder._
   import org.http4s.circe._
+
+  override def createProject(newProject: NewProject): F[Result[Unit]] =
+    send(POST(tgUri / "projects") withEntity newProject.asJson) {
+      case (Created, _, _) => Result.success(()).pure[F]
+      case (status, req, _) =>
+        Result.failure[Unit](s"Creating project in TG failed: ${req.pathInfo.renderString}: $status").pure[F]
+    }
 
   override def updateProject(slug: projects.Slug, updates: ProjectUpdates): F[Result[Unit]] =
     send(PATCH(tgUri / "projects" / slug) withEntity updates.asJson) {

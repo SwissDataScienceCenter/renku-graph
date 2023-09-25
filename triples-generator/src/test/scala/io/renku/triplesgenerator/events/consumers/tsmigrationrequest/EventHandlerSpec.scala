@@ -40,7 +40,7 @@ import io.renku.interpreters.TestLogger
 import io.renku.interpreters.TestLogger.Level.Info
 import io.renku.json.JsonOps._
 import io.renku.testtools.IOSpec
-import io.renku.triplesgenerator.generators.ErrorGenerators.processingRecoverableErrors
+import io.renku.triplesgenerator.errors.ErrorGenerators.processingRecoverableErrors
 import org.scalacheck.Gen
 import org.scalamock.matchers.ArgCapture.CaptureOne
 import org.scalamock.scalatest.MockFactory

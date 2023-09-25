@@ -26,6 +26,7 @@ import io.renku.generators.CommonGraphGenerators.{authUsers, serviceVersions}
 import io.renku.generators.Generators.Implicits._
 import io.renku.generators.Generators.nonEmptyStrings
 import io.renku.graph.model.EventsGenerators.commitIds
+import io.renku.graph.model.projects.Role
 import io.renku.graph.model.testentities.cliShapedPersons
 import io.renku.graph.model.testentities.generators.EntitiesGenerators._
 import io.renku.graph.model.versions.SchemaVersion
@@ -49,7 +50,7 @@ class ReProvisioningSpec extends AcceptanceSpec with ApplicationServices with TS
 
       And("There is data from this version in Jena")
 
-      val project  = dataProjects(testProject).map(addMemberWithId(user.id)).generateOne
+      val project  = dataProjects(testProject).map(addMemberWithId(user.id, Role.Owner)).generateOne
       val commitId = commitIds.generateOne
 
       gitLabStub.addAuthenticated(user)

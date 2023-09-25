@@ -23,7 +23,7 @@ import io.renku.cli.model.CliProject
 import io.renku.graph.model.cli.CliConverters
 import io.renku.graph.model.entities.EntityFunctions
 import io.renku.graph.model.images.ImageUri
-import io.renku.graph.model.projects.{DateCreated, DateModified, Description, ForksCount, Keyword, Name, Slug, Visibility}
+import io.renku.graph.model.projects.{DateCreated, DateModified, Description, ForksCount, Keyword, Name, Role, Slug, Visibility}
 import io.renku.graph.model.testentities.NonRenkuProject._
 import io.renku.graph.model.testentities.RenkuProject._
 import io.renku.graph.model.{GitLabApiUrl, GraphClass, RenkuUrl, entities}
@@ -39,7 +39,7 @@ trait Project extends Product with Serializable {
   val visibility:       Visibility
   val forksCount:       ForksCount
   val keywords:         Set[Keyword]
-  val members:          Set[Person]
+  val members:          Set[Project.Member]
   val images:           List[ImageUri]
 
   type ProjectType <: Project
@@ -61,6 +61,11 @@ trait Parent {
 }
 
 object Project {
+  final case class Member(person: Person, role: Role)
+  object Member {
+    implicit def toEntitiesMember(implicit renkuUrl: RenkuUrl): Member => entities.Project.Member =
+      m => entities.Project.Member(m.person.to[entities.Person], m.role)
+  }
 
   import cats.syntax.all._
   import io.renku.jsonld.syntax._

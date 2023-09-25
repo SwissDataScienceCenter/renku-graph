@@ -18,7 +18,7 @@
 
 package io.renku.logging
 
-import cats.effect.{Clock, Resource, Sync}
+import cats.effect.{Clock, Sync}
 import cats.syntax.all._
 import cats.{Applicative, Monad}
 import com.typesafe.config.{Config, ConfigFactory}
@@ -78,26 +78,19 @@ class ExecutionTimeRecorderImpl[F[_]: Sync: Clock: Logger](
       maybeHistogramLabel: Option[String Refined NonEmpty] = None
   ): F[(ElapsedTime, A)] =
     Clock[F]
-      .timed {
-        maybeHistogram match {
-          case None            => block
-          case Some(histogram) => timerResource(histogram, maybeHistogramLabel).surround(block)
-        }
-      }
+      .timed(block)
+      .flatTap(updateHistogram(maybeHistogramLabel))
       .map { case (elapsedTime, result) => ElapsedTime(elapsedTime) -> result }
 
-  private lazy val timerResource
-      : (Histogram[F], Option[String Refined NonEmpty]) => Resource[F, Option[Histogram.Timer[F]]] = {
-    case (h: SingleValueHistogram[F], None) =>
-      Resource.make(h.startTimer().map(_.some))(_.map(_.observeDuration.void).getOrElse(().pure[F]))
-    case (h: LabeledHistogram[F], Some(label)) =>
-      Resource.make(h.startTimer(label.value).map(_.some))(_.map(_.observeDuration.void).getOrElse(().pure[F]))
-    case (_: LabeledHistogram[F], None) =>
-      Resource.pure[F, Option[Histogram.Timer[F]]](Option.empty[Histogram.Timer[F]])
-    case (h: SingleValueHistogram[F], Some(label)) =>
-      Resource
-        .pure[F, Option[Histogram.Timer[F]]](Option.empty[Histogram.Timer[F]])
-        .evalTap(_ => Logger[F].error(s"Label $label sent for a Single Value Histogram ${h.name}"))
+  private def updateHistogram[A](maybeLabel: Option[String Refined NonEmpty]): ((FiniteDuration, A)) => F[Unit] = {
+    case (duration, _) =>
+      (maybeHistogram, maybeLabel) match {
+        case Some(h: SingleValueHistogram[F]) -> None    => h.observe(duration)
+        case Some(h: LabeledHistogram[F]) -> Some(label) => h.observe(label.value, duration)
+        case Some(h: SingleValueHistogram[F]) -> Some(label) =>
+          Logger[F].error(s"Label $label sent for a Single Value Histogram ${h.name}")
+        case _ => ().pure[F]
+      }
   }
 }
 

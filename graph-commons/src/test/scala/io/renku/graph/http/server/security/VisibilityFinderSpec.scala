@@ -110,7 +110,8 @@ class VisibilityFinderSpec
     val mapResponse =
       captureMapping(gitLabClient)(
         finder.findVisibility(projectSlug)(maybeAccessToken).unsafeRunSync(),
-        projectVisibilities.generateOption
+        projectVisibilities.generateOption,
+        underlyingMethod = Get
       )
   }
 

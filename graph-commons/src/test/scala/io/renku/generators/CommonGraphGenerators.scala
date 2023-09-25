@@ -27,6 +27,7 @@ import io.renku.config.sentry.SentryConfig
 import io.renku.config.sentry.SentryConfig.{Dsn, Environment}
 import io.renku.control.{RateLimit, RateLimitUnit}
 import io.renku.crypto.AesCrypto.Secret
+import io.renku.data.Message
 import io.renku.generators.Generators.Implicits._
 import io.renku.generators.Generators._
 import io.renku.graph.http.server.security.Authorizer.AuthContext
@@ -306,4 +307,16 @@ object CommonGraphGenerators {
     key             <- keysGen
     allowedProjects <- projectSlugs.toGeneratorOfSet(min = 0)
   } yield AuthContext(maybeAuthUser, key, allowedProjects)
+
+  val errorMessages: Gen[Message] = Gen.oneOf(
+    nonBlankStrings().map(Message.Error(_)),
+    exceptions.map(Message.Error.fromExceptionMessage(_)),
+    jsons.map(Message.Error.fromJsonUnsafe)
+  )
+
+  val infoMessages: Gen[Message] =
+    nonBlankStrings().map(Message.Info(_))
+
+  implicit val messages: Gen[Message] =
+    Gen.oneOf(errorMessages, infoMessages)
 }

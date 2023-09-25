@@ -16,10 +16,8 @@
  * limitations under the License.
  */
 
-package io.renku.triplesgenerator.events.consumers
-package tsmigrationrequest
+package io.renku.triplesgenerator.events.consumers.tsmigrationrequest
 
-import TSStateChecker.TSState.{MissingDatasets, ReProvisioning, Ready}
 import cats.effect.{Async, MonadCancelThrow}
 import cats.syntax.all._
 import com.typesafe.config.Config
@@ -34,9 +32,12 @@ import io.renku.events.{CategoryName, EventRequestContent, consumers}
 import io.renku.graph.config.EventLogUrl
 import io.renku.metrics.MetricsRegistry
 import io.renku.microservices.MicroserviceIdentifier
+import io.renku.triplesgenerator.events.consumers.TSStateChecker
+import io.renku.triplesgenerator.events.consumers.TSStateChecker.TSState.{MissingDatasets, ReProvisioning, Ready}
 import io.renku.triplesstore.SparqlQueryTimeRecorder
 import migrations.reprovisioning.ReProvisioningStatus
 import org.typelevel.log4cats.Logger
+import io.renku.triplesgenerator.errors.ProcessingRecoverableError
 
 import scala.util.control.NonFatal
 

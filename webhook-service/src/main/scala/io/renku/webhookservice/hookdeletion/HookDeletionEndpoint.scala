@@ -47,14 +47,23 @@ class HookDeletionEndpointImpl[F[_]: MonadThrow: Logger](
     with HookDeletionEndpoint[F] {
 
   def deleteHook(projectId: GitLabId, authUser: AuthUser): F[Response[F]] = {
-    hookDeletor.deleteHook(HookIdentifier(projectId, projectHookUrl), authUser.accessToken).flatMap(toHttpResponse(_))
-  } recoverWith httpResponse
+    hookDeletor
+      .deleteHook(HookIdentifier(projectId, projectHookUrl), authUser.accessToken)
+      .flatTap(logInfo(projectId))
+      .flatMap(toHttpResponse(_))
+  } recoverWith errorHttpResponse
+
+  private def logInfo(projectId: GitLabId): Option[DeletionResult] => F[Unit] = {
+    case Some(HookDeleted) => Logger[F].info(show"Hook deleted for $projectId")
+    case _                 => Logger[F].info(show"Hook already deleted for $projectId")
+  }
 
   private lazy val toHttpResponse: Option[DeletionResult] => F[Response[F]] = {
     case Some(HookDeleted) => Ok(Message.Info("Hook deleted"))
     case _                 => NotFound(Message.Info("Hook not found"))
   }
-  private lazy val httpResponse: PartialFunction[Throwable, F[Response[F]]] = {
+
+  private lazy val errorHttpResponse: PartialFunction[Throwable, F[Response[F]]] = {
     case ex @ UnauthorizedException =>
       Response[F](Status.Unauthorized)
         .withEntity(Message.Error.fromExceptionMessage(ex))

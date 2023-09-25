@@ -40,13 +40,15 @@ private trait LowLevelApis[F[_]] {
   def getApiVersion(uri: RenkuCoreUri.ForSchema): F[Result[SchemaApiVersions]]
   def getMigrationCheck(coreUri:           RenkuCoreUri,
                         projectGitHttpUrl: projects.GitHttpUrl,
+                        userInfo:          UserInfo,
                         accessToken:       AccessToken
   ):               F[Result[ProjectMigrationCheck]]
   def getVersions: F[Result[List[SchemaVersion]]]
+  def postProjectCreate(newProject: NewProject, accessToken: UserAccessToken): F[Result[Unit]]
   def postProjectUpdate(coreUri:     RenkuCoreUri.Versioned,
                         updates:     ProjectUpdates,
                         accessToken: UserAccessToken
-  ): F[Result[Unit]]
+  ): F[Result[Branch]]
 }
 
 private object LowLevelApis {
@@ -74,13 +76,18 @@ private class LowLevelApisImpl[F[_]: Async: Logger](coreLatestUri: RenkuCoreUri.
 
   override def getMigrationCheck(coreUri:           RenkuCoreUri,
                                  projectGitHttpUrl: projects.GitHttpUrl,
+                                 userInfo:          UserInfo,
                                  accessToken:       AccessToken
   ): F[Result[ProjectMigrationCheck]] = {
 
     val uri = (coreUri.uri / "renku" / "cache.migrations_check")
       .withQueryParam("git_url", projectGitHttpUrl.value)
 
-    send(GET(uri).withHeaders(Header.Raw(ci"gitlab-token", accessToken.value))) {
+    send(
+      request(GET, uri, accessToken)
+        .putHeaders(Header.Raw(ci"renku-user-email", userInfo.email.value))
+        .putHeaders(Header.Raw(ci"renku-user-fullname", userInfo.name.value))
+    ) {
       case (Ok, _, resp) =>
         toResult[ProjectMigrationCheck](resp)
       case reqInfo =>
@@ -102,25 +109,50 @@ private class LowLevelApisImpl[F[_]: Async: Logger](coreLatestUri: RenkuCoreUri.
     }
   }
 
+  override def postProjectCreate(newProject: NewProject, accessToken: UserAccessToken): F[Result[Unit]] =
+    send(
+      request(POST, coreLatestUri.uri / "renku" / "templates.create_project", accessToken)
+        .withEntity(newProject.asJson)
+        .putHeaders(Header.Raw(ci"renku-user-email", newProject.userInfo.email.value))
+        .putHeaders(Header.Raw(ci"renku-user-fullname", newProject.userInfo.name.value))
+    ) {
+      case (Ok, _, resp) => toResult[Unit](resp)(toSuccessfulCreation)
+      case reqInfo       => toFailure[Unit]("Submitting Project Creation payload failed")(reqInfo)
+    }
+
   override def postProjectUpdate(uri:         RenkuCoreUri.Versioned,
                                  updates:     ProjectUpdates,
                                  accessToken: UserAccessToken
-  ): F[Result[Unit]] =
+  ): F[Result[Branch]] =
     send(
       request(POST, uri.uri / "renku" / uri.apiVersion / "project.edit", accessToken)
         .withEntity(updates.asJson)
         .putHeaders(Header.Raw(ci"renku-user-email", updates.userInfo.email.value))
         .putHeaders(Header.Raw(ci"renku-user-fullname", updates.userInfo.name.value))
     ) {
-      case (Ok, _, resp) => toResult[Unit](resp)(toSuccessfulEdit)
-      case reqInfo       => toFailure[Unit]("Submitting Project Edit payload failed")(reqInfo)
+      case (Ok, _, resp) => toResult[Branch](resp)(toSuccessfulEdit)
+      case reqInfo       => toFailure[Branch]("Submitting Project Edit payload failed")(reqInfo)
     }
 
-  private lazy val toSuccessfulEdit = Decoder.instance { cur =>
-    cur
-      .downField("edited")
-      .success
-      .as(().asRight)
-      .getOrElse(DecodingFailure(CustomReason("Submitting Project Edit payload did not succeed"), cur).asLeft[Unit])
+  private lazy val toSuccessfulCreation: Decoder[Unit] = Decoder.instance { cur =>
+    def failure[A](message: Option[String] = None) = {
+      val m = message.fold("")(v => s": $v")
+      DecodingFailure(CustomReason(s"Submitting Project Creation payload did not succeed$m"), cur).asLeft[A]
+    }
+
+    cur.downField("name").success.fold(failure[Unit]())(_ => ().asRight[DecodingFailure])
+  }
+
+  private lazy val toSuccessfulEdit: Decoder[Branch] = Decoder.instance { cur =>
+    def failure[A](message: Option[String] = None) = {
+      val m = message.fold("")(v => s": $v")
+      DecodingFailure(CustomReason(s"Submitting Project Edit payload did not succeed$m"), cur).asLeft[A]
+    }
+
+    cur.downField("edited").success.fold(failure[Unit]())(_ => ().asRight[DecodingFailure]) >>
+      cur.downField("remote_branch").as[Option[Branch]].flatMap {
+        case None    => failure[Branch]("no info about branch".some)
+        case Some(b) => b.asRight
+      }
   }
 }

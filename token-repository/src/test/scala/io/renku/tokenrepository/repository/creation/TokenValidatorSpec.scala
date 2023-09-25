@@ -156,7 +156,8 @@ class UserIdFinderSpec
     lazy val responseMapping = captureMapping(gitLabClient)(
       findingMethod = finder.findUserId(accessTokens.generateOne).unsafeRunSync(),
       resultGenerator = personGitLabIds.generateOption,
-      maybeEndpointName = userEndpointName.some
+      maybeEndpointName = userEndpointName.some,
+      underlyingMethod = Get
     )
 
     def givenFindingUser(accessToken: AccessToken, returning: Option[persons.GitLabId]) =
@@ -244,7 +245,8 @@ class MemberRightsCheckerSpec
         .checkRights(projectIds.generateOne, personGitLabIds.generateOne, accessTokens.generateOne)
         .unsafeRunSync(),
       resultGenerator = results.generateOne,
-      maybeEndpointName = projectMemberEndpointName.some
+      maybeEndpointName = projectMemberEndpointName.some,
+      underlyingMethod = Get
     )
 
     def givenCheckingMemberRights(user:        persons.GitLabId,

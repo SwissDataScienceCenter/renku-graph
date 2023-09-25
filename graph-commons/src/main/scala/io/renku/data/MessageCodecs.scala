@@ -21,6 +21,7 @@ package io.renku.data
 import Message._
 import cats.effect.Concurrent
 import cats.syntax.all._
+import io.circe.DecodingFailure.Reason.CustomReason
 import io.circe.syntax._
 import io.circe.{Decoder, DecodingFailure, Encoder, Json}
 import io.renku.graph.model.Schemas.{renku, schema}
@@ -38,29 +39,32 @@ trait MessageCodecs {
       case Severity.Info.value  => Severity.Info.widen.asRight
       case Severity.Error.value => Severity.Error.widen.asRight
       case other =>
-        DecodingFailure(DecodingFailure.Reason.CustomReason(s"unknown Message.Severity '$other'"), cur).asLeft
+        DecodingFailure(CustomReason(s"unknown Message.Severity '$other'"), cur).asLeft
     }
 
   implicit lazy val severityEncoder: Encoder[Severity] = _.value.asJson
 
   implicit lazy val messageJsonDecoder: Decoder[Message] = Decoder.instance[Message] { cur =>
-    for {
-      severity    <- cur.downField("severity").as[Message.Severity]
-      messageJson <- cur.downField("message").as[Json]
-      message <- if (messageJson.isString) messageJson.as[String].map(Message.unsafeApply(_, severity))
-                 else if (messageJson.isObject && severity == Message.Severity.Error)
-                   Message.Error.fromJsonUnsafe(messageJson).asRight
-                 else
-                   DecodingFailure(
-                     DecodingFailure.Reason.CustomReason(s"Malformed '$severity' Message with '$messageJson'"),
-                     cur
-                   ).asLeft
-    } yield message
+    def toMessage(severity: Severity): Json => Decoder.Result[Message] = { messageJson =>
+      if (messageJson.isString)
+        messageJson.as[String].map(Message.unsafeApply(_, severity))
+      else
+        Message.fromJsonUnsafe(messageJson, severity).asRight
+    }
+
+    cur.downField("severity").as[Message.Severity] >>= { severity =>
+      cur.keys.toList.flatMap(_.filterNot(_ == "severity").toList) match {
+        case "message" :: Nil =>
+          cur.downField("message").as[Json] >>= toMessage(severity)
+        case _ =>
+          cur.downField("severity").delete.as[Json] >>= toMessage(severity)
+      }
+    }
   }
 
   implicit def messageJsonEncoder[T <: Message]: Encoder[T] = Encoder.instance[T] {
     case Message.StringMessage(v, s) => Json.obj("severity" -> s.asJson, "message" -> Json.fromString(v))
-    case Message.JsonMessage(v, s)   => Json.obj("severity" -> s.asJson, "message" -> v)
+    case Message.JsonMessage(v, s)   => Json.obj("severity" -> s.asJson).deepMerge(v)
   }
 
   implicit def messageJsonEntityDecoder[F[_]: Concurrent]: EntityDecoder[F, Message] = jsonOf[F, Message]

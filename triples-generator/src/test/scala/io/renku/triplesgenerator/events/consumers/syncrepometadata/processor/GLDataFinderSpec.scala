@@ -131,7 +131,8 @@ class GLDataFinderSpec
     givenAccessTokenFinding(slug, returning = accessTokens.generateSome.pure[IO])
 
     captureMapping(glClient)(finder.fetchGLData(slug).unsafeRunSync(),
-                             glDataExtracts(having = slug).toGeneratorOfOptions
+                             glDataExtracts(having = slug).toGeneratorOfOptions,
+                             underlyingMethod = Get
     )
   }
 

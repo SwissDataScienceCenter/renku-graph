@@ -21,7 +21,7 @@ package io.renku.core.client
 import cats.syntax.all._
 import io.renku.generators.Generators.Implicits._
 import io.renku.generators.Generators._
-import io.renku.graph.model.RenkuTinyTypeGenerators.{cliVersions, personEmails, personNames, projectDescriptions, projectGitHttpUrls, projectKeywords, projectSchemaVersions}
+import io.renku.graph.model.RenkuTinyTypeGenerators.{cliVersions, personEmails, personNames, projectDescriptions, projectGitHttpUrls, projectKeywords, projectNames, projectNamespaces, projectSchemaVersions}
 import org.http4s.Uri
 import org.scalacheck.Gen
 
@@ -33,15 +33,28 @@ object Generators {
   def resultSuccesses[T](payloadGen: Gen[T]): Gen[Result[T]] =
     payloadGen.map(Result.success)
 
+  implicit lazy val resultSimpleFailures: Gen[Result.Failure.Simple] =
+    sentences().map(_.value).map(Result.Failure.Simple(_))
+
   implicit lazy val resultDetailedFailures: Gen[Result.Failure.Detailed] =
-    (positiveInts().map(_.value) -> sentences().map(_.value))
-      .mapN(Result.Failure.Detailed(_, _))
+    (positiveInts().map(_.value), sentences().map(_.value), sentences().map(_.value).toGeneratorOfOptions)
+      .mapN(Result.Failure.Detailed(_, _, _))
+
+  implicit lazy val resultFailures: Gen[Result.Failure] =
+    Gen.oneOf(resultSimpleFailures, resultDetailedFailures)
 
   implicit lazy val apiVersions: Gen[ApiVersion] =
     (positiveInts(), positiveInts()).mapN((major, minor) => ApiVersion(s"$major.$minor"))
 
   implicit lazy val migrationRequiredGen: Gen[MigrationRequired] =
     Gen.oneOf(MigrationRequired.yes, MigrationRequired.no)
+
+  implicit val projectRepositories: Gen[ProjectRepository] =
+    (httpUrls() -> relativePaths(maxSegments = 2))
+      .mapN((url, path) => ProjectRepository(s"$url/$path"))
+
+  implicit lazy val branches: Gen[Branch] =
+    nonEmptyStrings().toGeneratorOf(Branch)
 
   implicit lazy val coreLatestUris: Gen[RenkuCoreUri.Latest] =
     httpUrls().map(uri => RenkuCoreUri.Latest(Uri.unsafeFromString(uri)))
@@ -79,4 +92,21 @@ object Generators {
      projectDescriptions.toGeneratorOfOptions.toGeneratorOfOptions,
      projectKeywords.toGeneratorOfSet().toGeneratorOfOptions
     ).mapN(ProjectUpdates.apply)
+
+  implicit val templateRepositoryUrls: Gen[templates.RepositoryUrl] = httpUrls().toGeneratorOf(templates.RepositoryUrl)
+  implicit val templateIdentifiers:    Gen[templates.Identifier]    = noDashUuid.toGeneratorOf(templates.Identifier)
+
+  implicit val templatesGen: Gen[Template] =
+    (templateRepositoryUrls, templateIdentifiers).mapN(Template.apply)
+
+  implicit lazy val newProjectsGen: Gen[NewProject] =
+    (projectRepositories,
+     projectNamespaces,
+     projectNames,
+     projectDescriptions.toGeneratorOfOptions,
+     projectKeywords.toGeneratorOfSet(),
+     templatesGen,
+     branches,
+     userInfos
+    ).mapN(NewProject.apply)
 }

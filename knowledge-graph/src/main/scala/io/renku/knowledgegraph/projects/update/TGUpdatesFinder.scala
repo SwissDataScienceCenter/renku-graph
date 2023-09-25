@@ -20,12 +20,18 @@ package io.renku.knowledgegraph.projects.update
 
 import cats.MonadThrow
 import cats.syntax.all._
+import io.renku.core.client.Branch
 import io.renku.graph.model.images.ImageUri
 import io.renku.triplesgenerator.api.{ProjectUpdates => TGProjectUpdates}
 
 private trait TGUpdatesFinder[F[_]] {
   def findTGProjectUpdates(updates:               ProjectUpdates,
                            maybeGLUpdatedProject: Option[GLUpdatedProject]
+  ): F[TGProjectUpdates]
+  def findTGProjectUpdates(updates:               ProjectUpdates,
+                           maybeGLUpdatedProject: Option[GLUpdatedProject],
+                           maybeDefaultBranch:    Option[DefaultBranch],
+                           corePushBranch:        Branch
   ): F[TGProjectUpdates]
 }
 
@@ -35,31 +41,59 @@ private object TGUpdatesFinder {
 }
 private class TGUpdatesFinderImpl[F[_]: MonadThrow] extends TGUpdatesFinder[F] {
 
-  override def findTGProjectUpdates(updates:               ProjectUpdates,
-                                    maybeGLUpdatedProject: Option[GLUpdatedProject]
+  def findTGProjectUpdates(updates:               ProjectUpdates,
+                           maybeGLUpdatedProject: Option[GLUpdatedProject]
   ): F[TGProjectUpdates] =
-    findNewImages(updates, maybeGLUpdatedProject).map(maybeNewImages =>
+    maybeGLUpdatedProject match {
+      case None                   => new Exception("No info about values updated in GL").raiseError
+      case Some(glUpdatedProject) => tgUpdates(updates, glUpdatedProject).map(removeCoreUpdatables)
+    }
+
+  override def findTGProjectUpdates(updates:               ProjectUpdates,
+                                    maybeGLUpdatedProject: Option[GLUpdatedProject],
+                                    maybeDefaultBranch:    Option[DefaultBranch],
+                                    corePushBranch:        Branch
+  ): F[TGProjectUpdates] = {
+    val corePushedToDefaultBranch = maybeDefaultBranch contains DefaultBranch.Unprotected(corePushBranch)
+
+    (updates.glUpdateNeeded, maybeGLUpdatedProject, corePushedToDefaultBranch) match {
+      case (true, None, _)                       => new Exception("No info about values updated in GL").raiseError
+      case (true, Some(glUpdatedProject), true)  => tgUpdates(updates, glUpdatedProject)
+      case (true, Some(glUpdatedProject), false) => tgUpdates(updates, glUpdatedProject).map(removeCoreUpdatables)
+      case (false, _, true)                      => tgUpdates(updates).map(removeGLUpdatables)
+      case (false, _, false)                     => TGProjectUpdates.empty.pure[F]
+    }
+  }
+
+  private def findNewImages(updates: ProjectUpdates, glUpdatedProject: GLUpdatedProject): F[Option[List[ImageUri]]] =
+    updates.newImage match {
+      case None                                            => Option.empty[List[ImageUri]].pure[F]
+      case Some(None) if glUpdatedProject.image.nonEmpty   => new Exception("Image not deleted in GL").raiseError
+      case Some(Some(_)) if glUpdatedProject.image.isEmpty => new Exception("Image not updated in GL").raiseError
+      case _                                               => glUpdatedProject.image.toList.some.pure[F]
+    }
+
+  private def tgUpdates(updates: ProjectUpdates, glUpdatedProject: GLUpdatedProject) =
+    findNewImages(updates, glUpdatedProject).map { maybeNewImages =>
       TGProjectUpdates(
         newDescription = updates.newDescription,
         newImages = maybeNewImages,
         newKeywords = updates.newKeywords,
         newVisibility = updates.newVisibility
       )
-    )
-
-  private def findNewImages(updates:               ProjectUpdates,
-                            maybeGLUpdatedProject: Option[GLUpdatedProject]
-  ): F[Option[List[ImageUri]]] =
-    updates.newImage match {
-      case None =>
-        Option.empty[List[ImageUri]].pure[F]
-      case Some(_) if maybeGLUpdatedProject.isEmpty =>
-        new Exception("No info about updated values in GL").raiseError
-      case Some(None) if maybeGLUpdatedProject.flatMap(_.image).nonEmpty =>
-        new Exception("Image not deleted in GL").raiseError
-      case Some(Some(_)) if maybeGLUpdatedProject.flatMap(_.image).isEmpty =>
-        new Exception("Image not updated in GL").raiseError
-      case _ =>
-        maybeGLUpdatedProject.map(_.image.toList).pure[F]
     }
+
+  private def tgUpdates(updates: ProjectUpdates) =
+    TGProjectUpdates(
+      newDescription = updates.newDescription,
+      newImages = None,
+      newKeywords = updates.newKeywords,
+      newVisibility = None
+    ).pure[F]
+
+  private lazy val removeCoreUpdatables: TGProjectUpdates => TGProjectUpdates =
+    _.copy(newDescription = None, newKeywords = None)
+
+  private lazy val removeGLUpdatables: TGProjectUpdates => TGProjectUpdates =
+    _.copy(newImages = None, newVisibility = None)
 }

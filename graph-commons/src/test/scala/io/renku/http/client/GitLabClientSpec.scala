@@ -188,7 +188,7 @@ class GitLabClientSpec
     }
   }
 
-  "post" should {
+  "post(Json)" should {
 
     val mapPostResponse: PartialFunction[(Status, Request[IO], Response[IO]), IO[Unit]] = {
       case (Accepted, _, _)     => ().pure[IO]
@@ -224,6 +224,44 @@ class GitLabClientSpec
       intercept[Exception] {
         client.post(path, endpointName, payload)(mapPostResponse).unsafeRunSync()
       } shouldBe UnauthorizedException
+    }
+  }
+
+  "post(Multipart)" should {
+
+    forAll(tokenScenarios) { (tokenType, accessToken: AccessToken) =>
+      s"send the given multipart request with the $tokenType to the endpoint" in new TestCase {
+
+        implicit val at: AccessToken = accessToken
+        val partName  = nonEmptyStrings().generateOne
+        val partValue = nonEmptyStrings().generateOne
+
+        val multipartPayload = Multiparts
+          .forSync[IO]
+          .flatMap(_.multipart(Vector(Part.formData[IO](partName, partValue))))
+          .unsafeRunSync()
+
+        stubFor {
+          post(s"/api/v4/$path")
+            .withAccessToken(accessToken.some)
+            .withMultipartRequestBody(
+              aMultipart(partName).withBody(equalTo(partValue))
+            )
+            .withHeader(
+              "Content-Type",
+              containing(Renderer.renderString(multipart.`form-data`))
+            )
+            .withHeader(
+              "Content-Type",
+              containing(s"""boundary="${multipartPayload.boundary.value}"""")
+            )
+            .willReturn(aResponse().withStatus(Accepted.code))
+        }
+
+        client
+          .postMultipart(path, endpointName, multipartPayload) { case (Accepted, _, _) => ().pure[IO] }
+          .unsafeRunSync() shouldBe ()
+      }
     }
   }
 

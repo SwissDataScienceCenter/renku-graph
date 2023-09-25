@@ -18,13 +18,12 @@
 
 package io.renku.graph.model.entities
 
-import ProjectLens._
 import cats.data.{Validated, ValidatedNel}
 import cats.syntax.all._
 import io.renku.cli.model.{CliPerson, CliProject}
 import io.renku.graph.model._
-import io.renku.graph.model.entities.Project.ProjectMember.{ProjectMemberNoEmail, ProjectMemberWithEmail}
-import io.renku.graph.model.entities.Project.{GitLabProjectInfo, ProjectMember}
+import io.renku.graph.model.entities.ProjectLens._
+import io.renku.graph.model.gitlab.{GitLabMember, GitLabProjectInfo, GitLabUser}
 import io.renku.graph.model.images.Image
 import io.renku.graph.model.projects.{DateCreated, DateModified, Description, Keyword, ResourceId}
 import io.renku.graph.model.versions.{CliVersion, SchemaVersion}
@@ -192,49 +191,41 @@ private[entities] object CliProjectConverter {
 
   private def members(
       allJsonLdPersons: Set[Person]
-  )(gitLabInfo: GitLabProjectInfo)(implicit renkuUrl: RenkuUrl): Set[Person] =
+  )(gitLabInfo: GitLabProjectInfo)(implicit renkuUrl: RenkuUrl): Set[Project.Member] =
     gitLabInfo.members.map(member =>
       allJsonLdPersons
-        .find(byEmailOrUsername(member))
+        .find(byEmailOrUsername(member.user))
         .map(merge(member))
-        .getOrElse(toPerson(member))
+        .getOrElse(toMember(member))
     )
 
-  private lazy val byEmailOrUsername: ProjectMember => Person => Boolean = {
-    case member: ProjectMemberWithEmail =>
+  private lazy val byEmailOrUsername: GitLabUser => Person => Boolean = {
+    case member @ GitLabUser(_, _, _, Some(email)) =>
       person =>
         person.maybeEmail match {
-          case Some(personEmail) => personEmail == member.email
+          case Some(personEmail) => personEmail == email
           case None              => person.name.value == member.username.value
         }
-    case member: ProjectMemberNoEmail => person => person.name.value == member.username.value
+    case member => person => person.name.value == member.username.value
   }
 
-  private def merge(member: Project.ProjectMember)(implicit renkuUrl: RenkuUrl): Person => Person =
-    member match {
-      case ProjectMemberWithEmail(name, _, gitLabId, email) =>
-        _.add(gitLabId).copy(name = name, maybeEmail = email.some)
-      case ProjectMemberNoEmail(name, _, gitLabId) =>
-        _.add(gitLabId).copy(name = name)
-    }
+  private def merge(user: GitLabUser)(implicit renkuUrl: RenkuUrl): Person => Person =
+    p => p.add(user.gitLabId).copy(name = user.name, maybeEmail = user.email.orElse(p.maybeEmail))
 
-  private def toPerson(projectMember: ProjectMember)(implicit renkuUrl: RenkuUrl): Person =
-    projectMember match {
-      case ProjectMemberNoEmail(name, _, gitLabId) =>
-        Person.WithGitLabId(persons.ResourceId(gitLabId),
-                            gitLabId,
-                            name,
-                            maybeEmail = None,
-                            maybeOrcidId = None,
-                            maybeAffiliation = None
-        )
-      case ProjectMemberWithEmail(name, _, gitLabId, email) =>
-        Person.WithGitLabId(persons.ResourceId(gitLabId),
-                            gitLabId,
-                            name,
-                            email.some,
-                            maybeOrcidId = None,
-                            maybeAffiliation = None
-        )
-    }
+  private def merge(member: GitLabMember)(implicit renkuUrl: RenkuUrl): Person => Project.Member = { p =>
+    Project.Member(merge(member.user).apply(p), member.role)
+  }
+
+  private def toPerson(user: GitLabUser)(implicit renkuUrl: RenkuUrl): Person =
+    Person.WithGitLabId(
+      persons.ResourceId(user.gitLabId),
+      user.gitLabId,
+      user.name,
+      user.email,
+      maybeOrcidId = None,
+      maybeAffiliation = None
+    )
+
+  private def toMember(projectMember: GitLabMember)(implicit renkuUrl: RenkuUrl): Project.Member =
+    Project.Member(toPerson(projectMember.user), projectMember.role)
 }

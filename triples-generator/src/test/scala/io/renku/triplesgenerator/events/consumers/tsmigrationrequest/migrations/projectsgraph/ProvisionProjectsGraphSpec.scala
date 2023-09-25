@@ -31,7 +31,7 @@ import io.renku.generators.Generators.{exceptions, nonEmptyStrings, positiveInts
 import io.renku.graph.model.testentities._
 import io.renku.interpreters.TestLogger
 import io.renku.testtools.IOSpec
-import io.renku.triplesgenerator.generators.ErrorGenerators.processingRecoverableErrors
+import io.renku.triplesgenerator.errors.ErrorGenerators.processingRecoverableErrors
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.EitherValues
 import org.scalatest.matchers.should

@@ -42,7 +42,7 @@ class KGProjectMembersFinderSpec
   "findProjectMembers" should {
 
     "return all members of a given project" in new TestCase {
-      val members = personEntities(withGitLabId).generateFixedSizeSet()
+      val members = projectMemberEntities(withGitLabId).generateFixedSizeSet()
       val project = anyRenkuProjectEntities.modify(membersLens.modify(_ => members)).generateOne
 
       upload(to = projectsDataset, project)

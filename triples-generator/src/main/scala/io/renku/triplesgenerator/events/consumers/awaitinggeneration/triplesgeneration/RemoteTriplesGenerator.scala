@@ -30,8 +30,8 @@ import io.renku.jsonld.JsonLD
 import io.renku.jsonld.parser._
 import io.renku.tinytypes.{StringTinyType, TinyTypeFactory}
 import io.renku.tinytypes.constraints.Url
-import io.renku.triplesgenerator.events.consumers.ProcessingRecoverableError
-import io.renku.triplesgenerator.events.consumers.ProcessingRecoverableError._
+import io.renku.triplesgenerator.errors.ProcessingRecoverableError
+import ProcessingRecoverableError._
 import io.renku.triplesgenerator.events.consumers.awaitinggeneration.CommitEvent
 import org.typelevel.log4cats.Logger
 

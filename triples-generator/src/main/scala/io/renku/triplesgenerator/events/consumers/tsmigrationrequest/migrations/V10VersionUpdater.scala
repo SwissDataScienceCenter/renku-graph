@@ -28,7 +28,7 @@ import io.renku.graph.config.RenkuUrlLoader
 import io.renku.graph.model.RenkuUrl
 import io.renku.graph.model.versions.RenkuVersionPair
 import io.renku.triplesgenerator.config.VersionCompatibilityConfig
-import io.renku.triplesgenerator.events.consumers.ProcessingRecoverableError
+import io.renku.triplesgenerator.errors.ProcessingRecoverableError
 import io.renku.triplesstore.{MigrationsConnectionConfig, SparqlQueryTimeRecorder}
 import org.typelevel.log4cats.Logger
 import reprovisioning.RenkuVersionPairUpdater

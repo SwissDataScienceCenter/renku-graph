@@ -46,7 +46,7 @@ abstract class SecurityRecordFinderSupport
   implicit val sqtr:      SparqlQueryTimeRecorder[IO] = TestSparqlQueryTimeRecorder.createUnsafe
 
   def toSecRecord(p: testentities.Project) =
-    Authorizer.SecurityRecord(p.visibility, p.slug, p.members.flatMap(_.maybeGitLabId))
+    Authorizer.SecurityRecord(p.visibility, p.slug, p.members.flatMap(_.person.maybeGitLabId))
 
   def projectWithDatasetAndMembers =
     EntitiesGenerators

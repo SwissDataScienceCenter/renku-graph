@@ -38,11 +38,11 @@ import io.renku.http.client.AccessToken
 import io.renku.jsonld.syntax._
 import io.renku.jsonld.{JsonLD, Property}
 import io.renku.testtools.IOSpec
-import io.renku.triplesgenerator.events.consumers.ProcessingRecoverableError._
+import io.renku.triplesgenerator.errors.{ProcessingNonRecoverableError, ProcessingRecoverableError}
+import io.renku.triplesgenerator.errors.ProcessingRecoverableError._
 import io.renku.triplesgenerator.events.consumers.awaitinggeneration.triplesgeneration.renkulog.Commands.{GitLabRepoUrlFinder, RepositoryPath}
 import io.renku.triplesgenerator.events.consumers.awaitinggeneration.{CommitEvent, categoryName}
-import io.renku.triplesgenerator.events.consumers.{ProcessingNonRecoverableError, ProcessingRecoverableError}
-import io.renku.triplesgenerator.generators.ErrorGenerators.nonRecoverableMalformedRepoErrors
+import io.renku.triplesgenerator.errors.ErrorGenerators.nonRecoverableMalformedRepoErrors
 import org.scalacheck.Gen
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.matchers.should

@@ -48,7 +48,7 @@ object NonRenkuProject {
                                  visibility:       Visibility,
                                  forksCount:       ForksCount,
                                  keywords:         Set[Keyword],
-                                 members:          Set[Person],
+                                 members:          Set[Project.Member],
                                  images:           List[ImageUri]
   ) extends NonRenkuProject {
     override type ProjectType = NonRenkuProject.WithoutParent
@@ -64,7 +64,7 @@ object NonRenkuProject {
                               visibility:       Visibility,
                               forksCount:       ForksCount,
                               keywords:         Set[Keyword],
-                              members:          Set[Person],
+                              members:          Set[Project.Member],
                               parent:           NonRenkuProject,
                               images:           List[ImageUri]
   ) extends NonRenkuProject
@@ -93,7 +93,7 @@ object NonRenkuProject {
         project.maybeCreator.map(_.to[entities.Person]),
         project.visibility,
         project.keywords,
-        project.members.map(_.to[entities.Person]),
+        project.members.map(_.to[entities.Project.Member]),
         convertImageUris(project.asEntityId)(project.images)
       )
 
@@ -111,7 +111,7 @@ object NonRenkuProject {
         project.maybeCreator.map(_.to[entities.Person]),
         project.visibility,
         project.keywords,
-        project.members.map(_.to[entities.Person]),
+        project.members.map(_.to[entities.Project.Member]),
         projects.ResourceId(project.parent.asEntityId),
         convertImageUris(project.asEntityId)(project.images)
       )
