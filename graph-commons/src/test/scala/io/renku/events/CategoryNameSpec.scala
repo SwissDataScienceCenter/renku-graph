@@ -18,18 +18,29 @@
 
 package io.renku.events
 
-import io.renku.tinytypes.constraints.NonBlank
-import io.renku.tinytypes.{StringTinyType, TinyTypeFactory}
-import skunk.data.Identifier
+import Generators.categoryNames
+import io.renku.generators.Generators.Implicits._
+import org.scalatest.matchers.should
+import org.scalatest.wordspec.AnyWordSpec
 
-final class CategoryName private (val value: String) extends AnyVal with StringTinyType {
-  def asChannelId: Identifier = Identifier
-    .fromString(value.toLowerCase)
-    .fold(err => throw new Exception(s"'$value' not a valid Channel identifier: $err"), identity)
-}
-object CategoryName extends TinyTypeFactory[CategoryName](new CategoryName(_)) with NonBlank[CategoryName] {
-  import io.circe.Decoder
-  import io.renku.tinytypes.json.TinyTypeDecoders.stringDecoder
+class CategoryNameSpec extends AnyWordSpec with should.Matchers {
 
-  implicit val decoder: Decoder[CategoryName] = stringDecoder(CategoryName)
+  "asChannelId" should {
+
+    "convert to a Channel Identifier" in {
+
+      val category = categoryNames.generateOne
+
+      category.asChannelId.value shouldBe category.value.toLowerCase
+    }
+
+    "fail if category is not a valid Identifier" in {
+
+      val category = CategoryName("FROM")
+
+      intercept[Exception](
+        category.asChannelId
+      ).getMessage should startWith(s"'${category.value}' not a valid Channel identifier: ")
+    }
+  }
 }

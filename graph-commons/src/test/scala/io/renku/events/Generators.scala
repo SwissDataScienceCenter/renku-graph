@@ -32,7 +32,7 @@ import io.renku.microservices.MicroserviceIdentifier
 
 object Generators {
 
-  val categoryNames: Gen[CategoryName] = nonBlankStrings() map (value => CategoryName(value.value))
+  val categoryNames: Gen[CategoryName] = nonBlankStrings(minLength = 5) map (value => CategoryName(value.value))
 
   final case class ZippedContentTinyType(value: Array[Byte]) extends ByteArrayTinyType with ZippedContent
 

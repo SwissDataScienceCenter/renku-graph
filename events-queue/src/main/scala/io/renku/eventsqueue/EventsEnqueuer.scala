@@ -27,7 +27,8 @@ import io.renku.events.CategoryName
 import skunk.data.Identifier
 
 trait EventsEnqueuer[F[_]] {
-  def enqueue[E](category: CategoryName, event: E, channel: Identifier)(implicit enc: Encoder[E]): F[Unit]
+  def enqueue[E](category: CategoryName, event: E)(implicit enc: Encoder[E]): F[Unit]
+  def enqueue[E](category: CategoryName, event: E, channel:      Identifier)(implicit enc: Encoder[E]): F[Unit]
 }
 
 object EventsEnqueuer {
@@ -37,6 +38,9 @@ object EventsEnqueuer {
 
 private class EventsEnqueuerImpl[F[_]: Async, DB](repository: DBRepository[F])(implicit sr: SessionResource[F, DB])
     extends EventsEnqueuer[F] {
+
+  override def enqueue[E](category: CategoryName, event: E)(implicit enc: Encoder[E]): F[Unit] =
+    enqueue(category, event, category.asChannelId)
 
   override def enqueue[E](category: CategoryName, event: E, channel: Identifier)(implicit enc: Encoder[E]): F[Unit] = {
     val encodedEvent = enc(event)
