@@ -46,7 +46,7 @@ class PositiveValuesLabeledGaugeSpec extends AnyWordSpec with MockFactory with s
 
       gauge.set(labelValue1 -> value1).unsafeRunSync() shouldBe ()
 
-      underlying.collectValuesFor(label.value, labelValue1.value) shouldBe List(value1)
+      gauge.collectValuesFor(label.value, labelValue1.value) shouldBe List(value1)
 
       // iteration 2
       val labelValue2 = projectSlugs.generateOne
@@ -54,7 +54,7 @@ class PositiveValuesLabeledGaugeSpec extends AnyWordSpec with MockFactory with s
 
       gauge.set(labelValue2 -> value2).unsafeRunSync() shouldBe ()
 
-      underlying.collectValuesFor(label.value, labelValue2.value) shouldBe List(value2)
+      gauge.collectValuesFor(label.value, labelValue2.value) shouldBe List(value2)
     }
 
     "set 0 if negatives value is given" in new TestCase {
@@ -64,7 +64,7 @@ class PositiveValuesLabeledGaugeSpec extends AnyWordSpec with MockFactory with s
 
       gauge.set(labelValue -> value).unsafeRunSync() shouldBe ()
 
-      underlying.collectValuesFor(label.value, labelValue.value) shouldBe List(0d)
+      gauge.collectValuesFor(label.value, labelValue.value) shouldBe List(0d)
     }
   }
 
@@ -77,7 +77,7 @@ class PositiveValuesLabeledGaugeSpec extends AnyWordSpec with MockFactory with s
 
       gauge.update(labelValue -> update).unsafeRunSync() shouldBe ()
 
-      underlying.collectValuesFor(label.value, labelValue.value) shouldBe List(update)
+      gauge.collectValuesFor(label.value, labelValue.value) shouldBe List(update)
     }
 
     "update the value associated with the label - case without a label and negative update" in new TestCase {
@@ -87,7 +87,7 @@ class PositiveValuesLabeledGaugeSpec extends AnyWordSpec with MockFactory with s
 
       gauge.update(labelValue -> -update).unsafeRunSync() shouldBe ()
 
-      underlying.collectValuesFor(label.value, labelValue.value) shouldBe List(0)
+      gauge.collectValuesFor(label.value, labelValue.value) shouldBe List(0)
     }
 
     "update the value associated with the label - case with a positive update value" in new TestCase {
@@ -97,13 +97,13 @@ class PositiveValuesLabeledGaugeSpec extends AnyWordSpec with MockFactory with s
 
       gauge.update(labelValue -> initialValue).unsafeRunSync() shouldBe ()
 
-      underlying.collectValuesFor(label.value, labelValue.value) shouldBe List(initialValue)
+      gauge.collectValuesFor(label.value, labelValue.value) shouldBe List(initialValue)
 
       val update = nonNegativeDoubles().generateOne.value
 
       gauge.update(labelValue -> update).unsafeRunSync() shouldBe ()
 
-      underlying.collectValuesFor(label.value, labelValue.value) shouldBe List(initialValue + update)
+      gauge.collectValuesFor(label.value, labelValue.value) shouldBe List(initialValue + update)
     }
 
     "update the value associated with the label - case with a negative update value so current + update < 0" in new TestCase {
@@ -117,7 +117,7 @@ class PositiveValuesLabeledGaugeSpec extends AnyWordSpec with MockFactory with s
 
       gauge.update(labelValue -> -update).unsafeRunSync() shouldBe ()
 
-      underlying.collectValuesFor(label.value, labelValue.value) shouldBe List(0d)
+      gauge.collectValuesFor(label.value, labelValue.value) shouldBe List(0d)
     }
   }
 
@@ -130,7 +130,7 @@ class PositiveValuesLabeledGaugeSpec extends AnyWordSpec with MockFactory with s
 
       gauge.update(labelValue1 -> value1).unsafeRunSync() shouldBe ()
 
-      underlying.collectValuesFor(label.value, labelValue1.value) shouldBe List(value1)
+      gauge.collectValuesFor(label.value, labelValue1.value) shouldBe List(value1)
 
       // re-provisioning
       val waitingEvents = waitingEventsGen.generateNonEmptyList().toList.flatten.toMap
@@ -138,7 +138,7 @@ class PositiveValuesLabeledGaugeSpec extends AnyWordSpec with MockFactory with s
 
       gauge.reset().unsafeRunSync() shouldBe ()
 
-      underlying.collectAllSamples should contain theSameElementsAs waitingEvents.map { case (labelValue, value) =>
+      gauge.collectAllSamples should contain theSameElementsAs waitingEvents.map { case (labelValue, value) =>
         (label.value, labelValue.value, value)
       }
     }
@@ -153,11 +153,11 @@ class PositiveValuesLabeledGaugeSpec extends AnyWordSpec with MockFactory with s
 
       gauge.update(labelValue1 -> value1).unsafeRunSync() shouldBe ()
 
-      underlying.collectValuesFor(label.value, labelValue1.value) shouldBe List(value1)
+      gauge.collectValuesFor(label.value, labelValue1.value) shouldBe List(value1)
 
       gauge.clear().unsafeRunSync() shouldBe ()
 
-      underlying.collectAllSamples.isEmpty shouldBe true
+      gauge.collectAllSamples.isEmpty shouldBe true
     }
   }
 
@@ -170,12 +170,12 @@ class PositiveValuesLabeledGaugeSpec extends AnyWordSpec with MockFactory with s
 
       gauge.update(labelValue -> value).unsafeRunSync() shouldBe ()
 
-      underlying.collectValuesFor(label.value, labelValue.value) shouldBe List(value)
+      gauge.collectValuesFor(label.value, labelValue.value) shouldBe List(value)
 
       // incrementing
       gauge.increment(labelValue).unsafeRunSync() shouldBe ()
 
-      underlying.collectValuesFor(label.value, labelValue.value) shouldBe List(value + 1)
+      gauge.collectValuesFor(label.value, labelValue.value) shouldBe List(value + 1)
     }
 
     "add label value if one is not present yet" in new TestCase {
@@ -184,7 +184,7 @@ class PositiveValuesLabeledGaugeSpec extends AnyWordSpec with MockFactory with s
 
       gauge.increment(labelValue).unsafeRunSync() shouldBe ()
 
-      underlying.collectValuesFor(label.value, labelValue.value) shouldBe List(1)
+      gauge.collectValuesFor(label.value, labelValue.value) shouldBe List(1)
     }
   }
 
@@ -200,7 +200,7 @@ class PositiveValuesLabeledGaugeSpec extends AnyWordSpec with MockFactory with s
       // decrementing
       gauge.decrement(labelValue).unsafeRunSync() shouldBe ()
 
-      underlying.collectValuesFor(label.value, labelValue.value) shouldBe List(value - 1)
+      gauge.collectValuesFor(label.value, labelValue.value) shouldBe List(value - 1)
     }
 
     "add label value with value 0 if one is not present yet" in new TestCase {
@@ -209,7 +209,7 @@ class PositiveValuesLabeledGaugeSpec extends AnyWordSpec with MockFactory with s
 
       gauge.decrement(labelValue).unsafeRunSync() shouldBe ()
 
-      underlying.collectValuesFor(label.value, labelValue.value) shouldBe List(0)
+      gauge.collectValuesFor(label.value, labelValue.value) shouldBe List(0)
     }
   }
 
@@ -228,8 +228,8 @@ class PositiveValuesLabeledGaugeSpec extends AnyWordSpec with MockFactory with s
       val value2      = nonNegativeDoubles().generateOne.value
       gauge.set(labelValue2 -> value2).unsafeRunSync() shouldBe ()
 
-      gauge.wrappedCollector.collectValuesFor(label.value, labelValue1.value) shouldBe List(value1)
-      gauge.wrappedCollector.collectValuesFor(label.value, labelValue2.value) shouldBe List(value2)
+      gauge.collectValuesFor(label.value, labelValue1.value) shouldBe List(value1)
+      gauge.collectValuesFor(label.value, labelValue2.value) shouldBe List(value2)
 
       // one label gets 0
       gauge.set(labelValue2 -> 0d).unsafeRunSync() shouldBe ()
@@ -237,14 +237,14 @@ class PositiveValuesLabeledGaugeSpec extends AnyWordSpec with MockFactory with s
       sleep(zeroRemovalTimeout.toMillis - (zerosCheckingInterval.toMillis * 2))
 
       // the 0 should be kept for the grace period
-      gauge.wrappedCollector.collectValuesFor(label.value, labelValue1.value) shouldBe List(value1)
-      gauge.wrappedCollector.collectValuesFor(label.value, labelValue2.value) shouldBe List(0d)
+      gauge.collectValuesFor(label.value, labelValue1.value) shouldBe List(value1)
+      gauge.collectValuesFor(label.value, labelValue2.value) shouldBe List(0d)
 
       // the label with 0 should be removed if it's longer than the grace period
       sleep(zeroRemovalTimeout.toMillis + (zerosCheckingInterval.toMillis * 2))
 
-      gauge.wrappedCollector.collectValuesFor(label.value, labelValue1.value) shouldBe List(value1)
-      gauge.wrappedCollector.collectValuesFor(label.value, labelValue2.value) shouldBe List.empty
+      gauge.collectValuesFor(label.value, labelValue1.value) shouldBe List(value1)
+      gauge.collectValuesFor(label.value, labelValue2.value) shouldBe List.empty
     }
 
     "not remove the label if 0 value was updated to non-0" in new TestCase {
@@ -256,7 +256,7 @@ class PositiveValuesLabeledGaugeSpec extends AnyWordSpec with MockFactory with s
       val value1     = nonNegativeDoubles().generateOne.value
       gauge.set(labelValue -> value1).unsafeRunSync() shouldBe ()
 
-      gauge.wrappedCollector.collectValuesFor(label.value, labelValue.value) shouldBe List(value1)
+      gauge.collectValuesFor(label.value, labelValue.value) shouldBe List(value1)
 
       // the value gets 0
       gauge.set(labelValue -> 0d).unsafeRunSync() shouldBe ()
@@ -264,7 +264,7 @@ class PositiveValuesLabeledGaugeSpec extends AnyWordSpec with MockFactory with s
       sleep(zeroRemovalTimeout.toMillis - (zerosCheckingInterval.toMillis * 2))
 
       // the 0 should be kept for the grace period
-      gauge.wrappedCollector.collectValuesFor(label.value, labelValue.value) shouldBe List(0d)
+      gauge.collectValuesFor(label.value, labelValue.value) shouldBe List(0d)
 
       // before the grace period the value is changed again to non-0
       val value2 = nonNegativeDoubles().generateOne.value
@@ -272,7 +272,7 @@ class PositiveValuesLabeledGaugeSpec extends AnyWordSpec with MockFactory with s
 
       sleep(zeroRemovalTimeout.toMillis + (zerosCheckingInterval.toMillis * 2))
 
-      gauge.wrappedCollector.collectValuesFor(label.value, labelValue.value) shouldBe List(value2)
+      gauge.collectValuesFor(label.value, labelValue.value) shouldBe List(value2)
     }
 
     "remove the label after the value was updated to 0" in new TestCase {
@@ -284,7 +284,7 @@ class PositiveValuesLabeledGaugeSpec extends AnyWordSpec with MockFactory with s
       val value      = nonNegativeDoubles().generateOne.value
       gauge.update(labelValue -> value).unsafeRunSync() shouldBe ()
 
-      gauge.wrappedCollector.collectValuesFor(label.value, labelValue.value) shouldBe List(value)
+      gauge.collectValuesFor(label.value, labelValue.value) shouldBe List(value)
 
       // the value gets 0
       gauge.update(labelValue -> -value * 2).unsafeRunSync() shouldBe ()
@@ -292,12 +292,12 @@ class PositiveValuesLabeledGaugeSpec extends AnyWordSpec with MockFactory with s
       sleep(zeroRemovalTimeout.toMillis - (zerosCheckingInterval.toMillis * 2))
 
       // the 0 should be kept for the grace period
-      gauge.wrappedCollector.collectValuesFor(label.value, labelValue.value) shouldBe List(0d)
+      gauge.collectValuesFor(label.value, labelValue.value) shouldBe List(0d)
 
       // after the grace period the label should be removed
       sleep(zeroRemovalTimeout.toMillis + (zerosCheckingInterval.toMillis * 2))
 
-      gauge.wrappedCollector.collectValuesFor(label.value, labelValue.value) shouldBe List.empty
+      gauge.collectValuesFor(label.value, labelValue.value) shouldBe List.empty
     }
 
     "remove the label after the value was decremented to 0" in new TestCase {
@@ -309,7 +309,7 @@ class PositiveValuesLabeledGaugeSpec extends AnyWordSpec with MockFactory with s
       val value      = 1d
       gauge.set(labelValue -> value).unsafeRunSync() shouldBe ()
 
-      gauge.wrappedCollector.collectValuesFor(label.value, labelValue.value) shouldBe List(value)
+      gauge.collectValuesFor(label.value, labelValue.value) shouldBe List(value)
 
       // the value gets 0
       gauge.decrement(labelValue).unsafeRunSync() shouldBe ()
@@ -317,12 +317,12 @@ class PositiveValuesLabeledGaugeSpec extends AnyWordSpec with MockFactory with s
       sleep(zeroRemovalTimeout.toMillis - (zerosCheckingInterval.toMillis * 2))
 
       // the 0 should be kept for the grace period
-      gauge.wrappedCollector.collectValuesFor(label.value, labelValue.value) shouldBe List(0d)
+      gauge.collectValuesFor(label.value, labelValue.value) shouldBe List(0d)
 
       // after the grace period the label should be removed
       sleep(zeroRemovalTimeout.toMillis + (zerosCheckingInterval.toMillis * 2))
 
-      gauge.wrappedCollector.collectValuesFor(label.value, labelValue.value) shouldBe List.empty
+      gauge.collectValuesFor(label.value, labelValue.value) shouldBe List.empty
     }
   }
 
@@ -336,7 +336,6 @@ class PositiveValuesLabeledGaugeSpec extends AnyWordSpec with MockFactory with s
 
     val resetDataFetch = mockFunction[IO[Map[Slug, Double]]]
     val gauge      = new PositiveValuesLabeledGauge[IO, Slug](name, help, label, resetDataFetch, zerosCheckingInterval)
-    val underlying = gauge.wrappedCollector
   }
 
   private lazy val waitingEventsGen: Gen[Map[Slug, Double]] = nonEmptySet {

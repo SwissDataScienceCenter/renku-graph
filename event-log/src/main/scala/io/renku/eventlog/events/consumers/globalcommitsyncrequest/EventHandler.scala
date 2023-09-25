@@ -18,13 +18,13 @@
 
 package io.renku.eventlog.events.consumers.globalcommitsyncrequest
 
-import cats.effect.{Concurrent, MonadCancelThrow}
+import cats.effect.{Async, MonadCancelThrow}
 import cats.syntax.all._
 import io.renku.eventlog.EventLogDB.SessionResource
 import io.renku.eventlog.metrics.QueriesExecutionTimes
-import io.renku.events.{consumers, CategoryName}
-import io.renku.events.consumers._
 import io.renku.events.consumers.EventDecodingTools._
+import io.renku.events.consumers._
+import io.renku.events.{CategoryName, consumers}
 import org.typelevel.log4cats.Logger
 
 private class EventHandler[F[_]: MonadCancelThrow: Logger](
@@ -47,6 +47,6 @@ private class EventHandler[F[_]: MonadCancelThrow: Logger](
 }
 
 private object EventHandler {
-  def apply[F[_]: Concurrent: SessionResource: Logger: QueriesExecutionTimes]: F[consumers.EventHandler[F]] =
+  def apply[F[_]: Async: SessionResource: Logger: QueriesExecutionTimes]: F[consumers.EventHandler[F]] =
     GlobalCommitSyncForcer[F]().map(new EventHandler[F](_))
 }

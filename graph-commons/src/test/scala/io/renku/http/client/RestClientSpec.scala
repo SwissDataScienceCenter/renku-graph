@@ -18,6 +18,7 @@
 
 package io.renku.http.client
 
+import cats.Applicative
 import cats.effect.{IO, Ref}
 import cats.syntax.all._
 import com.github.tomakehurst.wiremock.client.WireMock._
@@ -27,35 +28,34 @@ import eu.timepit.refined.api.Refined
 import eu.timepit.refined.auto._
 import eu.timepit.refined.collection.NonEmpty
 import io.circe.{Decoder, DecodingFailure, Json}
-import io.prometheus.client.Histogram
 import io.renku.config.ServiceUrl
 import io.renku.control.Throttler
-import io.renku.generators.Generators._
 import io.renku.generators.Generators.Implicits._
+import io.renku.generators.Generators._
 import io.renku.http.client.RestClientError._
 import io.renku.interpreters.TestLogger
 import io.renku.interpreters.TestLogger.Level.Warn
 import io.renku.logging.{ExecutionTimeRecorder, TestExecutionTimeRecorder}
+import io.renku.metrics.Histogram
 import io.renku.stubbing.ExternalServiceStubbing
 import io.renku.testtools.IOSpec
 import io.renku.tinytypes.ByteArrayTinyType
 import io.renku.tinytypes.TestTinyTypes.ByteArrayTestType
 import io.renku.tinytypes.contenttypes.ZippedContent
-import org.http4s.{multipart => _, _}
 import org.http4s.MediaType._
 import org.http4s.Method.{GET, POST}
 import org.http4s.circe.jsonOf
+import org.http4s.{multipart => _, _}
 import org.scalamock.scalatest.MockFactory
+import org.scalatest.OptionValues
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
-import org.scalatest.OptionValues
 import org.typelevel.log4cats.Logger
 
 import java.net.ConnectException
 import java.nio.charset.StandardCharsets
 import java.util.concurrent.TimeoutException
 import scala.concurrent.duration._
-import scala.jdk.CollectionConverters._
 import scala.util.Random
 
 class RestClientSpec
@@ -76,6 +76,8 @@ class RestClientSpec
             .willReturn(ok("1"))
         }
 
+        givenHistogramObservesExecutionTime(maybeLabel = None)
+
         client.callRemote(mapResponseToInt).unsafeRunSync() shouldBe 1
 
         verifyThrottling()
@@ -91,7 +93,7 @@ class RestClientSpec
             .willReturn(ok("1"))
         }
 
-        override val client = new TestRestClient(hostUrl, throttler, maybeTimeRecorder = None)
+        override lazy val client = new TestRestClient(hostUrl, throttler, maybeTimeRecorder = None)
 
         client.callRemote(mapResponseToInt).unsafeRunSync() shouldBe 1
 
@@ -109,6 +111,9 @@ class RestClientSpec
         }
 
         val requestName: String Refined NonEmpty = "some request"
+
+        givenHistogramObservesExecutionTime(maybeLabel = requestName.value.some)
+
         client.callRemote(requestName).unsafeRunSync() shouldBe 1
 
         verifyThrottling()
@@ -124,14 +129,12 @@ class RestClientSpec
       }
 
       val requestName: String Refined NonEmpty = "some request"
+
+      givenHistogramObservesExecutionTime(requestName.value.some)
+
       client.callRemote(requestName).unsafeRunSync() shouldBe 1
 
       verifyThrottling()
-
-      val sample = histogram.collect().asScala.flatMap(_.samples.asScala).last
-      sample.value               should be >= 0d
-      sample.labelNames.asScala  should contain only histogramLabel.value
-      sample.labelValues.asScala should contain only requestName.value
     }
 
     "cause the given histogram to capture execution time - case without label" in new TestCase {
@@ -141,16 +144,13 @@ class RestClientSpec
           .willReturn(ok("1"))
       }
 
-      override val histogram = Histogram.build("histogram", "help").create()
+      override lazy val histogram = mock[Histogram[IO]]
+
+      givenHistogramObservesExecutionTime(maybeLabel = None)
 
       client.callRemote(mapResponseToInt).unsafeRunSync() shouldBe 1
 
       verifyThrottling()
-
-      val sample = histogram.collect().asScala.flatMap(_.samples.asScala).last
-      sample.value                 should be >= 0d
-      sample.labelNames.asScala  shouldBe empty
-      sample.labelValues.asScala shouldBe empty
     }
 
     "fail if remote responds with status which does not match the response mapping rules" in new TestCase {
@@ -367,6 +367,8 @@ class RestClientSpec
           .willReturn(ok("1"))
       }
 
+      givenHistogramObservesExecutionTime(maybeLabel = None)
+
       client.callMultipartEndpoint(jsonPart, textPart, zippedPart).unsafeRunSync() shouldBe 1
 
       verify {
@@ -378,20 +380,25 @@ class RestClientSpec
   }
 
   private trait TestCase {
-    val histogramLabel: String Refined NonEmpty = "label"
-    val histogram             = Histogram.build("histogram", "help").labelNames(histogramLabel.value).create()
+    lazy val histogram        = mock[Histogram[IO]]
     private val throttlerUsed = Ref.unsafe[IO, Boolean](false)
     val throttler = new Throttler[IO, Any] {
       override def throttle[O](value: IO[O]): IO[O] = throttlerUsed.set(true) >> value
     }
     implicit val logger: TestLogger[IO] = TestLogger[IO]()
-    val executionTimeRecorder = TestExecutionTimeRecorder[IO](Some(histogram))
-    val client                = new TestRestClient(hostUrl, throttler, Some(executionTimeRecorder))
+    lazy val executionTimeRecorder = TestExecutionTimeRecorder[IO](Some(histogram))
+    lazy val client                = new TestRestClient(hostUrl, throttler, Some(executionTimeRecorder))
 
     def verifyThrottling() =
       withClue("throttler called:") {
         throttlerUsed.get.unsafeRunSync() shouldBe true
       }
+
+    def givenHistogramObservesExecutionTime(maybeLabel: Option[String]) =
+      (histogram
+        .observe(_: Option[String], _: FiniteDuration)(_: Logger[IO], _: Applicative[IO]))
+        .expects(maybeLabel, *, *, *)
+        .returning(().pure[IO])
   }
 
   private lazy val hostUrl = ServiceUrl(externalServiceBaseUrl)
@@ -436,5 +443,6 @@ class RestClientSpec
                    .build()
       response <- send(request)(mapResponseToInt)
     } yield response
+
   }
 }

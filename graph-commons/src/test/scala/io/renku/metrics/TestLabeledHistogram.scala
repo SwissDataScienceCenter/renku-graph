@@ -46,7 +46,7 @@ class TestLabeledHistogram(labelName: String) extends LabeledHistogram[IO] with 
     .create()
 
   def verifyExecutionTimeMeasured(forLabelValue: String, other: String*): Unit =
-    (forLabelValue +: other) diff wrappedCollector.collectAllSamples.map(_._2) match {
+    (forLabelValue +: other) diff this.collectAllSamples.map(_._2) match {
       case Nil     => ()
       case missing => fail(s"Execution time was not measured for '${missing.mkString(", ")}'")
     }
@@ -55,16 +55,12 @@ class TestLabeledHistogram(labelName: String) extends LabeledHistogram[IO] with 
     verifyExecutionTimeMeasured(forLabelValues.head, forLabelValues.tail: _*)
 
   def verifyNoInteractions(): Unit = {
-    if (wrappedCollector.collectAllSamples.nonEmpty)
+    if (this.collectAllSamples.nonEmpty)
       fail(
         "Expected no interaction with histogram but " +
-          s"execution time was measured for ${wrappedCollector.collectAllSamples.map(_._2).toSet.mkString(",")}"
+          s"execution time was measured for ${this.collectAllSamples.map(_._2).toSet.mkString(",")}"
       )
     ()
-  }
-
-  override def startTimer(labelValue: String): IO[Histogram.Timer[IO]] = IO {
-    new LabeledHistogram.NoThresholdTimerImpl[IO](wrappedCollector.labels(labelValue).startTimer())
   }
 
   override def observe(labelValue: String, amt: FiniteDuration): IO[Unit] =

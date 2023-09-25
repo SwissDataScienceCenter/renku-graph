@@ -20,7 +20,7 @@ package io.renku.tokenrepository.repository
 package creation
 
 import ProjectsTokensDB.SessionResource
-import cats.effect.MonadCancelThrow
+import cats.effect.Async
 import cats.syntax.all._
 import creation.TokenDates.ExpiryDate
 import io.renku.db.{DbClient, SqlStatement}
@@ -35,11 +35,11 @@ private trait TokenDueChecker[F[_]] {
 }
 
 private object TokenDueChecker {
-  def apply[F[_]: MonadCancelThrow: SessionResource: QueriesExecutionTimes]: F[TokenDueChecker[F]] =
+  def apply[F[_]: Async: SessionResource: QueriesExecutionTimes]: F[TokenDueChecker[F]] =
     ProjectTokenDuePeriod[F]().map(new TokenDueCheckerImpl[F](_))
 }
 
-private class TokenDueCheckerImpl[F[_]: MonadCancelThrow: SessionResource: QueriesExecutionTimes](
+private class TokenDueCheckerImpl[F[_]: Async: SessionResource: QueriesExecutionTimes](
     tokenDuePeriod: Period
 ) extends DbClient[F](Some(QueriesExecutionTimes[F]))
     with TokenDueChecker[F]

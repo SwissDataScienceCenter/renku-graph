@@ -18,7 +18,7 @@
 
 package io.renku.eventlog.events.producers
 
-import cats.effect.MonadCancelThrow
+import cats.effect.Async
 import cats.syntax.all._
 import io.renku.db.{DbClient, SqlStatement}
 import io.renku.eventlog.EventLogDB.SessionResource
@@ -40,13 +40,13 @@ private object DefaultSubscriberTracker {
 
   def apply[F[_]](implicit tracker: DefaultSubscriberTracker[F]): DefaultSubscriberTracker[F] = tracker
 
-  def create[F[_]: MonadCancelThrow: SessionResource: QueriesExecutionTimes]: F[DefaultSubscriberTracker[F]] = for {
+  def create[F[_]: Async: SessionResource: QueriesExecutionTimes]: F[DefaultSubscriberTracker[F]] = for {
     microserviceUrlFinder <- MicroserviceUrlFinder(Microservice.ServicePort)
     sourceUrl             <- microserviceUrlFinder.findBaseUrl()
   } yield new DefaultSubscriberTrackerImpl[F](sourceUrl)
 }
 
-private class DefaultSubscriberTrackerImpl[F[_]: MonadCancelThrow: SessionResource: QueriesExecutionTimes](
+private class DefaultSubscriberTrackerImpl[F[_]: Async: SessionResource: QueriesExecutionTimes](
     sourceUrl: MicroserviceBaseUrl
 ) extends DbClient(Some(QueriesExecutionTimes[F]))
     with DefaultSubscriberTracker[F]

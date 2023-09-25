@@ -18,6 +18,7 @@
 
 package io.renku.logging
 
+import cats.Applicative
 import cats.effect.{IO, Temporal}
 import cats.syntax.all._
 import com.typesafe.config.ConfigFactory
@@ -30,13 +31,14 @@ import io.renku.generators.Generators._
 import io.renku.interpreters.TestLogger
 import io.renku.interpreters.TestLogger.Level.Warn
 import io.renku.logging.ExecutionTimeRecorder.ElapsedTime
-import io.renku.metrics.{LabeledHistogram, SingleValueHistogram}
+import io.renku.metrics.Histogram
 import io.renku.testtools.CustomAsyncIOSpec
 import org.scalacheck.Gen.finiteDuration
 import org.scalamock.scalatest.AsyncMockFactory
 import org.scalatest.BeforeAndAfterEach
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AsyncWordSpec
+import org.typelevel.log4cats.Logger
 
 import scala.concurrent.duration._
 import scala.jdk.CollectionConverters._
@@ -72,10 +74,9 @@ class ExecutionTimeRecorderSpec
         .assertThrowsError[Exception](_ shouldBe exception)
     }
 
-    "put the given histogram to collect process execution time - case without a label" in {
+    "observe the process execution time and update the histogram - case with no label" in {
 
-      val histogram = mock[SingleValueHistogram[IO]]
-
+      val histogram             = mock[Histogram[IO]]
       val executionTimeRecorder = new ExecutionTimeRecorderImpl(loggingThreshold, Some(histogram))
 
       val blockOut = nonEmptyStrings().generateOne
@@ -83,8 +84,12 @@ class ExecutionTimeRecorderSpec
 
       val blockExecutionTime = positiveInts(max = 100).generateOne.value
       (histogram
-        .observe(_: FiniteDuration))
-        .expects(where((amt: FiniteDuration) => amt.toMillis >= blockExecutionTime))
+        .observe(_: Option[String], _: FiniteDuration)(_: Logger[IO], _: Applicative[IO]))
+        .expects(
+          where((l: Option[String], amt: FiniteDuration, _: Logger[IO], _: Applicative[IO]) =>
+            l.isEmpty && amt.toMillis >= blockExecutionTime
+          )
+        )
         .returning(().pure[IO])
 
       executionTimeRecorder
@@ -94,11 +99,10 @@ class ExecutionTimeRecorderSpec
         .assertNoException
     }
 
-    "made the given histogram to collect process execution time - case with a label" in {
+    "observe the process execution time and update the histogram - case with a label" in {
 
       val label: String Refined NonEmpty = "label"
-      val histogram = mock[LabeledHistogram[IO]]
-
+      val histogram             = mock[Histogram[IO]]
       val executionTimeRecorder = new ExecutionTimeRecorderImpl(loggingThreshold, Some(histogram))
 
       val blockOut = nonEmptyStrings().generateOne
@@ -106,8 +110,12 @@ class ExecutionTimeRecorderSpec
 
       val blockExecutionTime = positiveInts(max = 100).generateOne.value
       (histogram
-        .observe(_: String, _: FiniteDuration))
-        .expects(where((l: String, amt: FiniteDuration) => l == label.value && amt.toMillis >= blockExecutionTime))
+        .observe(_: Option[String], _: FiniteDuration)(_: Logger[IO], _: Applicative[IO]))
+        .expects(
+          where((l: Option[String], amt: FiniteDuration, _: Logger[IO], _: Applicative[IO]) =>
+            l == Option(label.value) && amt.toMillis >= blockExecutionTime
+          )
+        )
         .returning(().pure[IO])
 
       executionTimeRecorder
@@ -117,24 +125,6 @@ class ExecutionTimeRecorderSpec
         )
         .assertNoException >>
         IO(logger.expectNoLogs())
-    }
-
-    "made the given labelled histogram not to collect the process execution time when no label given" in {
-
-      val histogram = mock[LabeledHistogram[IO]]
-
-      val executionTimeRecorder = new ExecutionTimeRecorderImpl(loggingThreshold, Some(histogram))
-
-      val blockOut = nonEmptyStrings().generateOne
-      block.expects().returning(blockOut.pure[IO])
-
-      val blockExecutionTime = positiveInts(max = 100).generateOne.value
-      executionTimeRecorder
-        .measureExecutionTime[String] {
-          Temporal[IO].delayBy(block(), blockExecutionTime millis)
-        }
-        .assertNoException >>
-        logger.expectNoLogsF()
     }
   }
 

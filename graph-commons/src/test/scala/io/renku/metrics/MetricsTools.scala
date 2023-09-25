@@ -19,27 +19,41 @@
 package io.renku.metrics
 
 import cats.syntax.all._
-import io.prometheus.client.Collector
 import io.prometheus.client.Collector.MetricFamilySamples.Sample
 
 import scala.jdk.CollectionConverters._
 
 object MetricsTools {
 
-  implicit class CollectorOps(collector: Collector) {
+  type CollectedSample = (String, String, Double)
 
-    def collectAllSamples: Seq[(String, String, Double)] = for {
-      familySamples <- collector.collect().asScala.toList
+  implicit class CollectorOps[PC <: PrometheusCollector](collector: PC) {
+
+    def collectAllSamples: Seq[CollectedSample] = for {
+      familySamples <- collector.wrappedCollector.collect().asScala.toList
       sample        <- familySamples.samples.asScala.toList
       resultTuple   <- toResultTuple(sample)
     } yield resultTuple
 
-    private val toResultTuple: Sample => List[(String, String, Double)] = sample =>
+    private val toResultTuple: Sample => List[CollectedSample] = sample =>
       (sample.labelNames.asScala.toList, sample.labelValues.asScala.toList) mapN { case (labelName, labelValue) =>
         (labelName, labelValue, sample.value)
       }
 
     def collectValuesFor(label: String, labelValue: String): List[Double] =
       collectAllSamples.collect { case (l, lv, v) if l == label && lv == labelValue => v }.toList
+
+    def sumValuesFor(label: String): Double =
+      collector match {
+        case c: LabeledHistogramImpl[_] => c.wrappedCollector.labels(label).get().sum
+        case c => throw new Exception(s"${c.getClass} is not a wrapper around io.prometheus.client.Histogram")
+      }
+
+    def clear(): Unit = collector match {
+      case c: LabeledHistogramImpl[_] => c.wrappedCollector.clear()
+      case c => throw new Exception(s"${c.getClass} is not a wrapper around io.prometheus.client.Histogram")
+    }
   }
+
+  val toValue: CollectedSample => Double = { case (_, _, value) => value }
 }
