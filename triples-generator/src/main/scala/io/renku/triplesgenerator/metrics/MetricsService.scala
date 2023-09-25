@@ -22,11 +22,12 @@ import cats.Traverse
 import cats.data.Kleisli
 import cats.effect._
 import cats.syntax.all._
-import fs2.{Compiler, Stream}
 import eu.timepit.refined.auto._
+import fs2.{Compiler, Stream}
 import io.renku.lock.PostgresLockStats
 import io.renku.metrics.MetricsRegistry
 import io.renku.triplesgenerator.TgLockDB
+import org.typelevel.log4cats.Logger
 
 import scala.concurrent.duration.FiniteDuration
 
@@ -34,8 +35,12 @@ trait MetricsService[F[_]] {
 
   def collect: F[Unit]
 
-  def collectEvery(interval: FiniteDuration)(implicit C: Compiler[F, F], T: Temporal[F]) =
-    Stream.awakeEvery(interval).evalMap(_ => collect).compile.drain
+  def collectEvery(interval: FiniteDuration)(implicit C: Compiler[F, F], T: Temporal[F], L: Logger[F]): F[Unit] =
+    Stream
+      .awakeEvery(interval)
+      .evalMap(_ => collect.handleErrorWith(L.error(_)("An error during Metrics collection")))
+      .compile
+      .drain
 }
 
 object MetricsService {
