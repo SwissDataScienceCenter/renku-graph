@@ -196,10 +196,8 @@ private class EventPersisterImpl[F[_]: Async: SessionResource: QueriesExecutionT
 }
 
 private object EventPersister {
-  def apply[F[_]: Async: SessionResource: QueriesExecutionTimes: EventStatusGauges]
-      : F[EventPersisterImpl[F]] = MonadThrow[F].catchNonFatal {
-    new EventPersisterImpl[F]()
-  }
+  def apply[F[_]: Async: SessionResource: QueriesExecutionTimes: EventStatusGauges]: F[EventPersisterImpl[F]] =
+    MonadThrow[F].catchNonFatal(new EventPersisterImpl[F]())
 
   sealed trait Result extends Product with Serializable
   object Result {

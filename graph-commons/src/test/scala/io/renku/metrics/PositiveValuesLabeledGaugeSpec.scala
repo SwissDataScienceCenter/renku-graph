@@ -335,7 +335,7 @@ class PositiveValuesLabeledGaugeSpec extends AnyWordSpec with MockFactory with s
     val zerosCheckingInterval = 100 millis
 
     val resetDataFetch = mockFunction[IO[Map[Slug, Double]]]
-    val gauge      = new PositiveValuesLabeledGauge[IO, Slug](name, help, label, resetDataFetch, zerosCheckingInterval)
+    val gauge = new PositiveValuesLabeledGauge[IO, Slug](name, help, label, resetDataFetch, zerosCheckingInterval)
   }
 
   private lazy val waitingEventsGen: Gen[Map[Slug, Double]] = nonEmptySet {

@@ -71,8 +71,6 @@ private class DispatchRecoveryImpl[F[_]: Async: SessionResource: Logger: Queries
 }
 
 private object DispatchRecovery {
-  def apply[F[_]: Async: SessionResource: Logger: QueriesExecutionTimes]
-      : F[DispatchRecovery[F, MinProjectInfoEvent]] = MonadCancelThrow[F].catchNonFatal {
-    new DispatchRecoveryImpl[F]
-  }
+  def apply[F[_]: Async: SessionResource: Logger: QueriesExecutionTimes]: F[DispatchRecovery[F, MinProjectInfoEvent]] =
+    MonadCancelThrow[F].catchNonFatal(new DispatchRecoveryImpl[F])
 }
