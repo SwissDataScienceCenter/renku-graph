@@ -26,7 +26,7 @@ import eu.timepit.refined.api.Refined
 import eu.timepit.refined.collection.NonEmpty
 import io.renku.config.ConfigLoader.find
 import io.renku.logging.ExecutionTimeRecorder.ElapsedTime
-import io.renku.metrics.{Histogram, LabeledHistogram, SingleValueHistogram}
+import io.renku.metrics.Histogram
 import io.renku.tinytypes.{LongTinyType, TinyTypeFactory}
 import org.typelevel.log4cats.Logger
 
@@ -84,13 +84,7 @@ class ExecutionTimeRecorderImpl[F[_]: Sync: Clock: Logger](
 
   private def updateHistogram[A](maybeLabel: Option[String Refined NonEmpty]): ((FiniteDuration, A)) => F[Unit] = {
     case (duration, _) =>
-      (maybeHistogram, maybeLabel) match {
-        case Some(h: SingleValueHistogram[F]) -> None    => h.observe(duration)
-        case Some(h: LabeledHistogram[F]) -> Some(label) => h.observe(label.value, duration)
-        case Some(h: SingleValueHistogram[F]) -> Some(label) =>
-          Logger[F].error(s"Label $label sent for a Single Value Histogram ${h.name}")
-        case _ => ().pure[F]
-      }
+      maybeHistogram.fold(ifEmpty = ().pure[F])(_.observe(maybeLabel.map(_.value), duration))
   }
 }
 

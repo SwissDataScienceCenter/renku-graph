@@ -20,7 +20,7 @@ package io.renku.eventlog.events.consumers.statuschange
 
 import cats.MonadThrow
 import cats.data.Kleisli
-import cats.effect.MonadCancelThrow
+import cats.effect.Async
 import io.renku.db.{DbClient, SqlStatement}
 import io.renku.eventlog.TypeSerializers
 import io.renku.eventlog.metrics.QueriesExecutionTimes
@@ -34,12 +34,12 @@ private trait DeliveryInfoRemover[F[_]] {
 }
 
 private object DeliveryInfoRemover {
-  def apply[F[_]: MonadCancelThrow: QueriesExecutionTimes]: F[DeliveryInfoRemover[F]] = MonadThrow[F].catchNonFatal {
+  def apply[F[_]: Async: QueriesExecutionTimes]: F[DeliveryInfoRemover[F]] = MonadThrow[F].catchNonFatal {
     new DeliveryInfoRemoverImpl[F]
   }
 }
 
-private class DeliveryInfoRemoverImpl[F[_]: MonadCancelThrow: QueriesExecutionTimes]
+private class DeliveryInfoRemoverImpl[F[_]: Async: QueriesExecutionTimes]
     extends DbClient(Some(QueriesExecutionTimes[F]))
     with DeliveryInfoRemover[F]
     with TypeSerializers {

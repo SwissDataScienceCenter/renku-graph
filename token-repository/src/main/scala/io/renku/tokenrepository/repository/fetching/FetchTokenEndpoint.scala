@@ -20,7 +20,7 @@ package io.renku.tokenrepository.repository.fetching
 
 import cats.MonadThrow
 import cats.data.OptionT
-import cats.effect.MonadCancelThrow
+import cats.effect.Async
 import cats.syntax.all._
 import io.circe.syntax._
 import io.renku.data.Message
@@ -74,6 +74,6 @@ class FetchTokenEndpointImpl[F[_]: MonadThrow: Logger](tokenFinder: TokenFinder[
 }
 
 object FetchTokenEndpoint {
-  def apply[F[_]: MonadCancelThrow: Logger: SessionResource: QueriesExecutionTimes]: F[FetchTokenEndpoint[F]] =
+  def apply[F[_]: Async: Logger: SessionResource: QueriesExecutionTimes]: F[FetchTokenEndpoint[F]] =
     TokenFinder[F].map(new FetchTokenEndpointImpl[F](_))
 }

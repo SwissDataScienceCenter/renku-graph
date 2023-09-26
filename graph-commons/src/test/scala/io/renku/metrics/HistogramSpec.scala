@@ -24,14 +24,14 @@ import io.renku.generators.Generators.Implicits._
 import io.renku.generators.Generators._
 import io.renku.metrics.MetricsTools._
 import org.scalamock.scalatest.MockFactory
+import org.scalatest.TryValues
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
 
-import java.lang.Thread.sleep
 import scala.concurrent.duration._
 import scala.util.{Success, Try}
 
-class SingleValueHistogramSpec extends AnyWordSpec with MockFactory with should.Matchers {
+class SingleValueHistogramSpec extends AnyWordSpec with MockFactory with should.Matchers with TryValues {
 
   "apply" should {
 
@@ -53,36 +53,49 @@ class SingleValueHistogramSpec extends AnyWordSpec with MockFactory with should.
       }
   }
 
-  "startTimer -> observeDuration" should {
-
-    "collect measured duration" in new TestCase {
-
-      val histogram  = new SingleValueHistogramImpl[Try](name, help, Seq(0.1))
-      val underlying = histogram.wrappedCollector
-
-      val simulatedDuration = 500 millis
-      val observedDuration  = histogram.simulateDuration(simulatedDuration)
-
-      (observedDuration * 1000)              should be > simulatedDuration.toMillis.toDouble
-      underlying.collectAllSamples.last._3 shouldBe 1d
-    }
-  }
-
   "observe(Double)" should {
 
     "call the underlying impl" in new TestCase {
-      val histogram = new SingleValueHistogramImpl[Try](name, help, Seq(0.1))
+      val histogram = new SingleValueHistogramImpl[Try](name, help, Seq(0.1).some)
       histogram.observe(101d)
-      histogram.wrappedCollector.collectAllSamples.map(_._3) shouldBe List(0d, 1d)
+      histogram.collectAllSamples.map(toValue) shouldBe List(0d, 1d)
     }
   }
 
   "observe(FiniteDuration)" should {
 
     "convert the duration to seconds in Double format" in new TestCase {
-      val histogram = new SingleValueHistogramImpl[Try](name, help, Seq(0.1))
+      val histogram = new SingleValueHistogramImpl[Try](name, help, Seq(0.1).some)
       histogram.observe(101 millis)
-      histogram.wrappedCollector.collectAllSamples.map(_._3) shouldBe List(0d, 1d)
+      histogram.collectAllSamples.map(toValue) shouldBe List(0d, 1d)
+    }
+  }
+
+  "observe(Option[String], FiniteDuration)" should {
+
+    "update the underlying histogram in case of no label given" in {
+
+      val histogram = new SingleValueHistogramImpl[Try](nonBlankStrings().generateOne,
+                                                        nonBlankStrings().generateOne,
+                                                        maybeBuckets = Seq(0.1d).some
+      )
+
+      histogram.observe(maybeLabel = None, 101 millis).isSuccess shouldBe true
+
+      histogram.collectAllSamples.map(toValue) shouldBe List(0d, 1d)
+    }
+
+    "log an error if some label given" in {
+
+      val histogram = new SingleValueHistogramImpl[Try](nonBlankStrings().generateOne,
+                                                        nonBlankStrings().generateOne,
+                                                        maybeBuckets = Seq(0.1d).some
+      )
+
+      val label     = nonEmptyStrings().generateOne
+      val exception = histogram.observe(label.some, 101 millis).failure.exception
+
+      exception.getMessage shouldBe s"Label $label sent for a Single Value Histogram ${histogram.name}"
     }
   }
 
@@ -90,20 +103,9 @@ class SingleValueHistogramSpec extends AnyWordSpec with MockFactory with should.
     val name = nonBlankStrings().generateOne
     val help = sentences().generateOne
   }
-
-  private implicit class HistogramOps(histogram: SingleValueHistogram[Try]) {
-
-    def simulateDuration(duration: Duration): Double = {
-      val Success(timer) = histogram.startTimer()
-
-      sleep(duration.toMillis)
-
-      timer.observeDuration.fold(throw _, identity)
-    }
-  }
 }
 
-class LabeledHistogramSpec extends AnyWordSpec with MockFactory with should.Matchers {
+class LabeledHistogramSpec extends AnyWordSpec with MockFactory with should.Matchers with TryValues {
 
   "apply" should {
 
@@ -119,7 +121,7 @@ class LabeledHistogramSpec extends AnyWordSpec with MockFactory with should.Matc
 
         val labelName = nonBlankStrings().generateOne
 
-        val Success(histogram) = Histogram[Try](name, help, labelName, Seq(.1, 1))
+        val Success(histogram) = Histogram[Try](name, help, labelName, Seq(.1, 1), maybeThreshold = None)
 
         histogram.isInstanceOf[LabeledHistogram[Try]] shouldBe true
         histogram.name                                shouldBe name
@@ -127,90 +129,11 @@ class LabeledHistogramSpec extends AnyWordSpec with MockFactory with should.Matc
       }
   }
 
-  "startTimer -> observeDuration" should {
-
-    "collect measured duration for the label" in new TestCase {
-
-      val histogram  = new LabeledHistogramImpl[Try](name, help, label, Seq(0.1))
-      val underlying = histogram.wrappedCollector
-
-      val value             = nonEmptyStrings().generateOne
-      val simulatedDuration = 500 millis
-      val observedDuration  = histogram.simulateDuration(simulatedDuration, value)
-
-      (observedDuration * 1000)                       should be > simulatedDuration.toMillis.toDouble
-      underlying.collectValuesFor(label.value, value) should contain(observedDuration)
-    }
-
-    "collect measured time only for durations longer than threshold" in new TestCase {
-
-      val threshold  = 500 millis
-      val histogram  = new LabeledHistogramImpl[Try](name, help, label, Seq(0.1), maybeThreshold = threshold.some)
-      val underlying = histogram.wrappedCollector
-
-      // process below threshold
-      val value1                  = nonEmptyStrings().generateOne
-      val value1SimulatedDuration = threshold minus (200 millis)
-
-      val value1ObservedDuration = histogram.simulateDuration(value1SimulatedDuration, value1)
-
-      (value1ObservedDuration * 1000) should (
-        (be > value1SimulatedDuration.toMillis.toDouble) and (be < threshold.toMillis.toDouble)
-      )
-      underlying.collectValuesFor(label.value, value1) shouldBe Nil
-
-      // process above threshold
-      val value2                  = nonEmptyStrings().generateOne
-      val value2SimulatedDuration = threshold plus (200 millis)
-
-      val value2ObservedDuration = histogram.simulateDuration(value2SimulatedDuration, value2)
-
-      underlying.collectValuesFor(label.value, value2) should contain(value2ObservedDuration)
-
-      // another process below threshold
-      val value3                  = nonEmptyStrings().generateOne
-      val value3SimulatedDuration = threshold minus (200 millis)
-
-      histogram.simulateDuration(value3SimulatedDuration, value3)
-
-      underlying.collectValuesFor(label.value, value1) shouldBe Nil
-    }
-
-    "remove the collected label value once an observed duration for it gets below the threshold" in new TestCase {
-
-      val threshold  = 500 millis
-      val histogram  = new LabeledHistogramImpl[Try](name, help, label, Seq(0.1), maybeThreshold = threshold.some)
-      val underlying = histogram.wrappedCollector
-      val value      = nonEmptyStrings().generateOne
-
-      // process below threshold
-      val simulatedDuration1 = threshold minus (200 millis)
-
-      histogram.simulateDuration(simulatedDuration1, value)
-
-      underlying.collectValuesFor(label.value, value) shouldBe Nil
-
-      // process above threshold
-      val simulatedDuration2 = threshold plus (200 millis)
-
-      val observedDuration2 = histogram.simulateDuration(simulatedDuration2, value)
-
-      underlying.collectValuesFor(label.value, value) should contain(observedDuration2)
-
-      // another process below threshold
-      val simulatedDuration3 = threshold minus (200 millis)
-
-      histogram.simulateDuration(simulatedDuration3, value)
-
-      underlying.collectValuesFor(label.value, value) shouldBe Nil
-    }
-  }
-
   "observe(Double)" should {
 
     "store the value if no threshold given" in new TestCase {
 
-      val histogram = new LabeledHistogramImpl[Try](name, help, "label", Seq(0.1))
+      val histogram = new LabeledHistogramImpl[Try](name, help, "label", Seq(0.1).some)
 
       histogram.observe("label", 1.001d)
 
@@ -219,7 +142,8 @@ class LabeledHistogramSpec extends AnyWordSpec with MockFactory with should.Matc
 
     "store the value if threshold given but the value >= the threshold" in new TestCase {
 
-      val histogram = new LabeledHistogramImpl[Try](name, help, "label", Seq(0.1), maybeThreshold = (1 second).some)
+      val histogram =
+        new LabeledHistogramImpl[Try](name, help, "label", Seq(0.1).some, maybeThreshold = (1 second).some)
 
       histogram.observe("label", 1.001d)
 
@@ -228,7 +152,8 @@ class LabeledHistogramSpec extends AnyWordSpec with MockFactory with should.Matc
 
     "not store the value if threshold given and the value < the threshold" in new TestCase {
 
-      val histogram = new LabeledHistogramImpl[Try](name, help, "label", Seq(0.1), maybeThreshold = (1 second).some)
+      val histogram =
+        new LabeledHistogramImpl[Try](name, help, "label", Seq(0.1).some, maybeThreshold = (1 second).some)
 
       histogram.observe("label", .999d)
 
@@ -240,7 +165,7 @@ class LabeledHistogramSpec extends AnyWordSpec with MockFactory with should.Matc
 
     "store the value if no threshold given" in new TestCase {
 
-      val histogram = new LabeledHistogramImpl[Try](name, help, "label", Seq(0.1))
+      val histogram = new LabeledHistogramImpl[Try](name, help, "label", Seq(0.1).some)
 
       histogram.observe("label", 1001 millis)
 
@@ -249,7 +174,8 @@ class LabeledHistogramSpec extends AnyWordSpec with MockFactory with should.Matc
 
     "store the value if threshold given but the value >= the threshold" in new TestCase {
 
-      val histogram = new LabeledHistogramImpl[Try](name, help, "label", Seq(0.1), maybeThreshold = (1 second).some)
+      val histogram =
+        new LabeledHistogramImpl[Try](name, help, "label", Seq(0.1).some, maybeThreshold = (1 second).some)
 
       histogram.observe("label", 1001 millis)
 
@@ -258,7 +184,8 @@ class LabeledHistogramSpec extends AnyWordSpec with MockFactory with should.Matc
 
     "not store the value if threshold given and the value < the threshold" in new TestCase {
 
-      val histogram = new LabeledHistogramImpl[Try](name, help, "label", Seq(0.1), maybeThreshold = (1 second).some)
+      val histogram =
+        new LabeledHistogramImpl[Try](name, help, "label", Seq(0.1).some, maybeThreshold = (1 second).some)
 
       histogram.observe("label", 999 millis)
 
@@ -266,20 +193,40 @@ class LabeledHistogramSpec extends AnyWordSpec with MockFactory with should.Matc
     }
   }
 
-  private trait TestCase {
-    val label = nonBlankStrings().generateOne
-    val name  = nonBlankStrings().generateOne
-    val help  = sentences().generateOne
+  "observe(Option[String], FiniteDuration)" should {
+
+    "update the underlying histogram for the given label" in {
+
+      val histogram = new LabeledHistogramImpl[Try](nonBlankStrings().generateOne,
+                                                    nonBlankStrings().generateOne,
+                                                    nonBlankStrings().generateOne,
+                                                    maybeBuckets = Seq(0.1d).some
+      )
+
+      val label    = nonEmptyStrings().generateOne
+      val duration = 101 millis
+
+      histogram.observe(label.some, duration).success.value shouldBe ()
+
+      histogram.sumValuesFor(label) shouldBe duration.toMillis.toDouble / 1000
+    }
+
+    "do nothing in case no label given" in {
+
+      val histogram = new LabeledHistogramImpl[Try](nonBlankStrings().generateOne,
+                                                    nonBlankStrings().generateOne,
+                                                    nonBlankStrings().generateOne,
+                                                    maybeBuckets = Seq(0.1d).some
+      )
+
+      histogram.observe(None, durations().generateOne).success.value shouldBe ()
+
+      histogram.collectAllSamples shouldBe Seq.empty
+    }
   }
 
-  private implicit class HistogramOps(histogram: LabeledHistogram[Try]) {
-
-    def simulateDuration(duration: Duration, value: String): Double = {
-      val Success(timer) = histogram.startTimer(value)
-
-      sleep(duration.toMillis)
-
-      timer.observeDuration.fold(throw _, identity)
-    }
+  private trait TestCase {
+    val name = nonBlankStrings().generateOne
+    val help = sentences().generateOne
   }
 }

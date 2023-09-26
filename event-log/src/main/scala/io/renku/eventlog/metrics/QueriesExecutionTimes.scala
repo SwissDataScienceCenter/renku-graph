@@ -34,7 +34,7 @@ object QueriesExecutionTimes {
       name = "event_log_queries_execution_times",
       help = "Event Log queries execution times",
       labelName = "query_id",
-      buckets = Seq(.05, .1, .5, 1, 2.5, 5, 10, 50),
+      maybeBuckets = Seq(.05, .1, .5, 1, 2.5, 5, 10, 50).some,
       maybeThreshold = (750 millis).some
     ) with QueriesExecutionTimes[F]
   }.widen

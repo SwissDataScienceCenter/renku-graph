@@ -25,7 +25,7 @@ import eu.timepit.refined.api.Refined
 import eu.timepit.refined.auto._
 import eu.timepit.refined.collection.NonEmpty
 import io.renku.logging.ExecutionTimeRecorder
-import io.renku.metrics.LabeledHistogramImpl
+import io.renku.metrics.Histogram
 import org.typelevel.log4cats.Logger
 
 import scala.concurrent.duration._
@@ -39,18 +39,15 @@ object SparqlQueryTimeRecorder {
 
   import io.renku.metrics.MetricsRegistry
 
-  def create[F[_]: Sync: Logger: MetricsRegistry](): F[SparqlQueryTimeRecorder[F]] = MetricsRegistry[F]
-    .register {
-      new LabeledHistogramImpl[F](
-        name = "sparql_execution_times",
-        help = "Sparql execution times",
-        labelName = "query_id",
-        buckets = Seq(.05, .1, .5, 1, 2.5, 5, 10, 25, 50, 100),
-        maybeThreshold = (50 millis).some
-      )
-    }
-    .flatMap(histogram => ExecutionTimeRecorder[F](maybeHistogram = Some(histogram)))
-    .map(new SparqlQueryTimeRecorder(_))
+  def create[F[_]: Sync: Logger: MetricsRegistry](): F[SparqlQueryTimeRecorder[F]] =
+    Histogram[F](
+      name = "sparql_execution_times",
+      help = "Sparql execution times",
+      labelName = "query_id",
+      buckets = Seq(.05, .1, .5, 1, 2.5, 5, 10, 25, 50, 100),
+      maybeThreshold = (50 millis).some
+    ).flatMap(histogram => ExecutionTimeRecorder[F](maybeHistogram = Some(histogram)))
+      .map(new SparqlQueryTimeRecorder(_))
 
   def apply[F[_]](implicit ev: SparqlQueryTimeRecorder[F]): SparqlQueryTimeRecorder[F] = ev
 }

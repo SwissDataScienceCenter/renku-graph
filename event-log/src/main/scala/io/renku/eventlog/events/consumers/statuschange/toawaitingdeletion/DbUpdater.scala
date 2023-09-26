@@ -18,7 +18,7 @@
 
 package io.renku.eventlog.events.consumers.statuschange.toawaitingdeletion
 
-import cats.effect.MonadCancelThrow
+import cats.effect.Async
 import cats.kernel.Monoid
 import cats.syntax.all._
 import eu.timepit.refined.auto._
@@ -38,7 +38,7 @@ import skunk.implicits._
 
 import java.time.Instant
 
-private[statuschange] class DbUpdater[F[_]: MonadCancelThrow: QueriesExecutionTimes](
+private[statuschange] class DbUpdater[F[_]: Async: QueriesExecutionTimes](
     now: () => Instant = () => Instant.now
 ) extends DbClient(Some(QueriesExecutionTimes[F]))
     with statuschange.DBUpdater[F, ToAwaitingDeletion] {
