@@ -18,91 +18,20 @@
 
 package io.renku.metrics
 
-import cats.effect.IO
-import cats.effect.testing.scalatest.AsyncIOSpec
 import cats.syntax.all._
 import eu.timepit.refined.auto._
 import io.renku.generators.Generators.Implicits._
 import io.renku.generators.Generators._
-import io.renku.interpreters.TestLogger
-import io.renku.interpreters.TestLogger.Level.Error
 import io.renku.metrics.MetricsTools._
 import org.scalamock.scalatest.MockFactory
-import org.scalatest.BeforeAndAfterEach
+import org.scalatest.TryValues
 import org.scalatest.matchers.should
-import org.scalatest.wordspec.{AnyWordSpec, AsyncWordSpec}
+import org.scalatest.wordspec.AnyWordSpec
 
 import scala.concurrent.duration._
 import scala.util.{Success, Try}
 
-class HistogramSpec extends AsyncWordSpec with AsyncIOSpec with should.Matchers with BeforeAndAfterEach {
-
-  "observe" should {
-
-    "update the underlying histogram " +
-      "in case of a non-labelled histogram and no label given" in {
-
-        val histogram = new SingleValueHistogramImpl[IO](nonBlankStrings().generateOne,
-                                                         nonBlankStrings().generateOne,
-                                                         maybeBuckets = Seq(0.1d).some
-        )
-
-        histogram.observe(maybeLabel = None, 101 millis).assertNoException >>
-          IO(histogram.collectAllSamples.map(toValue)).asserting(_ shouldBe List(0d, 1d))
-      }
-
-    "update the underlying histogram " +
-      "in case of a labelled histogram and some label given" in {
-
-        val histogram = new LabeledHistogramImpl[IO](nonBlankStrings().generateOne,
-                                                     nonBlankStrings().generateOne,
-                                                     nonBlankStrings().generateOne,
-                                                     maybeBuckets = Seq(0.1d).some
-        )
-
-        val label    = nonEmptyStrings().generateOne
-        val duration = 101 millis
-
-        histogram.observe(label.some, duration).assertNoException >>
-          IO(histogram.sumValuesFor(label)).asserting(_ shouldBe duration.toMillis.toDouble / 1000)
-      }
-
-    "log an error " +
-      "in case of a non-labelled histogram and some label given" in {
-
-        val histogram = new SingleValueHistogramImpl[IO](nonBlankStrings().generateOne,
-                                                         nonBlankStrings().generateOne,
-                                                         maybeBuckets = Seq(0.1d).some
-        )
-
-        val label = nonEmptyStrings().generateOne
-        histogram.observe(label.some, 101 millis).assertNoException >>
-          logger.loggedOnlyF(Error(s"Label $label sent for a Single Value Histogram ${histogram.name}"))
-      }
-
-    "do nothing " +
-      "in case of a labelled histogram and no label given" in {
-
-        val histogram = new LabeledHistogramImpl[IO](nonBlankStrings().generateOne,
-                                                     nonBlankStrings().generateOne,
-                                                     nonBlankStrings().generateOne,
-                                                     maybeBuckets = Seq(0.1d).some
-        )
-
-        histogram.observe(None, durations().generateOne).assertNoException >>
-          IO(histogram.collectAllSamples).asserting(_ shouldBe Seq.empty)
-      }
-  }
-
-  private implicit lazy val logger: TestLogger[IO] = TestLogger()
-
-  protected override def beforeEach() = {
-    super.beforeEach()
-    logger.reset()
-  }
-}
-
-class SingleValueHistogramSpec extends AnyWordSpec with MockFactory with should.Matchers {
+class SingleValueHistogramSpec extends AnyWordSpec with MockFactory with should.Matchers with TryValues {
 
   "apply" should {
 
@@ -142,13 +71,41 @@ class SingleValueHistogramSpec extends AnyWordSpec with MockFactory with should.
     }
   }
 
+  "observe(Option[String], FiniteDuration)" should {
+
+    "update the underlying histogram in case of no label given" in {
+
+      val histogram = new SingleValueHistogramImpl[Try](nonBlankStrings().generateOne,
+                                                        nonBlankStrings().generateOne,
+                                                        maybeBuckets = Seq(0.1d).some
+      )
+
+      histogram.observe(maybeLabel = None, 101 millis).isSuccess shouldBe true
+
+      histogram.collectAllSamples.map(toValue) shouldBe List(0d, 1d)
+    }
+
+    "log an error if some label given" in {
+
+      val histogram = new SingleValueHistogramImpl[Try](nonBlankStrings().generateOne,
+                                                        nonBlankStrings().generateOne,
+                                                        maybeBuckets = Seq(0.1d).some
+      )
+
+      val label     = nonEmptyStrings().generateOne
+      val exception = histogram.observe(label.some, 101 millis).failure.exception
+
+      exception.getMessage shouldBe s"Label $label sent for a Single Value Histogram ${histogram.name}"
+    }
+  }
+
   private trait TestCase {
     val name = nonBlankStrings().generateOne
     val help = sentences().generateOne
   }
 }
 
-class LabeledHistogramSpec extends AnyWordSpec with MockFactory with should.Matchers {
+class LabeledHistogramSpec extends AnyWordSpec with MockFactory with should.Matchers with TryValues {
 
   "apply" should {
 
@@ -233,6 +190,38 @@ class LabeledHistogramSpec extends AnyWordSpec with MockFactory with should.Matc
       histogram.observe("label", 999 millis)
 
       histogram.wrappedCollector.labels("label").get().sum shouldBe 0d
+    }
+  }
+
+  "observe(Option[String], FiniteDuration)" should {
+
+    "update the underlying histogram for the given label" in {
+
+      val histogram = new LabeledHistogramImpl[Try](nonBlankStrings().generateOne,
+                                                    nonBlankStrings().generateOne,
+                                                    nonBlankStrings().generateOne,
+                                                    maybeBuckets = Seq(0.1d).some
+      )
+
+      val label    = nonEmptyStrings().generateOne
+      val duration = 101 millis
+
+      histogram.observe(label.some, duration).success.value shouldBe ()
+
+      histogram.sumValuesFor(label) shouldBe duration.toMillis.toDouble / 1000
+    }
+
+    "do nothing in case no label given" in {
+
+      val histogram = new LabeledHistogramImpl[Try](nonBlankStrings().generateOne,
+                                                    nonBlankStrings().generateOne,
+                                                    nonBlankStrings().generateOne,
+                                                    maybeBuckets = Seq(0.1d).some
+      )
+
+      histogram.observe(None, durations().generateOne).success.value shouldBe ()
+
+      histogram.collectAllSamples shouldBe Seq.empty
     }
   }
 

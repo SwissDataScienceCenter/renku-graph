@@ -20,6 +20,7 @@ package io.renku.metrics
 
 import cats.data.NonEmptyList
 import cats.effect.IO
+import cats.syntax.all._
 import eu.timepit.refined.api.Refined
 import eu.timepit.refined.auto._
 import eu.timepit.refined.collection.NonEmpty
@@ -70,6 +71,9 @@ class TestLabeledHistogram(labelName: String) extends LabeledHistogram[IO] with 
     IO {
       wrappedCollector.labels(labelValue).observe(amt)
     }
+
+  override def observe(maybeLabel: Option[String], duration: FiniteDuration): IO[Unit] =
+    maybeLabel.map(observe(_, duration)).getOrElse(().pure[IO])
 }
 
 object TestLabeledHistogram {

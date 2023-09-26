@@ -18,7 +18,6 @@
 
 package io.renku.logging
 
-import cats.Applicative
 import cats.effect.{IO, Temporal}
 import cats.syntax.all._
 import com.typesafe.config.ConfigFactory
@@ -38,7 +37,6 @@ import org.scalamock.scalatest.AsyncMockFactory
 import org.scalatest.BeforeAndAfterEach
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AsyncWordSpec
-import org.typelevel.log4cats.Logger
 
 import scala.concurrent.duration._
 import scala.jdk.CollectionConverters._
@@ -84,12 +82,8 @@ class ExecutionTimeRecorderSpec
 
       val blockExecutionTime = positiveInts(max = 100).generateOne.value
       (histogram
-        .observe(_: Option[String], _: FiniteDuration)(_: Logger[IO], _: Applicative[IO]))
-        .expects(
-          where((l: Option[String], amt: FiniteDuration, _: Logger[IO], _: Applicative[IO]) =>
-            l.isEmpty && amt.toMillis >= blockExecutionTime
-          )
-        )
+        .observe(_: Option[String], _: FiniteDuration))
+        .expects(where((l: Option[String], amt: FiniteDuration) => l.isEmpty && amt.toMillis >= blockExecutionTime))
         .returning(().pure[IO])
 
       executionTimeRecorder
@@ -110,9 +104,9 @@ class ExecutionTimeRecorderSpec
 
       val blockExecutionTime = positiveInts(max = 100).generateOne.value
       (histogram
-        .observe(_: Option[String], _: FiniteDuration)(_: Logger[IO], _: Applicative[IO]))
+        .observe(_: Option[String], _: FiniteDuration))
         .expects(
-          where((l: Option[String], amt: FiniteDuration, _: Logger[IO], _: Applicative[IO]) =>
+          where((l: Option[String], amt: FiniteDuration) =>
             l == Option(label.value) && amt.toMillis >= blockExecutionTime
           )
         )

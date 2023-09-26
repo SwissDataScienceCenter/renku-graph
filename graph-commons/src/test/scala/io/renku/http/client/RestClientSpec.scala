@@ -18,7 +18,6 @@
 
 package io.renku.http.client
 
-import cats.Applicative
 import cats.effect.{IO, Ref}
 import cats.syntax.all._
 import com.github.tomakehurst.wiremock.client.WireMock._
@@ -396,8 +395,8 @@ class RestClientSpec
 
     def givenHistogramObservesExecutionTime(maybeLabel: Option[String]) =
       (histogram
-        .observe(_: Option[String], _: FiniteDuration)(_: Logger[IO], _: Applicative[IO]))
-        .expects(maybeLabel, *, *, *)
+        .observe(_: Option[String], _: FiniteDuration))
+        .expects(maybeLabel, *)
         .returning(().pure[IO])
   }
 

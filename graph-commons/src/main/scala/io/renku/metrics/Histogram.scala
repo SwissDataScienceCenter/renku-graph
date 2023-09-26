@@ -18,24 +18,16 @@
 
 package io.renku.metrics
 
+import cats.MonadThrow
 import cats.syntax.all._
-import cats.{Applicative, MonadThrow}
 import eu.timepit.refined.api.Refined
 import eu.timepit.refined.collection.NonEmpty
 import io.prometheus.client.{Histogram => LibHistogram}
-import org.typelevel.log4cats.Logger
 
 import scala.concurrent.duration.{Duration, FiniteDuration}
 
 trait Histogram[F[_]] extends MetricsCollector {
-  def observe(maybeLabel: Option[String], duration: FiniteDuration)(implicit L: Logger[F], A: Applicative[F]): F[Unit] =
-    this -> maybeLabel match {
-      case (h: SingleValueHistogram[F]) -> None    => h.observe(duration)
-      case (h: LabeledHistogram[F]) -> Some(label) => h.observe(label, duration)
-      case (h: SingleValueHistogram[F]) -> Some(label) =>
-        L.error(s"Label $label sent for a Single Value Histogram ${h.name}")
-      case _ => ().pure[F]
-    }
+  def observe(maybeLabel: Option[String], duration: FiniteDuration): F[Unit]
 }
 
 trait SingleValueHistogram[F[_]] extends Histogram[F] {
@@ -67,6 +59,11 @@ class SingleValueHistogramImpl[F[_]: MonadThrow](val name: String Refined NonEmp
   override def observe(amt: Double): F[Unit] = MonadThrow[F].catchNonFatal {
     wrappedCollector.observe(amt)
   }
+
+  override def observe(maybeLabel: Option[String], duration: FiniteDuration): F[Unit] =
+    maybeLabel.fold(ifEmpty = observe(duration)) { label =>
+      new Exception(s"Label $label sent for a Single Value Histogram $name").raiseError[F, Unit]
+    }
 }
 
 trait LabeledHistogram[F[_]] extends Histogram[F] {
@@ -106,6 +103,9 @@ class LabeledHistogramImpl[F[_]: MonadThrow](val name: String Refined NonEmpty,
         wrappedCollector.labels(labelValue).observe(amt)
       else ()
     }
+
+  override def observe(maybeLabel: Option[String], duration: FiniteDuration): F[Unit] =
+    maybeLabel.map(observe(_, duration)).getOrElse(().pure[F])
 }
 
 object Histogram {
