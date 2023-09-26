@@ -66,7 +66,7 @@ class ProjectFunctionsSpec extends AnyWordSpec with should.Matchers with ScalaCh
 
         val updatedProject = update(entitiesOldMember.person, newPerson)(project)
 
-        updatedProject.members      shouldBe project.members - entitiesOldMember + entitiesOldMember.copy(person = newPerson)
+        updatedProject.members shouldBe project.members - entitiesOldMember + entitiesOldMember.copy(person = newPerson)
         updatedProject.maybeCreator shouldBe Some(newPerson)
       }
     }

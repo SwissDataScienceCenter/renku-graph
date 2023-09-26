@@ -18,7 +18,7 @@
 
 package io.renku.tokenrepository.repository.creation
 
-import cats.effect.MonadCancelThrow
+import cats.effect.Async
 import io.renku.db.DbClient
 import io.renku.graph.model.projects
 import io.renku.tokenrepository.repository.ProjectsTokensDB.SessionResource
@@ -30,11 +30,11 @@ private trait PersistedSlugFinder[F[_]] {
 }
 
 private object PersistedSlugFinder {
-  def apply[F[_]: MonadCancelThrow: SessionResource: QueriesExecutionTimes]: PersistedSlugFinder[F] =
+  def apply[F[_]: Async: SessionResource: QueriesExecutionTimes]: PersistedSlugFinder[F] =
     new PersistedSlugFinderImpl[F]
 }
 
-private class PersistedSlugFinderImpl[F[_]: MonadCancelThrow: SessionResource: QueriesExecutionTimes]
+private class PersistedSlugFinderImpl[F[_]: Async: SessionResource: QueriesExecutionTimes]
     extends DbClient[F](Some(QueriesExecutionTimes[F]))
     with PersistedSlugFinder[F]
     with TokenRepositoryTypeSerializers {

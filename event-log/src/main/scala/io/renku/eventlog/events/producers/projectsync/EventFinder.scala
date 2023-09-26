@@ -21,7 +21,7 @@ package projectsync
 
 import cats.MonadThrow
 import cats.data.Kleisli
-import cats.effect.MonadCancelThrow
+import cats.effect.Async
 import cats.syntax.all._
 import io.renku.db.{DbClient, SqlStatement}
 import io.renku.eventlog.EventLogDB.SessionResource
@@ -34,7 +34,7 @@ import skunk.implicits._
 
 import java.time.Instant
 
-private class EventFinderImpl[F[_]: MonadCancelThrow: SessionResource: QueriesExecutionTimes](
+private class EventFinderImpl[F[_]: Async: SessionResource: QueriesExecutionTimes](
     now: () => Instant = () => Instant.now
 ) extends DbClient(Some(QueriesExecutionTimes[F]))
     with EventFinder[F, ProjectSyncEvent]
@@ -138,6 +138,6 @@ private class EventFinderImpl[F[_]: MonadCancelThrow: SessionResource: QueriesEx
 }
 
 private object EventFinder {
-  def apply[F[_]: MonadCancelThrow: SessionResource: QueriesExecutionTimes]: F[EventFinder[F, ProjectSyncEvent]] =
+  def apply[F[_]: Async: SessionResource: QueriesExecutionTimes]: F[EventFinder[F, ProjectSyncEvent]] =
     MonadThrow[F].catchNonFatal(new EventFinderImpl[F]())
 }

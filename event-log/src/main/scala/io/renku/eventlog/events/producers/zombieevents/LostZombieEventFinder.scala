@@ -20,7 +20,7 @@ package io.renku.eventlog.events.producers.zombieevents
 
 import cats.MonadThrow
 import cats.data.Kleisli
-import cats.effect.MonadCancelThrow
+import cats.effect.Async
 import cats.syntax.all._
 import io.renku.db.{DbClient, SqlStatement}
 import io.renku.eventlog.EventLogDB.SessionResource
@@ -38,7 +38,7 @@ import skunk.implicits._
 import java.time.Duration
 import java.time.Instant.now
 
-private class LostZombieEventFinder[F[_]: MonadCancelThrow: SessionResource: QueriesExecutionTimes]
+private class LostZombieEventFinder[F[_]: Async: SessionResource: QueriesExecutionTimes]
     extends DbClient(Some(QueriesExecutionTimes[F]))
     with producers.EventFinder[F, ZombieEvent]
     with ZombieEventSubProcess
@@ -105,6 +105,6 @@ private class LostZombieEventFinder[F[_]: MonadCancelThrow: SessionResource: Que
 }
 
 private object LostZombieEventFinder {
-  def apply[F[_]: MonadCancelThrow: SessionResource: QueriesExecutionTimes]: F[producers.EventFinder[F, ZombieEvent]] =
+  def apply[F[_]: Async: SessionResource: QueriesExecutionTimes]: F[producers.EventFinder[F, ZombieEvent]] =
     MonadThrow[F].catchNonFatal(new LostZombieEventFinder[F])
 }

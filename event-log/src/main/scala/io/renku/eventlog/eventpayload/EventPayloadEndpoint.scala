@@ -18,7 +18,7 @@
 
 package io.renku.eventlog.eventpayload
 
-import cats.effect.Concurrent
+import cats.effect.{Async, Concurrent}
 import cats.syntax.all._
 import io.renku.data.Message
 import io.renku.eventlog.EventLogDB.SessionResource
@@ -38,7 +38,7 @@ trait EventPayloadEndpoint[F[_]] {
 
 object EventPayloadEndpoint {
 
-  def apply[F[_]: Concurrent: SessionResource: Logger: QueriesExecutionTimes]: EventPayloadEndpoint[F] =
+  def apply[F[_]: Async: SessionResource: Logger: QueriesExecutionTimes]: EventPayloadEndpoint[F] =
     apply[F](EventPayloadFinder[F])
 
   def apply[F[_]: Concurrent: Logger](payloadFinder: EventPayloadFinder[F]): EventPayloadEndpoint[F] =

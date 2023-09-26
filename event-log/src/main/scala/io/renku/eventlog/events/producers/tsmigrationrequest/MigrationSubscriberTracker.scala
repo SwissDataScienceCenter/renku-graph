@@ -20,7 +20,7 @@ package io.renku.eventlog.events.producers
 package tsmigrationrequest
 
 import cats.data.Kleisli
-import cats.effect.MonadCancelThrow
+import cats.effect.{Async, MonadCancelThrow}
 import cats.syntax.all._
 import io.renku.config.ServiceVersion
 import io.renku.db.{DbClient, SqlStatement}
@@ -35,7 +35,7 @@ import skunk.implicits._
 
 import java.time.Instant
 
-private class MigrationSubscriberTracker[F[_]: MonadCancelThrow: SessionResource: QueriesExecutionTimes](
+private class MigrationSubscriberTracker[F[_]: Async: SessionResource: QueriesExecutionTimes](
     now: () => Instant = () => Instant.now()
 ) extends DbClient(Some(QueriesExecutionTimes[F]))
     with events.producers.SubscriberTracker[F, MigrationSubscriber]
@@ -106,6 +106,6 @@ private class MigrationSubscriberTracker[F[_]: MonadCancelThrow: SessionResource
 }
 
 private object MigrationSubscriberTracker {
-  def apply[F[_]: MonadCancelThrow: SessionResource: QueriesExecutionTimes]: F[MigrationSubscriberTracker[F]] =
+  def apply[F[_]: Async: SessionResource: QueriesExecutionTimes]: F[MigrationSubscriberTracker[F]] =
     MonadCancelThrow[F].catchNonFatal(new MigrationSubscriberTracker[F]())
 }
