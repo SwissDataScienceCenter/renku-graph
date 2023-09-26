@@ -106,7 +106,7 @@ object Microservice extends IOMicroservice {
     awaitingGenerationSubscription <- awaitinggeneration.SubscriptionFactory[IO]
     membersSyncSubscription        <- membersync.SubscriptionFactory[IO](tsWriteLock, projectSparqlClient)
     triplesGeneratedSubscription   <- triplesgenerated.SubscriptionFactory[IO](tsWriteLock, projectSparqlClient)
-    cleanUpSubscription            <- cleanup.SubscriptionFactory[IO](tsWriteLock)
+    cleanUpSubscription            <- cleanup.SubscriptionFactory[IO](tsWriteLock, projectSparqlClient)
     minProjectInfoSubscription     <- minprojectinfo.SubscriptionFactory[IO](tsWriteLock, projectSparqlClient)
     migrationRequestSubscription   <- tsmigrationrequest.SubscriptionFactory[IO](config)
     syncRepoMetadataSubscription   <- syncrepometadata.SubscriptionFactory[IO](config, tsWriteLock)

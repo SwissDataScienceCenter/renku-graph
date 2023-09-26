@@ -21,9 +21,10 @@ package io.renku.triplesgenerator.events.consumers.cleanup
 import cats.effect.Async
 import cats.syntax.all._
 import io.renku.events.consumers.Project
+import io.renku.graph.model.RenkuUrl
 import io.renku.metrics.MetricsRegistry
 import io.renku.triplesgenerator.events.consumers.EventStatusUpdater
-import io.renku.triplesstore.SparqlQueryTimeRecorder
+import io.renku.triplesstore.{ProjectSparqlClient, SparqlQueryTimeRecorder}
 import org.typelevel.log4cats.Logger
 
 import scala.util.control.NonFatal
@@ -48,8 +49,10 @@ private class EventProcessorImpl[F[_]: Async: Logger](tsCleaner: namedgraphs.TSC
 }
 
 private object EventProcessor {
-  def apply[F[_]: Async: Logger: MetricsRegistry: SparqlQueryTimeRecorder]: F[EventProcessor[F]] = for {
+  def apply[F[_]: Async: Logger: MetricsRegistry: SparqlQueryTimeRecorder](
+      projectSparqlClient: ProjectSparqlClient[F]
+  )(implicit renkuUrl: RenkuUrl): F[EventProcessor[F]] = for {
     eventStatusUpdater <- EventStatusUpdater(categoryName)
-    tsCleaner          <- namedgraphs.TSCleaner.default[F]
+    tsCleaner          <- namedgraphs.TSCleaner.default[F](projectSparqlClient)
   } yield new EventProcessorImpl[F](tsCleaner, eventStatusUpdater)
 }
