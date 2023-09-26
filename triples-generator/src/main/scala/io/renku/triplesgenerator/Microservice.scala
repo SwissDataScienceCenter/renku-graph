@@ -29,7 +29,8 @@ import io.renku.db.{SessionPoolResource, SessionResource}
 import io.renku.entities.viewings
 import io.renku.events.consumers
 import io.renku.events.consumers.EventConsumersRegistry
-import io.renku.graph.model.projects
+import io.renku.graph.config.RenkuUrlLoader
+import io.renku.graph.model.{RenkuUrl, projects}
 import io.renku.graph.tokenrepository.AccessTokenFinder
 import io.renku.http.client.GitLabClient
 import io.renku.http.server.HttpServer
@@ -89,6 +90,7 @@ object Microservice extends IOMicroservice {
     implicit0(gc: GitLabClient[IO])         <- GitLabClient[IO]()
     implicit0(acf: AccessTokenFinder[IO])   <- AccessTokenFinder[IO]()
     implicit0(rp: ReProvisioningStatus[IO]) <- ReProvisioningStatus[IO]()
+    implicit0(rurl: RenkuUrl)               <- RenkuUrlLoader[IO](config)
 
     _ <- TgLockDB.migrate[IO](dbSessionPool, 20.seconds)
 
@@ -103,9 +105,9 @@ object Microservice extends IOMicroservice {
     cliVersionCompatChecker        <- CliVersionCompatibilityChecker[IO](config)
     awaitingGenerationSubscription <- awaitinggeneration.SubscriptionFactory[IO]
     membersSyncSubscription        <- membersync.SubscriptionFactory[IO](tsWriteLock, projectSparqlClient)
-    triplesGeneratedSubscription   <- triplesgenerated.SubscriptionFactory[IO](tsWriteLock)
+    triplesGeneratedSubscription   <- triplesgenerated.SubscriptionFactory[IO](tsWriteLock, projectSparqlClient)
     cleanUpSubscription            <- cleanup.SubscriptionFactory[IO](tsWriteLock)
-    minProjectInfoSubscription     <- minprojectinfo.SubscriptionFactory[IO](tsWriteLock)
+    minProjectInfoSubscription     <- minprojectinfo.SubscriptionFactory[IO](tsWriteLock, projectSparqlClient)
     migrationRequestSubscription   <- tsmigrationrequest.SubscriptionFactory[IO](config)
     syncRepoMetadataSubscription   <- syncrepometadata.SubscriptionFactory[IO](config, tsWriteLock)
     projectActivationsSubscription <- viewings.collector.projects.activated.SubscriptionFactory[IO](projectConnConfig)
@@ -126,8 +128,9 @@ object Microservice extends IOMicroservice {
                                 viewingDeletionSubscription
                               )
     serviceReadinessChecker <- ServiceReadinessChecker[IO](ServicePort)
-    microserviceRoutes      <- MicroserviceRoutes[IO](eventConsumersRegistry, tsWriteLock, config).map(_.routes)
-    termSignal              <- SignallingRef.of[IO, Boolean](false)
+    microserviceRoutes <-
+      MicroserviceRoutes[IO](eventConsumersRegistry, tsWriteLock, projectSparqlClient, config).map(_.routes)
+    termSignal <- SignallingRef.of[IO, Boolean](false)
     exitCode <- microserviceRoutes.use { routes =>
                   new MicroserviceRunner[IO](
                     serviceReadinessChecker,
