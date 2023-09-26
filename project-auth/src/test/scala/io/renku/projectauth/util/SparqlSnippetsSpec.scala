@@ -66,12 +66,12 @@ class SparqlSnippetsSpec extends AsyncFlatSpec with AsyncIOSpec with ProjectAuth
   }
 
   it should "select public projects if no user is given" in {
-    clientAndData.use { case (client, _) =>
+    clientAndData.use { case (client, data) =>
       for {
         r <- client.queryDecode[ProjectAuthDataRow](
                selectFragment(SparqlSnippets.visibleProjects(None, Visibility.all))
              )
-        _ = r.map(_.visibility).toSet shouldBe Set(Visibility.Public)
+        _ = r.map(_.visibility).toSet shouldBe data.filter(_.visibility == Visibility.Public).map(_.visibility).toSet
       } yield ()
     }
   }
@@ -147,15 +147,15 @@ class SparqlSnippetsSpec extends AsyncFlatSpec with AsyncIOSpec with ProjectAuth
 
   it should "update visibility on a project" in {
     clientAndData.use { case (client, data) =>
-      val el = data.head
+      val el       = data.head
       val otherVis = (Visibility.all - el.visibility).head
       for {
         _ <- client.update(
-          sparql"""${"renku" -> Schemas.renku}
-                  |${"schema" -> Schemas.schema}
-                  |${SparqlSnippets.changeVisibility(el.slug, otherVis)}
-                  |""".stripMargin
-        )
+               sparql"""${"renku" -> Schemas.renku}
+                       |${"schema" -> Schemas.schema}
+                       |${SparqlSnippets.changeVisibility(el.slug, otherVis)}
+                       |""".stripMargin
+             )
         r <- ProjectAuthService(client, renkuUrl).getAll(QueryFilter.all.withSlug(el.slug)).compile.lastOrError
         _ = r.visibility shouldBe otherVis
       } yield ()
@@ -182,7 +182,10 @@ class SparqlSnippetsSpec extends AsyncFlatSpec with AsyncIOSpec with ProjectAuth
   }
 
   def projectFilter(user: Option[persons.GitLabId], givenVisibility: Set[Visibility])(p: ProjectAuthData): Boolean =
-    givenVisibility.contains(p.visibility) &&
-      (p.visibility != Visibility.Internal || user.isDefined) &&
-      (p.visibility != Visibility.Private || user.exists(id => p.members.map(_.gitLabId).contains(id)))
+    givenVisibility.contains(p.visibility) && (p.visibility match {
+      case Visibility.Public   => true
+      case Visibility.Internal => user.isDefined
+      case Visibility.Private  => user.exists(id => p.members.map(_.gitLabId).contains(id))
+    })
+
 }
