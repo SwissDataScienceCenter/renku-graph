@@ -21,7 +21,9 @@ package io.renku.entities.viewings.search
 import eu.timepit.refined.auto._
 import io.renku.entities.viewings.search.RecentEntitiesFinder.{Criteria, EntityType}
 import io.renku.graph.model.entities.Person
+import io.renku.graph.model.projects.Visibility
 import io.renku.graph.model.{GraphClass, Schemas}
+import io.renku.projectauth.util.SparqlSnippets
 import io.renku.triplesstore.SparqlQuery
 import io.renku.triplesstore.SparqlQuery.Prefixes
 import io.renku.triplesstore.client.syntax.FragmentStringContext
@@ -57,6 +59,8 @@ object DatasetQuery extends (Criteria => Option[SparqlQuery]) {
                |      ?projectLink renku:dataset ?datasetId;
                |                    renku:project ?projectId.
                |    }
+               |
+               |    ${SparqlSnippets.visibleProjects(Some(criteria.authUser.id), Visibility.all)}
                |    
                |    Graph ${GraphClass.Persons.id} {
                |      ?personId a schema:Person;
