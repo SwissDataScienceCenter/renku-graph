@@ -128,8 +128,7 @@ class SparqlSnippetsSpec extends AsyncFlatSpec with AsyncIOSpec with ProjectAuth
              )
         expected = data.filter(projectFilter(None, Visibility.all)).sortBy(_.slug)
         found    = Stream.emits(r).through(ProjectAuthDataRow.collect).toList
-        _        = found                         shouldBe expected
-        _        = found.map(_.visibility).toSet shouldBe Set(Visibility.Public)
+        _        = found shouldBe expected
       } yield ()
     }
   }
