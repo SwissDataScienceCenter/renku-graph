@@ -51,8 +51,11 @@ class SparqlSnippetsSpec extends AsyncFlatSpec with AsyncIOSpec with ProjectAuth
             |  Graph ${ProjectAuth.graph} {
             |     ${SparqlSnippets.projectId} a schema:Project;
             |         renku:visibility ?visibility;
-            |         renku:slug ?slug;
-            |         renku:memberRole ?memberRole.
+            |         renku:slug ?slug.
+            |
+            |         Optional {
+            |           ${SparqlSnippets.projectId} renku:memberRole ?memberRole.
+            |         }
             |  }
             |
             |  $snippet
@@ -139,6 +142,23 @@ class SparqlSnippetsSpec extends AsyncFlatSpec with AsyncIOSpec with ProjectAuth
                selectFragment(SparqlSnippets.visibleProjects(user, Set.empty))
              )
         expected = data.filter(projectFilter(user, Visibility.all)).sortBy(_.slug)
+        found    = Stream.emits(r).through(ProjectAuthDataRow.collect).toList
+        _        = found shouldBe expected
+      } yield ()
+    }
+  }
+
+  it should "select possible projects when no members exist" in {
+    def clientAndData = withDataset(datasetName).evalMap { sc =>
+      val pa = ProjectAuthService(sc, renkuUrl)
+      insertData(pa, randomData(10).map(_.copy(members = Set.empty))).map(data => (sc, data))
+    }
+    clientAndData.use { case (client, data) =>
+      for {
+        r <- client.queryDecode[ProjectAuthDataRow](
+               selectFragment(SparqlSnippets.visibleProjects(None, Visibility.all))
+             )
+        expected = data.filter(projectFilter(None, Visibility.all)).sortBy(_.slug)
         found    = Stream.emits(r).through(ProjectAuthDataRow.collect).toList
         _        = found shouldBe expected
       } yield ()
