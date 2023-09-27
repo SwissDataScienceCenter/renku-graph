@@ -18,6 +18,7 @@
 
 package io.renku.core.client
 
+import cats.MonadThrow
 import cats.effect.Async
 import cats.syntax.all._
 import io.circe.Decoder.decodeList
@@ -35,6 +36,7 @@ import org.http4s.client.dsl.Http4sClientDsl
 import org.http4s.dsl.Http4sDsl
 import org.typelevel.ci._
 import org.typelevel.log4cats.Logger
+import scodec.bits.ByteVector
 
 private trait LowLevelApis[F[_]] {
   def getApiVersion(uri: RenkuCoreUri.ForSchema): F[Result[SchemaApiVersions]]
@@ -78,22 +80,18 @@ private class LowLevelApisImpl[F[_]: Async: Logger](coreLatestUri: RenkuCoreUri.
                                  projectGitHttpUrl: projects.GitHttpUrl,
                                  userInfo:          UserInfo,
                                  accessToken:       AccessToken
-  ): F[Result[ProjectMigrationCheck]] = {
+  ): F[Result[ProjectMigrationCheck]] =
+    toUserHeaders(userInfo) >>= { userHeaders =>
+      val uri = (coreUri.uri / "renku" / "cache.migrations_check")
+        .withQueryParam("git_url", projectGitHttpUrl.value)
 
-    val uri = (coreUri.uri / "renku" / "cache.migrations_check")
-      .withQueryParam("git_url", projectGitHttpUrl.value)
-
-    send(
-      request(GET, uri, accessToken)
-        .putHeaders(Header.Raw(ci"renku-user-email", userInfo.email.value))
-        .putHeaders(Header.Raw(ci"renku-user-fullname", userInfo.name.value))
-    ) {
-      case (Ok, _, resp) =>
-        toResult[ProjectMigrationCheck](resp)
-      case reqInfo =>
-        toFailure[ProjectMigrationCheck](s"Migration check for $projectGitHttpUrl failed")(reqInfo)
+      send(request(GET, uri, accessToken).putHeaders(userHeaders)) {
+        case (Ok, _, resp) =>
+          toResult[ProjectMigrationCheck](resp)
+        case reqInfo =>
+          toFailure[ProjectMigrationCheck](s"Migration check for $projectGitHttpUrl failed")(reqInfo)
+      }
     }
-  }
 
   override def getVersions: F[Result[List[SchemaVersion]]] = {
     val decoder = Decoder.instance[List[SchemaVersion]] { res =>
@@ -110,29 +108,45 @@ private class LowLevelApisImpl[F[_]: Async: Logger](coreLatestUri: RenkuCoreUri.
   }
 
   override def postProjectCreate(newProject: NewProject, accessToken: UserAccessToken): F[Result[Unit]] =
-    send(
-      request(POST, coreLatestUri.uri / "renku" / "templates.create_project", accessToken)
-        .withEntity(newProject.asJson)
-        .putHeaders(Header.Raw(ci"renku-user-email", newProject.userInfo.email.value))
-        .putHeaders(Header.Raw(ci"renku-user-fullname", newProject.userInfo.name.value))
-    ) {
-      case (Ok, _, resp) => toResult[Unit](resp)(toSuccessfulCreation)
-      case reqInfo       => toFailure[Unit]("Submitting Project Creation payload failed")(reqInfo)
+    toUserHeaders(newProject.userInfo) >>= { userHeaders =>
+      send(
+        request(POST, coreLatestUri.uri / "renku" / "templates.create_project", accessToken)
+          .withEntity(newProject.asJson)
+          .putHeaders(userHeaders)
+      ) {
+        case (Ok, _, resp) => toResult[Unit](resp)(toSuccessfulCreation)
+        case reqInfo       => toFailure[Unit]("Submitting Project Creation payload failed")(reqInfo)
+      }
     }
 
   override def postProjectUpdate(uri:         RenkuCoreUri.Versioned,
                                  updates:     ProjectUpdates,
                                  accessToken: UserAccessToken
   ): F[Result[Branch]] =
-    send(
-      request(POST, uri.uri / "renku" / uri.apiVersion / "project.edit", accessToken)
-        .withEntity(updates.asJson)
-        .putHeaders(Header.Raw(ci"renku-user-email", updates.userInfo.email.value))
-        .putHeaders(Header.Raw(ci"renku-user-fullname", updates.userInfo.name.value))
-    ) {
-      case (Ok, _, resp) => toResult[Branch](resp)(toSuccessfulEdit)
-      case reqInfo       => toFailure[Branch]("Submitting Project Edit payload failed")(reqInfo)
+    toUserHeaders(updates.userInfo) >>= { userHeaders =>
+      send(
+        request(POST, uri.uri / "renku" / uri.apiVersion / "project.edit", accessToken)
+          .withEntity(updates.asJson)
+          .putHeaders(userHeaders)
+      ) {
+        case (Ok, _, resp) => toResult[Branch](resp)(toSuccessfulEdit)
+        case reqInfo       => toFailure[Branch]("Submitting Project Edit payload failed")(reqInfo)
+      }
     }
+
+  private def toUserHeaders(userInfo: UserInfo): F[Seq[Header.Raw]] =
+    (base64Encode(userInfo.email.value), base64Encode(userInfo.name.value))
+      .mapN { case (encEmail, encName) =>
+        Seq(
+          Header.Raw(ci"renku-user-email", encEmail),
+          Header.Raw(ci"renku-user-fullname", encName)
+        )
+      }
+
+  private def base64Encode(v: String): F[String] =
+    MonadThrow[F].fromEither(
+      ByteVector.encodeUtf8(v).map(_.toBase64)
+    )
 
   private lazy val toSuccessfulCreation: Decoder[Unit] = Decoder.instance { cur =>
     def failure[A](message: Option[String] = None) = {
