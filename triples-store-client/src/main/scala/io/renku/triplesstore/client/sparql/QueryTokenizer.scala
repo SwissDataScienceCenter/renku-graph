@@ -25,8 +25,11 @@ import org.apache.lucene.util.AttributeFactory.StaticImplementationAttributeFact
 
 import java.io.StringReader
 
-trait QueryTokenizer {
+trait QueryTokenizer { self =>
   def split(input: String): List[String]
+
+  final def append(next: QueryTokenizer): QueryTokenizer =
+    (input: String) => self.split(input).flatMap(next.split)
 }
 
 object QueryTokenizer {
@@ -53,4 +56,10 @@ object QueryTokenizer {
       loop(Nil).reverse
     }
   }
+
+  def splitOn(c: Char): QueryTokenizer =
+    (input: String) => input.split(c).toList
+
+  def extended: QueryTokenizer =
+    luceneStandard.append(splitOn('_'))
 }

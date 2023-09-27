@@ -34,6 +34,11 @@ class QueryTokenizerSpec extends AnyFlatSpec with should.Matchers {
     tokenizer.split(input) shouldBe List("one", "two", "three")
   }
 
+  it should "split on underscores" in {
+    val input = "01_one_two"
+    QueryTokenizer.extended.split(input) shouldBe List("01", "one", "two")
+  }
+
   it should "return different data" in {
     val input = "one 1 two 2-3-4 \"http://hello.com\" next~"
     tokenizer.split(input) shouldBe List("one", "1", "two", "2", "3", "4", "http", "hello.com", "next")
