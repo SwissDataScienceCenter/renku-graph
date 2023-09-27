@@ -96,7 +96,7 @@ private class TransformationStepsRunnerImpl[F[_]: MonadThrow](
       project.visibility
     )
     EitherT
-      .rightT[F, ProcessingRecoverableError](
+      .liftF[F, ProcessingRecoverableError, Unit](
         projectAuthSync.syncProject(authData)
       )
       .map(_ => (project, queries))
