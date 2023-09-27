@@ -19,9 +19,8 @@
 package io.renku.eventsqueue
 
 import Generators.events
-import cats.effect.IO
 import cats.effect.testing.scalatest.AsyncIOSpec
-import cats.syntax.all._
+import cats.effect.{IO, Ref, Temporal}
 import fs2.Stream
 import io.circe.syntax._
 import io.renku.db.syntax._
@@ -32,6 +31,8 @@ import org.scalamock.scalatest.AsyncMockFactory
 import org.scalatest.flatspec.AsyncFlatSpec
 import org.scalatest.matchers.should
 
+import scala.concurrent.duration._
+
 class EventsDequeuerSpec
     extends AsyncFlatSpec
     with AsyncIOSpec
@@ -39,28 +40,51 @@ class EventsDequeuerSpec
     with should.Matchers
     with AsyncMockFactory {
 
-  it should "register the given handler that gets fed with chunks of events found for the category " +
+  it should "register the given handler that gets fed with a stream of events found for the category " +
     "even before any notification is sent" in {
 
-      val category              = categoryNames.generateOne
-      val dequeuedEvents        = events.generateList()
-      val dequeuedEventsEncoded = dequeuedEvents.map(_.asJson.noSpaces)
-      val handler               = mockFunction[List[String], IO[Unit]]
+      val category = categoryNames.generateOne
 
-      givenFindingChunkOfEvents(
-        category,
-        returning = QueryDef.liftF(Stream.constant[IO, List[String]](dequeuedEventsEncoded).pure[IO])
-      )
+      val handledEvents = Ref.unsafe[IO, List[String]](Nil)
+      val handler: Stream[IO, String] => IO[Unit] =
+        _.evalTap(e => handledEvents.update(l => (e :: l.reverse).reverse)).compile.drain
 
-      handler.expects(dequeuedEventsEncoded).returning(().pure[IO])
+      val dequeuedEvents       = events.generateList(min = 1).map(_.asJson.noSpaces)
+      val dequeuedEventsStream = Stream.emits[IO, String](dequeuedEvents)
+      givenFindingChunkOfEvents(category, returning = QueryDef.pure(dequeuedEventsStream))
 
-      dequeuer.registerHandler(category, handler).assertNoException
+      dequeuer.registerHandler(category, handler).assertNoException >>
+        handledEvents.get.asserting(_ shouldBe dequeuedEvents)
     }
+
+  it should "register the given handler that gets woken up on a notification is sent or the category channel" in {
+
+    val category = categoryNames.generateOne
+
+    val handledEvents = Ref.unsafe[IO, List[String]](Nil)
+    val handler: Stream[IO, String] => IO[Unit] =
+      _.evalTap(e => handledEvents.update(l => (e :: l.reverse).reverse)).compile.drain
+
+    val initialEvents       = events.generateList(min = 1).map(_.asJson.noSpaces)
+    val initialEventsStream = Stream.emits[IO, String](initialEvents)
+    givenFindingChunkOfEvents(category, returning = QueryDef.pure(initialEventsStream))
+
+    val dequeuedEvents       = events.generateList(min = 1).map(_.asJson.noSpaces)
+    val dequeuedEventsStream = Stream.emits[IO, String](dequeuedEvents)
+    givenFindingChunkOfEvents(category, returning = QueryDef.pure(dequeuedEventsStream))
+
+    dequeuer.registerHandler(category, handler).assertNoException >>
+      handledEvents.get.asserting(_ shouldBe initialEvents) >>
+      Temporal[IO].sleep(1 second) >>
+      notify(category.asChannelId, dequeuedEvents.head.asJson) >>
+      Temporal[IO].sleep(2 seconds) >>
+      handledEvents.get.asserting(_ shouldBe initialEvents ::: dequeuedEvents)
+  }
 
   private val dbRepository  = mock[DBRepository[IO]]
   private lazy val dequeuer = new EventsDequeuerImpl[IO, TestDB](dbRepository)
 
-  private def givenFindingChunkOfEvents(category: CategoryName, returning: QueryDef[IO, Stream[IO, List[String]]]) =
+  private def givenFindingChunkOfEvents(category: CategoryName, returning: QueryDef[IO, Stream[IO, String]]) =
     (dbRepository.fetchChunk _)
       .expects(category)
       .returning(returning)

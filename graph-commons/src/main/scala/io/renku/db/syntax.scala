@@ -31,6 +31,9 @@ object syntax extends implicits {
 
     def liftF[F[_]: Applicative, R](result: F[R]): QueryDef[F, R] =
       Kleisli.liftF[F, Session[F], R](result)
+
+    def pure[F[_]: Applicative, R](result: R): QueryDef[F, R] =
+      Kleisli.pure[F, Session[F], R](result)
   }
 
   type CommandDef[F[_]] = Kleisli[F, Session[F], Unit]

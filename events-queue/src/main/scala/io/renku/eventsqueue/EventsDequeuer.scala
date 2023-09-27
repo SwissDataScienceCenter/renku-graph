@@ -20,17 +20,32 @@ package io.renku.eventsqueue
 
 import cats.effect.Async
 import cats.syntax.all._
+import fs2.Stream
 import io.renku.db.SessionResource
+import io.renku.db.syntax._
 import io.renku.events.CategoryName
 
 trait EventsDequeuer[F[_]] {
-  def registerHandler(category: CategoryName, handler: List[String] => F[Unit]): F[Unit]
+  def registerHandler(category: CategoryName, handler: Stream[F, String] => F[Unit]): F[Unit]
 }
 
 private class EventsDequeuerImpl[F[_]: Async, DB](repository: DBRepository[F])(implicit sr: SessionResource[F, DB])
     extends EventsDequeuer[F] {
 
-  override def registerHandler(category: CategoryName, handler: List[String] => F[Unit]): F[Unit] =
-    sr.useK(repository.fetchChunk(category))
-      .flatMap(stream => stream.evalTap(handler(_)).compile.drain)
+  override def registerHandler(category: CategoryName, handler: Stream[F, String] => F[Unit]): F[Unit] =
+    sr.useK(dequeueEvents(category, handler)) >>
+      Async[F].start(sr.useK(listen(category, handler))).void
+
+  private def dequeueEvents(category: CategoryName, handler: Stream[F, String] => F[Unit]) =
+    repository.fetchChunk(category).flatMapF(handler(_))
+
+  private def listen(category: CategoryName, handler: Stream[F, String] => F[Unit]): CommandDef[F] =
+    CommandDef[F] { session =>
+      session
+        .channel(category.asChannelId)
+        .listen(maxQueued = 1)
+        .evalMap(_ => dequeueEvents(category, handler)(session))
+        .compile
+        .drain
+    }
 }

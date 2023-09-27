@@ -26,7 +26,7 @@ import fs2.Stream
 
 private trait DBRepository[F[_]] {
   def insert(category:     CategoryName, payload: Json): CommandDef[F]
-  def fetchChunk(category: CategoryName): QueryDef[F, Stream[F, List[String]]]
+  def fetchChunk(category: CategoryName): QueryDef[F, Stream[F, String]]
 }
 
 private object DBRepository {
@@ -38,5 +38,5 @@ private class DBRepositoryImpl[F[_], DB](implicit sr: SessionResource[F, DB]) ex
 
   println(sr)
   override def insert(category:     CategoryName, payload: Json): CommandDef[F] = ???
-  override def fetchChunk(category: CategoryName): QueryDef[F, Stream[F, List[String]]] = ???
+  override def fetchChunk(category: CategoryName): QueryDef[F, Stream[F, String]] = ???
 }

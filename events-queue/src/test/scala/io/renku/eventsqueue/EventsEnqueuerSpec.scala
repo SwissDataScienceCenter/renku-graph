@@ -47,7 +47,7 @@ class EventsEnqueuerSpec
       givenPersisting(category, event.asJson, returning = CommandDef.pure[IO])
 
       for {
-        conditionMet <- asssertNotifications(category.asChannelId, notifs => notifs.contains(event.asJson.noSpaces))
+        conditionMet <- assertNotifications(category.asChannelId, notifs => notifs.contains(event.asJson.noSpaces))
         _            <- enqueuer.enqueue(category, event)
         _            <- conditionMet.get.flatten
       } yield ()
