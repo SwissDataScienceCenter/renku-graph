@@ -21,12 +21,15 @@ package io.renku.eventsqueue
 import Generators.events
 import cats.effect.testing.scalatest.AsyncIOSpec
 import cats.effect.{IO, Ref, Temporal}
+import cats.syntax.all._
 import fs2.Stream
 import io.circe.syntax._
 import io.renku.db.syntax._
 import io.renku.events.CategoryName
 import io.renku.events.Generators.categoryNames
 import io.renku.generators.Generators.Implicits._
+import io.renku.generators.Generators.exceptions
+import io.renku.interpreters.TestLogger
 import org.scalamock.scalatest.AsyncMockFactory
 import org.scalatest.flatspec.AsyncFlatSpec
 import org.scalatest.matchers.should
@@ -41,7 +44,7 @@ class EventsDequeuerSpec
     with AsyncMockFactory {
 
   it should "register the given handler that gets fed with a stream of events found for the category " +
-    "even before any notification is sent" in {
+    "even before any notification is received" in {
 
       val category = categoryNames.generateOne
 
@@ -49,38 +52,82 @@ class EventsDequeuerSpec
       val handler: Stream[IO, String] => IO[Unit] =
         _.evalTap(e => handledEvents.update(l => (e :: l.reverse).reverse)).compile.drain
 
-      val dequeuedEvents       = events.generateList(min = 1).map(_.asJson.noSpaces)
-      val dequeuedEventsStream = Stream.emits[IO, String](dequeuedEvents)
-      givenFindingChunkOfEvents(category, returning = QueryDef.pure(dequeuedEventsStream))
+      val initialEvents = events.generateList(min = 1).map(_.asJson)
+      givenFindingChunkOfEvents(category,
+                                returning = QueryDef.pure(Stream.emits[IO, String](initialEvents.map(_.noSpaces)))
+      )
 
       dequeuer.registerHandler(category, handler).assertNoException >>
-        handledEvents.get.asserting(_ shouldBe dequeuedEvents)
+        handledEvents.get.asserting(_ shouldBe initialEvents.map(_.noSpaces))
     }
 
-  it should "register the given handler that gets woken up on a notification is sent or the category channel" in {
+  it should "fed the given handler with a stream of events " +
+    "after the category event is received" in {
 
-    val category = categoryNames.generateOne
+      val category = categoryNames.generateOne
 
-    val handledEvents = Ref.unsafe[IO, List[String]](Nil)
-    val handler: Stream[IO, String] => IO[Unit] =
-      _.evalTap(e => handledEvents.update(l => (e :: l.reverse).reverse)).compile.drain
+      val handledEvents = Ref.unsafe[IO, List[String]](Nil)
+      val handler: Stream[IO, String] => IO[Unit] =
+        _.evalTap(e => handledEvents.update(l => (e :: l.reverse).reverse)).compile.drain
 
-    val initialEvents       = events.generateList(min = 1).map(_.asJson.noSpaces)
-    val initialEventsStream = Stream.emits[IO, String](initialEvents)
-    givenFindingChunkOfEvents(category, returning = QueryDef.pure(initialEventsStream))
+      val initialEvents = events.generateList(min = 1).map(_.asJson)
+      givenFindingChunkOfEvents(category,
+                                returning = QueryDef.pure(Stream.emits[IO, String](initialEvents.map(_.noSpaces)))
+      )
 
-    val dequeuedEvents       = events.generateList(min = 1).map(_.asJson.noSpaces)
-    val dequeuedEventsStream = Stream.emits[IO, String](dequeuedEvents)
-    givenFindingChunkOfEvents(category, returning = QueryDef.pure(dequeuedEventsStream))
+      val onNotificationEvents = events.generateList(min = 1).map(_.asJson)
+      givenFindingChunkOfEvents(
+        category,
+        returning = QueryDef.pure(Stream.emits[IO, String](onNotificationEvents.map(_.noSpaces)))
+      )
 
-    dequeuer.registerHandler(category, handler).assertNoException >>
-      handledEvents.get.asserting(_ shouldBe initialEvents) >>
-      Temporal[IO].sleep(1 second) >>
-      notify(category.asChannelId, dequeuedEvents.head.asJson) >>
-      Temporal[IO].sleep(2 seconds) >>
-      handledEvents.get.asserting(_ shouldBe initialEvents ::: dequeuedEvents)
-  }
+      dequeuer.registerHandler(category, handler).assertNoException >>
+        handledEvents.get.asserting(_ shouldBe initialEvents.map(_.noSpaces)) >>
+        Temporal[IO].sleep(1 second) >>
+        notify(category.asChannelId, onNotificationEvents.head) >>
+        Temporal[IO].sleep(2 seconds) >>
+        handledEvents.get.asserting(_ shouldBe (initialEvents ::: onNotificationEvents).map(_.noSpaces))
+    }
 
+  it should "handle the error occurring during category event processing " +
+    "and prevent the process from dying" in {
+
+      val category = categoryNames.generateOne
+
+      val handledEvents = Ref.unsafe[IO, List[String]](Nil)
+      val failingEvent  = events.generateOne.asJson
+      val handler: Stream[IO, String] => IO[Unit] =
+        _.evalTap {
+          case e if e == failingEvent.noSpaces => exceptions.generateOne.raiseError[IO, Unit]
+          case e                               => handledEvents.update(l => (e :: l.reverse).reverse)
+        }.compile.drain
+
+      val initialEvents = events.generateList(min = 1).map(_.asJson)
+      givenFindingChunkOfEvents(
+        category,
+        returning = QueryDef.pure(Stream.emits[IO, String](initialEvents.map(_.noSpaces)))
+      )
+
+      givenFindingChunkOfEvents(category, returning = QueryDef.pure(Stream.emit[IO, String](failingEvent.noSpaces)))
+
+      val onNotificationEvents = events.generateList(min = 1).map(_.asJson)
+      givenFindingChunkOfEvents(
+        category,
+        returning = QueryDef.pure(Stream.emits[IO, String](onNotificationEvents.map(_.noSpaces)))
+      )
+
+      dequeuer.registerHandler(category, handler).assertNoException >>
+        handledEvents.get.asserting(_ shouldBe initialEvents.map(_.noSpaces)) >>
+        Temporal[IO].sleep(1 second) >>
+        notify(category.asChannelId, failingEvent) >>
+        Temporal[IO].sleep(2 seconds) >>
+        handledEvents.get.asserting(_ shouldBe initialEvents.map(_.noSpaces)) >>
+        notify(category.asChannelId, onNotificationEvents.head) >>
+        Temporal[IO].sleep(2 seconds) >>
+        handledEvents.get.asserting(_ shouldBe (initialEvents ::: onNotificationEvents).map(_.noSpaces))
+    }
+
+  private implicit lazy val logger: TestLogger[IO] = TestLogger()
   private val dbRepository  = mock[DBRepository[IO]]
   private lazy val dequeuer = new EventsDequeuerImpl[IO, TestDB](dbRepository)
 

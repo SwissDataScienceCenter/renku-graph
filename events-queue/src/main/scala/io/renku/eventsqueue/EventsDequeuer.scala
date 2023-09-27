@@ -24,22 +24,29 @@ import fs2.Stream
 import io.renku.db.SessionResource
 import io.renku.db.syntax._
 import io.renku.events.CategoryName
+import org.typelevel.log4cats.Logger
 
 trait EventsDequeuer[F[_]] {
   def registerHandler(category: CategoryName, handler: Stream[F, String] => F[Unit]): F[Unit]
 }
 
-private class EventsDequeuerImpl[F[_]: Async, DB](repository: DBRepository[F])(implicit sr: SessionResource[F, DB])
-    extends EventsDequeuer[F] {
+private class EventsDequeuerImpl[F[_]: Async: Logger, DB](repository: DBRepository[F])(implicit
+    sr: SessionResource[F, DB]
+) extends EventsDequeuer[F] {
 
   override def registerHandler(category: CategoryName, handler: Stream[F, String] => F[Unit]): F[Unit] =
     sr.useK(dequeueEvents(category, handler)) >>
-      Async[F].start(sr.useK(listen(category, handler))).void
+      Async[F].start(deq(category, handler)).void
 
   private def dequeueEvents(category: CategoryName, handler: Stream[F, String] => F[Unit]) =
     repository.fetchChunk(category).flatMapF(handler(_))
 
-  private def listen(category: CategoryName, handler: Stream[F, String] => F[Unit]): CommandDef[F] =
+  private def deq(category: CategoryName, handler: Stream[F, String] => F[Unit]): F[Unit] =
+    sr.useK(dequeueOnEvent(category, handler))
+      .handleErrorWith(logStatement(category))
+      .flatMap(_ => deq(category, handler))
+
+  private def dequeueOnEvent(category: CategoryName, handler: Stream[F, String] => F[Unit]): CommandDef[F] =
     CommandDef[F] { session =>
       session
         .channel(category.asChannelId)
@@ -48,4 +55,7 @@ private class EventsDequeuerImpl[F[_]: Async, DB](repository: DBRepository[F])(i
         .compile
         .drain
     }
+
+  private def logStatement(category: CategoryName): Throwable => F[Unit] =
+    Logger[F].error(_)(show"An error in the events dequeueing process for $category")
 }
