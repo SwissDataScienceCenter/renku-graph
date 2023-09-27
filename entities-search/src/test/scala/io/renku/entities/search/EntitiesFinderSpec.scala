@@ -1218,5 +1218,27 @@ class EntitiesFinderSpec
         .addAllEntitiesFrom(privateProject)
         .sortBy(_.name)(nameOrdering)
     }
+
+    "not return private projects/datasets of different user" in new TestCase {
+      val otherMember = personEntities(
+        personGitLabIds.suchThat(id => !member.person.maybeGitLabId.contains(id)).toGeneratorOfSomes
+      ).generateOne
+      val results = IOBody {
+        provisionTestProjects(privateProject, internalProject, publicProject) >>
+          finder
+            .findEntities(
+              Criteria(maybeUser = otherMember.toAuthUser.some,
+                       paging = PagingRequest.default.copy(perPage = PerPage(50))
+              )
+            )
+      }
+      val expected = List
+        .empty[model.Entity]
+        .addAllEntitiesFrom(publicProject)
+        .addAllEntitiesFrom(internalProject)
+        .addAllPersonsFrom(privateProject)
+        .sortBy(_.name)(nameOrdering)
+      results.results shouldBe expected
+    }
   }
 }

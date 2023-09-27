@@ -20,62 +20,15 @@ package io.renku.entities
 
 import cats.Show
 import cats.syntax.all._
-import io.renku.graph.model.entities.Person
-import io.renku.graph.model.{GraphClass, projects}
+import io.renku.entities.search.Criteria.Filters
+import io.renku.graph.model.projects
 import io.renku.tinytypes._
 import io.renku.triplesstore.client.sparql.{Fragment, LuceneQuery, VarName}
 import io.renku.triplesstore.client.syntax._
-import search.Criteria.Filters
 
 import java.time.{Instant, ZoneOffset}
 
 package object search {
-
-  private[search] implicit class CriteriaOps(criteria: Criteria) {
-
-    def maybeOnAccessRightsAndVisibility(projectIdVariable: String, visibilityVariable: String): String =
-      criteria.maybeUser match {
-        case Some(user) =>
-          val queriedVisibilities = criteria.filters.visibilities
-          val nonPrivateVisibilities =
-            if (queriedVisibilities.isEmpty)
-              projects.Visibility.all - projects.Visibility.Private
-            else (projects.Visibility.all - projects.Visibility.Private) intersect queriedVisibilities
-
-          val selectPrivateValue =
-            if (queriedVisibilities.isEmpty || queriedVisibilities.contains(projects.Visibility.Private))
-              projects.Visibility.Private.asObject.asSparql.sparql
-            else "''"
-          s"""|{
-              |  $projectIdVariable renku:projectVisibility $visibilityVariable .
-              |  {
-              |    VALUES ($visibilityVariable) {
-              |      ${nonPrivateVisibilities.map(v => s"(${v.asObject.asSparql.sparql})").mkString(" ")}
-              |    }
-              |  } UNION {
-              |    VALUES ($visibilityVariable) {
-              |      ($selectPrivateValue)
-              |    }
-              |    $projectIdVariable schema:member ?memberId.
-              |    GRAPH ${GraphClass.Persons.id.asSparql.sparql} {
-              |      ?memberId schema:sameAs ?memberSameAs.
-              |      ?memberSameAs schema:additionalType ${Person.gitLabSameAsAdditionalType.asTripleObject.asSparql.sparql};
-              |                    schema:identifier ${user.id.asObject.asSparql.sparql}
-              |    }
-              |  }
-              |}
-              |""".stripMargin
-        case _ =>
-          criteria.filters.visibilities match {
-            case v if v.isEmpty || v.contains(projects.Visibility.Public) =>
-              s"""|$projectIdVariable renku:projectVisibility $visibilityVariable .
-                  |VALUES ($visibilityVariable) { (${projects.Visibility.Public.asObject.asSparql.sparql}) }""".stripMargin
-            case _ =>
-              s"""|$projectIdVariable renku:projectVisibility $visibilityVariable .
-                  |VALUES ($visibilityVariable) { ('') }""".stripMargin
-          }
-      }
-  }
 
   private[search] implicit class FiltersOps(filters: Filters) {
 
@@ -109,10 +62,10 @@ package object search {
           fr"FILTER (IF (BOUND($variableName), LCASE($variableName) IN (${creators.map(_.toLowerCase).map(_.asObject)}), false))"
       }
 
-    def maybeOnNamespace(variableName: String): String =
+    def maybeOnNamespace(variableName: VarName): Fragment =
       filters.namespaces match {
-        case set if set.isEmpty => ""
-        case set => s"VALUES ($variableName) { ${set.map(v => s"(${v.asObject.asSparql.sparql})").mkString(" ")} }"
+        case set if set.isEmpty => Fragment.empty
+        case set                => fr"VALUES ($variableName) { ${set.map(_.asObject)} }"
       }
 
     def maybeOnDateCreated(variableName: VarName): Fragment =

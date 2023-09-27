@@ -32,6 +32,7 @@ import io.renku.interpreters.TestLogger
 import io.renku.jsonld.EntityId
 import io.renku.logging.TestSparqlQueryTimeRecorder
 import io.renku.testtools.IOSpec
+import io.renku.triplesgenerator.events.consumers.membersync.ProjectAuthSync
 import io.renku.triplesstore.SparqlQuery.Prefixes
 import io.renku.triplesstore._
 import org.scalamock.scalatest.MockFactory
@@ -57,6 +58,7 @@ class TSCleanerSpec
 
         givenProjectIdFindingSucceeds(project)
         givenSearchGraphsCleaningSucceeds(project)
+        givenProjectAuthSync(project)
 
         (cleaner removeTriples project.slug).unsafeRunSync()
 
@@ -75,6 +77,7 @@ class TSCleanerSpec
 
         givenProjectIdFindingSucceeds(parent)
         givenSearchGraphsCleaningSucceeds(parent)
+        givenProjectAuthSync(parent)
 
         (cleaner removeTriples parent.slug).unsafeRunSync()
 
@@ -97,6 +100,7 @@ class TSCleanerSpec
 
         givenProjectIdFindingSucceeds(parent)
         givenSearchGraphsCleaningSucceeds(parent)
+        givenProjectAuthSync(parent)
 
         (cleaner removeTriples parent.slug).unsafeRunSync()
 
@@ -123,6 +127,7 @@ class TSCleanerSpec
 
         givenProjectIdFindingSucceeds(topProject)
         givenSearchGraphsCleaningSucceeds(topProject)
+        givenProjectAuthSync(topProject)
 
         (cleaner removeTriples topProject.slug).unsafeRunSync()
 
@@ -156,6 +161,7 @@ class TSCleanerSpec
 
         givenProjectIdFindingSucceeds(topProject)
         givenSearchGraphsCleaningSucceeds(topProject)
+        givenProjectAuthSync(topProject)
 
         (cleaner removeTriples topProject.slug).unsafeRunSync()
 
@@ -188,6 +194,7 @@ class TSCleanerSpec
 
         givenProjectIdFindingSucceeds(middleProject)
         givenSearchGraphsCleaningSucceeds(middleProject)
+        givenProjectAuthSync(middleProject)
 
         (cleaner removeTriples middleProject.slug).unsafeRunSync()
 
@@ -221,6 +228,7 @@ class TSCleanerSpec
 
         givenProjectIdFindingSucceeds(bottomProject)
         givenSearchGraphsCleaningSucceeds(bottomProject)
+        givenProjectAuthSync(bottomProject)
 
         (cleaner removeTriples bottomProject.slug).unsafeRunSync()
 
@@ -257,6 +265,7 @@ class TSCleanerSpec
 
         givenProjectIdFindingSucceeds(topProject)
         givenSearchGraphsCleaningSucceeds(topProject)
+        givenProjectAuthSync(topProject)
 
         (cleaner removeTriples topProject.slug).unsafeRunSync()
 
@@ -317,6 +326,7 @@ class TSCleanerSpec
 
         givenProjectIdFindingSucceeds(topProject)
         givenSearchGraphsCleaningSucceeds(topProject)
+        givenProjectAuthSync(topProject)
 
         (cleaner removeTriples topProject.slug).unsafeRunSync()
 
@@ -360,6 +370,7 @@ class TSCleanerSpec
 
         givenProjectIdFindingSucceeds(topProject)
         givenSearchGraphsCleaningSucceeds(topProject)
+        givenProjectAuthSync(topProject)
 
         (cleaner removeTriples topProject.slug).unsafeRunSync()
 
@@ -394,6 +405,7 @@ class TSCleanerSpec
 
         givenProjectIdFindingSucceeds(middleProject)
         givenSearchGraphsCleaningSucceeds(middleProject)
+        givenProjectAuthSync(middleProject)
 
         cleaner.removeTriples(middleProject.slug).unsafeRunSync()
 
@@ -432,8 +444,10 @@ class TSCleanerSpec
 
         givenProjectIdFindingSucceeds(middleProject)
         givenProjectIdFindingSucceeds(middleProjectFork)
+        givenProjectAuthSync(middleProject)
         givenSearchGraphsCleaningSucceeds(middleProject)
         givenSearchGraphsCleaningSucceeds(middleProjectFork)
+        givenProjectAuthSync(middleProjectFork)
 
         cleaner.removeTriples(middleProject.slug).unsafeRunSync()
         cleaner.removeTriples(middleProjectFork.slug).unsafeRunSync()
@@ -473,6 +487,7 @@ class TSCleanerSpec
 
         givenProjectIdFindingSucceeds(middleProject)
         givenSearchGraphsCleaningSucceeds(middleProject)
+        givenProjectAuthSync(middleProject)
 
         cleaner.removeTriples(middleProject.slug).unsafeRunSync()
 
@@ -575,7 +590,8 @@ class TSCleanerSpec
     private implicit val timeRecorder: SparqlQueryTimeRecorder[IO] = TestSparqlQueryTimeRecorder[IO].unsafeRunSync()
     private val projectIdFinder     = mock[ProjectIdFinder[IO]]
     private val searchGraphsCleaner = mock[SearchGraphsCleaner[IO]]
-    val cleaner = new TSCleanerImpl[IO](projectIdFinder, searchGraphsCleaner, projectsDSConnectionInfo)
+    val projectAuthSync             = mock[ProjectAuthSync[IO]]
+    val cleaner = new TSCleanerImpl[IO](projectIdFinder, searchGraphsCleaner, projectAuthSync, projectsDSConnectionInfo)
 
     def givenProjectIdFindingSucceeds(project: Project) =
       (projectIdFinder.findProjectId _)
@@ -586,6 +602,11 @@ class TSCleanerSpec
       (searchGraphsCleaner.cleanSearchGraphs _)
         .expects(project.identification)
         .returning(().pure[IO])
+
+    def givenProjectAuthSync(project: Project) =
+      (projectAuthSync.removeAuthData _)
+        .expects(project.slug)
+        .returning(IO.unit)
   }
 
   private def findOutNewlyNominatedTopDS(ds1: Dataset[Dataset.Provenance], ds2: Dataset[Dataset.Provenance]): EntityId =

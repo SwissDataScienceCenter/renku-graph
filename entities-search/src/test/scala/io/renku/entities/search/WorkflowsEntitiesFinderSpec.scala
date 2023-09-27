@@ -22,6 +22,7 @@ import Criteria._
 import EntityConverters._
 import cats.syntax.all._
 import io.renku.entities.search.model.Entity.Workflow.WorkflowType
+import io.renku.entities.searchgraphs.SearchInfoDatasets
 import io.renku.generators.Generators.Implicits._
 import io.renku.generators.Generators._
 import io.renku.graph.model._
@@ -40,6 +41,7 @@ class WorkflowsEntitiesFinderSpec
     with FinderSpecOps
     with InMemoryJenaForSpec
     with ProjectsDataset
+    with SearchInfoDatasets
     with IOSpec {
 
   "findEntities - in case of a forks with workflows" should {
@@ -51,7 +53,7 @@ class WorkflowsEntitiesFinderSpec
         .forkOnce()
       val plan :: Nil = fork.plans
 
-      upload(to = projectsDataset, original, fork)
+      provisionTestProjects(original, fork).unsafeRunSync()
 
       val results = finder
         .findEntities(Criteria(Filters(entityTypes = Set(Filters.EntityType.Workflow))))
@@ -80,7 +82,7 @@ class WorkflowsEntitiesFinderSpec
       }
       val plan :: Nil = publicProject.plans
 
-      upload(to = projectsDataset, original, fork)
+      provisionTestProjects(original, fork).unsafeRunSync()
 
       finder
         .findEntities(
@@ -106,7 +108,7 @@ class WorkflowsEntitiesFinderSpec
       }
       val plan :: Nil = internalProject.plans
 
-      upload(to = projectsDataset, original, fork)
+      provisionTestProjects(original, fork).unsafeRunSync()
 
       finder
         .findEntities(
@@ -127,7 +129,7 @@ class WorkflowsEntitiesFinderSpec
         .generateOne
       val plan :: Nil = privateProject.plans
 
-      upload(to = projectsDataset, privateProject)
+      provisionTestProjects(privateProject).unsafeRunSync()
 
       finder
         .findEntities(
@@ -152,7 +154,7 @@ class WorkflowsEntitiesFinderSpec
         p.addUnlinkedStepPlan(p.stepPlans.head.invalidate())
       }
 
-      upload(to = projectsDataset, project)
+      provisionTestProjects(project).unsafeRunSync()
 
       finder
         .findEntities(Criteria(filters = Filters(entityTypes = Set(Filters.EntityType.Workflow))))
@@ -170,7 +172,7 @@ class WorkflowsEntitiesFinderSpec
           .generateOne
           .addCompositePlan(CreateCompositePlan(compositePlanEntities(personEntities, _)))
 
-      upload(to = projectsDataset, project)
+      provisionTestProjects(project).unsafeRunSync()
 
       val results = finder
         .findEntities(Criteria(filters = Filters(entityTypes = Set(Filters.EntityType.Workflow))))
