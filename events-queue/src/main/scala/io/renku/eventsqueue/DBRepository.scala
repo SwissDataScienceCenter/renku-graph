@@ -22,9 +22,11 @@ import io.circe.Json
 import io.renku.db.SessionResource
 import io.renku.db.syntax._
 import io.renku.events.CategoryName
+import fs2.Stream
 
 private trait DBRepository[F[_]] {
-  def insert(category: CategoryName, payload: Json): CommandDef[F]
+  def insert(category:     CategoryName, payload: Json): CommandDef[F]
+  def fetchChunk(category: CategoryName): QueryDef[F, Stream[F, List[String]]]
 }
 
 private object DBRepository {
@@ -35,5 +37,6 @@ private object DBRepository {
 private class DBRepositoryImpl[F[_], DB](implicit sr: SessionResource[F, DB]) extends DBRepository[F] {
 
   println(sr)
-  override def insert(category: CategoryName, payload: Json): CommandDef[F] = ???
+  override def insert(category:     CategoryName, payload: Json): CommandDef[F] = ???
+  override def fetchChunk(category: CategoryName): QueryDef[F, Stream[F, List[String]]] = ???
 }

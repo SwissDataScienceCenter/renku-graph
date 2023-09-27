@@ -25,7 +25,15 @@ import skunk.Session
 object syntax extends implicits {
 
   type QueryDef[F[_], R] = Kleisli[F, Session[F], R]
-  type CommandDef[F[_]]  = Kleisli[F, Session[F], Unit]
+
+  object QueryDef {
+    def apply[F[_], R](f: Session[F] => F[R]): QueryDef[F, R] = Kleisli(f)
+
+    def liftF[F[_]: Applicative, R](result: F[R]): QueryDef[F, R] =
+      Kleisli.liftF[F, Session[F], R](result)
+  }
+
+  type CommandDef[F[_]] = Kleisli[F, Session[F], Unit]
 
   object CommandDef {
     def apply[F[_]](f: Session[F] => F[Unit]): CommandDef[F] =

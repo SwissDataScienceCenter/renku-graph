@@ -18,14 +18,19 @@
 
 package io.renku.eventsqueue
 
+import cats.effect.Async
+import cats.syntax.all._
+import io.renku.db.SessionResource
 import io.renku.events.CategoryName
-import skunk.data.Identifier
 
 trait EventsDequeuer[F[_]] {
-  def registerHandler(channel: Identifier, category: CategoryName, handler: String => F[Unit]): Unit
+  def registerHandler(category: CategoryName, handler: List[String] => F[Unit]): F[Unit]
 }
 
-private class EventsDequeuerImpl[F[_]] extends EventsDequeuer[F] {
+private class EventsDequeuerImpl[F[_]: Async, DB](repository: DBRepository[F])(implicit sr: SessionResource[F, DB])
+    extends EventsDequeuer[F] {
 
-  override def registerHandler(channel: Identifier, category: CategoryName, handler: String => F[Unit]): Unit = ???
+  override def registerHandler(category: CategoryName, handler: List[String] => F[Unit]): F[Unit] =
+    sr.useK(repository.fetchChunk(category))
+      .flatMap(stream => stream.evalTap(handler(_)).compile.drain)
 }

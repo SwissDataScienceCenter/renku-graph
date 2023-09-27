@@ -18,17 +18,50 @@
 
 package io.renku.eventsqueue
 
+import Generators.events
 import cats.effect.IO
 import cats.effect.testing.scalatest.AsyncIOSpec
+import cats.syntax.all._
+import fs2.Stream
+import io.circe.syntax._
+import io.renku.db.syntax._
+import io.renku.events.CategoryName
+import io.renku.events.Generators.categoryNames
+import io.renku.generators.Generators.Implicits._
+import org.scalamock.scalatest.AsyncMockFactory
 import org.scalatest.flatspec.AsyncFlatSpec
 import org.scalatest.matchers.should
 
-class EventsDequeuerSpec extends AsyncFlatSpec with AsyncIOSpec with should.Matchers {
+class EventsDequeuerSpec
+    extends AsyncFlatSpec
+    with AsyncIOSpec
+    with EventsQueueDBSpec
+    with should.Matchers
+    with AsyncMockFactory {
 
-//  it should "register the given handler so it gets triggered on events from the given channel" in {
-//
-//
-//  }
+  it should "register the given handler that gets fed with chunks of events found for the category " +
+    "even before any notification is sent" in {
 
-  private lazy val dequeuer = new EventsDequeuerImpl[IO]
+      val category              = categoryNames.generateOne
+      val dequeuedEvents        = events.generateList()
+      val dequeuedEventsEncoded = dequeuedEvents.map(_.asJson.noSpaces)
+      val handler               = mockFunction[List[String], IO[Unit]]
+
+      givenFindingChunkOfEvents(
+        category,
+        returning = QueryDef.liftF(Stream.constant[IO, List[String]](dequeuedEventsEncoded).pure[IO])
+      )
+
+      handler.expects(dequeuedEventsEncoded).returning(().pure[IO])
+
+      dequeuer.registerHandler(category, handler).assertNoException
+    }
+
+  private val dbRepository  = mock[DBRepository[IO]]
+  private lazy val dequeuer = new EventsDequeuerImpl[IO, TestDB](dbRepository)
+
+  private def givenFindingChunkOfEvents(category: CategoryName, returning: QueryDef[IO, Stream[IO, List[String]]]) =
+    (dbRepository.fetchChunk _)
+      .expects(category)
+      .returning(returning)
 }

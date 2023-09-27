@@ -60,4 +60,5 @@ class EventsEnqueuerSpec
     (dbRepository.insert _)
       .expects(category, payload)
       .returning(returning)
+      .atLeastOnce()
 }
