@@ -33,7 +33,7 @@ object LuceneQuery {
 
   def fuzzy(str: String): LuceneQuery =
     new LuceneQuery(
-      QueryTokenizer.luceneStandard
+      QueryTokenizer.default
         .split(str)
         .map(_.trim)
         .map(QueryParserUtil.escape)
