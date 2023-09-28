@@ -18,25 +18,4 @@
 
 package io.renku.eventsqueue
 
-import io.circe.Json
-import io.renku.db.SessionResource
-import io.renku.db.syntax._
-import io.renku.events.CategoryName
-import fs2.Stream
-
-private trait DBRepository[F[_]] {
-  def insert(category:      CategoryName, payload: Json): CommandDef[F]
-  def fetchEvents(category: CategoryName): QueryDef[F, Stream[F, DequeuedEvent]]
-}
-
-private object DBRepository {
-  def apply[F[_], DB](implicit sr: SessionResource[F, DB]): DBRepository[F] =
-    new DBRepositoryImpl[F, DB]
-}
-
-private class DBRepositoryImpl[F[_], DB](implicit sr: SessionResource[F, DB]) extends DBRepository[F] {
-
-  println(sr)
-  override def insert(category:      CategoryName, payload: Json): CommandDef[F] = ???
-  override def fetchEvents(category: CategoryName): QueryDef[F, Stream[F, DequeuedEvent]] = ???
-}
+private final case class DequeuedEvent(id: Long, payload: String)

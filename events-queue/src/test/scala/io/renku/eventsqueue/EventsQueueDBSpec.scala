@@ -22,7 +22,6 @@ import cats.Applicative
 import cats.data.Kleisli
 import cats.effect.{Deferred, IO, Ref, Temporal}
 import cats.syntax.all._
-import io.circe.Json
 import org.scalatest.Suite
 import skunk.data.Identifier
 import skunk.{Channel, Session}
@@ -36,8 +35,8 @@ trait EventsQueueDBSpec extends ContainerDB { self: Suite =>
   private val timeout     = 10 seconds
   private val warmUpEvent = "warmup"
 
-  def notify(channel: Identifier, event: Json): IO[Unit] =
-    withChannel(channel)(_.notify(event.noSpaces))
+  def notify(channel: Identifier, payload: String): IO[Unit] =
+    withChannel(channel)(_.notify(payload))
 
   def assertNotifications(channel: Identifier, condition: List[String] => Boolean): IO[Deferred[IO, IO[Unit]]] =
     for {

@@ -18,12 +18,11 @@
 
 package io.renku.eventsqueue
 
-import Generators.events
+import Generators.dequeuedEvents
 import cats.effect.testing.scalatest.AsyncIOSpec
 import cats.effect.{IO, Ref, Temporal}
 import cats.syntax.all._
 import fs2.Stream
-import io.circe.syntax._
 import io.renku.db.syntax._
 import io.renku.events.CategoryName
 import io.renku.events.Generators.categoryNames
@@ -48,17 +47,13 @@ class EventsDequeuerSpec
 
       val category = categoryNames.generateOne
 
-      val handledEvents = Ref.unsafe[IO, List[String]](Nil)
-      val handler: Stream[IO, String] => IO[Unit] =
-        _.evalTap(e => handledEvents.update(l => (e :: l.reverse).reverse)).compile.drain
+      val initialEvents = dequeuedEvents.generateList(min = 1)
+      givenFindingChunkOfEvents(category, returning = QueryDef.pure(Stream.emits[IO, DequeuedEvent](initialEvents)))
 
-      val initialEvents = events.generateList(min = 1).map(_.asJson)
-      givenFindingChunkOfEvents(category,
-                                returning = QueryDef.pure(Stream.emits[IO, String](initialEvents.map(_.noSpaces)))
-      )
+      val handler = new AccumulatingHandler
 
       dequeuer.registerHandler(category, handler).assertNoException >>
-        handledEvents.get.asserting(_ shouldBe initialEvents.map(_.noSpaces))
+        handler.handledEvents.get.asserting(_ shouldBe initialEvents)
     }
 
   it should "fed the given handler with a stream of events " +
@@ -66,27 +61,20 @@ class EventsDequeuerSpec
 
       val category = categoryNames.generateOne
 
-      val handledEvents = Ref.unsafe[IO, List[String]](Nil)
-      val handler: Stream[IO, String] => IO[Unit] =
-        _.evalTap(e => handledEvents.update(l => (e :: l.reverse).reverse)).compile.drain
+      val initialEvents = dequeuedEvents.generateList(min = 1)
+      givenFindingChunkOfEvents(category, returning = QueryDef.pure(Stream.emits[IO, DequeuedEvent](initialEvents)))
 
-      val initialEvents = events.generateList(min = 1).map(_.asJson)
-      givenFindingChunkOfEvents(category,
-                                returning = QueryDef.pure(Stream.emits[IO, String](initialEvents.map(_.noSpaces)))
-      )
+      val onNotifEvents = dequeuedEvents.generateList(min = 1)
+      givenFindingChunkOfEvents(category, returning = QueryDef.pure(Stream.emits[IO, DequeuedEvent](onNotifEvents)))
 
-      val onNotificationEvents = events.generateList(min = 1).map(_.asJson)
-      givenFindingChunkOfEvents(
-        category,
-        returning = QueryDef.pure(Stream.emits[IO, String](onNotificationEvents.map(_.noSpaces)))
-      )
+      val handler = new AccumulatingHandler
 
       dequeuer.registerHandler(category, handler).assertNoException >>
-        handledEvents.get.asserting(_ shouldBe initialEvents.map(_.noSpaces)) >>
+        handler.handledEvents.get.asserting(_ shouldBe initialEvents) >>
         Temporal[IO].sleep(1 second) >>
-        notify(category.asChannelId, onNotificationEvents.head) >>
+        notify(category.asChannelId, onNotifEvents.head.payload) >>
         Temporal[IO].sleep(2 seconds) >>
-        handledEvents.get.asserting(_ shouldBe (initialEvents ::: onNotificationEvents).map(_.noSpaces))
+        handler.handledEvents.get.asserting(_ shouldBe (initialEvents ::: onNotifEvents))
     }
 
   it should "handle the error occurring during category event processing " +
@@ -94,45 +82,49 @@ class EventsDequeuerSpec
 
       val category = categoryNames.generateOne
 
-      val handledEvents = Ref.unsafe[IO, List[String]](Nil)
-      val failingEvent  = events.generateOne.asJson
-      val handler: Stream[IO, String] => IO[Unit] =
-        _.evalTap {
-          case e if e == failingEvent.noSpaces => exceptions.generateOne.raiseError[IO, Unit]
-          case e                               => handledEvents.update(l => (e :: l.reverse).reverse)
-        }.compile.drain
+      val initialEvents = dequeuedEvents.generateList(min = 1)
+      givenFindingChunkOfEvents(category, returning = QueryDef.pure(Stream.emits[IO, DequeuedEvent](initialEvents)))
 
-      val initialEvents = events.generateList(min = 1).map(_.asJson)
-      givenFindingChunkOfEvents(
-        category,
-        returning = QueryDef.pure(Stream.emits[IO, String](initialEvents.map(_.noSpaces)))
-      )
+      val failingEvent = dequeuedEvents.generateOne
+      givenFindingChunkOfEvents(category, returning = QueryDef.pure(Stream.emit[IO, DequeuedEvent](failingEvent)))
 
-      givenFindingChunkOfEvents(category, returning = QueryDef.pure(Stream.emit[IO, String](failingEvent.noSpaces)))
+      val onNotifEvents = dequeuedEvents.generateList(min = 1)
+      givenFindingChunkOfEvents(category, returning = QueryDef.pure(Stream.emits[IO, DequeuedEvent](onNotifEvents)))
 
-      val onNotificationEvents = events.generateList(min = 1).map(_.asJson)
-      givenFindingChunkOfEvents(
-        category,
-        returning = QueryDef.pure(Stream.emits[IO, String](onNotificationEvents.map(_.noSpaces)))
-      )
+      val handler = new AccumulatingHandler(maybeFailOnEvent = failingEvent.some)
 
       dequeuer.registerHandler(category, handler).assertNoException >>
-        handledEvents.get.asserting(_ shouldBe initialEvents.map(_.noSpaces)) >>
+        handler.handledEvents.get.asserting(_ shouldBe initialEvents) >>
         Temporal[IO].sleep(1 second) >>
-        notify(category.asChannelId, failingEvent) >>
+        notify(category.asChannelId, failingEvent.payload) >>
         Temporal[IO].sleep(2 seconds) >>
-        handledEvents.get.asserting(_ shouldBe initialEvents.map(_.noSpaces)) >>
-        notify(category.asChannelId, onNotificationEvents.head) >>
+        handler.handledEvents.get.asserting(_ shouldBe initialEvents) >>
+        notify(category.asChannelId, onNotifEvents.head.payload) >>
         Temporal[IO].sleep(2 seconds) >>
-        handledEvents.get.asserting(_ shouldBe (initialEvents ::: onNotificationEvents).map(_.noSpaces))
+        handler.handledEvents.get.asserting(_ shouldBe (initialEvents ::: onNotifEvents))
     }
 
   private implicit lazy val logger: TestLogger[IO] = TestLogger()
   private val dbRepository  = mock[DBRepository[IO]]
   private lazy val dequeuer = new EventsDequeuerImpl[IO, TestDB](dbRepository)
 
-  private def givenFindingChunkOfEvents(category: CategoryName, returning: QueryDef[IO, Stream[IO, String]]) =
-    (dbRepository.fetchChunk _)
+  private def givenFindingChunkOfEvents(category: CategoryName, returning: QueryDef[IO, Stream[IO, DequeuedEvent]]) =
+    (dbRepository.fetchEvents _)
       .expects(category)
       .returning(returning)
+
+  private class AccumulatingHandler(maybeFailOnEvent: Option[DequeuedEvent] = None)
+      extends (Stream[IO, DequeuedEvent] => IO[Unit]) {
+
+    val handledEvents = Ref.unsafe[IO, List[DequeuedEvent]](Nil)
+
+    override def apply(stream: Stream[IO, DequeuedEvent]): IO[Unit] =
+      stream
+        .evalTap {
+          case e if maybeFailOnEvent.contains(e) => exceptions.generateOne.raiseError[IO, Unit]
+          case e                                 => handledEvents.update(_ appended e)
+        }
+        .compile
+        .drain
+  }
 }

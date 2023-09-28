@@ -27,26 +27,26 @@ import io.renku.events.CategoryName
 import org.typelevel.log4cats.Logger
 
 trait EventsDequeuer[F[_]] {
-  def registerHandler(category: CategoryName, handler: Stream[F, String] => F[Unit]): F[Unit]
+  def registerHandler(category: CategoryName, handler: Stream[F, DequeuedEvent] => F[Unit]): F[Unit]
 }
 
 private class EventsDequeuerImpl[F[_]: Async: Logger, DB](repository: DBRepository[F])(implicit
     sr: SessionResource[F, DB]
 ) extends EventsDequeuer[F] {
 
-  override def registerHandler(category: CategoryName, handler: Stream[F, String] => F[Unit]): F[Unit] =
+  override def registerHandler(category: CategoryName, handler: Stream[F, DequeuedEvent] => F[Unit]): F[Unit] =
     sr.useK(dequeueEvents(category, handler)) >>
       Async[F].start(deq(category, handler)).void
 
-  private def dequeueEvents(category: CategoryName, handler: Stream[F, String] => F[Unit]) =
-    repository.fetchChunk(category).flatMapF(handler(_))
+  private def dequeueEvents(category: CategoryName, handler: Stream[F, DequeuedEvent] => F[Unit]) =
+    repository.fetchEvents(category).flatMapF(handler(_))
 
-  private def deq(category: CategoryName, handler: Stream[F, String] => F[Unit]): F[Unit] =
+  private def deq(category: CategoryName, handler: Stream[F, DequeuedEvent] => F[Unit]): F[Unit] =
     sr.useK(dequeueOnEvent(category, handler))
       .handleErrorWith(logStatement(category))
       .flatMap(_ => deq(category, handler))
 
-  private def dequeueOnEvent(category: CategoryName, handler: Stream[F, String] => F[Unit]): CommandDef[F] =
+  private def dequeueOnEvent(category: CategoryName, handler: Stream[F, DequeuedEvent] => F[Unit]): CommandDef[F] =
     CommandDef[F] { session =>
       session
         .channel(category.asChannelId)

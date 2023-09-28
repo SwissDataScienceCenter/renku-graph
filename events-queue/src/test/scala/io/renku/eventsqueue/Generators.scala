@@ -18,13 +18,20 @@
 
 package io.renku.eventsqueue
 
-import io.renku.generators.Generators.nonEmptyStrings
+import cats.syntax.all._
+import io.circe.syntax._
+import io.renku.generators.Generators.Implicits._
+import io.renku.generators.Generators.{countingGen, nonEmptyStrings}
 import org.scalacheck.Gen
 import skunk.data.Identifier
 
 private object Generators {
 
-  val events: Gen[TestEvent] =
+  val dequeuedEvents: Gen[DequeuedEvent] =
+    (countingGen, events.map(_.asJson.noSpaces))
+      .mapN(DequeuedEvent.apply)
+
+  lazy val events: Gen[TestEvent] =
     nonEmptyStrings().map(TestEvent(_))
 
   def channelIds: Gen[Identifier] =
