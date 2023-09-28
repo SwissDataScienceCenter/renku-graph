@@ -200,6 +200,7 @@ class RecentEntitiesFinderSpec extends SearchTestBase {
     val project2 = renkuProjectEntities(visibilityPrivate)
       .withActivities(activityEntities(stepPlanEntities()))
       .withDatasets(datasetEntities(provenanceNonModified))
+      .suchThat(_.maybeCreator.isDefined)
       .generateOne
 
     val person = project2.maybeCreator.get
