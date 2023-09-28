@@ -95,6 +95,10 @@ object Dependencies {
     "org.apache.lucene" % "lucene-queryparser" % V.luceneQueryParser
   )
 
+  val luceneAnalyzer = Seq(
+    "org.apache.lucene" % "lucene-analysis-common" % V.luceneQueryParser
+  )
+
   val http4sClient = Seq(
     "org.http4s" %% "http4s-ember-client" % V.http4sEmber
   )
