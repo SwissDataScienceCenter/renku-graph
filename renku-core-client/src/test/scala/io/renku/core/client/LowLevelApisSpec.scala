@@ -37,6 +37,7 @@ import org.scalatest.matchers.should
 import org.scalatest.wordspec.AsyncWordSpec
 import org.scalatest.{EitherValues, OptionValues}
 import org.typelevel.log4cats.Logger
+import scodec.bits.ByteVector
 
 class LowLevelApisSpec
     extends AsyncWordSpec
@@ -80,8 +81,8 @@ class LowLevelApisSpec
           get(urlPathEqualTo("/renku/cache.migrations_check"))
             .withQueryParam("git_url", equalTo(projectGitHttpUrl.value))
             .withAccessToken(accessToken.some)
-            .withHeader("renku-user-email", equalTo(userInfo.email.value))
-            .withHeader("renku-user-fullname", equalTo(userInfo.name.value))
+            .withHeader("renku-user-email", equalTo(base64Encode(userInfo.email.value)))
+            .withHeader("renku-user-fullname", equalTo(base64Encode(userInfo.name.value)))
             .willReturn(ok(Result.success(migrationCheck).asJson.spaces2))
         }
 
@@ -120,8 +121,8 @@ class LowLevelApisSpec
         post(s"/renku/templates.create_project")
           .withRequestBody(equalToJson(newProject.asJson.spaces2))
           .withAccessToken(accessToken.some)
-          .withHeader("renku-user-email", equalTo(newProject.userInfo.email.value))
-          .withHeader("renku-user-fullname", equalTo(newProject.userInfo.name.value))
+          .withHeader("renku-user-email", equalTo(base64Encode(newProject.userInfo.email.value)))
+          .withHeader("renku-user-fullname", equalTo(base64Encode(newProject.userInfo.name.value)))
           .willReturn(ok(Result.success(json"""{"name": ${newProject.name}}""").asJson.spaces2))
       }
 
@@ -144,8 +145,8 @@ class LowLevelApisSpec
           post(s"/renku/${versionedUri.apiVersion}/project.edit")
             .withRequestBody(equalToJson(updates.asJson.spaces2))
             .withAccessToken(accessToken.some)
-            .withHeader("renku-user-email", equalTo(updates.userInfo.email.value))
-            .withHeader("renku-user-fullname", equalTo(updates.userInfo.name.value))
+            .withHeader("renku-user-email", equalTo(base64Encode(updates.userInfo.email.value)))
+            .withHeader("renku-user-fullname", equalTo(base64Encode(updates.userInfo.name.value)))
             .willReturn(ok(Result.success(json"""{"edited": {}, "remote_branch": $remoteBranch}""").asJson.spaces2))
         }
 
@@ -158,4 +159,7 @@ class LowLevelApisSpec
 
   private implicit val logger: Logger[IO] = TestLogger()
   private lazy val client = new LowLevelApisImpl[IO](RenkuCoreUri.Latest(externalServiceBaseUri), ClientTools[IO])
+
+  private lazy val base64Encode: String => String =
+    ByteVector.encodeUtf8(_).map(_.toBase64).fold(throw _, identity)
 }

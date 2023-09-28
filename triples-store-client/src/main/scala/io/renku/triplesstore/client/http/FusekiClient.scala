@@ -32,6 +32,12 @@ trait FusekiClient[F[_]] {
 
   def deleteDataset(name: String): F[Unit]
 
+  def datasetExists(name: String): F[Boolean]
+
+  def createDatasetIfNotExists(name: String, persistent: Boolean): F[Unit]
+
+  def deleteDatasetIfExists(name: String): F[Unit]
+
   def sparql(datasetName: String): SparqlClient[F]
 }
 

@@ -21,6 +21,7 @@ package io.renku.triplesgenerator.events.consumers.minprojectinfo
 import cats.effect.Async
 import cats.syntax.all._
 import cats.{MonadThrow, NonEmptyParallel, Parallel}
+import io.renku.graph.model.RenkuUrl
 import io.renku.graph.tokenrepository.AccessTokenFinder
 import io.renku.http.client.{AccessToken, GitLabClient}
 import io.renku.logging.ExecutionTimeRecorder
@@ -33,7 +34,7 @@ import io.renku.triplesgenerator.errors.{ProcessingNonRecoverableError, Processi
 import io.renku.triplesgenerator.tsprovisioning.triplesuploading.TriplesUploadResult
 import io.renku.triplesgenerator.tsprovisioning.triplesuploading.TriplesUploadResult.{DeliverySuccess, NonRecoverableFailure, RecoverableFailure}
 import io.renku.triplesgenerator.tsprovisioning.{TSProvisioner, UploadingResult}
-import io.renku.triplesstore.SparqlQueryTimeRecorder
+import io.renku.triplesstore.{ProjectSparqlClient, SparqlQueryTimeRecorder}
 import org.typelevel.log4cats.Logger
 
 import scala.util.control.NonFatal
@@ -164,9 +165,10 @@ private object EventProcessor {
 
   def apply[F[
       _
-  ]: Async: NonEmptyParallel: Parallel: GitLabClient: AccessTokenFinder: Logger: MetricsRegistry: SparqlQueryTimeRecorder]
-      : F[EventProcessor[F]] = for {
-    tsProvisioner           <- TSProvisioner[F]
+  ]: Async: NonEmptyParallel: Parallel: GitLabClient: AccessTokenFinder: Logger: MetricsRegistry: SparqlQueryTimeRecorder](
+      projectSparqlClient: ProjectSparqlClient[F]
+  )(implicit renkuUrl: RenkuUrl): F[EventProcessor[F]] = for {
+    tsProvisioner           <- TSProvisioner[F](projectSparqlClient)
     entityBuilder           <- EntityBuilder[F]
     projectExistenceChecker <- ProjectExistenceChecker[F]
     tgClient                <- triplesgenerator.api.events.Client[F]

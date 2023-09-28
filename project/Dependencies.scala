@@ -6,7 +6,7 @@ object Dependencies {
   object V {
     val ammonite               = "2.4.1"
     val catsCore               = "2.10.0"
-    val catsEffect             = "3.5.1"
+    val catsEffect             = "3.5.2"
     val catsEffectScalaTest    = "1.5.0"
     val catsEffectMunit        = "1.0.7"
     val scalacheckEffectMunit  = "1.0.4"
@@ -38,7 +38,7 @@ object Dependencies {
     val swaggerParser          = "2.1.16"
     val testContainersScala    = "0.41.0"
     val widoco                 = "1.4.20"
-    val wiremock               = "3.1.0"
+    val wiremock               = "3.2.0"
   }
 
   val ip4s = Seq(
