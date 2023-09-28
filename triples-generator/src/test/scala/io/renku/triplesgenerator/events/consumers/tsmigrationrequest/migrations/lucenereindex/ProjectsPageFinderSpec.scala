@@ -60,13 +60,13 @@ class ProjectsPageFinderSpec
 
       val (page1, page2) = slugs splitAt pageSize
 
-      finder.nextProjectsPage().unsafeRunSync() shouldBe page1
+      finder.nextProjectsPage.unsafeRunSync() shouldBe page1
 
       page1.foreach(donePersister.noteDone(_).unsafeRunSync())
-      finder.nextProjectsPage().unsafeRunSync() shouldBe page2
+      finder.nextProjectsPage.unsafeRunSync() shouldBe page2
 
       page2.foreach(donePersister.noteDone(_).unsafeRunSync())
-      finder.nextProjectsPage().unsafeRunSync() shouldBe Nil
+      finder.nextProjectsPage.unsafeRunSync() shouldBe Nil
     }
   }
 

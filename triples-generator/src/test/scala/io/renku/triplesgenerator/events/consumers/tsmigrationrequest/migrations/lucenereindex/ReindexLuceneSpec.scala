@@ -78,7 +78,7 @@ class ReindexLuceneSpec
       givenBacklogCreated()
 
       val exception = exceptions.generateOne
-      (() => projectsFinder.nextProjectsPage())
+      (() => projectsFinder.nextProjectsPage)
         .expects()
         .returning(exception.raiseError[IO, List[projects.Slug]])
 
@@ -119,7 +119,7 @@ class ReindexLuceneSpec
 
   private def givenProjectsPagesReturned(pages: List[List[projects.Slug]]): Unit =
     pages foreach { page =>
-      (projectsFinder.nextProjectsPage _)
+      (() => projectsFinder.nextProjectsPage)
         .expects()
         .returning(page.pure[IO])
     }

@@ -32,7 +32,7 @@ import org.typelevel.log4cats.Logger
 import tooling.RecordsFinder
 
 private trait ProjectsPageFinder[F[_]] {
-  def nextProjectsPage(): F[List[projects.Slug]]
+  def nextProjectsPage: F[List[projects.Slug]]
 }
 
 private object ProjectsPageFinder {
@@ -55,7 +55,7 @@ private class ProjectsPageFinderImpl[F[_]: Monad](recordsFinder: RecordsFinder[F
 
   private val pageSize: Int = 50
 
-  override def nextProjectsPage(): F[List[projects.Slug]] =
+  override def nextProjectsPage: F[List[projects.Slug]] =
     findRecords[projects.Slug](query)
 
   private lazy val query = SparqlQuery.ofUnsafe(

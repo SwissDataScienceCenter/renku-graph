@@ -58,7 +58,7 @@ private class ReindexLucene[F[_]: Async: Logger](
       Logger[F].info(show"$categoryName: $name backlog created") >>
       Stream
         .iterate(1)(_ + 1)
-        .evalMap(_ => nextProjectsPage())
+        .evalMap(_ => nextProjectsPage)
         .takeThrough(_.nonEmpty)
         .flatMap(in => Stream.emits(in))
         .evalMap(slug => findProgressInfo.map(slug -> _))

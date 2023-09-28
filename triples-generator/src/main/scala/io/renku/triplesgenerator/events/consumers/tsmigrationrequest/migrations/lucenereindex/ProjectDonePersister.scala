@@ -46,13 +46,13 @@ private class ProjectDonePersisterImpl[F[_]](tsClient: TSClient[F])(implicit ru:
   import io.renku.triplesstore.client.syntax._
 
   override def noteDone(slug: projects.Slug): F[Unit] =
-    tsClient.updateWithNoResult(v10MigratedTriple(slug))
+    tsClient.updateWithNoResult(deleteTripleQuery(slug))
 
-  private def v10MigratedTriple(slug: projects.Slug) = {
+  private def deleteTripleQuery(slug: projects.Slug) = {
     val triple = Triple(ReindexLucene.name.asEntityId, renku / "toBeMigrated", slug.asObject)
     SparqlQuery.ofUnsafe(
       show"${ReindexLucene.name} - store migrated",
-      s"DELETE DATA {${triple.asSparql.sparql}}"
+      sparql"DELETE DATA {$triple}"
     )
   }
 }
