@@ -20,6 +20,7 @@ package io.renku.entities.search
 
 import cats.data.NonEmptyList
 import cats.syntax.all._
+import eu.timepit.refined.auto._
 import io.renku.entities.search
 import io.renku.entities.search.Criteria.Filters._
 import io.renku.entities.search.Criteria.{Filters, Sort}
@@ -1039,7 +1040,7 @@ class EntitiesFinderSpec
 
     "be sorting by Matching Score if requested" in new TestCase {
 
-      val query = nonBlankStrings(minLength = 6).generateOne
+      val query: NonBlank = "project score"
 
       val ds -> project = renkuProjectEntities(visibilityPublic)
         .modify(replaceProjectName(to = projects.Name(query.value)))
