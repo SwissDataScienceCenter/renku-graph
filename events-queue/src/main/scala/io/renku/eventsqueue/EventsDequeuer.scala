@@ -20,33 +20,50 @@ package io.renku.eventsqueue
 
 import cats.effect.Async
 import cats.syntax.all._
-import fs2.Stream
+import fs2.Pipe
 import io.renku.db.SessionResource
-import io.renku.db.syntax._
+import io.renku.db.syntax.CommandDef
 import io.renku.events.CategoryName
 import org.typelevel.log4cats.Logger
+import skunk.Session
 
 trait EventsDequeuer[F[_]] {
-  def registerHandler(category: CategoryName, handler: Stream[F, DequeuedEvent] => F[Unit]): F[Unit]
+  def registerHandler(category: CategoryName, handler: Pipe[F, DequeuedEvent, DequeuedEvent]): F[Unit]
 }
 
 private class EventsDequeuerImpl[F[_]: Async: Logger, DB](repository: DBRepository[F])(implicit
     sr: SessionResource[F, DB]
 ) extends EventsDequeuer[F] {
 
-  override def registerHandler(category: CategoryName, handler: Stream[F, DequeuedEvent] => F[Unit]): F[Unit] =
+  override def registerHandler(category: CategoryName, handler: Pipe[F, DequeuedEvent, DequeuedEvent]): F[Unit] =
     sr.useK(dequeueEvents(category, handler)) >>
-      Async[F].start(deq(category, handler)).void
+      Async[F].start(dequeueWithErrorHandling(category, handler)).void
 
-  private def dequeueEvents(category: CategoryName, handler: Stream[F, DequeuedEvent] => F[Unit]) =
-    repository.fetchEvents(category).flatMapF(handler(_))
+  private def dequeueEvents(category: CategoryName, handler: Pipe[F, DequeuedEvent, DequeuedEvent]): CommandDef[F] =
+    CommandDef[F] { session =>
+      repository
+        .eventsStream(category)
+        .map(updateProcessing(session))
+        .map(_.through(handler).attempt.evalMap(logErrorAndReturnNone(category)).collect { case Some(e) => e })
+        .map(removeEvents(session))
+        .flatMapF(_.compile.drain)
+        .run(session)
+    }
 
-  private def deq(category: CategoryName, handler: Stream[F, DequeuedEvent] => F[Unit]): F[Unit] =
+  private def dequeueWithErrorHandling(category: CategoryName,
+                                       handler:  Pipe[F, DequeuedEvent, DequeuedEvent]
+  ): F[Unit] =
     sr.useK(dequeueOnEvent(category, handler))
       .handleErrorWith(logStatement(category))
-      .flatMap(_ => deq(category, handler))
+      .flatMap(_ => dequeueWithErrorHandling(category, handler))
 
-  private def dequeueOnEvent(category: CategoryName, handler: Stream[F, DequeuedEvent] => F[Unit]): CommandDef[F] =
+  private def updateProcessing(session: Session[F]): Pipe[F, DequeuedEvent, DequeuedEvent] =
+    _.evalTap(e => repository.markUnderProcessing(e.id)(session))
+
+  private def removeEvents(session: Session[F]): Pipe[F, DequeuedEvent, Unit] =
+    _.evalMap(e => repository.delete(e.id)(session))
+
+  private def dequeueOnEvent(category: CategoryName, handler: Pipe[F, DequeuedEvent, DequeuedEvent]): CommandDef[F] =
     CommandDef[F] { session =>
       session
         .channel(category.asChannelId)
@@ -58,4 +75,12 @@ private class EventsDequeuerImpl[F[_]: Async: Logger, DB](repository: DBReposito
 
   private def logStatement(category: CategoryName): Throwable => F[Unit] =
     Logger[F].error(_)(show"An error in the events dequeueing process for $category")
+
+  private def logErrorAndReturnNone(
+      category: CategoryName
+  ): Either[Throwable, DequeuedEvent] => F[Option[DequeuedEvent]] =
+    _.fold(
+      Logger[F].error(_)(show"An error in the events dequeueing process for $category").as(Option.empty[DequeuedEvent]),
+      Option(_).pure[F]
+    )
 }

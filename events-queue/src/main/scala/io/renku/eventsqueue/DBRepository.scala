@@ -25,8 +25,10 @@ import io.renku.events.CategoryName
 import fs2.Stream
 
 private trait DBRepository[F[_]] {
-  def insert(category:      CategoryName, payload: Json): CommandDef[F]
-  def fetchEvents(category: CategoryName): QueryDef[F, Stream[F, DequeuedEvent]]
+  def insert(category:             CategoryName, payload: Json): CommandDef[F]
+  def eventsStream(category:       CategoryName): QueryDef[F, Stream[F, DequeuedEvent]]
+  def markUnderProcessing(eventId: Long): CommandDef[F]
+  def delete(eventId:              Long): CommandDef[F]
 }
 
 private object DBRepository {
@@ -37,6 +39,8 @@ private object DBRepository {
 private class DBRepositoryImpl[F[_], DB](implicit sr: SessionResource[F, DB]) extends DBRepository[F] {
 
   println(sr)
-  override def insert(category:      CategoryName, payload: Json): CommandDef[F] = ???
-  override def fetchEvents(category: CategoryName): QueryDef[F, Stream[F, DequeuedEvent]] = ???
+  override def insert(category:             CategoryName, payload: Json): CommandDef[F] = ???
+  override def eventsStream(category:       CategoryName): QueryDef[F, Stream[F, DequeuedEvent]] = ???
+  override def markUnderProcessing(eventId: Long): CommandDef[F] = ???
+  override def delete(eventId:              Long): CommandDef[F] = ???
 }
