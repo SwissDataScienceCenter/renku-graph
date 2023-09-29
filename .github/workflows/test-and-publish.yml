@@ -102,10 +102,6 @@ jobs:
             ~/.cache/coursier
             ~/.sbt
           key: ${{ runner.os }}-sbt-${{ hashFiles('**/build.sbt') }}
-      - name: Write version to Chart.yaml and version.conf files
-        run: |
-          sudo rm -rf .git/index.lock
-          sbt writeVersionToChart
       - name: Set environment variables
         run: |
           echo "GIT_USER=Renku Bot" >> $GITHUB_ENV
