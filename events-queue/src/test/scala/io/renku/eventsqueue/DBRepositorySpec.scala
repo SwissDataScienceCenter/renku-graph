@@ -18,12 +18,30 @@
 
 package io.renku.eventsqueue
 
-import org.scalatest.flatspec.AnyFlatSpec
+import Generators.events
+import cats.effect.IO
+import cats.effect.testing.scalatest.AsyncIOSpec
+import io.circe.syntax._
+import io.renku.events.Generators.categoryNames
+import io.renku.generators.Generators.Implicits._
 import org.scalatest.matchers.should
+import org.scalatest.wordspec.AsyncWordSpec
 
-class DBRepositorySpec extends AnyFlatSpec with should.Matchers {
+class DBRepositorySpec extends AsyncWordSpec with AsyncIOSpec with EventsQueueDBSpec with should.Matchers {
 
-  it should "fail" in {
-    fail("boom!")
+  "insert/eventsStream" should {
+
+    "insert a new row in status 'NEW' into the enqueued_event so the eventsStream can fetch it" in {
+
+      val category = categoryNames.generateOne
+      val event    = events.generateOne
+
+      execute(repo.insert(category, event.asJson)).assertNoException >>
+        execute(repo.eventsStream(category))
+          .flatMap(_.compile.toList)
+          .asserting(_.map(_.payload) shouldBe List(event.asJson.noSpaces))
+    }
   }
+
+  private lazy val repo = new DBRepositoryImpl[IO, TestDB]
 }
