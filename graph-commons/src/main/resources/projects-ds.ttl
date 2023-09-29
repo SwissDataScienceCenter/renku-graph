@@ -29,6 +29,10 @@
 <#indexLucene> a text:TextIndexLucene ;
   text:directory <file:///fuseki/databases/projects/lucene_index> ;
   text:entityMap <#entMap> ;
+  text:analyzer [
+    a text:ConfigurableAnalyzer ;
+    text:tokenizer text:LetterTokenizer
+  ];
 .
 
 <#entMap> a         text:EntityMap ;

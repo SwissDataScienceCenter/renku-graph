@@ -24,6 +24,7 @@ import cats.{NonEmptyParallel, Parallel}
 import io.renku.events.consumers.ProcessExecutor
 import io.renku.events.consumers.subscriptions.SubscriptionMechanism
 import io.renku.events.{CategoryName, consumers}
+import io.renku.graph.model.RenkuUrl
 import io.renku.graph.tokenrepository.AccessTokenFinder
 import io.renku.http.client.GitLabClient
 import io.renku.lock.syntax._
@@ -31,7 +32,7 @@ import io.renku.metrics.MetricsRegistry
 import io.renku.triplesgenerator.TgLockDB.TsWriteLock
 import io.renku.triplesgenerator.events.consumers.TSReadinessForEventsChecker
 import io.renku.triplesgenerator.events.consumers.tsmigrationrequest.migrations.reprovisioning.ReProvisioningStatus
-import io.renku.triplesstore.SparqlQueryTimeRecorder
+import io.renku.triplesstore.{ProjectSparqlClient, SparqlQueryTimeRecorder}
 import org.typelevel.log4cats.Logger
 
 private class EventHandler[F[_]: MonadCancelThrow: Logger](
@@ -62,10 +63,11 @@ private object EventHandler {
   ]: Async: NonEmptyParallel: Parallel: ReProvisioningStatus: GitLabClient: AccessTokenFinder: Logger: MetricsRegistry: SparqlQueryTimeRecorder](
       subscriptionMechanism:     SubscriptionMechanism[F],
       concurrentProcessesNumber: ConcurrentProcessesNumber,
-      tsWriteLock:               TsWriteLock[F]
-  ): F[consumers.EventHandler[F]] = for {
+      tsWriteLock:               TsWriteLock[F],
+      projectSparqlClient:       ProjectSparqlClient[F]
+  )(implicit renkuUrl: RenkuUrl): F[consumers.EventHandler[F]] = for {
     tsReadinessChecker <- TSReadinessForEventsChecker[F]
-    eventProcessor     <- EventProcessor[F]
+    eventProcessor     <- EventProcessor[F](projectSparqlClient)
     processExecutor    <- ProcessExecutor.concurrent(concurrentProcessesNumber.asRefined)
   } yield new EventHandler[F](
     categoryName,

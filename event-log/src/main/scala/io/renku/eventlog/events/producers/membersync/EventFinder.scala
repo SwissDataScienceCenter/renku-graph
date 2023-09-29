@@ -20,7 +20,7 @@ package io.renku.eventlog.events.producers.membersync
 
 import cats.MonadThrow
 import cats.data.Kleisli
-import cats.effect.MonadCancelThrow
+import cats.effect.Async
 import cats.syntax.all._
 import io.renku.db.{DbClient, SqlStatement}
 import io.renku.eventlog.EventLogDB.SessionResource
@@ -29,13 +29,13 @@ import io.renku.eventlog.metrics.QueriesExecutionTimes
 import io.renku.events.CategoryName
 import io.renku.graph.model.events.{EventDate, LastSyncedDate}
 import io.renku.graph.model.projects
+import skunk._
 import skunk.data.Completion
 import skunk.implicits._
-import skunk._
 
 import java.time.Instant
 
-private class EventFinderImpl[F[_]: MonadCancelThrow: SessionResource: QueriesExecutionTimes](
+private class EventFinderImpl[F[_]: Async: SessionResource: QueriesExecutionTimes](
     now: () => Instant = () => Instant.now
 ) extends DbClient(Some(QueriesExecutionTimes[F]))
     with EventFinder[F, MemberSyncEvent]
@@ -141,6 +141,6 @@ private class EventFinderImpl[F[_]: MonadCancelThrow: SessionResource: QueriesEx
 }
 
 private object EventFinder {
-  def apply[F[_]: MonadCancelThrow: SessionResource: QueriesExecutionTimes]: F[EventFinder[F, MemberSyncEvent]] =
+  def apply[F[_]: Async: SessionResource: QueriesExecutionTimes]: F[EventFinder[F, MemberSyncEvent]] =
     MonadThrow[F].catchNonFatal(new EventFinderImpl[F]())
 }

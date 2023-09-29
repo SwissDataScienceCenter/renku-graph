@@ -20,7 +20,7 @@ package io.renku.eventlog.events.consumers.projectsync
 
 import cats.MonadThrow
 import cats.data.Kleisli
-import cats.effect.MonadCancelThrow
+import cats.effect.Async
 import cats.syntax.all._
 import io.renku.db.{DbClient, SqlStatement}
 import io.renku.eventlog.EventLogDB.SessionResource
@@ -32,7 +32,7 @@ private trait ProjectRemover[F[_]] {
   def removeProject(projectId: projects.GitLabId): F[Unit]
 }
 
-private class ProjectRemoverImpl[F[_]: MonadCancelThrow: SessionResource: QueriesExecutionTimes]
+private class ProjectRemoverImpl[F[_]: Async: SessionResource: QueriesExecutionTimes]
     extends DbClient(Some(QueriesExecutionTimes[F]))
     with ProjectRemover[F]
     with TypeSerializers {
@@ -80,6 +80,6 @@ private class ProjectRemoverImpl[F[_]: MonadCancelThrow: SessionResource: Querie
 }
 
 private object ProjectRemover {
-  def apply[F[_]: MonadCancelThrow: SessionResource: QueriesExecutionTimes]: F[ProjectRemover[F]] =
+  def apply[F[_]: Async: SessionResource: QueriesExecutionTimes]: F[ProjectRemover[F]] =
     MonadThrow[F].catchNonFatal(new ProjectRemoverImpl[F]).widen
 }

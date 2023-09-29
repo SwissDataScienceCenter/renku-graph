@@ -18,7 +18,7 @@
 
 package io.renku.eventlog.eventdetails
 
-import cats.effect.Concurrent
+import cats.effect.{Async, Concurrent}
 import cats.syntax.all._
 import eu.timepit.refined.auto._
 import io.circe.Encoder
@@ -67,7 +67,7 @@ class EventDetailsEndpointImpl[F[_]: Concurrent: Logger](eventDetailsFinder: Eve
 }
 
 object EventDetailsEndpoint {
-  def apply[F[_]: Concurrent: SessionResource: Logger: QueriesExecutionTimes]: F[EventDetailsEndpoint[F]] = for {
+  def apply[F[_]: Async: SessionResource: Logger: QueriesExecutionTimes]: F[EventDetailsEndpoint[F]] = for {
     eventDetailFinder <- EventDetailsFinder[F]
   } yield new EventDetailsEndpointImpl[F](eventDetailFinder)
 }

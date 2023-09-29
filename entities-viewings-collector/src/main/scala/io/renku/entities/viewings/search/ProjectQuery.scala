@@ -21,7 +21,9 @@ package io.renku.entities.viewings.search
 import eu.timepit.refined.auto._
 import io.renku.entities.viewings.search.RecentEntitiesFinder.{Criteria, EntityType}
 import io.renku.graph.model.entities.Person
+import io.renku.graph.model.projects.Visibility
 import io.renku.graph.model.{GraphClass, Schemas}
+import io.renku.projectauth.util.SparqlSnippets
 import io.renku.triplesstore.SparqlQuery
 import io.renku.triplesstore.SparqlQuery.Prefixes
 import io.renku.triplesstore.client.syntax._
@@ -58,6 +60,8 @@ object ProjectQuery extends (Criteria => Option[SparqlQuery]) {
                |      ?personSameAs schema:additionalType ${Person.gitLabSameAsAdditionalType};
                |                    schema:identifier ${criteria.authUser.id.value}.
                |    }
+               |
+               |    ${SparqlSnippets.visibleProjects(Some(criteria.authUser.id), Visibility.all)}
                |
                |    Graph ?projectId {
                |      ?projectId a schema:Project;

@@ -20,7 +20,7 @@ package io.renku.eventlog.events.consumers.commitsyncrequest
 
 import cats.MonadThrow
 import cats.data.Kleisli
-import cats.effect.MonadCancelThrow
+import cats.effect.Async
 import cats.syntax.all._
 import eu.timepit.refined.api.Refined
 import io.renku.db.{DbClient, SqlStatement}
@@ -41,7 +41,7 @@ private trait CommitSyncForcer[F[_]] {
   def forceCommitSync(projectId: projects.GitLabId, projectSlug: projects.Slug): F[Unit]
 }
 
-private class CommitSyncForcerImpl[F[_]: MonadCancelThrow: SessionResource: QueriesExecutionTimes]
+private class CommitSyncForcerImpl[F[_]: Async: SessionResource: QueriesExecutionTimes]
     extends DbClient(Some(QueriesExecutionTimes[F]))
     with CommitSyncForcer[F]
     with TypeSerializers
@@ -83,6 +83,6 @@ private class CommitSyncForcerImpl[F[_]: MonadCancelThrow: SessionResource: Quer
 }
 
 private object CommitSyncForcer {
-  def apply[F[_]: MonadCancelThrow: SessionResource: QueriesExecutionTimes]: F[CommitSyncForcer[F]] =
+  def apply[F[_]: Async: SessionResource: QueriesExecutionTimes]: F[CommitSyncForcer[F]] =
     MonadThrow[F].catchNonFatal(new CommitSyncForcerImpl[F])
 }

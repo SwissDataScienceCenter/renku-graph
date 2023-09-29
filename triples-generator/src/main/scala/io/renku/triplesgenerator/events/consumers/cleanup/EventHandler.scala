@@ -24,13 +24,14 @@ import eu.timepit.refined.auto._
 import io.renku.events.consumers.ProcessExecutor
 import io.renku.events.consumers.subscriptions.SubscriptionMechanism
 import io.renku.events.{CategoryName, consumers}
+import io.renku.graph.model.RenkuUrl
 import io.renku.metrics.MetricsRegistry
 import io.renku.lock.syntax._
 import io.renku.triplesgenerator.TgLockDB.TsWriteLock
 import io.renku.triplesgenerator.api.events.CleanUpEvent
 import io.renku.triplesgenerator.events.consumers.TSReadinessForEventsChecker
 import io.renku.triplesgenerator.events.consumers.tsmigrationrequest.migrations.reprovisioning.ReProvisioningStatus
-import io.renku.triplesstore.SparqlQueryTimeRecorder
+import io.renku.triplesstore.{ProjectSparqlClient, SparqlQueryTimeRecorder}
 import org.typelevel.log4cats.Logger
 
 private class EventHandler[F[_]: MonadCancelThrow: Logger](
@@ -57,10 +58,11 @@ private object EventHandler {
 
   def apply[F[_]: Async: ReProvisioningStatus: Logger: MetricsRegistry: SparqlQueryTimeRecorder](
       subscriptionMechanism: SubscriptionMechanism[F],
-      tsWriteLock:           TsWriteLock[F]
-  ): F[consumers.EventHandler[F]] = for {
+      tsWriteLock:           TsWriteLock[F],
+      projectSparqlClient:   ProjectSparqlClient[F]
+  )(implicit renkuUrl: RenkuUrl): F[consumers.EventHandler[F]] = for {
     tsReadinessChecker <- TSReadinessForEventsChecker[F]
-    eventProcessor     <- EventProcessor[F]
+    eventProcessor     <- EventProcessor[F](projectSparqlClient)
     processExecutor    <- ProcessExecutor.concurrent(processesCount = 1)
   } yield new EventHandler[F](
     categoryName,

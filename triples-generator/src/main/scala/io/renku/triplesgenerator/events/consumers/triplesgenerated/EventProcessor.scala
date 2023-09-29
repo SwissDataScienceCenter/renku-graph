@@ -23,6 +23,7 @@ import cats.effect.Async
 import cats.syntax.all._
 import cats.{MonadThrow, NonEmptyParallel, Parallel}
 import eu.timepit.refined.auto._
+import io.renku.graph.model.RenkuUrl
 import io.renku.graph.model.events.{EventProcessingTime, EventStatus}
 import io.renku.graph.tokenrepository.AccessTokenFinder
 import io.renku.http.client.{AccessToken, GitLabClient}
@@ -36,7 +37,7 @@ import io.renku.triplesgenerator.events.consumers.EventStatusUpdater._
 import io.renku.triplesgenerator.tsprovisioning.triplesuploading.TriplesUploadResult
 import io.renku.triplesgenerator.tsprovisioning.triplesuploading.TriplesUploadResult._
 import io.renku.triplesgenerator.tsprovisioning.{TSProvisioner, UploadingResult}
-import io.renku.triplesstore.SparqlQueryTimeRecorder
+import io.renku.triplesstore.{ProjectSparqlClient, SparqlQueryTimeRecorder}
 import org.typelevel.log4cats.Logger
 
 import java.time.Duration
@@ -195,9 +196,10 @@ private object EventProcessor {
 
   def apply[F[
       _
-  ]: Async: NonEmptyParallel: Parallel: GitLabClient: AccessTokenFinder: Logger: MetricsRegistry: SparqlQueryTimeRecorder]
-      : F[EventProcessor[F]] = for {
-    tsProvisioner      <- TSProvisioner[F]
+  ]: Async: NonEmptyParallel: Parallel: GitLabClient: AccessTokenFinder: Logger: MetricsRegistry: SparqlQueryTimeRecorder](
+      projectSparqlClient: ProjectSparqlClient[F]
+  )(implicit renkuUrl: RenkuUrl): F[EventProcessor[F]] = for {
+    tsProvisioner      <- TSProvisioner[F](projectSparqlClient)
     eventStatusUpdater <- EventStatusUpdater(categoryName)
     eventsProcessingTimes <- Histogram(
                                name = "triples_transformation_processing_times",

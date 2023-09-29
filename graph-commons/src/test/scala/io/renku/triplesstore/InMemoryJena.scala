@@ -87,6 +87,9 @@ trait InMemoryJena {
       .sequence
       .void
 
+  def uploadIO[T](to: DatasetName, objects: T*)(implicit ef: EntityFunctions[T], gp: GraphsProducer[T]): IO[Unit] =
+    uploadIO(to, objects >>= gp.apply: _*)
+
   def upload(to: DatasetName, graphs: Graph*)(implicit ioRuntime: IORuntime): Unit =
     uploadIO(to, graphs: _*).unsafeRunSync()
 

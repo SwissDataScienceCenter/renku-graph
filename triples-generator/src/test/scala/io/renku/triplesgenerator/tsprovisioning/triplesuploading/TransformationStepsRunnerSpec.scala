@@ -27,8 +27,9 @@ import io.renku.generators.Generators._
 import io.renku.graph.model.GraphModelGenerators.personNames
 import io.renku.graph.model.entities
 import io.renku.graph.model.testentities._
-import io.renku.triplesgenerator.errors.ProcessingRecoverableError
 import io.renku.triplesgenerator.errors.ErrorGenerators.{logWorthyRecoverableErrors, processingRecoverableErrors}
+import io.renku.triplesgenerator.errors.ProcessingRecoverableError
+import io.renku.triplesgenerator.events.consumers.membersync.ProjectAuthSync
 import io.renku.triplesgenerator.tsprovisioning.Generators._
 import io.renku.triplesgenerator.tsprovisioning.TransformationStep
 import io.renku.triplesgenerator.tsprovisioning.TransformationStep.{ProjectWithQueries, Queries}
@@ -79,6 +80,7 @@ class TransformationStepsRunnerSpec extends AnyWordSpec with MockFactory with sh
         }
 
         givenSearchGraphProvisioning(step2Project, returning = rightT(()))
+        (projectAuthSync.syncProject _).expects(*).returning(Try(()))
       }
 
       stepsRunner.run(
@@ -338,7 +340,8 @@ class TransformationStepsRunnerSpec extends AnyWordSpec with MockFactory with sh
   private trait TestCase {
     val resultsUploader                 = mock[TransformationResultsUploader[Try]]
     private val searchGraphsProvisioner = mock[SearchGraphsProvisioner[Try]]
-    val stepsRunner = new TransformationStepsRunnerImpl[Try](resultsUploader, searchGraphsProvisioner)
+    val projectAuthSync                 = mock[ProjectAuthSync[Try]]
+    val stepsRunner = new TransformationStepsRunnerImpl[Try](resultsUploader, searchGraphsProvisioner, projectAuthSync)
 
     def givenSearchGraphProvisioning(project:   entities.Project,
                                      returning: EitherT[Try, ProcessingRecoverableError, Unit]

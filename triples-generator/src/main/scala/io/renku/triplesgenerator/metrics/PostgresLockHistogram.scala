@@ -33,7 +33,7 @@ object PostgresLockHistogram {
       name = "postgres_lock_wait_times",
       help = "PostgresLock wait times",
       labelName = "object_id",
-      buckets = Seq(.05, .1, .5, 1, 2.5, 5, 10, 50),
+      maybeBuckets = Seq(.05, .1, .5, 1, 2.5, 5, 10, 50).some,
       maybeThreshold = 200.millis.some
     ) with PostgresLockHistogram[F]
   }.widen

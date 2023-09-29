@@ -50,6 +50,7 @@ private[tsmigrationrequest] object Migrations {
     addProjectSlug                 <- projectslug.AddProjectSlug[F]
     datasetsGraphPersonRemover     <- DatasetsGraphPersonRemover[F]
     projectsGraphPersonRemover     <- ProjectsGraphPersonRemover[F]
+    reindexLucene                  <- lucenereindex.ReindexLucene[F]
     migrations <- validateNames(
                     datasetsCreator,
                     datasetsRemover,
@@ -67,7 +68,8 @@ private[tsmigrationrequest] object Migrations {
                     fixMultipleProjectVersions,
                     addProjectSlug,
                     datasetsGraphPersonRemover,
-                    projectsGraphPersonRemover
+                    projectsGraphPersonRemover,
+                    reindexLucene
                   )
   } yield migrations
 

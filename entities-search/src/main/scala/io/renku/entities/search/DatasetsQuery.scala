@@ -24,9 +24,9 @@ import io.circe.{Decoder, DecodingFailure}
 import io.renku.entities.search.Criteria.Filters
 import io.renku.entities.search.model.{Entity, MatchingScore}
 import io.renku.graph.model._
-import io.renku.graph.model.entities.Person
 import io.renku.graph.model.projects.Visibility
 import io.renku.http.server.security.model.AuthUser
+import io.renku.projectauth.util.SparqlSnippets
 import io.renku.triplesstore.client.sparql.{Fragment, LuceneQuery, VarName}
 import io.renku.triplesstore.client.syntax._
 
@@ -146,46 +146,11 @@ object DatasetsQuery extends EntityQuery[Entity.Dataset] {
          |""".stripMargin
 
   private def accessRightsAndVisibility(maybeUser: Option[AuthUser], visibilities: Set[Visibility]): Fragment =
-    maybeUser match {
-      case Some(user) =>
-        val nonPrivateVisibilities =
-          if (visibilities.isEmpty)
-            projects.Visibility.all - projects.Visibility.Private
-          else (projects.Visibility.all - projects.Visibility.Private) intersect visibilities
-
-        val selectPrivateValue =
-          if (visibilities.isEmpty || visibilities.contains(projects.Visibility.Private))
-            projects.Visibility.Private.asObject
-          else "".asTripleObject
-        fr"""|{
-             |  ?projId renku:projectVisibility ?visibility .
-             |  {
-             |    VALUES (?visibility) {
-             |      ${nonPrivateVisibilities.map(_.asObject)}
-             |    }
-             |  } UNION {
-             |    VALUES (?visibility) {
-             |      ($selectPrivateValue)
-             |    }
-             |    ?projId schema:member ?memberId.
-             |    GRAPH ${GraphClass.Persons.id} {
-             |      ?memberId schema:sameAs ?memberSameAs.
-             |      ?memberSameAs schema:additionalType ${Person.gitLabSameAsAdditionalType.asTripleObject};
-             |                    schema:identifier ${user.id.asObject}
-             |    }
-             |  }
-             |}
-             |""".stripMargin
-      case None =>
-        visibilities match {
-          case v if v.isEmpty || v.contains(projects.Visibility.Public) =>
-            fr"""|?projId renku:projectVisibility ?visibility .
-                 |VALUES (?visibility) { (${projects.Visibility.Public.asObject}) }""".stripMargin
-          case _ =>
-            fr"""|?projId renku:projectVisibility ?visibility .
-                 |VALUES (?visibility) { ('') }""".stripMargin
-        }
-    }
+    sparql"""
+            |?projId renku:projectVisibility ?visibility .
+            |BIND (?projId AS ${SparqlSnippets.projectId})
+            |${SparqlSnippets.visibleProjects(maybeUser.map(_.id), visibilities)}
+            """
 
   private def images: Fragment =
     fr"""|       OPTIONAL {

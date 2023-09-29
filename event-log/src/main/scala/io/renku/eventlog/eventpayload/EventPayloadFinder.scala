@@ -18,7 +18,7 @@
 
 package io.renku.eventlog.eventpayload
 
-import cats.effect.MonadCancelThrow
+import cats.effect.Async
 import eu.timepit.refined.auto._
 import io.renku.db.{DbClient, SqlStatement}
 import io.renku.eventlog.EventLogDB.SessionResource
@@ -43,7 +43,7 @@ object EventPayloadFinder {
     def length: Long = data.length
   }
 
-  def apply[F[_]: MonadCancelThrow: SessionResource: QueriesExecutionTimes]: EventPayloadFinder[F] =
+  def apply[F[_]: Async: SessionResource: QueriesExecutionTimes]: EventPayloadFinder[F] =
     new DbClient[F](Some(QueriesExecutionTimes[F])) with EventPayloadFinder[F] with TypeSerializers {
 
       override def findEventPayload(eventId: EventId, projectSlug: ProjectSlug): F[Option[PayloadData]] =

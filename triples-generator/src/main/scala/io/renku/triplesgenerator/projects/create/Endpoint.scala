@@ -23,9 +23,10 @@ import cats.effect.Async
 import cats.syntax.all._
 import eu.timepit.refined.auto._
 import io.renku.data.Message
+import io.renku.graph.model.RenkuUrl
 import io.renku.triplesgenerator.TgLockDB.TsWriteLock
 import io.renku.triplesgenerator.api.NewProject
-import io.renku.triplesstore.SparqlQueryTimeRecorder
+import io.renku.triplesstore.{ProjectSparqlClient, SparqlQueryTimeRecorder}
 import org.http4s.circe.CirceEntityDecoder._
 import org.http4s.dsl.Http4sDsl
 import org.http4s.{Request, Response}
@@ -36,8 +37,11 @@ trait Endpoint[F[_]] {
 }
 
 object Endpoint {
-  def apply[F[_]: Async: Logger: SparqlQueryTimeRecorder](tsWriteLock: TsWriteLock[F]): F[Endpoint[F]] =
-    ProjectCreator[F](tsWriteLock).map(new EndpointImpl[F](_))
+  def apply[F[_]: Async: Logger: SparqlQueryTimeRecorder](
+      tsWriteLock:         TsWriteLock[F],
+      projectSparqlClient: ProjectSparqlClient[F]
+  )(implicit renkuUrl: RenkuUrl): F[Endpoint[F]] =
+    ProjectCreator[F](tsWriteLock, projectSparqlClient).map(new EndpointImpl[F](_))
 }
 
 private class EndpointImpl[F[_]: Async: Logger](projectCreator: ProjectCreator[F])

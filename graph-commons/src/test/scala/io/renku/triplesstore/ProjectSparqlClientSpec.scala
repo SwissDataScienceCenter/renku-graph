@@ -20,13 +20,15 @@ package io.renku.triplesstore
 
 import cats.effect.IO
 import cats.effect.testing.scalatest.AsyncIOSpec
+import cats.syntax.all._
 import eu.timepit.refined.auto._
-import io.prometheus.client.Histogram
 import io.renku.cli.model.CliSoftwareAgent
 import io.renku.graph.model.agents
 import io.renku.interpreters.TestLogger
 import io.renku.jsonld.syntax._
 import io.renku.logging.TestExecutionTimeRecorder
+import io.renku.metrics.MetricsTools._
+import io.renku.metrics._
 import io.renku.triplesstore.client.syntax._
 import io.renku.triplesstore.client.util.JenaContainerSupport
 import org.scalatest.flatspec.AsyncFlatSpec
@@ -36,23 +38,23 @@ import org.typelevel.log4cats.Logger
 class ProjectSparqlClientSpec extends AsyncFlatSpec with AsyncIOSpec with JenaContainerSupport with should.Matchers {
   implicit val logger: Logger[IO] = TestLogger()
 
-  val makeHistogram = IO(
-    new Histogram.Builder().name("test").help("test").labelNames("update").buckets(0.5, 0.8).create()
-  )
+  private val makeHistogram: IO[LabeledHistogram[IO] with PrometheusCollector] = IO {
+    new LabeledHistogramImpl[IO]("test", "test", "update", Seq(0.5d, 0.8d).some, maybeThreshold = None)
+  }
 
-  def makeSparqlQueryTimeRecorder(h: Histogram): SparqlQueryTimeRecorder[IO] =
+  def makeSparqlQueryTimeRecorder(h: Histogram[IO]): SparqlQueryTimeRecorder[IO] =
     new SparqlQueryTimeRecorder[IO](TestExecutionTimeRecorder[IO](Some(h)))
 
   def withProjectClient(implicit sqr: SparqlQueryTimeRecorder[IO]) =
     withDataset("projects").map(ProjectSparqlClient.apply(_))
 
-  def assertSampled(histogram: Histogram) =
-    histogram.collect().get(0).samples.size should be > 0
+  def assertSampled(histogram: PrometheusCollector) =
+    histogram.collectAllSamples.size should be > 0
 
-  def assertNotSampled(histogram: Histogram) =
-    histogram.collect().get(0).samples.size shouldBe 0
+  def assertNotSampled(histogram: PrometheusCollector) =
+    histogram.collectAllSamples.size shouldBe 0
 
-  def resetHistogram(histogram: Histogram) = {
+  def resetHistogram(histogram: PrometheusCollector) = {
     histogram.clear()
     assertNotSampled(histogram)
   }
@@ -120,5 +122,4 @@ class ProjectSparqlClientSpec extends AsyncFlatSpec with AsyncIOSpec with JenaCo
       } yield ()
     }
   }
-
 }

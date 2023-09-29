@@ -64,9 +64,9 @@ object AllProjects {
           s"""
              |SELECT DISTINCT ?projectSlug
              |WHERE {
-             |  Graph ?g {
+             |  Graph ?projectId {
              |    ?projectId a schema:Project;
-             |      renku:projectPath ?projectSlug.
+             |               renku:slug ?projectSlug.
              |  }
              |}
              |ORDER BY ?projectId
