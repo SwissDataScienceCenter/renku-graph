@@ -26,12 +26,13 @@ import io.circe.Decoder
 import io.renku.graph.config.RenkuUrlLoader
 import io.renku.graph.model.RenkuUrl
 import io.renku.graph.model.Schemas.renku
-import io.renku.triplesstore._
 import io.renku.triplesstore.SparqlQuery.Prefixes
+import io.renku.triplesstore._
 import org.typelevel.log4cats.Logger
 
 private trait ProgressFinder[F[_]] {
   def findProgressInfo: F[String]
+  def findLeftInBacklog:    F[Int]
 }
 
 private object ProgressFinder {
@@ -51,26 +52,26 @@ private class ProgressFinderImpl[F[_]: Sync](migrationsDSClient: TSClient[F])(im
   private val total: Ref[F, Int] = Ref.unsafe[F, Int](0)
 
   override def findProgressInfo: F[String] = for {
-    left  <- findLeftCount
+    left  <- findLeftInBacklog
     total <- findTotal
   } yield s"$left left from $total"
 
-  private def findLeftCount =
+  override def findLeftInBacklog: F[Int] =
     migrationsDSClient.queryExpecting[Int](
       SparqlQuery.ofUnsafe(
         show"${ReindexLucene.name} - find left",
         Prefixes of (renku -> "renku"),
-        s"""|SELECT (COUNT(?slug) AS ?count)
-            |WHERE {
-            |  ${ReindexLucene.name.asEntityId.asSparql.sparql} renku:toBeMigrated ?slug
-            |}
-            |""".stripMargin
+        sparql"""|SELECT (COUNT(?slug) AS ?count)
+                 |WHERE {
+                 |  ${ReindexLucene.name.asEntityId} renku:toBeMigrated ?slug
+                 |}
+                 |""".stripMargin
       )
     )
 
   private def findTotal: F[Int] =
     total.get >>= {
-      case 0       => findLeftCount >>= (v => total.updateAndGet(_ => v))
+      case 0       => findLeftInBacklog >>= (v => total.updateAndGet(_ => v))
       case nonZero => nonZero.pure[F]
     }
 
