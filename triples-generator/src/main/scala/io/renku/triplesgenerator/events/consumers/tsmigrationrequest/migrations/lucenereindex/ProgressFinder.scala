@@ -31,8 +31,8 @@ import io.renku.triplesstore._
 import org.typelevel.log4cats.Logger
 
 private trait ProgressFinder[F[_]] {
-  def findProgressInfo: F[String]
-  def findLeftInBacklog:    F[Int]
+  def findProgressInfo:  F[String]
+  def findLeftInBacklog: F[Int]
 }
 
 private object ProgressFinder {
