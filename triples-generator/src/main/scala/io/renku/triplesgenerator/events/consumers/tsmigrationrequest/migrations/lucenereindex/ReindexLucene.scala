@@ -20,12 +20,12 @@ package io.renku.triplesgenerator.events.consumers.tsmigrationrequest
 package migrations
 package lucenereindex
 
+import cats.Applicative
 import cats.data.EitherT
 import cats.effect.Async
 import cats.syntax.all._
 import io.renku.eventlog
 import io.renku.eventlog.api.events.StatusChangeEvent
-import io.renku.events.CategoryName
 import io.renku.graph.model.projects
 import io.renku.metrics.MetricsRegistry
 import io.renku.triplesgenerator.errors.ProcessingRecoverableError
@@ -44,17 +44,17 @@ private class ReindexLucene[F[_]: Async: Logger](
     recoveryStrategy:     RecoverableErrorsRecovery = RecoverableErrorsRecovery
 ) extends RegisteredMigration[F](ReindexLucene.name, executionRegister, recoveryStrategy) {
 
+  private val applicative = Applicative[F]
+  import applicative.whenA
   import envReadinessChecker._
   import fs2._
-  import progressFinder._
+  import progressFinder.{findLeftInBacklog, findProgressInfo}
   import projectDonePersister._
   import projectsFinder._
   import recoveryStrategy._
 
-  private val cleanUpEventCategory = CategoryName("CLEAN_UP_REQUEST")
-
   protected[lucenereindex] override def migrate(): EitherT[F, ProcessingRecoverableError, Unit] = EitherT {
-    backlogCreator.createBacklog() >>
+    findLeftInBacklog.flatMap(cnt => whenA(cnt == 0)(backlogCreator.createBacklog())) >>
       Logger[F].info(show"$categoryName: $name backlog created") >>
       Stream
         .iterate(1)(_ + 1)
@@ -64,7 +64,7 @@ private class ReindexLucene[F[_]: Async: Logger](
         .evalMap(slug => findProgressInfo.map(slug -> _))
         .evalTap { case (slug, info) => logInfo(show"processing project '$slug'; waiting for free resources", info) }
         .evalTap(_ => envReadyToTakeEvent)
-        .evalTap { case (slug, info) => logInfo(show"sending $cleanUpEventCategory event for '$slug'", info) }
+        .evalTap { case (slug, info) => logInfo(show"sending RedoProjectTransformation event for '$slug'", info) }
         .evalTap(sendRedoProjectTransformation)
         .evalTap { case (slug, _) => noteDone(slug) }
         .evalTap { case (slug, info) => logInfo(show"event sent for '$slug'", info) }

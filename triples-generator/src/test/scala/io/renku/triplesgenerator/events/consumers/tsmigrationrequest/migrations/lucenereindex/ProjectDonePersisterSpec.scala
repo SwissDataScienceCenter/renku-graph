@@ -19,53 +19,51 @@
 package io.renku.triplesgenerator.events.consumers.tsmigrationrequest.migrations.lucenereindex
 
 import cats.effect.IO
+import cats.syntax.all._
 import io.renku.generators.Generators.Implicits._
 import io.renku.graph.model.GraphModelGenerators.renkuUrls
 import io.renku.graph.model.RenkuTinyTypeGenerators.projectSlugs
 import io.renku.graph.model.RenkuUrl
 import io.renku.interpreters.TestLogger
 import io.renku.logging.TestSparqlQueryTimeRecorder
-import io.renku.testtools.IOSpec
+import io.renku.testtools.CustomAsyncIOSpec
 import io.renku.triplesstore._
-import org.scalatest.OptionValues
+import org.scalatest.flatspec.AsyncFlatSpec
 import org.scalatest.matchers.should
-import org.scalatest.wordspec.AnyWordSpec
+import org.scalatest.{OptionValues, Succeeded}
 
 import scala.util.Random
 
 class ProjectDonePersisterSpec
-    extends AnyWordSpec
+    extends AsyncFlatSpec
     with should.Matchers
-    with IOSpec
+    with CustomAsyncIOSpec
     with InMemoryJenaForSpec
     with MigrationsDataset
     with OptionValues {
 
-  "noteDone" should {
+  it should "persist the (MigrationToV10, renku:migrated, slug) triple" in {
 
-    "persist the (MigrationToV10, renku:migrated, slug) triple" in new TestCase {
+    val slugs = projectSlugs.generateList(min = 2)
 
-      val slugs = projectSlugs.generateList(min = 2)
+    for {
+      _ <- slugs.map { slug =>
+             val insertQuery = BacklogCreator.asToBeMigratedInserts(slug)
+             runUpdate(on = migrationsDataset, insertQuery)
+           }.sequence
 
-      slugs foreach { slug =>
-        val insertQuery = BacklogCreator.asToBeMigratedInserts(slug)
-        runUpdate(on = migrationsDataset, insertQuery).unsafeRunSync()
-      }
+      _ <- progressFinder.findProgressInfo.asserting(_ shouldBe s"${slugs.size} left from ${slugs.size}")
 
-      progressFinder.findProgressInfo.unsafeRunSync() shouldBe s"${slugs.size} left from ${slugs.size}"
+      _ <- donePersister.noteDone(Random.shuffle(slugs).head).assertNoException
 
-      donePersister.noteDone(Random.shuffle(slugs).head).unsafeRunSync()
-
-      progressFinder.findProgressInfo.unsafeRunSync() shouldBe s"${slugs.size - 1} left from ${slugs.size}"
-    }
+      _ <- progressFinder.findProgressInfo.asserting(_ shouldBe s"${slugs.size - 1} left from ${slugs.size}")
+    } yield Succeeded
   }
 
-  private trait TestCase {
-    implicit val renkuUrl:       RenkuUrl                    = renkuUrls.generateOne
-    private implicit val logger: TestLogger[IO]              = TestLogger[IO]()
-    private implicit val tr:     SparqlQueryTimeRecorder[IO] = TestSparqlQueryTimeRecorder[IO].unsafeRunSync()
-    private val tsClient = TSClient[IO](migrationsDSConnectionInfo)
-    val progressFinder   = new ProgressFinderImpl[IO](tsClient)
-    val donePersister    = new ProjectDonePersisterImpl[IO](tsClient)
-  }
+  private implicit lazy val renkuUrl: RenkuUrl                    = renkuUrls.generateOne
+  private implicit val logger:        TestLogger[IO]              = TestLogger[IO]()
+  private implicit val tr:            SparqlQueryTimeRecorder[IO] = TestSparqlQueryTimeRecorder[IO].unsafeRunSync()
+  private lazy val tsClient       = TSClient[IO](migrationsDSConnectionInfo)
+  private lazy val progressFinder = new ProgressFinderImpl[IO](tsClient)
+  private lazy val donePersister  = new ProjectDonePersisterImpl[IO](tsClient)
 }

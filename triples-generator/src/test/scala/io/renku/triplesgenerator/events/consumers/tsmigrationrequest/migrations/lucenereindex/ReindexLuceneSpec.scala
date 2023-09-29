@@ -45,12 +45,14 @@ class ReindexLuceneSpec
     with AsyncMockFactory
     with EitherValues {
 
-  it should "prepare backlog of all the projects in the TS " +
+  it should "prepare backlog of all the projects in the TS if no backlog has been created yet " +
     "and start the process that " +
     "goes through all the projects, " +
     "wait until the env has capacity to serve a new re-provisioning event, " +
     "send the RedoProjectTransformation event to EL for each of them, " +
     "keep a note of the project once an event is sent for it" in {
+
+      givenFindingLeftProjectsInBacklog(returning = 0.pure[IO])
 
       givenBacklogCreated()
 
@@ -72,8 +74,33 @@ class ReindexLuceneSpec
       migration.migrate().value.asserting(_.value shouldBe ())
     }
 
+  it should "skip the backlog preparation task if the backlog is already built " +
+    "and start the process where it was stopped" in {
+
+      givenFindingLeftProjectsInBacklog(returning = positiveInts().generateOne.value.pure[IO])
+
+      val allProjects = projectSlugs.generateList(min = pageSize, max = pageSize * 2)
+
+      val projectsPages = allProjects
+        .sliding(pageSize, pageSize)
+        .toList
+      givenProjectsPagesReturned(projectsPages :+ List.empty[projects.Slug])
+
+      givenProgressInfoFinding(returning = nonEmptyStrings().generateOne.pure[IO], times = allProjects.size)
+
+      givenEnvHasCapabilitiesToTakeNextEvent
+
+      allProjects map givenRedoTransformationEventSent
+
+      allProjects foreach verifyProjectNotedDone
+
+      migration.migrate().value.asserting(_.value shouldBe ())
+    }
+
   it should "return a Recoverable Error if in case of an exception while finding projects " +
     "the given strategy returns one" in {
+
+      givenFindingLeftProjectsInBacklog(returning = 0.pure[IO])
 
       givenBacklogCreated()
 
@@ -123,6 +150,11 @@ class ReindexLuceneSpec
         .expects()
         .returning(page.pure[IO])
     }
+
+  private def givenFindingLeftProjectsInBacklog(returning: IO[Int]) =
+    (() => progressFinder.findLeftInBacklog)
+      .expects()
+      .returning(returning)
 
   private def givenProgressInfoFinding(returning: IO[String], times: Int) =
     (() => progressFinder.findProgressInfo)

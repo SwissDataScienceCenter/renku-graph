@@ -29,68 +29,63 @@ import io.renku.graph.model.versions.SchemaVersion
 import io.renku.interpreters.TestLogger
 import io.renku.jsonld.syntax._
 import io.renku.logging.TestSparqlQueryTimeRecorder
-import io.renku.testtools.IOSpec
+import io.renku.testtools.CustomAsyncIOSpec
 import io.renku.triplesstore.SparqlQuery.Prefixes
 import io.renku.triplesstore._
 import io.renku.triplesstore.client.syntax._
 import org.scalacheck.Gen
-import org.scalamock.scalatest.MockFactory
+import org.scalamock.scalatest.AsyncMockFactory
+import org.scalatest.Succeeded
+import org.scalatest.flatspec.AsyncFlatSpec
 import org.scalatest.matchers.should
-import org.scalatest.wordspec.AnyWordSpec
 import tooling.AllProjects
 
 class BacklogCreatorSpec
-    extends AnyWordSpec
+    extends AsyncFlatSpec
+    with CustomAsyncIOSpec
     with should.Matchers
-    with IOSpec
     with InMemoryJenaForSpec
     with ProjectsDataset
     with MigrationsDataset
-    with MockFactory {
+    with AsyncMockFactory {
 
   private val pageSize = 50
 
-  "createBacklog" should {
+  it should "find all projects that are in the TS" in {
 
-    "find all projects that are in the TS" in new TestCase {
+    val projects = anyRenkuProjectEntities
+      .generateList(min = pageSize + 1, max = Gen.choose(pageSize + 1, (2 * pageSize) - 1).generateOne)
+      .map(_.to[entities.Project])
 
-      val projects = anyRenkuProjectEntities
-        .generateList(min = pageSize + 1, max = Gen.choose(pageSize + 1, (2 * pageSize) - 1).generateOne)
-        .map(_.to[entities.Project])
+    for {
+      _ <- fetchBacklogProjects.asserting(_ shouldBe Nil)
 
-      fetchBacklogProjects shouldBe Nil
+      _ <- uploadIO(to = projectsDataset, projects: _*)(implicitly[EntityFunctions[entities.Project]],
+                                                        projectsDSGraphsProducer[entities.Project]
+           )
+      _ <- backlogCreator.createBacklog().assertNoException
+      _ <- fetchBacklogProjects.asserting(_.toSet shouldBe projects.map(_.slug).toSet)
+    } yield Succeeded
+  }
 
-      upload(to = projectsDataset, projects: _*)(implicitly[EntityFunctions[entities.Project]],
-                                                 projectsDSGraphsProducer[entities.Project],
-                                                 ioRuntime
+  private implicit val logger:       TestLogger[IO]              = TestLogger[IO]()
+  private implicit val timeRecorder: SparqlQueryTimeRecorder[IO] = TestSparqlQueryTimeRecorder[IO].unsafeRunSync()
+  private lazy val backlogCreator =
+    new BacklogCreatorImpl[IO](AllProjects[IO](projectsDSConnectionInfo), TSClient[IO](migrationsDSConnectionInfo))
+
+  private def fetchBacklogProjects =
+    runSelect(
+      on = migrationsDataset,
+      SparqlQuery.ofUnsafe(
+        "test ReindexLucene backlog",
+        Prefixes of renku -> "renku",
+        sparql"""|SELECT ?slug
+                 |WHERE {
+                 |  ${ReindexLucene.name.asEntityId} renku:toBeMigrated ?slug
+                 |}
+                 |""".stripMargin
       )
-
-      backlogCreator.createBacklog().unsafeRunSync() shouldBe ()
-
-      fetchBacklogProjects.toSet shouldBe projects.map(_.slug).toSet
-    }
-  }
-
-  private trait TestCase {
-    private implicit val logger:       TestLogger[IO]              = TestLogger[IO]()
-    private implicit val timeRecorder: SparqlQueryTimeRecorder[IO] = TestSparqlQueryTimeRecorder[IO].unsafeRunSync()
-    val backlogCreator =
-      new BacklogCreatorImpl[IO](AllProjects[IO](projectsDSConnectionInfo), TSClient[IO](migrationsDSConnectionInfo))
-
-    def fetchBacklogProjects =
-      runSelect(
-        on = migrationsDataset,
-        SparqlQuery.ofUnsafe(
-          "test ReindexLucene backlog",
-          Prefixes of renku -> "renku",
-          sparql"""|SELECT ?slug
-                   |WHERE {
-                   |  ${ReindexLucene.name.asEntityId} renku:toBeMigrated ?slug
-                   |}
-                   |""".stripMargin
-        )
-      ).unsafeRunSync().flatMap(_.get("slug").map(projects.Slug))
-  }
+    ).map(_.flatMap(_.get("slug").map(projects.Slug)))
 
   private def setSchema(version: SchemaVersion): Project => Project =
     _.fold(_.copy(version = version), _.copy(version = version), identity, identity)
