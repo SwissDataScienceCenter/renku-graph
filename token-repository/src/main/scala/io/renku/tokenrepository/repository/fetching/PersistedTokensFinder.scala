@@ -35,11 +35,11 @@ private[repository] trait PersistedTokensFinder[F[_]] {
 }
 
 private[repository] object PersistedTokensFinder {
-  def apply[F[_]: MonadCancelThrow: SessionResource: QueriesExecutionTimes]: PersistedTokensFinder[F] =
+  def apply[F[_]: Async: SessionResource: QueriesExecutionTimes]: PersistedTokensFinder[F] =
     new PersistedTokensFinderImpl[F]
 }
 
-private class PersistedTokensFinderImpl[F[_]: MonadCancelThrow: SessionResource: QueriesExecutionTimes]
+private class PersistedTokensFinderImpl[F[_]: Async: SessionResource: QueriesExecutionTimes]
     extends DbClient[F](Some(QueriesExecutionTimes[F]))
     with PersistedTokensFinder[F]
     with TokenRepositoryTypeSerializers {

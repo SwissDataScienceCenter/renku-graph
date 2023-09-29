@@ -20,7 +20,7 @@ package io.renku.eventlog.events.producers
 package eventdelivery
 
 import cats.MonadThrow
-import cats.effect.MonadCancelThrow
+import cats.effect.Async
 import cats.syntax.all._
 import eu.timepit.refined.auto._
 import io.renku.db.{DbClient, SqlStatement}
@@ -39,7 +39,7 @@ private[producers] trait EventDelivery[F[_], CategoryEvent] {
   def registerSending(event: CategoryEvent, subscriberUrl: SubscriberUrl): F[Unit]
 }
 
-private class EventDeliveryImpl[F[_]: MonadCancelThrow: SessionResource: QueriesExecutionTimes, CategoryEvent](
+private class EventDeliveryImpl[F[_]: Async: SessionResource: QueriesExecutionTimes, CategoryEvent](
     eventDeliveryIdExtractor: CategoryEvent => EventDeliveryId,
     sourceUrl:                MicroserviceBaseUrl
 ) extends DbClient(Some(QueriesExecutionTimes[F]))
@@ -111,7 +111,7 @@ private class EventDeliveryImpl[F[_]: MonadCancelThrow: SessionResource: Queries
 
 private[producers] object EventDelivery {
 
-  def apply[F[_]: MonadCancelThrow: SessionResource: QueriesExecutionTimes, CategoryEvent](
+  def apply[F[_]: Async: SessionResource: QueriesExecutionTimes, CategoryEvent](
       eventDeliveryIdExtractor: CategoryEvent => EventDeliveryId
   ): F[EventDelivery[F, CategoryEvent]] = for {
     microserviceUrlFinder <- MicroserviceUrlFinder(Microservice.ServicePort)

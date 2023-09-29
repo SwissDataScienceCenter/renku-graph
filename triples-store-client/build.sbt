@@ -22,6 +22,7 @@ name := "triples-store-client"
 libraryDependencies ++=
   Dependencies.jsonld4s ++
     Dependencies.luceneQueryParser ++
+    Dependencies.luceneAnalyzer ++
     Dependencies.rdf4jQueryParserSparql ++
     Dependencies.http4sClient ++
     Dependencies.http4sCirce

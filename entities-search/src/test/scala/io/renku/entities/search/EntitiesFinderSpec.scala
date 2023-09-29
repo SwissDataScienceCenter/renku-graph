@@ -20,6 +20,7 @@ package io.renku.entities.search
 
 import cats.data.NonEmptyList
 import cats.syntax.all._
+import eu.timepit.refined.auto._
 import io.renku.entities.search
 import io.renku.entities.search.Criteria.Filters._
 import io.renku.entities.search.Criteria.{Filters, Sort}
@@ -1039,7 +1040,7 @@ class EntitiesFinderSpec
 
     "be sorting by Matching Score if requested" in new TestCase {
 
-      val query = nonBlankStrings(minLength = 6).generateOne
+      val query: NonBlank = "project score"
 
       val ds -> project = renkuProjectEntities(visibilityPublic)
         .modify(replaceProjectName(to = projects.Name(query.value)))
@@ -1217,6 +1218,28 @@ class EntitiesFinderSpec
         .addAllEntitiesFrom(internalProject)
         .addAllEntitiesFrom(privateProject)
         .sortBy(_.name)(nameOrdering)
+    }
+
+    "not return private projects/datasets of different user" in new TestCase {
+      val otherMember = personEntities(
+        personGitLabIds.suchThat(id => !member.person.maybeGitLabId.contains(id)).toGeneratorOfSomes
+      ).generateOne
+      val results = IOBody {
+        provisionTestProjects(privateProject, internalProject, publicProject) >>
+          finder
+            .findEntities(
+              Criteria(maybeUser = otherMember.toAuthUser.some,
+                       paging = PagingRequest.default.copy(perPage = PerPage(50))
+              )
+            )
+      }
+      val expected = List
+        .empty[model.Entity]
+        .addAllEntitiesFrom(publicProject)
+        .addAllEntitiesFrom(internalProject)
+        .addAllPersonsFrom(privateProject)
+        .sortBy(_.name)(nameOrdering)
+      results.results shouldBe expected
     }
   }
 }

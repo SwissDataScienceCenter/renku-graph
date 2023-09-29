@@ -20,11 +20,11 @@ package io.renku.triplesstore.client.http
 
 import cats.effect._
 import cats.syntax.all._
-import org.http4s.Method.{DELETE, POST}
+import org.http4s.Method.{DELETE, GET, POST}
 import org.http4s.client.Client
 import org.http4s.client.dsl.Http4sClientDsl
 import org.http4s.headers.Accept
-import org.http4s.{MediaType, UrlForm}
+import org.http4s.{MediaType, Status, UrlForm}
 import org.typelevel.log4cats.Logger
 
 final class DefaultFusekiClient[F[_]: Async: Logger](
@@ -40,6 +40,15 @@ final class DefaultFusekiClient[F[_]: Async: Logger](
   override def sparql(datasetName: String): SparqlClient[F] = {
     val subConfig = cc.copy(baseUrl = cc.baseUrl / datasetName)
     new DefaultSparqlClient[F](client, subConfig)
+  }
+
+  override def datasetExists(name: String): F[Boolean] = {
+    val req = GET(datasetsUri).withBasicAuth(cc.basicAuth)
+    client.run(req).use { resp =>
+      if (resp.status.isSuccess) true.pure[F]
+      else if (resp.status == Status.NotFound) false.pure[F]
+      else SparqlRequestError(s"getDataset($name)", resp).flatMap(Async[F].raiseError)
+    }
   }
 
   override def createDataset(name: String, persistent: Boolean): F[Unit] =
@@ -59,8 +68,20 @@ final class DefaultFusekiClient[F[_]: Async: Logger](
     }
   }
 
+  override def createDatasetIfNotExists(name: String, persistent: Boolean): F[Unit] =
+    datasetExists(name).flatMap {
+      case true  => ().pure[F]
+      case false => createDataset(name, persistent)
+    }
+
   override def deleteDataset(name: String): F[Unit] =
     retry.fold(deleteDataset0(name))(_.retryConnectionError(deleteDataset0(name)))
+
+  override def deleteDatasetIfExists(name: String): F[Unit] =
+    datasetExists(name).flatMap {
+      case true  => deleteDataset(name)
+      case false => ().pure[F]
+    }
 
   private def deleteDataset0(name: String): F[Unit] = {
     val req = DELETE(datasetsUri / name).withBasicAuth(cc.basicAuth)

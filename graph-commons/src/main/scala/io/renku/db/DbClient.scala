@@ -19,25 +19,25 @@
 package io.renku.db
 
 import cats.data.Kleisli
+import cats.effect.Clock
 import cats.syntax.all._
 import cats.{Monad, Show}
 import io.renku.metrics.LabeledHistogram
 import skunk.Session
 import skunk.data.Completion
 
-abstract class DbClient[F[_]: Monad](maybeHistogram: Option[LabeledHistogram[F]]) {
+abstract class DbClient[F[_]: Monad: Clock](maybeHistogram: Option[LabeledHistogram[F]]) {
 
   protected def measureExecutionTime[ResultType](
       query: SqlStatement[F, ResultType]
   ): Kleisli[F, Session[F], ResultType] = Kleisli { session =>
     maybeHistogram match {
-      case None => query.queryExecution.run(session)
+      case None =>
+        query.queryExecution.run(session)
       case Some(histogram) =>
-        for {
-          timer  <- histogram.startTimer(query.name.value)
-          result <- query.queryExecution.run(session)
-          _      <- timer.observeDuration
-        } yield result
+        Clock[F]
+          .timed(query.queryExecution.run(session))
+          .flatMap { case (duration, result) => histogram.observe(query.name.value, duration).as(result) }
     }
   }
 

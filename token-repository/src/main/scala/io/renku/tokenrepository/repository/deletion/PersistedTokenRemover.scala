@@ -18,7 +18,7 @@
 
 package io.renku.tokenrepository.repository.deletion
 
-import cats.effect.MonadCancelThrow
+import cats.effect.Async
 import cats.syntax.all._
 import io.renku.db.{DbClient, SqlStatement}
 import io.renku.graph.model.projects.GitLabId
@@ -33,11 +33,11 @@ private[repository] trait PersistedTokenRemover[F[_]] {
 }
 
 private[repository] object PersistedTokenRemover {
-  def apply[F[_]: MonadCancelThrow: SessionResource: QueriesExecutionTimes]: PersistedTokenRemover[F] =
+  def apply[F[_]: Async: SessionResource: QueriesExecutionTimes]: PersistedTokenRemover[F] =
     new PersistedTokenRemoverImpl[F]
 }
 
-private class PersistedTokenRemoverImpl[F[_]: MonadCancelThrow: SessionResource: QueriesExecutionTimes]
+private class PersistedTokenRemoverImpl[F[_]: Async: SessionResource: QueriesExecutionTimes]
     extends DbClient[F](Some(QueriesExecutionTimes[F]))
     with PersistedTokenRemover[F]
     with TokenRepositoryTypeSerializers {

@@ -19,7 +19,7 @@
 package io.renku.eventlog.events.consumers.globalcommitsyncrequest
 
 import cats.data.Kleisli
-import cats.effect.MonadCancelThrow
+import cats.effect.Async
 import cats.syntax.all._
 import com.typesafe.config.{Config, ConfigFactory}
 import io.renku.db.{DbClient, SqlStatement}
@@ -39,7 +39,7 @@ private trait GlobalCommitSyncForcer[F[_]] {
   def moveGlobalCommitSync(projectId: projects.GitLabId, projectSlug: projects.Slug): F[Unit]
 }
 
-private class GlobalCommitSyncForcerImpl[F[_]: MonadCancelThrow: SessionResource: QueriesExecutionTimes](
+private class GlobalCommitSyncForcerImpl[F[_]: Async: SessionResource: QueriesExecutionTimes](
     syncFrequency:  Duration,
     delayOnRequest: Duration,
     now:            () => Instant = () => Instant.now
@@ -91,7 +91,7 @@ private object GlobalCommitSyncForcer {
 
   import scala.concurrent.duration.FiniteDuration
 
-  def apply[F[_]: MonadCancelThrow: SessionResource: QueriesExecutionTimes](
+  def apply[F[_]: Async: SessionResource: QueriesExecutionTimes](
       config: Config = ConfigFactory.load()
   ): F[GlobalCommitSyncForcer[F]] = for {
     configFrequency      <- find[F, FiniteDuration]("global-commit-sync-frequency", config)

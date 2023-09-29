@@ -19,7 +19,7 @@
 package io.renku.eventlog.events.consumers.creation
 
 import cats.data.{Kleisli, NonEmptyList}
-import cats.effect.MonadCancelThrow
+import cats.effect.Async
 import cats.syntax.all._
 import cats.{Applicative, MonadThrow}
 import eu.timepit.refined.auto._
@@ -41,7 +41,7 @@ private trait EventPersister[F[_]] {
   def storeNewEvent(event: Event): F[Result]
 }
 
-private class EventPersisterImpl[F[_]: MonadCancelThrow: SessionResource: QueriesExecutionTimes: EventStatusGauges](
+private class EventPersisterImpl[F[_]: Async: SessionResource: QueriesExecutionTimes: EventStatusGauges](
     now: () => Instant = () => Instant.now
 ) extends DbClient(Some(QueriesExecutionTimes[F]))
     with EventPersister[F] {
@@ -196,10 +196,8 @@ private class EventPersisterImpl[F[_]: MonadCancelThrow: SessionResource: Querie
 }
 
 private object EventPersister {
-  def apply[F[_]: MonadCancelThrow: SessionResource: QueriesExecutionTimes: EventStatusGauges]
-      : F[EventPersisterImpl[F]] = MonadThrow[F].catchNonFatal {
-    new EventPersisterImpl[F]()
-  }
+  def apply[F[_]: Async: SessionResource: QueriesExecutionTimes: EventStatusGauges]: F[EventPersisterImpl[F]] =
+    MonadThrow[F].catchNonFatal(new EventPersisterImpl[F]())
 
   sealed trait Result extends Product with Serializable
   object Result {

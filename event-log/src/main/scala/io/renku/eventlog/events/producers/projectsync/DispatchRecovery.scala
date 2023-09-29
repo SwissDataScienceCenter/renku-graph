@@ -20,7 +20,7 @@ package io.renku.eventlog.events.producers
 package projectsync
 
 import EventsSender.SendingResult
-import cats.effect.MonadCancelThrow
+import cats.effect.{Async, MonadCancelThrow}
 import cats.syntax.all._
 import io.renku.db.{DbClient, SqlStatement}
 import io.renku.eventlog.EventLogDB.SessionResource
@@ -35,7 +35,7 @@ import skunk.data.Completion
 
 import scala.util.control.NonFatal
 
-private class DispatchRecoveryImpl[F[_]: MonadCancelThrow: SessionResource: Logger: QueriesExecutionTimes]
+private class DispatchRecoveryImpl[F[_]: Async: SessionResource: Logger: QueriesExecutionTimes]
     extends DbClient(Some(QueriesExecutionTimes[F]))
     with producers.DispatchRecovery[F, ProjectSyncEvent]
     with SubscriptionTypeSerializers {
@@ -71,8 +71,6 @@ private class DispatchRecoveryImpl[F[_]: MonadCancelThrow: SessionResource: Logg
 }
 
 private object DispatchRecovery {
-  def apply[F[_]: MonadCancelThrow: SessionResource: Logger: QueriesExecutionTimes]
-      : F[DispatchRecovery[F, ProjectSyncEvent]] = MonadCancelThrow[F].catchNonFatal {
-    new DispatchRecoveryImpl[F]()
-  }
+  def apply[F[_]: Async: SessionResource: Logger: QueriesExecutionTimes]: F[DispatchRecovery[F, ProjectSyncEvent]] =
+    MonadCancelThrow[F].catchNonFatal(new DispatchRecoveryImpl[F]())
 }

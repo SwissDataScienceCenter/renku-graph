@@ -21,7 +21,7 @@ package globalcommitsync
 
 import cats.MonadThrow
 import cats.data.Kleisli
-import cats.effect.MonadCancelThrow
+import cats.effect.Async
 import cats.syntax.all._
 import io.renku.db.{DbClient, SqlStatement}
 import io.renku.eventlog.EventLogDB.SessionResource
@@ -38,13 +38,13 @@ private trait LastSyncedDateUpdater[F[_]] {
 }
 
 private object LastSyncedDateUpdater {
-  def apply[F[_]: MonadCancelThrow: SessionResource: QueriesExecutionTimes]: F[LastSyncedDateUpdater[F]] =
+  def apply[F[_]: Async: SessionResource: QueriesExecutionTimes]: F[LastSyncedDateUpdater[F]] =
     MonadThrow[F].catchNonFatal(
       new LastSyncedDateUpdateImpl[F]
     )
 }
 
-private class LastSyncedDateUpdateImpl[F[_]: MonadCancelThrow: SessionResource: QueriesExecutionTimes]
+private class LastSyncedDateUpdateImpl[F[_]: Async: SessionResource: QueriesExecutionTimes]
     extends DbClient(Some(QueriesExecutionTimes[F]))
     with LastSyncedDateUpdater[F]
     with SubscriptionTypeSerializers {

@@ -42,7 +42,7 @@ object Generators {
 
   final case class ProjectAuthDataBuilder(
       slug:       Gen[Slug] = RenkuTinyTypeGenerators.projectSlugs,
-      members:    Gen[Set[ProjectMember]] = Gen.choose(0, 150).flatMap(n => Gen.listOfN(n, memberGen)).map(_.toSet),
+      members:    Gen[Set[ProjectMember]] = Gen.choose(1, 150).flatMap(n => Gen.listOfN(n, memberGen)).map(_.toSet),
       visibility: Gen[Visibility] = RenkuTinyTypeGenerators.projectVisibilities
   ) {
     def withMembers(members: (Int, Role)*): ProjectAuthDataBuilder =

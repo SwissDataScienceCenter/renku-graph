@@ -6,7 +6,7 @@ object Dependencies {
   object V {
     val ammonite               = "2.4.1"
     val catsCore               = "2.10.0"
-    val catsEffect             = "3.5.1"
+    val catsEffect             = "3.5.2"
     val catsEffectScalaTest    = "1.5.0"
     val catsEffectMunit        = "1.0.7"
     val scalacheckEffectMunit  = "1.0.4"
@@ -23,7 +23,7 @@ object Dependencies {
     val log4cats               = "2.6.0"
     val log4jCore              = "2.20.0"
     val logback                = "1.4.11"
-    val luceneQueryParser      = "9.7.0"
+    val luceneQueryParser      = "9.8.0"
     val owlapi                 = "5.5.0"
     val pureconfig             = "0.17.4"
     val rdf4jQueryParserSparql = "4.3.6"
@@ -33,12 +33,12 @@ object Dependencies {
     val scalamock              = "5.2.0"
     val scalatest              = "3.2.17"
     val scalatestScalacheck    = "3.2.14.0"
-    val sentryLogback          = "6.29.0"
+    val sentryLogback          = "6.30.0"
     val skunk                  = "0.6.0"
     val swaggerParser          = "2.1.16"
     val testContainersScala    = "0.41.0"
     val widoco                 = "1.4.20"
-    val wiremock               = "3.1.0"
+    val wiremock               = "3.2.0"
   }
 
   val ip4s = Seq(
@@ -93,6 +93,10 @@ object Dependencies {
 
   val luceneQueryParser = Seq(
     "org.apache.lucene" % "lucene-queryparser" % V.luceneQueryParser
+  )
+
+  val luceneAnalyzer = Seq(
+    "org.apache.lucene" % "lucene-analysis-common" % V.luceneQueryParser
   )
 
   val http4sClient = Seq(

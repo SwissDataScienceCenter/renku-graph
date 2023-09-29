@@ -20,7 +20,7 @@ package io.renku.eventlog.events.consumers.zombieevents
 
 import cats.MonadThrow
 import cats.data.Kleisli
-import cats.effect.MonadCancelThrow
+import cats.effect.Async
 import cats.syntax.all._
 import eu.timepit.refined.auto._
 import io.renku.db.{DbClient, SqlStatement}
@@ -40,7 +40,7 @@ private trait ZombieStatusCleaner[F[_]] {
   def cleanZombieStatus(event: ZombieEvent): F[UpdateResult]
 }
 
-private class ZombieStatusCleanerImpl[F[_]: MonadCancelThrow: SessionResource: QueriesExecutionTimes](
+private class ZombieStatusCleanerImpl[F[_]: Async: SessionResource: QueriesExecutionTimes](
     now: () => Instant = () => Instant.now
 ) extends DbClient(Some(QueriesExecutionTimes[F]))
     with ZombieStatusCleaner[F]
@@ -86,6 +86,6 @@ private class ZombieStatusCleanerImpl[F[_]: MonadCancelThrow: SessionResource: Q
 }
 
 private object ZombieStatusCleaner {
-  def apply[F[_]: MonadCancelThrow: SessionResource: QueriesExecutionTimes]: F[ZombieStatusCleaner[F]] =
+  def apply[F[_]: Async: SessionResource: QueriesExecutionTimes]: F[ZombieStatusCleaner[F]] =
     MonadThrow[F].catchNonFatal(new ZombieStatusCleanerImpl[F]())
 }

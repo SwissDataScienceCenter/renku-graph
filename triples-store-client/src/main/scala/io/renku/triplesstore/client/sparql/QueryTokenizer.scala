@@ -18,6 +18,8 @@
 
 package io.renku.triplesstore.client.sparql
 
+import org.apache.lucene.analysis.Tokenizer
+import org.apache.lucene.analysis.core.LetterTokenizer
 import org.apache.lucene.analysis.standard.StandardTokenizer
 import org.apache.lucene.analysis.tokenattributes.{CharTermAttribute, CharTermAttributeImpl}
 import org.apache.lucene.util.AttributeFactory
@@ -25,15 +27,30 @@ import org.apache.lucene.util.AttributeFactory.StaticImplementationAttributeFact
 
 import java.io.StringReader
 
-trait QueryTokenizer {
+trait QueryTokenizer { self =>
   def split(input: String): List[String]
+
+  final def append(next: QueryTokenizer): QueryTokenizer =
+    (input: String) => self.split(input).flatMap(next.split)
 }
 
 object QueryTokenizer {
 
-  def luceneStandard: QueryTokenizer = new QueryTokenizer {
+  def luceneStandard: QueryTokenizer =
+    new LuceneTokenizer(new StandardTokenizer(_))
+
+  def luceneLetters: QueryTokenizer =
+    new LuceneTokenizer(new LetterTokenizer(_))
+
+  def splitOn(c: Char): QueryTokenizer =
+    (input: String) => input.split(c).toList
+
+  def default: QueryTokenizer =
+    luceneLetters
+
+  private final class LuceneTokenizer(createDelegate: AttributeFactory => Tokenizer) extends QueryTokenizer {
     override def split(input: String): List[String] = {
-      val tokenizer = new StandardTokenizer(
+      val tokenizer = createDelegate(
         new StaticImplementationAttributeFactory[CharTermAttributeImpl](
           AttributeFactory.DEFAULT_ATTRIBUTE_FACTORY,
           classOf[CharTermAttributeImpl]

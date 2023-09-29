@@ -23,10 +23,13 @@ import cats.MonadThrow
 import cats.data.EitherT
 import cats.effect.Async
 import cats.syntax.all._
+import io.renku.graph.model.RenkuUrl
 import io.renku.graph.model.entities.Project
+import io.renku.projectauth.{ProjectAuthData, ProjectMember}
 import io.renku.triplesgenerator.errors.ProcessingRecoverableError
+import io.renku.triplesgenerator.events.consumers.membersync.ProjectAuthSync
 import io.renku.triplesgenerator.tsprovisioning.TransformationStep.{ProjectWithQueries, Queries}
-import io.renku.triplesstore.{SparqlQuery, SparqlQueryTimeRecorder}
+import io.renku.triplesstore.{ProjectSparqlClient, SparqlQuery, SparqlQueryTimeRecorder}
 import org.typelevel.log4cats.Logger
 
 import scala.util.control.NonFatal
@@ -37,7 +40,8 @@ private[tsprovisioning] trait TransformationStepsRunner[F[_]] {
 
 private class TransformationStepsRunnerImpl[F[_]: MonadThrow](
     resultsUploader:         TransformationResultsUploader[F],
-    searchGraphsProvisioner: SearchGraphsProvisioner[F]
+    searchGraphsProvisioner: SearchGraphsProvisioner[F],
+    projectAuthSync:         ProjectAuthSync[F]
 ) extends TransformationStepsRunner[F] {
 
   import TriplesUploadResult._
@@ -47,7 +51,8 @@ private class TransformationStepsRunnerImpl[F[_]: MonadThrow](
       executeAllPreDataUploadQueries >>=
       encodeAndSendProject >>=
       executeAllPostDataUploadQueries >>=
-      provisionSearchGraphs
+      provisionSearchGraphs >>=
+      provisionProjectAuthGraph
   }
     .leftMap(RecoverableFailure)
     .map(_ => DeliverySuccess)
@@ -84,6 +89,19 @@ private class TransformationStepsRunnerImpl[F[_]: MonadThrow](
       searchGraphsProvisioner.provisionSearchGraphs(project).map(_ => projectAndQueries)
   }
 
+  private def provisionProjectAuthGraph: ((Project, Queries)) => ProjectWithQueries[F] = { case (project, queries) =>
+    val authData = ProjectAuthData(
+      project.slug,
+      project.members.flatMap(m => m.person.maybeGitLabId.map(gId => ProjectMember(gId, m.role))),
+      project.visibility
+    )
+    EitherT
+      .liftF[F, ProcessingRecoverableError, Unit](
+        projectAuthSync.syncProject(authData)
+      )
+      .map(_ => (project, queries))
+  }
+
   private def execute(queries: List[SparqlQuery]): EitherT[F, ProcessingRecoverableError, Unit] =
     queries.foldLeft(EitherT.rightT[F, ProcessingRecoverableError](())) { (previousResult, query) =>
       previousResult >> resultsUploader.execute(query)
@@ -99,8 +117,11 @@ private class TransformationStepsRunnerImpl[F[_]: MonadThrow](
 
 private[tsprovisioning] object TransformationStepsRunner {
 
-  def apply[F[_]: Async: Logger: SparqlQueryTimeRecorder]: F[TransformationStepsRunner[F]] = for {
+  def apply[F[_]: Async: Logger: SparqlQueryTimeRecorder](
+      projectSparqlClient: ProjectSparqlClient[F]
+  )(implicit renkuUrl: RenkuUrl): F[TransformationStepsRunner[F]] = for {
     resultsUploader         <- TransformationResultsUploader[F]
     searchGraphsProvisioner <- SearchGraphsProvisioner.default[F]
-  } yield new TransformationStepsRunnerImpl[F](resultsUploader, searchGraphsProvisioner)
+    projectAuthSync = ProjectAuthSync(projectSparqlClient)
+  } yield new TransformationStepsRunnerImpl[F](resultsUploader, searchGraphsProvisioner, projectAuthSync)
 }

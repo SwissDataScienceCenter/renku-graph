@@ -18,7 +18,7 @@
 
 package io.renku.eventlog.events.consumers.cleanuprequest
 
-import cats.effect.MonadCancelThrow
+import cats.effect.Async
 import cats.syntax.all._
 import io.renku.db.{DbClient, SqlStatement}
 import io.renku.eventlog.EventLogDB.SessionResource
@@ -31,11 +31,11 @@ private trait ProjectIdFinder[F[_]] {
 }
 
 private object ProjectIdFinder {
-  def apply[F[_]: MonadCancelThrow: SessionResource: QueriesExecutionTimes]: F[ProjectIdFinder[F]] =
+  def apply[F[_]: Async: SessionResource: QueriesExecutionTimes]: F[ProjectIdFinder[F]] =
     new ProjectIdFinderImpl[F].pure[F].widen
 }
 
-private class ProjectIdFinderImpl[F[_]: MonadCancelThrow: SessionResource: QueriesExecutionTimes]
+private class ProjectIdFinderImpl[F[_]: Async: SessionResource: QueriesExecutionTimes]
     extends DbClient(Some(QueriesExecutionTimes[F]))
     with ProjectIdFinder[F]
     with TypeSerializers {
