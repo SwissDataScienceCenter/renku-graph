@@ -29,6 +29,7 @@ import io.renku.events.Generators.categoryNames
 import io.renku.generators.Generators.Implicits._
 import io.renku.generators.Generators.exceptions
 import io.renku.interpreters.TestLogger
+import io.renku.lock.Lock
 import org.scalamock.scalatest.AsyncMockFactory
 import org.scalatest.flatspec.AsyncFlatSpec
 import org.scalatest.matchers.should
@@ -122,8 +123,9 @@ class EventsDequeuerSpec
     }
 
   private implicit lazy val logger: TestLogger[IO] = TestLogger()
-  private val dbRepository  = mock[DBRepository[IO]]
-  private lazy val dequeuer = new EventsDequeuerImpl[IO, TestDB](dbRepository)
+  private val dbRepository = mock[DBRepository[IO]]
+  private val tsWriteLock: Lock[IO, CategoryName] = Lock.none[IO, CategoryName]
+  private lazy val dequeuer = new EventsDequeuerImpl[IO, TestDB](dbRepository, tsWriteLock)
 
   private def givenFindingEvents(category: CategoryName, returning: QueryDef[IO, Stream[IO, DequeuedEvent]]) =
     (dbRepository.eventsStream _)
@@ -154,7 +156,7 @@ class EventsDequeuerSpec
     override def apply(stream: Stream[IO, DequeuedEvent]): Stream[IO, DequeuedEvent] =
       stream.evalTap {
         case e if maybeFailOnEvent contains e => exceptions.generateOne.raiseError[IO, Unit]
-        case e                                 => handledEvents.update(_ appended e)
+        case e                                => handledEvents.update(_ appended e)
       }
   }
 }

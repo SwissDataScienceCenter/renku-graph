@@ -24,6 +24,7 @@ import fs2.Pipe
 import io.renku.db.SessionResource
 import io.renku.db.syntax.CommandDef
 import io.renku.events.CategoryName
+import io.renku.lock.Lock
 import org.typelevel.log4cats.Logger
 import skunk.Session
 
@@ -31,8 +32,8 @@ trait EventsDequeuer[F[_]] {
   def registerHandler(category: CategoryName, handler: Pipe[F, DequeuedEvent, DequeuedEvent]): F[Unit]
 }
 
-private class EventsDequeuerImpl[F[_]: Async: Logger, DB](repository: DBRepository[F])(implicit
-    sr: SessionResource[F, DB]
+private class EventsDequeuerImpl[F[_]: Async: Logger, DB](repository: DBRepository[F], lock: Lock[F, CategoryName])(
+    implicit sr: SessionResource[F, DB]
 ) extends EventsDequeuer[F] {
 
   override def registerHandler(category: CategoryName, handler: Pipe[F, DequeuedEvent, DequeuedEvent]): F[Unit] =
@@ -41,13 +42,15 @@ private class EventsDequeuerImpl[F[_]: Async: Logger, DB](repository: DBReposito
 
   private def dequeueEvents(category: CategoryName, handler: Pipe[F, DequeuedEvent, DequeuedEvent]): CommandDef[F] =
     CommandDef[F] { session =>
-      repository
-        .eventsStream(category)
-        .map(updateProcessing(session))
-        .map(_.through(handler).attempt.evalMap(logErrorAndReturnNone(category)).collect { case Some(e) => e })
-        .map(removeEvents(session))
-        .flatMapF(_.compile.drain)
-        .run(session)
+      lock.run(category).surround {
+        repository
+          .eventsStream(category)
+          .map(updateProcessing(session))
+          .map(_.through(handler).attempt.evalMap(logErrorAndReturnNone(category)).collect { case Some(e) => e })
+          .map(removeEvents(session))
+          .flatMapF(_.compile.drain)
+          .run(session)
+      }
     }
 
   private def dequeueWithErrorHandling(category: CategoryName,
