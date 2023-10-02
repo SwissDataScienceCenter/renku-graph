@@ -32,6 +32,12 @@ trait EventsDequeuer[F[_]] {
   def registerHandler(category: CategoryName, handler: Pipe[F, DequeuedEvent, DequeuedEvent]): F[Unit]
 }
 
+object EventsDequeuer {
+  def apply[F[_]: Async: Logger, DB](repository: DBRepository[F], lock: Lock[F, CategoryName])(implicit
+      sr: SessionResource[F, DB]
+  ): EventsDequeuer[F] = new EventsDequeuerImpl[F, DB](repository, lock)
+}
+
 private class EventsDequeuerImpl[F[_]: Async: Logger, DB](repository: DBRepository[F], lock: Lock[F, CategoryName])(
     implicit sr: SessionResource[F, DB]
 ) extends EventsDequeuer[F] {
