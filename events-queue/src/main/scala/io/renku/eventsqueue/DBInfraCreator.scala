@@ -51,7 +51,6 @@ private class DBInfraCreatorImpl[F[_]: MonadCancelThrow: Logger, DB](implicit sr
     }
 
   private def createTable() = for {
-    _ <- run(createEnqueueStatusTypeSql)
     _ <- run(createTableSql)
     _ <- run(createIndexSql("idx_enqueued_event_category", Column.payload))
     _ <- run(createIndexSql("idx_enqueued_event_payload", Column.payload))
@@ -67,12 +66,6 @@ private class DBInfraCreatorImpl[F[_]: MonadCancelThrow: Logger, DB](implicit sr
     Kleisli(_.unique(query).recover { case _ => false })
   }
 
-  private lazy val createEnqueueStatusTypeSql: Command[Void] = sql"""
-    CREATE TYPE ENQUEUE_STATUS AS ENUM (
-      '#${EnqueueStatus.New.value}', '#${EnqueueStatus.Processing.value}'
-    );
-    """.command
-
   private lazy val createTableSql: Command[Void] = sql"""
     CREATE TABLE IF NOT EXISTS #${QueueTable.name}(
       id                  SERIAL                   PRIMARY KEY,
@@ -80,7 +73,7 @@ private class DBInfraCreatorImpl[F[_]: MonadCancelThrow: Logger, DB](implicit sr
       #${Column.payload}  TEXT                     NOT NULL,
       #${Column.created}  TIMESTAMP WITH TIME ZONE NOT NULL,
       #${Column.updated}  TIMESTAMP WITH TIME ZONE NOT NULL,
-      #${Column.status}   ENQUEUE_STATUS           NOT NULL
+      #${Column.status}   SMALLINT                 NOT NULL
     );
     """.command
 

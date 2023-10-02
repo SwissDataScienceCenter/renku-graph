@@ -18,4 +18,19 @@
 
 package io.renku.eventsqueue
 
-private final case class DequeuedEvent(id: Int, payload: String)
+import io.renku.events.CategoryName
+import skunk.codec.all.{int2, varchar}
+import skunk.{Decoder, Encoder}
+
+object TypeSerializers extends TypeSerializers
+
+trait TypeSerializers {
+
+  val categoryNameDecoder: Decoder[CategoryName] = varchar.map(CategoryName.apply)
+  val categoryNameEncoder: Encoder[CategoryName] = varchar.values.contramap(_.value)
+
+  private[eventsqueue] val enqueueStatusDecoder: Decoder[EnqueueStatus] = int2.emap { v =>
+    EnqueueStatus.all.find(_.dbValue == v).toRight(left = s"'$v' is not valid EnqueueStatus")
+  }
+  private[eventsqueue] val enqueueStatusEncoder: Encoder[EnqueueStatus] = int2.values.contramap(_.dbValue)
+}

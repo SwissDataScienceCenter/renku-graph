@@ -28,7 +28,7 @@ import skunk.data.Identifier
 private object Generators {
 
   val dequeuedEvents: Gen[DequeuedEvent] =
-    (countingGen, events.map(_.asJson.noSpaces))
+    (countingGen.map(_.toInt), events.map(_.asJson.noSpaces))
       .mapN(DequeuedEvent.apply)
 
   lazy val events: Gen[TestEvent] =

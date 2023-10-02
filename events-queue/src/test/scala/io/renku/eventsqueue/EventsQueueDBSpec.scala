@@ -20,11 +20,14 @@ package io.renku.eventsqueue
 
 import cats.Applicative
 import cats.data.Kleisli
-import cats.effect.{Deferred, IO, Ref, Temporal}
+import cats.effect._
 import cats.syntax.all._
+import io.renku.db.syntax.CommandDef
+import io.renku.interpreters.TestLogger
 import org.scalatest.Suite
 import skunk.data.Identifier
-import skunk.{Channel, Session}
+import skunk.implicits._
+import skunk.{Channel, Command, Session, Void}
 
 import scala.concurrent.duration._
 
@@ -32,8 +35,22 @@ trait EventsQueueDBSpec extends ContainerDB { self: Suite =>
 
   private type IOChannel = Channel[IO, String, String]
 
+  implicit val logger: TestLogger[IO] = TestLogger()
+
   private val timeout     = 10 seconds
   private val warmUpEvent = "warmup"
+
+  def withDB: Resource[IO, Unit] =
+    Resource.make(DBInfraCreator[IO, TestDB].createDBInfra() >> truncateDB())(_ => ().pure[IO])
+
+  private def truncateDB() = {
+    val query: Command[Void] = sql"""TRUNCATE enqueued_event""".command
+    execute {
+      CommandDef[IO] {
+        _.prepare(query).flatMap(_.execute(Void)).void
+      }
+    }
+  }
 
   def notify(channel: Identifier, payload: String): IO[Unit] =
     withChannel(channel)(_.notify(payload))

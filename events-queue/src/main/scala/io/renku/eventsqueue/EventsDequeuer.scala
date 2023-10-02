@@ -26,7 +26,7 @@ import io.renku.db.syntax.CommandDef
 import io.renku.events.CategoryName
 import io.renku.lock.Lock
 import org.typelevel.log4cats.Logger
-import skunk.Session
+import skunk.{Session, SqlState}
 
 trait EventsDequeuer[F[_]] {
   def registerHandler(category: CategoryName, handler: Pipe[F, DequeuedEvent, DequeuedEvent]): F[Unit]
@@ -42,13 +42,17 @@ private class EventsDequeuerImpl[F[_]: Async: Logger, DB](repository: DBReposito
 
   private def dequeueEvents(category: CategoryName, handler: Pipe[F, DequeuedEvent, DequeuedEvent]): CommandDef[F] =
     CommandDef[F] { session =>
+      val transformation: Pipe[F, DequeuedEvent, Unit] =
+        _.through(updateProcessing(session))
+          .through(handler)
+          .attempt
+          .evalMap(logErrorAndReturnNone(category))
+          .collect { case Some(e) => e }
+          .through(removeEvents(session))
+
       lock.run(category).surround {
         repository
-          .eventsStream(category)
-          .map(updateProcessing(session))
-          .map(_.through(handler).attempt.evalMap(logErrorAndReturnNone(category)).collect { case Some(e) => e })
-          .map(removeEvents(session))
-          .flatMapF(_.compile.drain)
+          .processEvents(category, transformation)
           .run(session)
       }
     }
@@ -61,10 +65,10 @@ private class EventsDequeuerImpl[F[_]: Async: Logger, DB](repository: DBReposito
       .flatMap(_ => dequeueWithErrorHandling(category, handler))
 
   private def updateProcessing(session: Session[F]): Pipe[F, DequeuedEvent, DequeuedEvent] =
-    _.evalTap(e => repository.markUnderProcessing(e.id)(session))
+    _.evalTap(e => repository.markUnderProcessing(e.id)(session).handleErrorWith(skipDeadlocks))
 
   private def removeEvents(session: Session[F]): Pipe[F, DequeuedEvent, Unit] =
-    _.evalMap(e => repository.delete(e.id)(session))
+    _.evalMap(e => repository.delete(e.id)(session).handleErrorWith(skipDeadlocks))
 
   private def dequeueOnEvent(category: CategoryName, handler: Pipe[F, DequeuedEvent, DequeuedEvent]): CommandDef[F] =
     CommandDef[F] { session =>
@@ -86,4 +90,6 @@ private class EventsDequeuerImpl[F[_]: Async: Logger, DB](repository: DBReposito
       Logger[F].error(_)(show"An error in the events dequeueing process for $category").as(Option.empty[DequeuedEvent]),
       Option(_).pure[F]
     )
+
+  private lazy val skipDeadlocks: Throwable => F[Unit] = { case SqlState.DeadlockDetected(_) => ().pure[F] }
 }

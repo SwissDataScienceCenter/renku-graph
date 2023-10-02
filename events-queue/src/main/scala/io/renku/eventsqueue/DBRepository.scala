@@ -18,29 +18,111 @@
 
 package io.renku.eventsqueue
 
+import cats.effect.Async
+import cats.syntax.all._
+import fs2.Pipe
 import io.circe.Json
-import io.renku.db.SessionResource
-import io.renku.db.syntax._
+import io.renku.db.syntax.{CommandDef, _}
+import io.renku.db.{DbClient, SqlStatement}
 import io.renku.events.CategoryName
-import fs2.Stream
+import skunk._
+import skunk.implicits._
+
+import java.time.{OffsetDateTime, Duration => JDuration}
+import scala.concurrent.duration._
 
 private trait DBRepository[F[_]] {
-  def insert(category:             CategoryName, payload: Json): CommandDef[F]
-  def eventsStream(category:       CategoryName): QueryDef[F, Stream[F, DequeuedEvent]]
-  def markUnderProcessing(eventId: Long): CommandDef[F]
-  def delete(eventId:              Long): CommandDef[F]
+  def insert(category:             CategoryName, payload:        Json):                         CommandDef[F]
+  def processEvents(category:      CategoryName, transformation: Pipe[F, DequeuedEvent, Unit]): QueryDef[F, Unit]
+  def markUnderProcessing(eventId: Int): CommandDef[F]
+  def delete(eventId:              Int): CommandDef[F]
 }
 
 private object DBRepository {
-  def apply[F[_], DB](implicit sr: SessionResource[F, DB]): DBRepository[F] =
+  def apply[F[_]: Async, DB]: DBRepository[F] =
     new DBRepositoryImpl[F, DB]
+
+  val reclaimTime: JDuration = JDuration.ofSeconds((30 minutes).toSeconds)
 }
 
-private class DBRepositoryImpl[F[_], DB](implicit sr: SessionResource[F, DB]) extends DBRepository[F] {
+private class DBRepositoryImpl[F[_]: Async, DB] extends DbClient[F](maybeHistogram = None) with DBRepository[F] {
 
-  println(sr)
-  override def insert(category:             CategoryName, payload: Json): CommandDef[F] = ???
-  override def eventsStream(category:       CategoryName): QueryDef[F, Stream[F, DequeuedEvent]] = ???
-  override def markUnderProcessing(eventId: Long): CommandDef[F] = ???
-  override def delete(eventId:              Long): CommandDef[F] = ???
+  import DBRepository._
+  import TypeSerializers._
+  import skunk.codec.all.{int4, text, timestamptz}
+
+  override def insert(category: CategoryName, payload: Json): CommandDef[F] =
+    measureExecutionTime {
+      val timestamp = OffsetDateTime.now()
+      SqlStatement
+        .named(s"$queryPrefix insert")
+        .command[CategoryName *: String *: OffsetDateTime *: OffsetDateTime *: EnqueueStatus *: EmptyTuple](
+          sql"""INSERT INTO enqueued_event (category, payload, created, updated, status)
+                VALUES ($categoryNameEncoder, $text, $timestamptz, $timestamptz, $enqueueStatusEncoder)
+                """.command
+        )
+        .arguments(category *: payload.noSpaces *: timestamp *: timestamp *: EnqueueStatus.New *: EmptyTuple)
+        .build
+        .void
+    }
+
+  override def processEvents(category: CategoryName, transformation: Pipe[F, DequeuedEvent, Unit]): CommandDef[F] =
+    measureExecutionTime(
+      s"$queryPrefix process",
+      CommandDef[F] {
+        _.prepare(fetchQuery)
+          .flatMap(
+            _.stream(category *: EnqueueStatus.New *: EnqueueStatus.Processing *:
+                       (OffsetDateTime.now() minus reclaimTime) *: EmptyTuple,
+                     chunkSize = 32
+            )
+              .through(transformation)
+              .compile
+              .drain
+          )
+      }
+    )
+
+  private lazy val fetchQuery
+      : Query[CategoryName *: EnqueueStatus *: EnqueueStatus *: OffsetDateTime *: EmptyTuple, DequeuedEvent] =
+    sql"""SELECT id, payload
+          FROM enqueued_event
+          WHERE category = $categoryNameEncoder
+                AND ((status = $enqueueStatusEncoder)
+                      OR (status = $enqueueStatusEncoder AND $timestamptz >= updated)
+                    )
+          """
+      .query(int4 ~ text)
+      .map { case (id: Int) ~ (payload: String) => DequeuedEvent(id, payload) }
+
+  override def markUnderProcessing(eventId: Int): CommandDef[F] =
+    measureExecutionTime {
+      SqlStatement
+        .named(s"$queryPrefix update")
+        .command[OffsetDateTime *: EnqueueStatus *: Int *: EmptyTuple](
+          sql"""UPDATE enqueued_event
+                SET updated = $timestamptz, status = $enqueueStatusEncoder
+                WHERE id = $int4
+                """.command
+        )
+        .arguments(OffsetDateTime.now() *: EnqueueStatus.Processing *: eventId *: EmptyTuple)
+        .build
+        .void
+    }
+
+  override def delete(eventId: Int): CommandDef[F] =
+    measureExecutionTime {
+      SqlStatement
+        .named(s"$queryPrefix delete")
+        .command[Int](
+          sql"""DELETE FROM enqueued_event
+                WHERE id = $int4
+                """.command
+        )
+        .arguments(eventId)
+        .build
+        .void
+    }
+
+  private lazy val queryPrefix = "queue event -"
 }

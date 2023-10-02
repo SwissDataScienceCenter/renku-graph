@@ -21,14 +21,28 @@ package io.renku.eventsqueue
 import cats.Show
 
 private sealed trait EnqueueStatus {
-  val value: String
+  val value:   String
+  val dbValue: Short
   override lazy val toString: String        = value
   lazy val widen:             EnqueueStatus = this
 }
 
 private object EnqueueStatus {
-  case object New        extends EnqueueStatus { override val value: String = "NEW" }
-  case object Processing extends EnqueueStatus { override val value: String = "PROCESSING" }
+  case object New extends EnqueueStatus {
+    override val value:   String = "NEW"
+    override val dbValue: Short  = 0
+  }
+  case object Processing extends EnqueueStatus {
+    override val value:   String = "PROCESSING"
+    override val dbValue: Short  = 1
+  }
+
+  lazy val all: Set[EnqueueStatus] = Set(New, Processing)
+
+  def apply(value: String): EnqueueStatus =
+    EnqueueStatus.all
+      .find(_.value == value)
+      .getOrElse(throw new IllegalArgumentException(s"'$value' unknown EnqueueStatus"))
 
   implicit def show[S <: EnqueueStatus]: Show[S] = Show.fromToString
 }
