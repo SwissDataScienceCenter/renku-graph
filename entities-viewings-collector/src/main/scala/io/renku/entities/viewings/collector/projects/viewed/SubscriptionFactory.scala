@@ -20,14 +20,25 @@ package io.renku.entities.viewings.collector.projects.viewed
 
 import cats.effect.Async
 import cats.syntax.all._
-import io.renku.events.consumers
+import io.renku.db.SessionResource
 import io.renku.events.consumers.subscriptions.SubscriptionMechanism
+import io.renku.events.{CategoryName, consumers}
+import io.renku.eventsqueue.EventsDequeuer
+import io.renku.lock.Lock
 import io.renku.triplesstore.{ProjectsConnectionConfig, SparqlQueryTimeRecorder}
 import org.typelevel.log4cats.Logger
 
 object SubscriptionFactory {
-  def apply[F[_]: Async: Logger: SparqlQueryTimeRecorder](
-      connConfig: ProjectsConnectionConfig
-  ): F[(consumers.EventHandler[F], SubscriptionMechanism[F])] =
-    EventHandler[F](connConfig).map(_ -> SubscriptionMechanism.noOpSubscriptionMechanism(categoryName))
+  def apply[F[_]: Async: Logger: SparqlQueryTimeRecorder, DB](
+      categoryLock:    Lock[F, CategoryName],
+      sessionResource: SessionResource[F, DB],
+      connConfig:      ProjectsConnectionConfig
+  ): F[(consumers.EventHandler[F], SubscriptionMechanism[F])] = {
+    implicit val sr: SessionResource[F, DB] = sessionResource
+    for {
+      handler        <- EventHandler[F, DB]
+      eventProcessor <- EventProcessor[F](connConfig)
+      _              <- EventsDequeuer[F, DB](categoryLock).registerHandler(categoryName, eventProcessor)
+    } yield handler -> SubscriptionMechanism.noOpSubscriptionMechanism(categoryName)
+  }
 }

@@ -52,6 +52,7 @@ class EventsDequeuerSpec
       val handler = new AccumulatingHandler
 
       dequeuer(repository).registerHandler(category, handler).assertNoException >>
+        Temporal[IO].sleep(1 second) >>
         repository.processed.get.asserting(_ shouldBe initialEvents.map(_.id)) >>
         repository.deleted.get.asserting(_ shouldBe initialEvents.map(_.id)) >>
         handler.handledEvents.get.asserting(_ shouldBe initialEvents)
@@ -68,6 +69,7 @@ class EventsDequeuerSpec
       val handler = new AccumulatingHandler
 
       dequeuer(repository).registerHandler(category, handler).assertNoException >>
+        Temporal[IO].sleep(1 second) >>
         handler.handledEvents.get.asserting(_ shouldBe initialEvents) >>
         Temporal[IO].sleep(1 second) >>
         notify(category.asChannelId, onNotifEvents.head.payload) >>
@@ -97,6 +99,7 @@ class EventsDequeuerSpec
       val handler = new AccumulatingHandler(maybeFailOnEvent = failingEvent.some)
 
       dequeuer(repository).registerHandler(category, handler).assertNoException >>
+        Temporal[IO].sleep(1 second) >>
         handler.handledEvents.get.asserting(_ shouldBe initialEvents) >>
         Temporal[IO].sleep(1 second) >>
         notify(category.asChannelId, failingEvent.payload) >>

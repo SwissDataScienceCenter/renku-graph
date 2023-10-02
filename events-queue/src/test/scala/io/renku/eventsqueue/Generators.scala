@@ -25,13 +25,13 @@ import io.renku.generators.Generators.{countingGen, nonEmptyStrings}
 import org.scalacheck.Gen
 import skunk.data.Identifier
 
-private object Generators {
+object Generators {
 
   val dequeuedEvents: Gen[DequeuedEvent] =
     (countingGen.map(_.toInt), events.map(_.asJson.noSpaces))
       .mapN(DequeuedEvent.apply)
 
-  lazy val events: Gen[TestEvent] =
+  private[eventsqueue] lazy val events: Gen[TestEvent] =
     nonEmptyStrings().map(TestEvent(_))
 
   def channelIds: Gen[Identifier] =

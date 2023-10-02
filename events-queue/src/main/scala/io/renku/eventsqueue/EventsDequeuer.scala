@@ -33,9 +33,10 @@ trait EventsDequeuer[F[_]] {
 }
 
 object EventsDequeuer {
-  def apply[F[_]: Async: Logger, DB](repository: DBRepository[F], lock: Lock[F, CategoryName])(implicit
+  def apply[F[_]: Async: Logger, DB](lock: Lock[F, CategoryName])(implicit
       sr: SessionResource[F, DB]
-  ): EventsDequeuer[F] = new EventsDequeuerImpl[F, DB](repository, lock)
+  ): EventsDequeuer[F] =
+    new EventsDequeuerImpl[F, DB](DBRepository[F, DB], lock)
 }
 
 private class EventsDequeuerImpl[F[_]: Async: Logger, DB](repository: DBRepository[F], lock: Lock[F, CategoryName])(
@@ -43,8 +44,13 @@ private class EventsDequeuerImpl[F[_]: Async: Logger, DB](repository: DBReposito
 ) extends EventsDequeuer[F] {
 
   override def registerHandler(category: CategoryName, handler: Pipe[F, DequeuedEvent, DequeuedEvent]): F[Unit] =
-    sr.useK(dequeueEvents(category, handler)) >>
-      Async[F].start(dequeueWithErrorHandling(category, handler)).void
+    Async[F].start {
+      initialDequeue(category, handler) >> dequeueFromNotif(category, handler)
+    }.void
+
+  private def initialDequeue(category: CategoryName, handler: Pipe[F, DequeuedEvent, DequeuedEvent]) =
+    sr.useK(dequeueEvents(category, handler))
+      .handleErrorWith(logStatement(category))
 
   private def dequeueEvents(category: CategoryName, handler: Pipe[F, DequeuedEvent, DequeuedEvent]): CommandDef[F] =
     CommandDef[F] { session =>
@@ -63,12 +69,10 @@ private class EventsDequeuerImpl[F[_]: Async: Logger, DB](repository: DBReposito
       }
     }
 
-  private def dequeueWithErrorHandling(category: CategoryName,
-                                       handler:  Pipe[F, DequeuedEvent, DequeuedEvent]
-  ): F[Unit] =
+  private def dequeueFromNotif(category: CategoryName, handler: Pipe[F, DequeuedEvent, DequeuedEvent]): F[Unit] =
     sr.useK(dequeueOnEvent(category, handler))
       .handleErrorWith(logStatement(category))
-      .flatMap(_ => dequeueWithErrorHandling(category, handler))
+      .flatMap(_ => dequeueFromNotif(category, handler))
 
   private def updateProcessing(session: Session[F]): Pipe[F, DequeuedEvent, DequeuedEvent] =
     _.evalTap(e => repository.markUnderProcessing(e.id)(session).handleErrorWith(skipDeadlocks))

@@ -201,7 +201,11 @@ lazy val entitiesViewingsCollector = project
   .in(file("entities-viewings-collector"))
   .withId("entities-viewings-collector")
   .settings(commonSettings)
-  .dependsOn(triplesGeneratorApi % "compile->compile; test->test", entitiesSearch % "compile->compile; test->test")
+  .dependsOn(
+    eventsQueue         % "compile->compile; test->test",
+    triplesGeneratorApi % "compile->compile; test->test",
+    entitiesSearch      % "compile->compile; test->test"
+  )
   .enablePlugins(AutomateHeaderPlugin)
 
 lazy val triplesGenerator = project

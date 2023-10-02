@@ -18,4 +18,12 @@
 
 package io.renku.eventsqueue
 
-private final case class DequeuedEvent(id: Int, payload: String)
+import cats.Show
+
+final case class DequeuedEvent(id: Int, payload: String)
+
+object DequeuedEvent {
+  implicit val show: Show[DequeuedEvent] = Show.show { case DequeuedEvent(id, payload) =>
+    s"id: $id; payload: $payload"
+  }
+}

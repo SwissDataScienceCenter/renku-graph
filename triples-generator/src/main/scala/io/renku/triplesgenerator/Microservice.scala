@@ -27,7 +27,7 @@ import io.renku.config.certificates.CertificateLoader
 import io.renku.config.sentry.SentryInitializer
 import io.renku.db.{SessionPoolResource, SessionResource}
 import io.renku.entities.viewings
-import io.renku.events.consumers
+import io.renku.events.{CategoryName, consumers}
 import io.renku.events.consumers.EventConsumersRegistry
 import io.renku.graph.config.RenkuUrlLoader
 import io.renku.graph.model.{RenkuUrl, projects}
@@ -83,7 +83,7 @@ object Microservice extends IOMicroservice {
 
   private def doRun(
       config:              Config,
-      dbSessionPool:       SessionResource[IO, TgLockDB],
+      sessionResource:     SessionResource[IO, TgLockDB],
       projectSparqlClient: ProjectSparqlClient[IO]
   )(implicit mr: MetricsRegistry[IO], sqtr: SparqlQueryTimeRecorder[IO]): IO[ExitCode] = for {
 
@@ -92,12 +92,13 @@ object Microservice extends IOMicroservice {
     implicit0(rp: ReProvisioningStatus[IO]) <- ReProvisioningStatus[IO]()
     implicit0(rurl: RenkuUrl)               <- RenkuUrlLoader[IO](config)
 
-    _ <- TgLockDB.migrate[IO](dbSessionPool, 20.seconds)
+    _ <- TgLockDB.migrate[IO](sessionResource, 20.seconds)
 
-    metricsService <- MetricsService[IO](dbSessionPool)
+    metricsService <- MetricsService[IO](sessionResource)
     _ <- metricsService.collectEvery(Duration.fromNanos(config.getDuration("metrics-interval").toNanos)).start
 
-    tsWriteLock = TgLockDB.createLock[IO, projects.Slug](dbSessionPool, 0.5.seconds)
+    tsWriteLock  = TgLockDB.createLock[IO, projects.Slug](sessionResource, 0.5.seconds)
+    categoryLock = TgLockDB.createLock[IO, CategoryName](sessionResource, 0.5.seconds)
     projectConnConfig              <- ProjectsConnectionConfig[IO](config)
     certificateLoader              <- CertificateLoader[IO]
     gitCertificateInstaller        <- GitCertificateInstaller[IO]
@@ -111,9 +112,11 @@ object Microservice extends IOMicroservice {
     migrationRequestSubscription   <- tsmigrationrequest.SubscriptionFactory[IO](config)
     syncRepoMetadataSubscription   <- syncrepometadata.SubscriptionFactory[IO](config, tsWriteLock)
     projectActivationsSubscription <- viewings.collector.projects.activated.SubscriptionFactory[IO](projectConnConfig)
-    projectViewingsSubscription    <- viewings.collector.projects.viewed.SubscriptionFactory[IO](projectConnConfig)
-    datasetViewingsSubscription    <- viewings.collector.datasets.SubscriptionFactory[IO](projectConnConfig)
-    viewingDeletionSubscription    <- viewings.deletion.projects.SubscriptionFactory[IO](projectConnConfig)
+    projectViewingsSubscription <-
+      viewings.collector.projects.viewed
+        .SubscriptionFactory[IO, TgLockDB](categoryLock, sessionResource, projectConnConfig)
+    datasetViewingsSubscription <- viewings.collector.datasets.SubscriptionFactory[IO](projectConnConfig)
+    viewingDeletionSubscription <- viewings.deletion.projects.SubscriptionFactory[IO](projectConnConfig)
     eventConsumersRegistry <- consumers.EventConsumersRegistry(
                                 awaitingGenerationSubscription,
                                 membersSyncSubscription,
