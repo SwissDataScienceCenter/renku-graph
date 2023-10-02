@@ -351,13 +351,6 @@ lazy val commonSettings = Seq(
 
 import sbtrelease.Vcs
 
-lazy val writeVersionToChart = taskKey[Unit]("Write release version to Chart.yaml")
-writeVersionToChart := writeVersion(lineToChange = "version",
-                                    version => s"version: $version",
-                                    streams.value.log,
-                                    root.base / "helm-chart" / "renku-graph" / "Chart.yaml"
-)
-
 lazy val writeVersionToVersionConf = taskKey[Unit]("Write release version to version.conf files")
 writeVersionToVersionConf := writeVersion(
   lineToChange = "version",
