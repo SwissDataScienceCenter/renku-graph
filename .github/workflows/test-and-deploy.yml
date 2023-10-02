@@ -92,40 +92,41 @@ jobs:
           key: ${{ runner.os }}-sbt-${{ hashFiles('**/build.sbt') }}
       - name: Formatter
         run: sbt scalafmtCheck
-  deploy-to-graph:
-    name: Deploy to renku-kg-dev
-    runs-on: ubuntu-20.04
-    needs: [unit-tests, acceptance-tests, formatter]
-    if: "github.ref == 'refs/heads/development'"
-    environment:
-      name: renku-kg-dev
-    steps:
-      - name: deploy-development
-        uses: SwissDataScienceCenter/renku-actions/deploy-renku@v1.6.0
-        env:
-          DOCKER_PASSWORD: ${{ secrets.RENKU_DOCKER_PASSWORD }}
-          DOCKER_USERNAME: ${{ secrets.RENKU_DOCKER_USERNAME }}
-          GITLAB_TOKEN: ${{ secrets.DEV_GITLAB_TOKEN }}
-          KUBECONFIG: "${{ github.workspace }}/renkubot-kube.config"
-          RANCHER_PROJECT_ID: ${{ secrets.CI_RANCHER_PROJECT }}
-          RENKU_RELEASE: renku-kg-dev
-          RENKU_VALUES_FILE: "${{ github.workspace }}/values.yaml"
-          RENKU_VALUES: ${{ secrets.CI_RENKU_KG_VALUES }}
-          RENKUBOT_KUBECONFIG: ${{ secrets.RENKUBOT_DEV_KUBECONFIG }}
-          RENKUBOT_RANCHER_BEARER_TOKEN: ${{ secrets.RENKUBOT_RANCHER_BEARER_TOKEN }}
-          RANCHER_DEV_API_ENDPOINT: ${{ secrets.RANCHER_DEV_API_ENDPOINT }}
-          RENKU_BOT_DEV_PASSWORD: ${{ secrets.RENKU_BOT_DEV_PASSWORD }}
-          RENKU_ANONYMOUS_SESSIONS: true
-          RENKU_TESTS_ENABLED: true
-          TEST_ARTIFACTS_PATH: "tests-artifacts-${{ github.sha }}"
-          renku_graph: "@development"
-          renku: "@master"
+  # deploy-to-graph:
+  #   name: Deploy to renku-kg-dev
+  #   runs-on: ubuntu-20.04
+  #   needs: [unit-tests, acceptance-tests, formatter]
+  #   if: "github.ref == 'refs/heads/development'"
+  #   environment:
+  #     name: renku-kg-dev
+  #   steps:
+  #     - name: deploy-development
+  #       uses: SwissDataScienceCenter/renku-actions/deploy-renku@v1.7.0
+  #       env:
+  #         DOCKER_PASSWORD: ${{ secrets.RENKU_DOCKER_PASSWORD }}
+  #         DOCKER_USERNAME: ${{ secrets.RENKU_DOCKER_USERNAME }}
+  #         GITLAB_TOKEN: ${{ secrets.DEV_GITLAB_TOKEN }}
+  #         KUBECONFIG: "${{ github.workspace }}/renkubot-kube.config"
+  #         RANCHER_PROJECT_ID: ${{ secrets.CI_RANCHER_PROJECT }}
+  #         RENKU_RELEASE: renku-kg-dev
+  #         RENKU_VALUES_FILE: "${{ github.workspace }}/values.yaml"
+  #         RENKU_VALUES: ${{ secrets.CI_RENKU_KG_VALUES }}
+  #         RENKUBOT_KUBECONFIG: ${{ secrets.RENKUBOT_DEV_KUBECONFIG }}
+  #         RENKUBOT_RANCHER_BEARER_TOKEN: ${{ secrets.RENKUBOT_RANCHER_BEARER_TOKEN }}
+  #         RANCHER_DEV_API_ENDPOINT: ${{ secrets.RANCHER_DEV_API_ENDPOINT }}
+  #         RENKU_BOT_DEV_PASSWORD: ${{ secrets.RENKU_BOT_DEV_PASSWORD }}
+  #         RENKU_ANONYMOUS_SESSIONS: true
+  #         RENKU_TESTS_ENABLED: true
+  #         TEST_ARTIFACTS_PATH: "tests-artifacts-${{ github.sha }}"
+  #         renku_graph: "@development"
+  #         renku: "@master"
   renku-acceptance-tests:
     name: Renku acceptance tests against renku-kg-dev
     runs-on: ubuntu-20.04
-    needs: deploy-to-graph
+    # needs: deploy-to-graph
+    needs: [unit-tests, acceptance-tests, formatter]
     steps:
-      - uses: SwissDataScienceCenter/renku-actions/test-renku@v1.6.0
+      - uses: SwissDataScienceCenter/renku-actions/test-renku@v1.7.0
         with:
           kubeconfig: ${{ secrets.RENKUBOT_DEV_KUBECONFIG }}
           renku-release: renku-kg-dev

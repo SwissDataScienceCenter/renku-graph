@@ -1,227 +1,25 @@
-# Default values for renku-graph.
-# This is a YAML-formatted file.
-# Declare variables to be passed into your templates.
-
-global:
-  ## Specify a secret that contains the certificate
-  ## if you would like to use a custom CA. The key for the secret
-  ## should have the .crt extension otherwise it is ignored. The
-  ## keys across all secrets are mounted as files in one location so
-  ## the keys across all secrets have to be unique.
-  certificates:
+graph:
+  webhookService:
     image:
-      repository: renku/certificates
-      tag: '0.0.2'
-    customCAs: []
-      # - secret:
-  graph:
-    dbEventLog:
-      postgresPassword:
-        # Password for the `eventlog` user
-        # Generate one using: `openssl rand -hex 16`
-        value:
-    tokenRepository:
-      postgresPassword:
-        # Password for the `tokenstorage` user
-        # Generate one using: `openssl rand -hex 16`
-        value:
-    triplesGenerator:
-      postgresPassword:
-        # Password for the `triplesgenerator` user
-        # Generate one using: `openssl rand -hex 16`
-        value:
-  ## to enable debug mode
-  debug: false
-
-jena:
-  image:
-    repository: renku/renku-jena
-    pullPolicy: IfNotPresent
-  users:
-    admin:
-      ## Admin user password
-      ## Generate one using: `openssl rand -hex 16`
-      password:
-    renku:
-      ## Dataset user password
-      ## Generate one using: `openssl rand -hex 16`
-      password:
-  persistence:
-    accessModes:
-      - ReadWriteOnce
-    size: 10Gi
-  additionalEnvironmentVariables:
-    - name: JVM_ARGS
-      value: -Xmx2G -Xms2G
-  resources:
-    requests:
-      cpu: 1000m
-      memory: 3Gi
-  additionalVolumeMounts:
-    - name: shiro
-      mountPath: /fuseki/shiro.ini
-      subPath: shiro.ini
-      readOnly: true
-  additionalVolumes:
-    - name: shiro
-      configMap:
-        name: shiro-ini
-        defaultMode: 0555
-  additionalInitContainerScript: "find /fuseki -name tdb.lock -type f -delete && find /fuseki/configuration -name *.ttl -type f -empty -delete && echo clean-up done"
-  test:
-    enabled: false
-
-webhookService:
-  image:
-    repository: renku/webhook-service
-    tag: 'latest'
-    pullPolicy: IfNotPresent
-  service:
-    type: ClusterIP
-    port: 80
-  resources:
-    requests:
-      cpu: 500m
-      memory: 256Mi
-  jvmXmx: 128M
-  gitlab:
-    rateLimit: 100/sec
-  hookToken:
-    ## A secret for signing request header tokens to be sent by GitLab with the Push Events
-    ## Generated using: `openssl rand -hex 8|base64`
-    secret:
-
-tokenRepository:
-  image:
-    repository: renku/token-repository
-    tag: 'latest'
-    pullPolicy: IfNotPresent
-  service:
-    type: ClusterIP
-    port: 9003
-  resources:
-    requests:
-      cpu: 500m
-      memory: 256Mi
-  jvmXmx: 128M
-  gitlab:
-    rateLimit: 50/sec
-  projectTokenTTL: '365 days'
-  # name of the Project Access Tokens to be created on behalf of the user in GitLab; defaults to .Release.Name
-  projectTokenName:
-  projectTokenDuePeriod: '184 days'
-  connectionPool: 2
-  tokenEncryption:
-    ## A secret for signing access tokens stored in the database
-    ## Generated using: `openssl rand -hex 8|base64`
-    secret:
-
-triplesGenerator:
-  replicas: 1
-  image:
-    repository: renku/triples-generator
-    tag: 'latest'
-    pullPolicy: IfNotPresent
-  service:
-    type: ClusterIP
-    port: 9002
-  resources:
-    requests:
-      memory: 2048Mi
-      cpu: "1"
-  jvmXmx: 1g
-  gitlab:
-    rateLimit: 30/sec
-  ## a demanded number of concurrent triples generation processes
-  generationProcessesNumber: 2
-  transformationProcessesNumber: 2
-  connectionPool: 3
-  # set this to a pip-installable renku-python version which will be installed on startup
-  renkuPythonDevVersion:
-
-knowledgeGraph:
-  replicas: 1
-  image:
-    repository: renku/knowledge-graph
-    tag: 'latest'
-    pullPolicy: IfNotPresent
-  service:
-    type: ClusterIP
-    port: 80
-  resources:
-    requests:
-      memory: 512Mi
-  gitlab:
-    rateLimit: 100/sec
-  jvmXmx: 256M
-  services:
-    renku:
-      ## Renku knowledge-graph resources path e.g. `knowledge-graph` would assume
-      ## Renku resource are available at: https://{global.renku.domain}/knowledge-graph
-      resourcesPath: "/knowledge-graph"
-
-eventLog:
-  image:
-    repository: renku/event-log
-    tag: 'latest'
-    pullPolicy: IfNotPresent
-  service:
-    type: ClusterIP
-    port: 9005
-  resources:
-    requests:
-      memory: 512Mi
-  jvmXmx: 256M
-  gitlab:
-    rateLimit: 10/sec
-  connectionPool: 10
-
-commitEventService:
-  image:
-    repository: renku/commit-event-service
-    tag: 'latest'
-    pullPolicy: IfNotPresent
-  service:
-    type: ClusterIP
-    port: 9006
-  resources:
-    requests:
-      memory: 384Mi
-  jvmXmx: 128M
-  gitlab:
-    rateLimit: 10/sec
-
-sentry:
-  enabled: false
-  dsn: '' # Sentry dsn
-  sentryDsnRenkuPython: '' # Sentry dsn for renku CLI
-  environment: '' # Environment name e.g. renkulabio
-
-nameOverride: ''
-fullnameOverride: ''
-
-persistence:
-  enabled: true
-
-  ## A manually managed Persistent Volume and Claim
-  ## Requires persistence.enabled: true
-  ## If defined, PVC must be created manually before volume will be bound
-  # existingClaim:
-
-  # storageClass: "-"
-  accessMode: ReadWriteOnce
-  size: 2Gi
-
-nodeSelector: {}
-
-tolerations: []
-
-affinity: {}
-
-podSecurityContext: {}
-
-securityContext:
-  runAsUser: 1000
-  runAsGroup: 1000
-  allowPrivilegeEscalation: false
-  runAsNonRoot: true
+      repository: renku/webhook-service
+      tag: 'latest'
+  tokenRepository:
+    image:
+      repository: renku/token-repository
+      tag: 'latest'
+  triplesGenerator:
+    image:
+      repository: renku/triples-generator
+      tag: 'latest'
+  knowledgeGraph:
+    image:
+      repository: renku/knowledge-graph
+      tag: 'latest'
+  eventLog:
+    image:
+      repository: renku/event-log
+      tag: 'latest'
+  commitEventService:
+    image:
+      repository: renku/commit-event-service
+      tag: 'latest'
