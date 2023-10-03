@@ -36,7 +36,7 @@ class EventsQueueDBCreatorSpec extends AsyncFlatSpec with AsyncIOSpec with shoul
     for {
       _ <- checkTableExists(QueueTable.name).asserting(_ shouldBe false)
 
-      _ <- execute(dbInfraCreator.createDBInfra()).assertNoException
+      _ <- execute(dbInfraCreator.createDBInfra).assertNoException
 
       _ <- checkTableExists(QueueTable.name).asserting(_ shouldBe true)
       _ <- verifyIndexExists(QueueTable.name, "idx_enqueued_event_category").assertNoException

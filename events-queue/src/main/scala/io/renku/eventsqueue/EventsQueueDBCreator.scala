@@ -19,8 +19,8 @@
 package io.renku.eventsqueue
 
 import DBInfra.QueueTable
+import cats.MonadThrow
 import cats.data.Kleisli
-import cats.effect.kernel.MonadCancelThrow
 import cats.syntax.all._
 import io.renku.db.syntax._
 import io.renku.eventsqueue.DBInfra.QueueTable.Column
@@ -30,17 +30,17 @@ import skunk.implicits._
 import skunk.{Command, Query, Void}
 
 trait EventsQueueDBCreator[F[_]] {
-  def createDBInfra(): CommandDef[F]
+  def createDBInfra: CommandDef[F]
 }
 
 object EventsQueueDBCreator {
-  def apply[F[_]: MonadCancelThrow: Logger]: EventsQueueDBCreator[F] =
+  def apply[F[_]: MonadThrow: Logger]: EventsQueueDBCreator[F] =
     new EventsQueueDBCreatorImpl[F]
 }
 
-private class EventsQueueDBCreatorImpl[F[_]: MonadCancelThrow: Logger] extends EventsQueueDBCreator[F] {
+private class EventsQueueDBCreatorImpl[F[_]: MonadThrow: Logger] extends EventsQueueDBCreator[F] {
 
-  override def createDBInfra(): CommandDef[F] =
+  override def createDBInfra: CommandDef[F] =
     checkTableExists() >>= {
       case true  => Kleisli.liftF(Logger[F].info(s"'${QueueTable.name}' already exists"))
       case false => createTable()

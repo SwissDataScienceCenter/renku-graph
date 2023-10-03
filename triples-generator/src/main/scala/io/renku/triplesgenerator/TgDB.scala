@@ -34,7 +34,7 @@ import scala.concurrent.duration.FiniteDuration
 sealed trait TgDB
 
 object TgDB {
-  type TsWriteLock[F[_]]       = Lock[F, projects.Slug]
+  type TsWriteLock[F[_]] = Lock[F, projects.Slug]
 
   type SessionResource[F[_]] = io.renku.db.SessionResource[F, TgDB]
 
@@ -49,9 +49,9 @@ object TgDB {
     PostgresLock.exclusive[F, A](sessionPool.session, interval)
 
   def migrate[F[_]: MonadCancelThrow: Temporal: Logger](dbPool: SessionResource[F], retry: FiniteDuration): F[Unit] = {
-    val statsTableRun = dbPool.session.use(PostgresLockStats.ensureStatsTable[F]).attempt
-    val eventsQueueRun = dbPool.session.use(DBInfraCreator[F, TgDB](dbPool).ensureStatsTable[F]).attempt
-    (Stream.eval(statsTableRun) ++ Stream.awakeDelay(retry).evalMap(_ => statsTableRun))
+    val statsTableRun  = dbPool.session.use(PostgresLockStats.ensureStatsTable[F]).attempt
+    val eventsQueueRun = dbPool.session.use(EventsQueueDBCreator[F].createDBInfra.run).attempt
+    (Stream.eval(statsTableRun) ++ Stream.eval(eventsQueueRun) ++ Stream.awakeDelay(retry).evalMap(_ => statsTableRun))
       .evalMap {
         case Right(_) => Logger[F].info(s"triples_generator db migration done").as(0)
         case Left(ex) => Logger[F].error(ex)(s"Error running triples_generator migrations").as(1)

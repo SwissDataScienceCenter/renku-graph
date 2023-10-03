@@ -41,7 +41,7 @@ trait EventsQueueDBSpec extends ContainerDB { self: Suite =>
   private val warmUpEvent = "warmup"
 
   def withDB: Resource[IO, Unit] =
-    Resource.make(execute(EventsQueueDBCreator[IO].createDBInfra()) >> truncateDB())(_ => ().pure[IO])
+    Resource.make(execute(EventsQueueDBCreator[IO].createDBInfra) >> truncateDB())(_ => ().pure[IO])
 
   private def truncateDB() = {
     val query: Command[Void] = sql"""TRUNCATE enqueued_event""".command
