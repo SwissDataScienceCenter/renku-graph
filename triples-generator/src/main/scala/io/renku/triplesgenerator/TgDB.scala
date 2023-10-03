@@ -51,7 +51,8 @@ object TgDB {
   def migrate[F[_]: MonadCancelThrow: Temporal: Logger](dbPool: SessionResource[F], retry: FiniteDuration): F[Unit] = {
     val statsTableRun  = dbPool.session.use(PostgresLockStats.ensureStatsTable[F]).attempt
     val eventsQueueRun = dbPool.session.use(EventsQueueDBCreator[F].createDBInfra.run).attempt
-    (Stream.eval(statsTableRun) ++ Stream.eval(eventsQueueRun) ++ Stream.awakeDelay(retry).evalMap(_ => statsTableRun))
+    val migrations     = statsTableRun >> eventsQueueRun
+    (Stream.eval(migrations) ++ Stream.awakeDelay(retry).evalMap(_ => migrations))
       .evalMap {
         case Right(_) => Logger[F].info(s"triples_generator db migration done").as(0)
         case Left(ex) => Logger[F].error(ex)(s"Error running triples_generator migrations").as(1)
