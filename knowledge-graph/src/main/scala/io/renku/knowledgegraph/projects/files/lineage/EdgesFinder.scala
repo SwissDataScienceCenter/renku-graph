@@ -143,7 +143,15 @@ private class EdgesFinderImpl[F[_]: Async: Logger: SparqlQueryTimeRecorder](
     case _                                       => false
   }
 
-  private def projectMemberFilterQuery(projectResourceId: String): Option[AuthUser] => String = {
+  // TODO
+  private def projectMemberFilterQuery(projectResourceId: String): Option[AuthUser] => String = { _ =>
+    s"""
+       |# $projectResourceId
+       |""".stripMargin
+
+  }
+
+  private def projectMemberFilterQuery2(projectResourceId: String): Option[AuthUser] => String = {
     case Some(user) =>
       s"""|$projectResourceId renku:projectVisibility ?visibility .
           |OPTIONAL {
