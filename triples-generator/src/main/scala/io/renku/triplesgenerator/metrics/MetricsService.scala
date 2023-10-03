@@ -26,7 +26,7 @@ import eu.timepit.refined.auto._
 import fs2.{Compiler, Stream}
 import io.renku.lock.PostgresLockStats
 import io.renku.metrics.MetricsRegistry
-import io.renku.triplesgenerator.TgLockDB
+import io.renku.triplesgenerator.TgDB
 import org.typelevel.log4cats.Logger
 
 import scala.concurrent.duration.FiniteDuration
@@ -45,7 +45,7 @@ trait MetricsService[F[_]] {
 
 object MetricsService {
 
-  def apply[F[_]: Async: MetricsRegistry](dbPool: TgLockDB.SessionResource[F]): F[MetricsService[F]] = {
+  def apply[F[_]: Async: MetricsRegistry](dbPool: TgDB.SessionResource[F]): F[MetricsService[F]] = {
     val pgGauge  = PostgresLockGauge[F]("triples_generator")
     val pgHg     = PostgresLockHistogram[F]
     val getStats = dbPool.useK(Kleisli(PostgresLockStats.getStats[F]))

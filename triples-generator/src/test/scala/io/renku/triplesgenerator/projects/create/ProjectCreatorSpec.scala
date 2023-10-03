@@ -26,7 +26,7 @@ import io.renku.generators.Generators.Implicits._
 import io.renku.graph.model.testentities._
 import io.renku.graph.model.{entities, projects}
 import io.renku.lock.Lock
-import io.renku.triplesgenerator.TgLockDB.TsWriteLock
+import io.renku.triplesgenerator.TgDB.TsWriteLock
 import io.renku.triplesgenerator.api.Generators.newProjectsGen
 import io.renku.triplesgenerator.api.NewProject
 import io.renku.triplesgenerator.tsprovisioning.Generators.triplesUploadFailures

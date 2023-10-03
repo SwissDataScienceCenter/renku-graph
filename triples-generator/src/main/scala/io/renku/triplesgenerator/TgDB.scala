@@ -30,12 +30,12 @@ import org.typelevel.log4cats.Logger
 
 import scala.concurrent.duration.FiniteDuration
 
-sealed trait TgLockDB
+sealed trait TgDB
 
-object TgLockDB {
-  type TsWriteLock[F[_]] = Lock[F, projects.Slug]
+object TgDB {
+  type TsWriteLock[F[_]]       = Lock[F, projects.Slug]
 
-  type SessionResource[F[_]] = io.renku.db.SessionResource[F, TgLockDB]
+  type SessionResource[F[_]] = io.renku.db.SessionResource[F, TgDB]
 
   object SessionResource {
     def apply[F[_]](implicit sr: SessionResource[F]): SessionResource[F] = sr
@@ -61,7 +61,7 @@ object TgLockDB {
 }
 
 class TgLockDbConfigProvider[F[_]: MonadThrow]()
-    extends DBConfigProvider[F, TgLockDB](
+    extends DBConfigProvider[F, TgDB](
       namespace = "triples-generator-db",
       dbName = "triples_generator"
     )

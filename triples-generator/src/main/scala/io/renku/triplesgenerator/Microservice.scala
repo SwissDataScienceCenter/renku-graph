@@ -67,7 +67,7 @@ object Microservice extends IOMicroservice {
     val resources = for {
       config <- Resource.eval(parseConfigArgs(args))
       dbSessionPool <- Resource
-                         .eval(new TgLockDbConfigProvider[IO].map(SessionPoolResource[IO, TgLockDB]))
+                         .eval(new TgLockDbConfigProvider[IO].map(SessionPoolResource[IO, TgDB]))
                          .flatMap(identity)
       implicit0(mr: MetricsRegistry[IO])           <- Resource.eval(MetricsRegistry[IO]())
       implicit0(sqtr: SparqlQueryTimeRecorder[IO]) <- Resource.eval(SparqlQueryTimeRecorder.create[IO]())
@@ -83,7 +83,7 @@ object Microservice extends IOMicroservice {
 
   private def doRun(
       config:              Config,
-      sessionResource:     SessionResource[IO, TgLockDB],
+      sessionResource:     SessionResource[IO, TgDB],
       projectSparqlClient: ProjectSparqlClient[IO]
   )(implicit mr: MetricsRegistry[IO], sqtr: SparqlQueryTimeRecorder[IO]): IO[ExitCode] = for {
 
@@ -92,13 +92,13 @@ object Microservice extends IOMicroservice {
     implicit0(rp: ReProvisioningStatus[IO]) <- ReProvisioningStatus[IO]()
     implicit0(rurl: RenkuUrl)               <- RenkuUrlLoader[IO](config)
 
-    _ <- TgLockDB.migrate[IO](sessionResource, 20.seconds)
+    _ <- TgDB.migrate[IO](sessionResource, 20.seconds)
 
     metricsService <- MetricsService[IO](sessionResource)
     _ <- metricsService.collectEvery(Duration.fromNanos(config.getDuration("metrics-interval").toNanos)).start
 
-    tsWriteLock  = TgLockDB.createLock[IO, projects.Slug](sessionResource, 0.5.seconds)
-    categoryLock = TgLockDB.createLock[IO, CategoryName](sessionResource, 0.5.seconds)
+    tsWriteLock  = TgDB.createLock[IO, projects.Slug](sessionResource, 0.5.seconds)
+    categoryLock = TgDB.createLock[IO, CategoryName](sessionResource, 0.5.seconds)
     projectConnConfig              <- ProjectsConnectionConfig[IO](config)
     certificateLoader              <- CertificateLoader[IO]
     gitCertificateInstaller        <- GitCertificateInstaller[IO]
@@ -113,8 +113,7 @@ object Microservice extends IOMicroservice {
     syncRepoMetadataSubscription   <- syncrepometadata.SubscriptionFactory[IO](config, tsWriteLock)
     projectActivationsSubscription <- viewings.collector.projects.activated.SubscriptionFactory[IO](projectConnConfig)
     projectViewingsSubscription <-
-      viewings.collector.projects.viewed
-        .SubscriptionFactory[IO, TgLockDB](categoryLock, sessionResource, projectConnConfig)
+      viewings.collector.projects.viewed.SubscriptionFactory[IO, TgDB](categoryLock, sessionResource, projectConnConfig)
     datasetViewingsSubscription <- viewings.collector.datasets.SubscriptionFactory[IO](projectConnConfig)
     viewingDeletionSubscription <- viewings.deletion.projects.SubscriptionFactory[IO](projectConnConfig)
     eventConsumersRegistry <- consumers.EventConsumersRegistry(
