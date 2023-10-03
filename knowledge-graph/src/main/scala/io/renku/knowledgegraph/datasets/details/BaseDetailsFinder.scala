@@ -199,7 +199,7 @@ private class BaseDetailsFinderImpl[F[_]: Async: Logger: SparqlQueryTimeRecorder
   )
 
   private lazy val allowedProjectFilterQuery: Option[AuthUser] => Fragment = { user =>
-    SparqlSnippets(VarName("originalDsProjId"), VarName("visibility")).visibleProjects(user.map(_.id), Visibility.all)
+    SparqlSnippets(VarName("originalDsProjId")).visibleProjects(user.map(_.id), Visibility.all)
   }
 
   def findKeywords(dataset: Dataset): F[List[Keyword]] =

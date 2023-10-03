@@ -25,7 +25,7 @@ import io.renku.projectauth.ProjectAuth
 import io.renku.triplesstore.client.sparql.{Fragment, VarName}
 import io.renku.triplesstore.client.syntax._
 
-final class SparqlSnippets(val projectId: VarName, val projectVisibility: VarName) {
+final class SparqlSnippets(val projectId: VarName) {
 
   def changeVisibility(slug: projects.Slug, newValue: projects.Visibility): Fragment =
     sparql"""|DELETE { GRAPH ${ProjectAuth.graph} { ?id renku:visibility ?visibility } }
@@ -78,9 +78,9 @@ final class SparqlSnippets(val projectId: VarName, val projectVisibility: VarNam
 }
 
 object SparqlSnippets {
-  def apply(projectVar: VarName, visibilityVar: VarName): SparqlSnippets =
-    new SparqlSnippets(projectVar, visibilityVar)
+  def apply(projectVar: VarName): SparqlSnippets =
+    new SparqlSnippets(projectVar)
 
   val default =
-    SparqlSnippets(VarName("projectId"), VarName("projectVisibility"))
+    SparqlSnippets(VarName("projectId"))
 }

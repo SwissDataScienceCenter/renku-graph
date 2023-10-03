@@ -50,7 +50,7 @@ private case object ProjectsQuery extends EntityQuery[model.Entity.Project] {
   private val someCreatorNameVar  = VarName("someCreatorName")
   private val keywordVar          = VarName("keyword")
   private val encodedImageUrlVar  = VarName("encodedImageUrl")
-  private val authSnippets        = SparqlSnippets(projectIdVar, visibilityVar)
+  private val authSnippets        = SparqlSnippets(projectIdVar)
 
   override val selectVariables: Set[String] =
     Set(

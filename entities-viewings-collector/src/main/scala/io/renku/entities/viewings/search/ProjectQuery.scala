@@ -31,7 +31,7 @@ import io.renku.triplesstore.client.syntax._
 
 object ProjectQuery extends (Criteria => Option[SparqlQuery]) {
   private[this] val v            = Variables.Project
-  private[this] val authSnippets = SparqlSnippets(VarName("projectId"), v.visibility)
+  private[this] val authSnippets = SparqlSnippets(VarName("projectId"))
 
   def apply(criteria: Criteria): Option[SparqlQuery] =
     Option.when(criteria.forType(EntityType.Project))(makeQuery(criteria))

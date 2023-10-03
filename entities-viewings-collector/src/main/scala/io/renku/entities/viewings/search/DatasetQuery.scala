@@ -31,7 +31,7 @@ import io.renku.triplesstore.client.syntax.FragmentStringContext
 
 object DatasetQuery extends (Criteria => Option[SparqlQuery]) {
   private[this] val v            = Variables.Dataset
-  private[this] val authSnippets = SparqlSnippets(VarName("projectId"), v.projectVisibility)
+  private[this] val authSnippets = SparqlSnippets(VarName("projectId"))
 
   def apply(criteria: Criteria): Option[SparqlQuery] =
     Option.when(criteria.forType(EntityType.Dataset))(makeQuery(criteria))

@@ -46,7 +46,7 @@ private case object WorkflowsQuery extends EntityQuery[model.Entity.Workflow] {
                                      "?workflowTypes"
   )
 
-  private val authSnippets = SparqlSnippets(VarName("projectId"), VarName("projectVisibility"))
+  private val authSnippets = SparqlSnippets(VarName("projectId"))
 
   override def query(criteria: Criteria) = (criteria.filters whenRequesting entityType) {
     import criteria._

@@ -46,7 +46,7 @@ object DatasetsQuery extends EntityQuery[Entity.Dataset] {
   val keywordsVar             = VarName("keywords")
   val imagesVar               = VarName("images")
 
-  private val authSnippets = SparqlSnippets(VarName("projId"), VarName("projectVisibility"))
+  private val authSnippets = SparqlSnippets(VarName("projId"))
 
   override val selectVariables = Set(
     entityTypeVar,
