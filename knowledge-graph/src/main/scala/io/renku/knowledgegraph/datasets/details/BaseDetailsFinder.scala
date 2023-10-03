@@ -180,10 +180,10 @@ private class BaseDetailsFinderImpl[F[_]: Async: Logger: SparqlQueryTimeRecorder
              |               schema:version ?version;
              |               schema:sameAs/schema:url ?originalDsId
              |  }
+             |  ${allowedProjectFilterQuery(authContext.maybeAuthUser)}
              |  GRAPH ?originalDsProjId {
              |    ?originalDsProjId renku:hasDataset ?originalDsId;
              |                      renku:projectPath ?projectSlug.
-             |    ${allowedProjectFilterQuery(authContext.maybeAuthUser)}
              |    ?originalDsTagId schema:about/schema:url ?originalDsId;
              |                     schema:name ?version
              |  }
