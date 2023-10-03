@@ -30,13 +30,13 @@ import skunk._
 import skunk.codec.all.{bool, varchar}
 import skunk.implicits._
 
-class DBInfraCreatorSpec extends AsyncFlatSpec with AsyncIOSpec with should.Matchers with ContainerDB {
+class EventsQueueDBCreatorSpec extends AsyncFlatSpec with AsyncIOSpec with should.Matchers with ContainerDB {
 
   it should "create an 'enqueued-event' table if not exists" in {
     for {
       _ <- checkTableExists(QueueTable.name).asserting(_ shouldBe false)
 
-      _ <- dbInfraCreator.createDBInfra().assertNoException
+      _ <- execute(dbInfraCreator.createDBInfra()).assertNoException
 
       _ <- checkTableExists(QueueTable.name).asserting(_ shouldBe true)
       _ <- verifyIndexExists(QueueTable.name, "idx_enqueued_event_category").assertNoException
@@ -48,7 +48,7 @@ class DBInfraCreatorSpec extends AsyncFlatSpec with AsyncIOSpec with should.Matc
   }
 
   private implicit lazy val logger: TestLogger[IO] = TestLogger()
-  private lazy val dbInfraCreator = new DBInfraCreatorImpl[IO, TestDB]
+  private lazy val dbInfraCreator = new EventsQueueDBCreatorImpl[IO]
 
   private def checkTableExists(table: String): IO[Boolean] = execute[Boolean] {
     val query: Query[String, Boolean] =

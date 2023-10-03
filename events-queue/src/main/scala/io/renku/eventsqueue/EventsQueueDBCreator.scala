@@ -22,7 +22,6 @@ import DBInfra.QueueTable
 import cats.data.Kleisli
 import cats.effect.kernel.MonadCancelThrow
 import cats.syntax.all._
-import io.renku.db.SessionResource
 import io.renku.db.syntax._
 import io.renku.eventsqueue.DBInfra.QueueTable.Column
 import org.typelevel.log4cats.Logger
@@ -30,24 +29,21 @@ import skunk.codec.all.bool
 import skunk.implicits._
 import skunk.{Command, Query, Void}
 
-trait DBInfraCreator[F[_]] {
-  def createDBInfra(): F[Unit]
+trait EventsQueueDBCreator[F[_]] {
+  def createDBInfra(): CommandDef[F]
 }
 
-object DBInfraCreator {
-  def apply[F[_]: MonadCancelThrow: Logger, DB](implicit sr: SessionResource[F, DB]): DBInfraCreator[F] =
-    new DBInfraCreatorImpl[F, DB]
+object EventsQueueDBCreator {
+  def apply[F[_]: MonadCancelThrow: Logger]: EventsQueueDBCreator[F] =
+    new EventsQueueDBCreatorImpl[F]
 }
 
-private class DBInfraCreatorImpl[F[_]: MonadCancelThrow: Logger, DB](implicit sr: SessionResource[F, DB])
-    extends DBInfraCreator[F] {
+private class EventsQueueDBCreatorImpl[F[_]: MonadCancelThrow: Logger] extends EventsQueueDBCreator[F] {
 
-  override def createDBInfra(): F[Unit] =
-    sr.useK {
-      checkTableExists() >>= {
-        case true  => Kleisli.liftF(Logger[F].info(s"'${QueueTable.name}' already exists"))
-        case false => createTable()
-      }
+  override def createDBInfra(): CommandDef[F] =
+    checkTableExists() >>= {
+      case true  => Kleisli.liftF(Logger[F].info(s"'${QueueTable.name}' already exists"))
+      case false => createTable()
     }
 
   private def createTable() = for {

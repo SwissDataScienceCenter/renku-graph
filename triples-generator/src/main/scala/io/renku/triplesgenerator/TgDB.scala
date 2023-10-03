@@ -24,6 +24,7 @@ import cats.syntax.all._
 import eu.timepit.refined.auto._
 import fs2.Stream
 import io.renku.db.DBConfigProvider
+import io.renku.eventsqueue.EventsQueueDBCreator
 import io.renku.graph.model.projects
 import io.renku.lock.{Lock, LongKey, PostgresLock, PostgresLockStats}
 import org.typelevel.log4cats.Logger
@@ -48,8 +49,9 @@ object TgDB {
     PostgresLock.exclusive[F, A](sessionPool.session, interval)
 
   def migrate[F[_]: MonadCancelThrow: Temporal: Logger](dbPool: SessionResource[F], retry: FiniteDuration): F[Unit] = {
-    val run = dbPool.session.use(PostgresLockStats.ensureStatsTable[F]).attempt
-    (Stream.eval(run) ++ Stream.awakeDelay(retry).evalMap(_ => run))
+    val statsTableRun = dbPool.session.use(PostgresLockStats.ensureStatsTable[F]).attempt
+    val eventsQueueRun = dbPool.session.use(DBInfraCreator[F, TgDB](dbPool).ensureStatsTable[F]).attempt
+    (Stream.eval(statsTableRun) ++ Stream.awakeDelay(retry).evalMap(_ => statsTableRun))
       .evalMap {
         case Right(_) => Logger[F].info(s"triples_generator db migration done").as(0)
         case Left(ex) => Logger[F].error(ex)(s"Error running triples_generator migrations").as(1)
