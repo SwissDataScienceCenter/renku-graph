@@ -46,6 +46,8 @@ private case object WorkflowsQuery extends EntityQuery[model.Entity.Workflow] {
                                      "?workflowTypes"
   )
 
+  private val authSnippets = SparqlSnippets(VarName("projectId"), VarName("projectVisibility"))
+
   override def query(criteria: Criteria) = (criteria.filters whenRequesting entityType) {
     import criteria._
     // format: off
@@ -111,7 +113,7 @@ private case object WorkflowsQuery extends EntityQuery[model.Entity.Workflow] {
   }
 
   private def accessRightsAndVisibility(maybeUser: Option[AuthUser], visibilities: Set[projects.Visibility]): Fragment =
-    SparqlSnippets.visibleProjects(maybeUser.map(_.id), visibilities)
+    authSnippets.visibleProjects(maybeUser.map(_.id), visibilities)
 
   private def withoutQuerySnippet: Fragment =
     sparql"""

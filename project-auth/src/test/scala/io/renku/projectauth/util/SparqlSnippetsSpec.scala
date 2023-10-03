@@ -49,12 +49,12 @@ class SparqlSnippetsSpec extends AsyncFlatSpec with AsyncIOSpec with ProjectAuth
             |SELECT ?slug ?visibility ?memberRole
             |WHERE {
             |  Graph ${ProjectAuth.graph} {
-            |     ${SparqlSnippets.projectId} a schema:Project;
+            |     ${SparqlSnippets.default.projectId} a schema:Project;
             |         renku:visibility ?visibility;
             |         renku:slug ?slug.
             |
             |         Optional {
-            |           ${SparqlSnippets.projectId} renku:memberRole ?memberRole.
+            |           ${SparqlSnippets.default.projectId} renku:memberRole ?memberRole.
             |         }
             |  }
             |
@@ -72,7 +72,7 @@ class SparqlSnippetsSpec extends AsyncFlatSpec with AsyncIOSpec with ProjectAuth
     clientAndData.use { case (client, data) =>
       for {
         r <- client.queryDecode[ProjectAuthDataRow](
-               selectFragment(SparqlSnippets.visibleProjects(None, Visibility.all))
+               selectFragment(SparqlSnippets.default.visibleProjects(None, Visibility.all))
              )
         _ = r.map(_.visibility).toSet shouldBe data.filter(_.visibility == Visibility.Public).map(_.visibility).toSet
       } yield ()
@@ -85,7 +85,7 @@ class SparqlSnippetsSpec extends AsyncFlatSpec with AsyncIOSpec with ProjectAuth
         nonExistingUser <- IO(selectUserNotIn(data).generateOne)
         nonPrivate = data.filter(p => p.visibility != Visibility.Private)
         r <- client.queryDecode[ProjectAuthDataRow](
-               selectFragment(SparqlSnippets.visibleProjects(nonExistingUser.some, Visibility.all))
+               selectFragment(SparqlSnippets.default.visibleProjects(nonExistingUser.some, Visibility.all))
              )
         _ = r.map(_.visibility).max shouldBe nonPrivate.map(_.visibility).max
       } yield ()
@@ -97,7 +97,7 @@ class SparqlSnippetsSpec extends AsyncFlatSpec with AsyncIOSpec with ProjectAuth
       for {
         existingUser <- IO(selectUserFrom(data).generateOne)
         r <- client.queryDecode[ProjectAuthDataRow](
-               selectFragment(SparqlSnippets.visibleProjects(existingUser.some, Visibility.all))
+               selectFragment(SparqlSnippets.default.visibleProjects(existingUser.some, Visibility.all))
              )
         _ = r.map(_.visibility).max shouldBe data.map(_.visibility).max
 
@@ -113,7 +113,7 @@ class SparqlSnippetsSpec extends AsyncFlatSpec with AsyncIOSpec with ProjectAuth
     clientAndData.use { case (client, _) =>
       for {
         r <- client.queryDecode[ProjectAuthDataRow](
-               selectFragment(SparqlSnippets.visibleProjects(None, internal))
+               selectFragment(SparqlSnippets.default.visibleProjects(None, internal))
              )
         _ = r shouldBe Nil
       } yield ()
@@ -124,7 +124,7 @@ class SparqlSnippetsSpec extends AsyncFlatSpec with AsyncIOSpec with ProjectAuth
     clientAndData.use { case (client, data) =>
       for {
         r <- client.queryDecode[ProjectAuthDataRow](
-               selectFragment(SparqlSnippets.visibleProjects(None, Set.empty))
+               selectFragment(SparqlSnippets.default.visibleProjects(None, Set.empty))
              )
         expected = data.filter(projectFilter(None, Visibility.all)).sortBy(_.slug)
         found    = Stream.emits(r).through(ProjectAuthDataRow.collect).toList
@@ -138,7 +138,7 @@ class SparqlSnippetsSpec extends AsyncFlatSpec with AsyncIOSpec with ProjectAuth
       for {
         user <- IO(selectUserFrom(data).generateSome)
         r <- client.queryDecode[ProjectAuthDataRow](
-               selectFragment(SparqlSnippets.visibleProjects(user, Set.empty))
+               selectFragment(SparqlSnippets.default.visibleProjects(user, Set.empty))
              )
         expected = data.filter(projectFilter(user, Visibility.all)).sortBy(_.slug)
         found    = Stream.emits(r).through(ProjectAuthDataRow.collect).toList
@@ -155,7 +155,7 @@ class SparqlSnippetsSpec extends AsyncFlatSpec with AsyncIOSpec with ProjectAuth
     clientAndData.use { case (client, data) =>
       for {
         r <- client.queryDecode[ProjectAuthDataRow](
-               selectFragment(SparqlSnippets.visibleProjects(None, Visibility.all))
+               selectFragment(SparqlSnippets.default.visibleProjects(None, Visibility.all))
              )
         expected = data.filter(projectFilter(None, Visibility.all)).sortBy(_.slug)
         found    = Stream.emits(r).through(ProjectAuthDataRow.collect).toList
@@ -172,7 +172,7 @@ class SparqlSnippetsSpec extends AsyncFlatSpec with AsyncIOSpec with ProjectAuth
         _ <- client.update(
                sparql"""${"renku" -> Schemas.renku}
                        |${"schema" -> Schemas.schema}
-                       |${SparqlSnippets.changeVisibility(el.slug, otherVis)}
+                       |${SparqlSnippets.default.changeVisibility(el.slug, otherVis)}
                        |""".stripMargin
              )
         r <- ProjectAuthService(client, renkuUrl).getAll(QueryFilter.all.withSlug(el.slug)).compile.lastOrError
@@ -190,7 +190,7 @@ class SparqlSnippetsSpec extends AsyncFlatSpec with AsyncIOSpec with ProjectAuth
         for {
           existingUser <- IO(selectUserFrom(data).generateSome)
           r <- client.queryDecode[ProjectAuthDataRow](
-                 selectFragment(SparqlSnippets.visibleProjects(existingUser, givenVisibility))
+                 selectFragment(SparqlSnippets.default.visibleProjects(existingUser, givenVisibility))
                )
           expected = data.filter(projectFilter(existingUser, givenVisibility)).sortBy(_.slug)
           found    = Stream.emits(r).through(ProjectAuthDataRow.collect).toList

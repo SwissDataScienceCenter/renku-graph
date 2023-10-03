@@ -50,6 +50,7 @@ private case object ProjectsQuery extends EntityQuery[model.Entity.Project] {
   private val someCreatorNameVar  = VarName("someCreatorName")
   private val keywordVar          = VarName("keyword")
   private val encodedImageUrlVar  = VarName("encodedImageUrl")
+  private val authSnippets        = SparqlSnippets(projectIdVar, visibilityVar)
 
   override val selectVariables: Set[String] =
     Set(
@@ -147,7 +148,7 @@ private case object ProjectsQuery extends EntityQuery[model.Entity.Project] {
   private def accessRightsAndVisibility(maybeUser: Option[AuthUser], visibilities: Set[projects.Visibility]): Fragment =
     sparql"""
             |$projectIdVar renku:projectVisibility $visibilityVar .
-            |${SparqlSnippets.visibleProjects(maybeUser.map(_.id), visibilities)}
+            |${authSnippets.visibleProjects(maybeUser.map(_.id), visibilities)}
               """.stripMargin
 
   private def namespacesPart(ns: Set[projects.Namespace]): Fragment = {
