@@ -19,7 +19,6 @@
 package io.renku.knowledgegraph.datasets
 package details
 
-import Dataset.Tag
 import cats.MonadThrow
 import cats.effect.Async
 import cats.syntax.all._
@@ -28,14 +27,15 @@ import io.circe.{Decoder, DecodingFailure}
 import io.renku.graph.http.server.security.Authorizer.AuthContext
 import io.renku.graph.model._
 import io.renku.graph.model.datasets.{Identifier, Keyword, SameAs}
-import io.renku.graph.model.entities.Person
 import io.renku.graph.model.images.ImageUri
-import io.renku.graph.model.projects.Slug
+import io.renku.graph.model.projects.{Slug, Visibility}
 import io.renku.http.server.security.model.AuthUser
 import io.renku.jsonld.syntax._
+import io.renku.knowledgegraph.datasets.details.Dataset.Tag
+import io.renku.projectauth.util.SparqlSnippets
 import io.renku.triplesstore.SparqlQuery.Prefixes
 import io.renku.triplesstore._
-import io.renku.triplesstore.client.sparql.Fragment
+import io.renku.triplesstore.client.sparql.{Fragment, VarName}
 import io.renku.triplesstore.client.syntax._
 import org.typelevel.log4cats.Logger
 
@@ -198,29 +198,8 @@ private class BaseDetailsFinderImpl[F[_]: Async: Logger: SparqlQueryTimeRecorder
              |""".stripMargin
   )
 
-  private lazy val allowedProjectFilterQuery: Option[AuthUser] => Fragment = {
-    case Some(user) =>
-      fr"""|?originalDsProjId renku:projectVisibility ?visibility.
-           |{
-           |  VALUES (?visibility) {
-           |    (${projects.Visibility.Public.asObject}) (${projects.Visibility.Internal.asObject})
-           |  }
-           |} UNION {
-           |  VALUES (?visibility) {
-           |    (${projects.Visibility.Private.asObject})
-           |  }
-           |  ?originalDsProjId schema:member ?memberId
-           |  GRAPH ${GraphClass.Persons.id} {
-           |    ?memberId schema:sameAs ?sameAsId.
-           |    ?sameAsId schema:additionalType ${Person.gitLabSameAsAdditionalType.asTripleObject};
-           |              schema:identifier ${user.id.asObject}
-           |  }
-           |}
-           |""".stripMargin
-    case _ =>
-      fr"""|?originalDsProjId renku:projectVisibility ?visibility .
-           |VALUES (?visibility) { (${projects.Visibility.Public.asObject})}
-           |""".stripMargin
+  private lazy val allowedProjectFilterQuery: Option[AuthUser] => Fragment = { user =>
+    SparqlSnippets(VarName("originalDsProjId"), VarName("visibility")).visibleProjects(user.map(_.id), Visibility.all)
   }
 
   def findKeywords(dataset: Dataset): F[List[Keyword]] =
