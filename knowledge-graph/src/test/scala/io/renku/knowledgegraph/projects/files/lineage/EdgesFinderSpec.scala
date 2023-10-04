@@ -241,7 +241,7 @@ class EdgesFinderSpec
       }
 
     "return no the edges of the internal project " +
-      "case when the user anonymous" in new TestCase {
+      "case when the user is anonymous" in new TestCase {
         val authUser = authUsers.generateOne
 
         val exemplarData = LineageExemplarData(renkuProjectEntities(fixed(Visibility.Internal)).generateOne)

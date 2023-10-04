@@ -65,7 +65,7 @@ private class TSProjectFinderImpl[F[_]: Async: Logger: SparqlQueryTimeRecorder](
              |
              |  ${memberProjects(criteria)}
              |
-             |  ${maybeOnAccessRights2(criteria)}
+             |  ${maybeOnAccessRights(criteria)}
              |
              |  GRAPH ?projectId {
              |    ?projectId 
@@ -89,10 +89,10 @@ private class TSProjectFinderImpl[F[_]: Async: Logger: SparqlQueryTimeRecorder](
              |""".stripMargin
   )
 
-  def memberProjects(criteria: Criteria): Fragment =
+  private def memberProjects(criteria: Criteria): Fragment =
     authSnippets.memberProjects(criteria.userId)
 
-  def maybeOnAccessRights2(criteria: Criteria): Fragment =
+  private def maybeOnAccessRights(criteria: Criteria): Fragment =
     authSnippets
       .visibleProjects(criteria.maybeUser.map(_.id), Visibility.all)
 
