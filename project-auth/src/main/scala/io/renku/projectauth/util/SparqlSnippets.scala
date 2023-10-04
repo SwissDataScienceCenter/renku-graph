@@ -38,6 +38,14 @@ final class SparqlSnippets(val projectId: VarName) {
              |  }
              |}""".stripMargin
 
+  def memberProjects(userId: persons.GitLabId): Fragment =
+    sparql"""
+            |Graph renku:ProjectAuth {
+            |   $projectId a schema:Project;
+            |              renku:memberId ${userId.value}.
+            |}
+            | """.stripMargin
+
   def visibleProjects(userId: Option[persons.GitLabId], selectedVisibility: Set[Visibility]): Fragment = {
     val visibilities =
       if (selectedVisibility.isEmpty) Visibility.all

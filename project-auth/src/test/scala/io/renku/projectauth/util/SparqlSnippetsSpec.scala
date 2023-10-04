@@ -25,7 +25,7 @@ import fs2.Stream
 import io.renku.generators.Generators.Implicits._
 import io.renku.graph.model.projects.Visibility
 import io.renku.graph.model.{RenkuUrl, Schemas, persons}
-import io.renku.projectauth.{Generators, ProjectAuth, ProjectAuthData, ProjectAuthService, ProjectAuthServiceSupport, QueryFilter}
+import io.renku.projectauth._
 import io.renku.triplesstore.client.sparql.Fragment
 import io.renku.triplesstore.client.syntax._
 import org.scalatest.flatspec.AsyncFlatSpec
@@ -197,6 +197,28 @@ class SparqlSnippetsSpec extends AsyncFlatSpec with AsyncIOSpec with ProjectAuth
           _        = found shouldBe expected
         } yield ()
       }
+    }
+  }
+
+  it should "select projects given a member" in {
+    clientAndData.use { case (client, data) =>
+      for {
+        existingUser    <- IO(selectUserFrom(data).generateOne)
+        nonExistingUser <- IO(selectUserNotIn(data).generateOne)
+        r1 <-
+          client.queryDecode[ProjectAuthDataRow](selectFragment(SparqlSnippets.default.memberProjects(existingUser)))
+        r2 <-
+          client.queryDecode[ProjectAuthDataRow](selectFragment(SparqlSnippets.default.memberProjects(nonExistingUser)))
+
+        expected1 = data.filter(_.members.map(_.gitLabId).contains(existingUser)).sortBy(_.slug)
+        result1 = Stream
+                    .emits(r1)
+                    .through(ProjectAuthDataRow.collect)
+                    .toList
+
+        _ = result1 shouldBe expected1
+        _ = r2      shouldBe Nil
+      } yield ()
     }
   }
 
