@@ -20,6 +20,7 @@ package io.renku.knowledgegraph.projects.files.lineage
 
 import cats.effect.IO
 import cats.syntax.all._
+import io.renku.entities.searchgraphs.SearchInfoDatasets
 import io.renku.generators.CommonGraphGenerators.authUsers
 import io.renku.generators.Generators.Implicits._
 import io.renku.generators.Generators.fixed
@@ -38,14 +39,18 @@ import io.renku.triplesstore.{InMemoryJenaForSpec, ProjectsDataset, SparqlQueryT
 import model._
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
+import org.typelevel.log4cats.Logger
 
 class EdgesFinderSpec
     extends AnyWordSpec
     with should.Matchers
     with InMemoryJenaForSpec
     with ProjectsDataset
+    with SearchInfoDatasets
     with ExternalServiceStubbing
     with IOSpec {
+
+  implicit override val ioLogger: Logger[IO] = TestLogger[IO]()
 
   "findEdges" should {
 
@@ -56,7 +61,7 @@ class EdgesFinderSpec
 
         import exemplarData._
 
-        upload(to = projectsDataset, project)
+        provisionTestProject(project).unsafeRunSync()
 
         edgesFinder
           .findEdges(project.slug, maybeUser = None)
@@ -114,7 +119,7 @@ class EdgesFinderSpec
         .planOutputParameterOverrides(out1 -> out2)
         .buildProvenanceUnsafe()
 
-      upload(to = projectsDataset, project.addActivities(activity1, activity2))
+      provisionTestProject(project.addActivities(activity1, activity2)).unsafeRunSync()
 
       edgesFinder
         .findEdges(project.slug, maybeUser = None)
@@ -142,7 +147,7 @@ class EdgesFinderSpec
         "case when the user is not authenticated" in new TestCase {
           val exemplarData = LineageExemplarData(renkuProjectEntities(fixed(visibility)).generateOne)
 
-          upload(to = projectsDataset, exemplarData.project)
+          provisionTestProject(exemplarData.project).unsafeRunSync()
 
           edgesFinder
             .findEdges(projectSlugs.generateOne, authUsers.generateOption)
@@ -156,7 +161,7 @@ class EdgesFinderSpec
       "case when the user is authenticated but he's not the project member" in new TestCase {
         val exemplarData = LineageExemplarData(renkuProjectEntities(fixed(Visibility.Private)).generateOne)
 
-        upload(to = projectsDataset, exemplarData.project)
+        provisionTestProject(exemplarData.project).unsafeRunSync()
 
         edgesFinder
           .findEdges(projectSlugs.generateOne, authUsers.generateSome)
@@ -178,7 +183,7 @@ class EdgesFinderSpec
 
           import exemplarData._
 
-          upload(to = projectsDataset, project)
+          provisionTestProject(project).unsafeRunSync()
 
           edgesFinder
             .findEdges(project.slug, Some(authUser))
@@ -211,7 +216,7 @@ class EdgesFinderSpec
 
         import exemplarData._
 
-        upload(to = projectsDataset, project)
+        provisionTestProject(project).unsafeRunSync()
 
         edgesFinder
           .findEdges(project.slug, Some(authUser))
@@ -233,6 +238,21 @@ class EdgesFinderSpec
             Set(`grid_plot entity`.toNodeLocation, `cumulative entity`.toNodeLocation)
           )
         )
+      }
+
+    "return no the edges of the internal project " +
+      "case when the user anonymous" in new TestCase {
+        val authUser = authUsers.generateOne
+
+        val exemplarData = LineageExemplarData(renkuProjectEntities(fixed(Visibility.Internal)).generateOne)
+
+        import exemplarData._
+
+        provisionTestProject(project).unsafeRunSync()
+
+        edgesFinder
+          .findEdges(project.slug, None)
+          .unsafeRunSync() shouldBe Map()
       }
   }
 
