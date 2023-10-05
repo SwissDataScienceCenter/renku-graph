@@ -202,7 +202,7 @@ class DatasetFinderSpec
     "not return a dataset if the user is not authorised for the project where the DS belongs to" in new TestCase {
 
       val (dataset, project) =
-        anyRenkuProjectEntities(visibilityPublic).addDataset(datasetEntities(provenanceInternal)).generateOne
+        anyRenkuProjectEntities(visibilityPrivate).addDataset(datasetEntities(provenanceInternal)).generateOne
 
       provisionTestProject(project).unsafeRunSync()
 
@@ -453,7 +453,9 @@ class DatasetFinderSpec
     "return details of the dataset with the given id " +
       "- a case where the user has no access to the original project" in new TestCase {
 
-        val (originalDataset, originalProject -> fork) = renkuProjectEntities(visibilityPublic)
+        val authUser = authUsers.generateOne
+        val (originalDataset, originalProject -> fork) = renkuProjectEntities(visibilityPrivate)
+          .map(replaceMembers(Set(projectMemberEntities(authUser.id.some).generateOne)))
           .addDataset(datasetEntities(provenanceInternal))
           .forkOnce()
           .generateOne

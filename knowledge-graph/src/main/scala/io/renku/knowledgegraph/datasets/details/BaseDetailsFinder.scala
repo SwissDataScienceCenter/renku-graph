@@ -82,7 +82,7 @@ private class BaseDetailsFinderImpl[F[_]: Async: Logger: SparqlQueryTimeRecorder
                |                   schema:name ?projectName;
                |                   renku:projectVisibility ?projectVisibility;
                |                   renku:projectPath ?projectSlug.
-               |        VALUES (?projectSlug) { ${authContext.allowedProjects.map(_.asObject)} }
+               |
                |        FILTER NOT EXISTS {
                |          ?datasetId prov:invalidatedAtTime ?invalidationTime.
                |        }
@@ -96,6 +96,8 @@ private class BaseDetailsFinderImpl[F[_]: Async: Logger: SparqlQueryTimeRecorder
                |    ORDER BY ?dateCreated ?projectName
                |    LIMIT 1
                |  }
+               |
+               |  ${SparqlSnippets.default.visibleProjects(authContext.maybeAuthUser.map(_.id), Visibility.all)}
                |
                |  GRAPH ?projectId {
                |    ?datasetId schema:identifier ${identifier.asObject};
@@ -141,12 +143,13 @@ private class BaseDetailsFinderImpl[F[_]: Async: Logger: SparqlQueryTimeRecorder
                |                   schema:name ?projectName;
                |                   renku:projectVisibility ?projectVisibility;
                |                   renku:projectPath ?projectSlug.
-               |        VALUES (?projectSlug) { ${authContext.allowedProjects.map(_.asObject)} }
                |      }
                |    }
                |    ORDER BY ?dateCreated ?projectName
                |    LIMIT 1
                |  }
+               |
+               |  ${SparqlSnippets.default.visibleProjects(authContext.maybeAuthUser.map(_.id), Visibility.all)}
                |
                |  GRAPH ?projectId {
                |    ?datasetId renku:topmostSameAs ?topmostSameAs;
