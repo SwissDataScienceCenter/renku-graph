@@ -18,6 +18,8 @@
 
 package io.renku.eventsqueue
 
+import DBInfra.QueueTable
+import DBInfra.QueueTable.Column
 import cats.effect.Async
 import io.renku.db.syntax._
 import io.renku.db.{DbClient, SqlStatement}
@@ -44,9 +46,9 @@ private class EventsQueueStatsImpl[F[_]: Async, DB]
     SqlStatement
       .named(s"$queryPrefix stats")
       .select[Void, (CategoryName, Long)](
-        sql"""SELECT category, COUNT(id) AS count
-              FROM enqueued_event
-              GROUP BY category"""
+        sql"""SELECT #${Column.category}, COUNT(#${Column.id}) AS count
+              FROM #${QueueTable.name}
+              GROUP BY #${Column.category}"""
           .query(categoryNameDecoder ~ int8)
       )
       .arguments(Void)

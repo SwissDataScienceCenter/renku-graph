@@ -18,6 +18,8 @@
 
 package io.renku.eventsqueue
 
+import DBInfra.QueueTable
+import DBInfra.QueueTable.Column
 import cats.effect.Async
 import io.circe.Json
 import io.renku.db.syntax._
@@ -57,7 +59,7 @@ private class EventsRepositoryImpl[F[_]: Async, DB]
     SqlStatement
       .named(s"$queryPrefix insert")
       .command[CategoryName *: String *: OffsetDateTime *: OffsetDateTime *: EnqueueStatus *: EmptyTuple](
-        sql"""INSERT INTO enqueued_event (category, payload, created, updated, status)
+        sql"""INSERT INTO #${QueueTable.name} (#${Column.category}, #${Column.payload}, #${Column.created}, #${Column.updated}, #${Column.status})
               VALUES ($categoryNameEncoder, $text, $timestamptz, $timestamptz, $enqueueStatusEncoder)""".command
       )
       .arguments(category *: payload.noSpaces *: timestamp *: timestamp *: EnqueueStatus.New *: EmptyTuple)
@@ -82,11 +84,11 @@ private class EventsRepositoryImpl[F[_]: Async, DB]
   private def fetchQuery(
       chunkSize: Int
   ): Query[CategoryName *: EnqueueStatus *: EnqueueStatus *: OffsetDateTime *: EmptyTuple, DequeuedEvent] =
-    sql"""SELECT id, payload
-          FROM enqueued_event
-          WHERE category = $categoryNameEncoder
-                AND ((status = $enqueueStatusEncoder)
-                      OR (status = $enqueueStatusEncoder AND $timestamptz >= updated)
+    sql"""SELECT #${Column.id}, #${Column.payload}
+          FROM #${QueueTable.name}
+          WHERE #${Column.category} = $categoryNameEncoder
+                AND ((#${Column.status} = $enqueueStatusEncoder)
+                      OR (#${Column.status} = $enqueueStatusEncoder AND $timestamptz >= #${Column.updated})
                     )
           LIMIT #${chunkSize.toString}"""
       .query(int4 ~ text)
@@ -96,9 +98,9 @@ private class EventsRepositoryImpl[F[_]: Async, DB]
     SqlStatement
       .named(s"$queryPrefix update to processing")
       .command[OffsetDateTime *: EnqueueStatus *: Int *: EmptyTuple](
-        sql"""UPDATE enqueued_event
-              SET updated = $timestamptz, status = $enqueueStatusEncoder
-              WHERE id = $int4""".command
+        sql"""UPDATE #${QueueTable.name}
+              SET #${Column.updated} = $timestamptz, #${Column.status} = $enqueueStatusEncoder
+              WHERE #${Column.id} = $int4""".command
       )
       .arguments(OffsetDateTime.now() *: EnqueueStatus.Processing *: eventId *: EmptyTuple)
       .build
@@ -109,9 +111,9 @@ private class EventsRepositoryImpl[F[_]: Async, DB]
     SqlStatement
       .named(s"$queryPrefix update to new")
       .command[OffsetDateTime *: EnqueueStatus *: Int *: EmptyTuple](
-        sql"""UPDATE enqueued_event
-              SET updated = $timestamptz, status = $enqueueStatusEncoder
-              WHERE id = $int4""".command
+        sql"""UPDATE #${QueueTable.name}
+              SET #${Column.updated} = $timestamptz, #${Column.status} = $enqueueStatusEncoder
+              WHERE #${Column.id} = $int4""".command
       )
       .arguments(OffsetDateTime.now() *: EnqueueStatus.New *: eventId *: EmptyTuple)
       .build
@@ -122,8 +124,8 @@ private class EventsRepositoryImpl[F[_]: Async, DB]
     SqlStatement
       .named(s"$queryPrefix delete")
       .command[Int *: EnqueueStatus *: EmptyTuple](
-        sql"""DELETE FROM enqueued_event
-              WHERE id = $int4 AND status = $enqueueStatusEncoder""".command
+        sql"""DELETE FROM #${QueueTable.name}
+              WHERE #${Column.id} = $int4 AND #${Column.status} = $enqueueStatusEncoder""".command
       )
       .arguments(eventId *: EnqueueStatus.Processing *: EmptyTuple)
       .build

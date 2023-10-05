@@ -33,9 +33,9 @@ class EventsQueueStatsSpec extends AsyncFlatSpec with CustomAsyncIOSpec with Eve
   it should "return stats about number of events per category" in {
 
     val category1       = categoryNames.generateOne
-    val category1Events = events.generateList().map(_.asJson)
+    val category1Events = events.generateList(min = 1).map(_.asJson)
     val category2       = categoryNames.generateOne
-    val category2Events = events.generateList().map(_.asJson)
+    val category2Events = events.generateList(min = 1).map(_.asJson)
 
     withDB.surround {
       for {
