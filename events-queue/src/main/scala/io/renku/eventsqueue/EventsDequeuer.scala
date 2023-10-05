@@ -30,7 +30,7 @@ import skunk.{Session, SqlState}
 
 trait EventsDequeuer[F[_]] {
   def acquireEventsStream(category: CategoryName):  Stream[F, DequeuedEvent]
-  def returnToQueue(event:        DequeuedEvent): F[Unit]
+  def returnToQueue(event:          DequeuedEvent): F[Unit]
 }
 
 object EventsDequeuer {

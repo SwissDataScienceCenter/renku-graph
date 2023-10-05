@@ -141,7 +141,7 @@ class EventProcessorSpec extends AsyncFlatSpec with AsyncIOSpec with should.Matc
   private implicit val logger: TestLogger[IO] = TestLogger()
   private val persister      = mock[EventPersister[IO]]
   private val eventsDequeuer = mock[EventsDequeuer[IO]]
-  private lazy val processor = new EventProcessorImpl[IO](persister,eventsDequeuer)
+  private lazy val processor = new EventProcessorImpl[IO](persister, eventsDequeuer)
 
   private def givenPersisting(event: ProjectViewedEvent, returning: IO[Unit]) =
     (persister.persist _)

@@ -79,7 +79,7 @@ class EventHandlerSpec extends AnyWordSpec with should.Matchers with IOSpec with
     val event = projectViewedEvents.generateOne
 
     implicit val logger: TestLogger[IO] = TestLogger[IO]()
-    val eventEnqueuer  = mock[EventsEnqueuer[IO]]
-    val handler        = new EventHandler[IO](eventEnqueuer, mock[ProcessExecutor[IO]])
+    val eventEnqueuer = mock[EventsEnqueuer[IO]]
+    val handler       = new EventHandler[IO](eventEnqueuer, mock[ProcessExecutor[IO]])
   }
 }
