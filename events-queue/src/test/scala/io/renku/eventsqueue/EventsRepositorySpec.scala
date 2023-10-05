@@ -91,29 +91,29 @@ class EventsRepositorySpec extends AsyncFlatSpec with CustomAsyncIOSpec with Eve
   }
 
   it should "not pick events for processing " +
-    "if they are in the Processing status for less than Reclaim Time" in {
+    "if they are in the Processing status for less than the grace period" in {
 
-      val moreThanReclaimTime = events.generateOne.asJson
-      val inReclaimTime       = events.generateOne.asJson
-      val lessThanReclaimTime = events.generateOne.asJson
-      val allEvents           = List(moreThanReclaimTime, inReclaimTime, lessThanReclaimTime)
+      val moreThanGracePeriod = events.generateOne.asJson
+      val inGracePeriod       = events.generateOne.asJson
+      val lessThanGracePeriod = events.generateOne.asJson
+      val allEvents           = List(moreThanGracePeriod, inGracePeriod, lessThanGracePeriod)
 
       withDB.surround {
         for {
           _ <- allEvents.traverse_(e => execute(repo.insert(category, e))).assertNoException
           _ <- update(
-                 moreThanReclaimTime,
+                 moreThanGracePeriod,
                  EnqueueStatus.Processing,
-                 reclaimTime.plus(javaDurations(min = JDuration.ofSeconds(1)).generateOne)
+                 gracePeriodFromNow.plus(javaDurations(min = JDuration.ofSeconds(1)).generateOne)
                )
-          _ <- update(inReclaimTime, EnqueueStatus.Processing, reclaimTime)
+          _ <- update(inGracePeriod, EnqueueStatus.Processing, gracePeriodFromNow)
           _ <- update(
-                 lessThanReclaimTime,
+                 lessThanGracePeriod,
                  EnqueueStatus.Processing,
-                 reclaimTime.minus(javaDurations(min = JDuration.ofSeconds(1)).generateOne)
+                 gracePeriodFromNow.minus(javaDurations(min = JDuration.ofSeconds(1)).generateOne)
                )
           res <- execute(repo.fetchEvents(category)).asserting(
-                   _.map(_.payload) shouldBe List(inReclaimTime.noSpaces, lessThanReclaimTime.noSpaces)
+                   _.map(_.payload) shouldBe List(inGracePeriod.noSpaces, lessThanGracePeriod.noSpaces)
                  )
         } yield res
       }
@@ -171,7 +171,7 @@ class EventsRepositorySpec extends AsyncFlatSpec with CustomAsyncIOSpec with Eve
     }
   }
 
-  private lazy val reclaimTime = OffsetDateTime.now().minus(EventsRepository.reclaimTime)
+  private lazy val gracePeriodFromNow = OffsetDateTime.now().minus(EventsRepository.gracePeriod)
 
   private lazy val repo = new EventsRepositoryImpl[IO, TestDB]
 }

@@ -41,7 +41,7 @@ private object EventsRepository {
   def apply[F[_]: Async, DB]: EventsRepository[F] =
     new EventsRepositoryImpl[F, DB]
 
-  val reclaimTime: JDuration = JDuration.ofSeconds((30 minutes).toSeconds)
+  val gracePeriod: JDuration = JDuration.ofSeconds((30 minutes).toSeconds)
 }
 
 private class EventsRepositoryImpl[F[_]: Async, DB] extends DbClient[F](maybeHistogram = None) with EventsRepository[F] {
@@ -73,7 +73,7 @@ private class EventsRepositoryImpl[F[_]: Async, DB] extends DbClient[F](maybeHis
       )
       .arguments(
         category *: EnqueueStatus.New *: EnqueueStatus.Processing *:
-          (OffsetDateTime.now() minus reclaimTime) *: EmptyTuple
+          (OffsetDateTime.now() minus gracePeriod) *: EmptyTuple
       )
       .build(_.toList)
   }
