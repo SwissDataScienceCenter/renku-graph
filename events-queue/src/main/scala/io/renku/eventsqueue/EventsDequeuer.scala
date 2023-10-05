@@ -20,7 +20,7 @@ package io.renku.eventsqueue
 
 import cats.effect.{Async, Resource}
 import cats.syntax.all._
-import fs2.Stream
+import fs2.{Chunk, Stream}
 import io.renku.db.SessionResource
 import io.renku.events.CategoryName
 import io.renku.lock.Lock
@@ -29,7 +29,7 @@ import skunk.data.Notification
 import skunk.{Session, SqlState}
 
 trait EventsDequeuer[F[_]] {
-  def acquireEventsStream(category: CategoryName):  Stream[F, DequeuedEvent]
+  def acquireEventsStream(category: CategoryName):  Stream[F, Chunk[DequeuedEvent]]
   def returnToQueue(event:          DequeuedEvent): F[Unit]
 }
 
@@ -43,13 +43,13 @@ private class EventsDequeuerImpl[F[_]: Async: Logger, DB](repository: EventsRepo
     implicit sr: SessionResource[F, DB]
 ) extends EventsDequeuer[F] {
 
-  override def acquireEventsStream(category: CategoryName): Stream[F, DequeuedEvent] =
-    (fetchAllChunks(category) ++ fetchEventsOnNotif(category)).flatMap(Stream.emits)
+  override def acquireEventsStream(category: CategoryName): Stream[F, Chunk[DequeuedEvent]] =
+    fetchAllChunks(category) ++ fetchEventsOnNotif(category)
 
-  private def fetchAllChunks(category: CategoryName): Stream[F, List[DequeuedEvent]] =
+  private def fetchAllChunks(category: CategoryName): Stream[F, Chunk[DequeuedEvent]] =
     (Stream.resource(fetchEventsChunk(category)) ++ fetchAllChunks(category)).takeWhile(_.nonEmpty)
 
-  private def fetchEventsChunk(category: CategoryName): Resource[F, List[DequeuedEvent]] =
+  private def fetchEventsChunk(category: CategoryName): Resource[F, Chunk[DequeuedEvent]] =
     Resource
       .make(fetchChunkAndMarkProcessing(category))(chunk => sr.session.use(removeEvents(chunk)))
 
@@ -57,10 +57,10 @@ private class EventsDequeuerImpl[F[_]: Async: Logger, DB](repository: EventsRepo
     sr.session.use { session =>
       lock
         .run(category)
-        .use(_ => repository.fetchEvents(category)(session).flatTap(updateProcessing(_)(session)))
+        .use(_ => repository.fetchEvents(category)(session).map(Chunk.from).flatTap(updateProcessing(_)(session)))
     }
 
-  private def fetchEventsOnNotif(category: CategoryName): Stream[F, List[DequeuedEvent]] =
+  private def fetchEventsOnNotif(category: CategoryName): Stream[F, Chunk[DequeuedEvent]] =
     dequeueOnEvent(category) >> fetchAllChunks(category)
 
   private def dequeueOnEvent(category: CategoryName): Stream[F, Notification[String]] =
@@ -72,10 +72,10 @@ private class EventsDequeuerImpl[F[_]: Async: Logger, DB](repository: EventsRepo
       }
     }.flatten
 
-  private def updateProcessing(events: List[DequeuedEvent])(session: Session[F]): F[Unit] =
+  private def updateProcessing(events: Chunk[DequeuedEvent])(session: Session[F]): F[Unit] =
     events.traverse_(e => repository.markUnderProcessing(e.id)(session).handleErrorWith(skipDeadlocks))
 
-  private def removeEvents(events: List[DequeuedEvent])(session: Session[F]): F[Unit] =
+  private def removeEvents(events: Chunk[DequeuedEvent])(session: Session[F]): F[Unit] =
     events.traverse_(e => repository.delete(e.id)(session).handleErrorWith(skipDeadlocks))
 
   private lazy val skipDeadlocks: Throwable => F[Unit] = { case SqlState.DeadlockDetected(_) => ().pure[F] }

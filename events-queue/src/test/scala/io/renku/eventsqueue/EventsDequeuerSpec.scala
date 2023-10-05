@@ -22,7 +22,7 @@ import Generators.dequeuedEvents
 import cats.effect.testing.scalatest.AsyncIOSpec
 import cats.effect.{IO, Ref}
 import fs2.concurrent.SignallingRef
-import fs2.{Pipe, Stream}
+import fs2.{Chunk, Pipe, Stream}
 import io.circe.Json
 import io.renku.db.syntax._
 import io.renku.events.CategoryName
@@ -42,7 +42,7 @@ class EventsDequeuerSpec
 
   "acquireEventsStream" should {
 
-    "obtain an infinite Stream of events from the repository " +
+    "obtain an infinite Stream of chunks of events from the repository " +
       "which status is already updated before passing to the handler " +
       "and deleted afterwards " +
       "- case when there are chunks of events in the queue before any notification is received" in {
@@ -51,27 +51,28 @@ class EventsDequeuerSpec
         val initialEvents2 = dequeuedEvents.generateList(min = 1)
         val repository     = createRepository(initialEvents1, initialEvents2)
 
+        val handler = new AccumulatingHandler
+
         val allEvents = initialEvents1 ::: initialEvents2
+
         for {
-          _ <- dequeuer(repository)
-                 .acquireEventsStream(category)
-                 .take(allEvents.size)
-                 .compile
-                 .toList
-                 .asserting(_ shouldBe allEvents)
-          _   <- repository.processed.get.asserting(_ shouldBe allEvents.map(_.id))
-          res <- repository.deleted.get.asserting(_ shouldBe allEvents.map(_.id))
+          deqFiber <- dequeuer(repository).acquireEventsStream(category).through(handler).compile.drain.start
+          _        <- handler.handledEvents.waitUntil(_ == allEvents)
+          _        <- deqFiber.cancel
+          _        <- repository.processed.get.asserting(_ shouldBe allEvents.map(_.id))
+          res      <- repository.deleted.get.asserting(_ shouldBe allEvents.map(_.id))
         } yield res
       }
 
     "continue receiving subsequent chunks of events on every notification received from the channel" in {
 
       val initialEvents = dequeuedEvents.generateList(min = 1)
-      val onNotifEvents = dequeuedEvents.generateList(min = 1)
-      val allEvents     = initialEvents ::: onNotifEvents
       val repository    = createRepository(initialEvents)
 
       val handler = new AccumulatingHandler
+
+      val onNotifEvents = dequeuedEvents.generateList(min = 1)
+      val allEvents     = initialEvents ::: onNotifEvents
 
       for {
         deqFiber <- dequeuer(repository).acquireEventsStream(category).through(handler).compile.drain.start
@@ -141,11 +142,11 @@ class EventsDequeuerSpec
       CommandDef.liftF(deleted.update(_ appended eventId))
   }
 
-  private class AccumulatingHandler() extends Pipe[IO, DequeuedEvent, DequeuedEvent] {
+  private class AccumulatingHandler() extends Pipe[IO, Chunk[DequeuedEvent], Unit] {
 
     val handledEvents = SignallingRef[IO, List[DequeuedEvent]](Nil).unsafeRunSync()
 
-    override def apply(stream: Stream[IO, DequeuedEvent]): Stream[IO, DequeuedEvent] =
-      stream.evalTap(e => handledEvents.update(_ appended e))
+    override def apply(stream: Stream[IO, Chunk[DequeuedEvent]]): Stream[IO, Unit] =
+      stream.evalMap(chunk => handledEvents.update(_ appendedAll chunk.toList))
   }
 }

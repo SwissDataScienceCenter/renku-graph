@@ -18,10 +18,10 @@
 
 package io.renku.entities.viewings.collector.projects.viewed
 
+import cats.MonadThrow
 import cats.effect.Async
 import cats.syntax.all._
-import cats.{Eq, MonadThrow}
-import fs2.{Pipe, Stream}
+import fs2.{Chunk, Pipe}
 import io.circe.Error
 import io.circe.parser._
 import io.renku.eventsqueue.{DequeuedEvent, EventsDequeuer}
@@ -30,7 +30,7 @@ import io.renku.triplesgenerator.api.events.{ProjectViewedEvent, UserId}
 import io.renku.triplesstore.{ProjectsConnectionConfig, SparqlQueryTimeRecorder}
 import org.typelevel.log4cats.Logger
 
-private trait EventProcessor[F[_]] extends Pipe[F, DequeuedEvent, DequeuedEvent]
+private trait EventProcessor[F[_]] extends Pipe[F, Chunk[DequeuedEvent], Unit]
 
 private object EventProcessor {
   def apply[F[_]: Async: Logger: SparqlQueryTimeRecorder](connConfig:     ProjectsConnectionConfig,
@@ -43,38 +43,37 @@ private class EventProcessorImpl[F[_]: MonadThrow: Logger](eventPersister: Event
                                                            eventsDequeuer: EventsDequeuer[F]
 ) extends EventProcessor[F] {
 
-  override def apply(in: fs2.Stream[F, DequeuedEvent]): fs2.Stream[F, DequeuedEvent] =
-    in
-      .evalMap(de => parseAndDecode(de).fproductLeft(_ => de))
-      .groupAdjacentBy { case (_, maybeEv) => maybeEv.map(ev => ev.slug -> ev.maybeUserId) }
-      .map { case (slug, chunk) => slug -> chunk.toList.sortBy { case (_, maybeEv) => maybeEv.map(_.dateViewed) } }
-      .evalMap { case (_, sorted) => persist(sorted) }
-      .flatMap(events => Stream.emits[F, DequeuedEvent](events.map(_._1)))
+  override def apply(in: fs2.Stream[F, Chunk[DequeuedEvent]]): fs2.Stream[F, Unit] =
+    in.evalMap(processChunk)
 
-  private lazy val parseAndDecode: DequeuedEvent => F[Option[ProjectViewedEvent]] =
-    de =>
-      parse(de.payload)
-        .flatMap(_.as[ProjectViewedEvent])
-        .fold(logParsingFailure(de), Option(_).pure[F])
+  private lazy val processChunk: Chunk[DequeuedEvent] => F[Unit] =
+    _.toList
+      .map(de => parseAndDecode(de).map(EventContext(de, _)))
+      .sequence
+      .map(_.groupBy(_.groupingKey).values.toList.map(_.sortBy(_.maybeDecoded.map(_.dateViewed)).reverse))
+      .flatMap(_.traverse_(persist))
+
+  private def parseAndDecode(de: DequeuedEvent): F[Option[ProjectViewedEvent]] =
+    parse(de.payload)
+      .flatMap(_.as[ProjectViewedEvent])
+      .fold(logParsingFailure(de), Option(_).pure[F])
+
+  private case class EventContext(dequeued: DequeuedEvent, maybeDecoded: Option[ProjectViewedEvent]) {
+    lazy val groupingKey: Option[(projects.Slug, Option[UserId])] =
+      maybeDecoded.map(ev => ev.slug -> ev.maybeUserId)
+  }
 
   private def logParsingFailure(de: DequeuedEvent): Error => F[Option[ProjectViewedEvent]] =
     Logger[F].error(_)(show"$categoryName: decoding event failed: ${de.id}").as(Option.empty[ProjectViewedEvent])
 
-  private implicit lazy val groupByEq: Eq[(projects.Slug, Option[UserId])] = Eq.instance {
-    case (slug1 -> maybeUserId1, slug2 -> maybeUserId2) =>
-      slug1 == slug2 && maybeUserId1 == maybeUserId2
-  }
-
-  private lazy val persist
-      : List[(DequeuedEvent, Option[ProjectViewedEvent])] => F[List[(DequeuedEvent, Option[ProjectViewedEvent])]] = {
-    list =>
-      list.reverse.headOption match {
-        case Some(de -> Some(ev)) =>
-          Logger[F].info(show"$categoryName: ${ev.slug} persisting group of ${list.size}") >>
-            eventPersister.persist(ev).as(list).handleErrorWith(returnToQueue(de)(_).as(list.reverse.tail))
-        case _ =>
-          list.pure[F]
-      }
+  private lazy val persist: List[EventContext] => F[Unit] = { list =>
+    list.headOption match {
+      case Some(EventContext(de, Some(ev))) =>
+        Logger[F].info(show"$categoryName: ${ev.slug} persisting group of ${list.size}") >>
+          eventPersister.persist(ev).handleErrorWith(returnToQueue(de)(_))
+      case _ =>
+        ().pure[F]
+    }
   }
 
   private def returnToQueue(de: DequeuedEvent): Throwable => F[Unit] =

@@ -21,10 +21,10 @@ package io.renku.entities.viewings.collector.projects.viewed
 import cats.effect.IO
 import cats.effect.testing.scalatest.AsyncIOSpec
 import cats.syntax.all._
-import fs2.Stream
+import fs2.{Chunk, Stream}
 import io.circe.syntax._
-import io.renku.eventsqueue.{DequeuedEvent, EventsDequeuer}
 import io.renku.eventsqueue.Generators.dequeuedEvents
+import io.renku.eventsqueue.{DequeuedEvent, EventsDequeuer}
 import io.renku.generators.Generators.Implicits._
 import io.renku.generators.Generators.{exceptions, timestamps, timestampsNotInTheFuture}
 import io.renku.graph.model.RenkuTinyTypeGenerators.projectSlugs
@@ -38,10 +38,10 @@ import org.scalatest.matchers.should
 
 class EventProcessorSpec extends AsyncFlatSpec with AsyncIOSpec with should.Matchers with AsyncMockFactory {
 
-  it should "define a event transformation that " +
-    "decodes the event payload " +
-    "groups by slug when there's no userId and " +
-    "persists the item with the most recent date for each group" in {
+  it should "define events chunk transformation that " +
+    "decodes the each event's payload " +
+    "groups by slug when there's no userId " +
+    "and persists the item with the most recent date for each group" in {
 
       val slug1       = projectSlugs.generateOne
       val event1Slug1 = ProjectViewedEvent.forProject(slug1)
@@ -65,7 +65,7 @@ class EventProcessorSpec extends AsyncFlatSpec with AsyncIOSpec with should.Matc
       givenPersisting(event2Slug1, returning = ().pure[IO])
       givenPersisting(event1Slug2, returning = ().pure[IO])
 
-      Stream.emits[IO, DequeuedEvent](events).through(processor).compile.toList.asserting(_.toSet shouldBe events.toSet)
+      Stream.emit[IO, Chunk[DequeuedEvent]](Chunk.from(events)).through(processor).compile.drain.assertNoException
     }
 
   it should "define a event transformation that " +
@@ -90,7 +90,7 @@ class EventProcessorSpec extends AsyncFlatSpec with AsyncIOSpec with should.Matc
       givenPersisting(event1Slug, returning = ().pure[IO])
       givenPersisting(event2Slug, returning = ().pure[IO])
 
-      Stream.emits[IO, DequeuedEvent](events).through(processor).compile.toList.asserting(_.toSet shouldBe events.toSet)
+      Stream.emit[IO, Chunk[DequeuedEvent]](Chunk.from(events)).through(processor).compile.drain.assertNoException
     }
 
   it should "handle parsing/decoding errors by logging them as errors" in {
@@ -108,14 +108,13 @@ class EventProcessorSpec extends AsyncFlatSpec with AsyncIOSpec with should.Matc
       dequeuedEvents.map(_.copy(payload = event3Slug.asJson.noSpaces)).generateOne
     )
 
-    givenPersisting(event1Slug, returning = ().pure[IO])
     givenPersisting(event3Slug, returning = ().pure[IO])
 
-    Stream.emits[IO, DequeuedEvent](events).through(processor).compile.toList.asserting(_.toSet shouldBe events.toSet)
+    Stream.emit[IO, Chunk[DequeuedEvent]](Chunk.from(events)).through(processor).compile.drain.assertNoException
   }
 
   it should "handle persisting errors by logging them as errors " +
-    "and returning the event back to the queue" in {
+    "and returning them event back to the queue" in {
 
       val eventSlug1 = projectViewedEvents.generateOne
       val deSlug1    = dequeuedEvents.map(_.copy(payload = eventSlug1.asJson.noSpaces)).generateOne
@@ -131,11 +130,11 @@ class EventProcessorSpec extends AsyncFlatSpec with AsyncIOSpec with should.Matc
 
       givenReturningEventToQueue(deSlug2, returning = ().pure[IO])
 
-      Stream[IO, DequeuedEvent](deSlug1, deSlug2, deSlug3)
+      Stream[IO, Chunk[DequeuedEvent]](Chunk(deSlug1, deSlug2, deSlug3))
         .through(processor)
         .compile
-        .toList
-        .asserting(_.sortBy(_.id) shouldBe List(deSlug1, deSlug3).sortBy(_.id))
+        .drain
+        .assertNoException
     }
 
   private implicit val logger: TestLogger[IO] = TestLogger()
