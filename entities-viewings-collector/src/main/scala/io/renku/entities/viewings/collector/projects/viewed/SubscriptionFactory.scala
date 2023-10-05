@@ -18,7 +18,7 @@
 
 package io.renku.entities.viewings.collector.projects.viewed
 
-import cats.effect.Async
+import cats.effect.{Async, Temporal}
 import cats.syntax.all._
 import io.renku.db.SessionResource
 import io.renku.events.consumers.subscriptions.SubscriptionMechanism
@@ -28,6 +28,8 @@ import io.renku.lock.Lock
 import io.renku.triplesstore.{ProjectsConnectionConfig, SparqlQueryTimeRecorder}
 import org.typelevel.log4cats.Logger
 
+import scala.concurrent.duration._
+
 object SubscriptionFactory {
   def apply[F[_]: Async: Logger: SparqlQueryTimeRecorder, DB](
       categoryLock:    Lock[F, CategoryName],
@@ -36,9 +38,24 @@ object SubscriptionFactory {
   ): F[(consumers.EventHandler[F], SubscriptionMechanism[F])] = {
     implicit val sr: SessionResource[F, DB] = sessionResource
     for {
-      handler        <- EventHandler[F, DB]
-      eventProcessor <- EventProcessor[F](connConfig)
-      _              <- EventsDequeuer[F, DB](categoryLock).registerHandler(categoryName, eventProcessor)
+      handler <- EventHandler[F, DB]
+      eventsDequeuer = EventsDequeuer[F, DB](categoryLock)
+      eventProcessor <- EventProcessor[F](connConfig, eventsDequeuer)
+      _              <- kickOffEventsDequeueing[F](eventsDequeuer, eventProcessor)
     } yield handler -> SubscriptionMechanism.noOpSubscriptionMechanism(categoryName)
   }
+
+  private[viewed] def kickOffEventsDequeueing[F[_]: Async: Logger](dequeuer:  EventsDequeuer[F],
+                                                                   processor: EventProcessor[F]
+  ) = Async[F].start {
+    Logger[F].info(show"Starting events enqueuer for $categoryName") >>
+      hookToTheEventsStream(dequeuer, processor)
+        .handleErrorWith(
+          Logger[F].error(_)(show"An error in the $categoryName processing pipe; restarting") >>
+            Temporal[F].delayBy(hookToTheEventsStream(dequeuer, processor), 2 seconds)
+        )
+  }.void
+
+  private def hookToTheEventsStream[F[_]: Async](dequeuer: EventsDequeuer[F], processor: EventProcessor[F]) =
+    dequeuer.acquireEventsStream(categoryName).through(processor).compile.drain
 }

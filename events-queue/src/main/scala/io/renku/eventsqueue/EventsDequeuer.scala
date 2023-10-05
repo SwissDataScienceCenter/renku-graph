@@ -18,88 +18,68 @@
 
 package io.renku.eventsqueue
 
-import cats.effect.Async
+import cats.effect.{Async, Resource}
 import cats.syntax.all._
-import fs2.Pipe
+import fs2.Stream
 import io.renku.db.SessionResource
-import io.renku.db.syntax.CommandDef
 import io.renku.events.CategoryName
 import io.renku.lock.Lock
 import org.typelevel.log4cats.Logger
+import skunk.data.Notification
 import skunk.{Session, SqlState}
 
 trait EventsDequeuer[F[_]] {
-  def registerHandler(category: CategoryName, handler: Pipe[F, DequeuedEvent, DequeuedEvent]): F[Unit]
+  def acquireEventsStream(category: CategoryName):  Stream[F, DequeuedEvent]
+  def returnToQueue(event:        DequeuedEvent): F[Unit]
 }
 
 object EventsDequeuer {
   def apply[F[_]: Async: Logger, DB](lock: Lock[F, CategoryName])(implicit
       sr: SessionResource[F, DB]
-  ): EventsDequeuer[F] =
-    new EventsDequeuerImpl[F, DB](DBRepository[F, DB], lock)
+  ): EventsDequeuer[F] = new EventsDequeuerImpl[F, DB](EventsRepository[F, DB], lock)
 }
 
-private class EventsDequeuerImpl[F[_]: Async: Logger, DB](repository: DBRepository[F], lock: Lock[F, CategoryName])(
+private class EventsDequeuerImpl[F[_]: Async: Logger, DB](repository: EventsRepository[F], lock: Lock[F, CategoryName])(
     implicit sr: SessionResource[F, DB]
 ) extends EventsDequeuer[F] {
 
-  override def registerHandler(category: CategoryName, handler: Pipe[F, DequeuedEvent, DequeuedEvent]): F[Unit] =
-    Async[F].start {
-      initialDequeue(category, handler) >> dequeueFromNotif(category, handler)
-    }.void
+  override def acquireEventsStream(category: CategoryName): Stream[F, DequeuedEvent] =
+    (fetchAllChunks(category) ++ fetchEventsOnNotif(category)).flatMap(Stream.emits)
 
-  private def initialDequeue(category: CategoryName, handler: Pipe[F, DequeuedEvent, DequeuedEvent]) =
-    sr.useK(dequeueEvents(category, handler))
-      .handleErrorWith(logStatement(category))
+  private def fetchAllChunks(category: CategoryName): Stream[F, List[DequeuedEvent]] =
+    (Stream.resource(fetchEventsChunk(category)) ++ fetchAllChunks(category)).takeWhile(_.nonEmpty)
 
-  private def dequeueEvents(category: CategoryName, handler: Pipe[F, DequeuedEvent, DequeuedEvent]): CommandDef[F] =
-    CommandDef[F] { session =>
-      val transformation: Pipe[F, DequeuedEvent, Unit] =
-        _.through(updateProcessing(session))
-          .through(handler)
-          .attempt
-          .evalMap(logErrorAndReturnNone(category))
-          .collect { case Some(e) => e }
-          .through(removeEvents(session))
+  private def fetchEventsChunk(category: CategoryName): Resource[F, List[DequeuedEvent]] =
+    Resource
+      .make(fetchChunkAndMarkProcessing(category))(chunk => sr.session.use(removeEvents(chunk)))
 
-      lock.run(category).surround {
-        repository
-          .processEvents(category, transformation)
-          .run(session)
+  private def fetchChunkAndMarkProcessing(category: CategoryName) =
+    sr.session.use { session =>
+      lock
+        .run(category)
+        .use(_ => repository.fetchEvents(category)(session).flatTap(updateProcessing(_)(session)))
+    }
+
+  private def fetchEventsOnNotif(category: CategoryName): Stream[F, List[DequeuedEvent]] =
+    dequeueOnEvent(category) >> fetchAllChunks(category)
+
+  private def dequeueOnEvent(category: CategoryName): Stream[F, Notification[String]] =
+    Stream.resource {
+      sr.session >>= { session =>
+        session
+          .channel(category.asChannelId)
+          .listenR(maxQueued = 1)
       }
-    }
+    }.flatten
 
-  private def dequeueFromNotif(category: CategoryName, handler: Pipe[F, DequeuedEvent, DequeuedEvent]): F[Unit] =
-    sr.useK(dequeueOnEvent(category, handler))
-      .handleErrorWith(logStatement(category))
-      .flatMap(_ => dequeueFromNotif(category, handler))
+  private def updateProcessing(events: List[DequeuedEvent])(session: Session[F]): F[Unit] =
+    events.traverse_(e => repository.markUnderProcessing(e.id)(session).handleErrorWith(skipDeadlocks))
 
-  private def updateProcessing(session: Session[F]): Pipe[F, DequeuedEvent, DequeuedEvent] =
-    _.evalTap(e => repository.markUnderProcessing(e.id)(session).handleErrorWith(skipDeadlocks))
-
-  private def removeEvents(session: Session[F]): Pipe[F, DequeuedEvent, Unit] =
-    _.evalMap(e => repository.delete(e.id)(session).handleErrorWith(skipDeadlocks))
-
-  private def dequeueOnEvent(category: CategoryName, handler: Pipe[F, DequeuedEvent, DequeuedEvent]): CommandDef[F] =
-    CommandDef[F] { session =>
-      session
-        .channel(category.asChannelId)
-        .listen(maxQueued = 1)
-        .evalMap(_ => dequeueEvents(category, handler)(session))
-        .compile
-        .drain
-    }
-
-  private def logStatement(category: CategoryName): Throwable => F[Unit] =
-    Logger[F].error(_)(show"An error in the events dequeueing process for $category")
-
-  private def logErrorAndReturnNone(
-      category: CategoryName
-  ): Either[Throwable, DequeuedEvent] => F[Option[DequeuedEvent]] =
-    _.fold(
-      Logger[F].error(_)(show"An error in the events dequeueing process for $category").as(Option.empty[DequeuedEvent]),
-      Option(_).pure[F]
-    )
+  private def removeEvents(events: List[DequeuedEvent])(session: Session[F]): F[Unit] =
+    events.traverse_(e => repository.delete(e.id)(session).handleErrorWith(skipDeadlocks))
 
   private lazy val skipDeadlocks: Throwable => F[Unit] = { case SqlState.DeadlockDetected(_) => ().pure[F] }
+
+  override def returnToQueue(event: DequeuedEvent): F[Unit] =
+    sr.session.use(repository.returnToQueue(event.id).run)
 }

@@ -19,7 +19,7 @@
 package io.renku.eventsqueue
 
 import Generators.events
-import cats.effect.{IO, Ref}
+import cats.effect.IO
 import cats.syntax.all._
 import io.circe.Json
 import io.circe.syntax._
@@ -38,28 +38,25 @@ import skunk.implicits._
 
 import java.time.{OffsetDateTime, Duration => JDuration}
 
-class DBRepositorySpec extends AsyncFlatSpec with CustomAsyncIOSpec with EventsQueueDBSpec with should.Matchers {
+class EventsRepositorySpec extends AsyncFlatSpec with CustomAsyncIOSpec with EventsQueueDBSpec with should.Matchers {
 
   private val category = categoryNames.generateOne
 
-  it should "insert new rows into the DB so they are ready for processing" in {
+  it should "insert rows in status New into the DB so they are ready for processing" in {
 
-    val allEvents   = events.generateList().map(_.asJson)
-    val readyEvents = Ref.unsafe[IO, List[DequeuedEvent]](Nil)
+    val allEvents = events.generateList().map(_.asJson)
 
     withDB.surround {
       for {
         _   <- allEvents.traverse_(e => execute(repo.insert(category, e))).assertNoException
-        _   <- execute(repo.processEvents(category, _.evalMap(e => readyEvents.update(_ appended e)))).assertNoException
-        res <- readyEvents.get.asserting(_.map(_.payload) shouldBe allEvents.map(_.noSpaces))
+        res <- execute(repo.fetchEvents(category)).asserting(_.map(_.payload) shouldBe allEvents.map(_.noSpaces))
       } yield res
     }
   }
 
-  it should "update rows so they are not visible for processing" in {
+  it should "update rows in status New so they are not visible for processing" in {
 
-    val allEvents   = events.generateList(min = 2).map(_.asJson)
-    val readyEvents = Ref.unsafe[IO, List[DequeuedEvent]](Nil)
+    val allEvents = events.generateList(min = 2).map(_.asJson)
 
     withDB.surround {
       for {
@@ -67,24 +64,28 @@ class DBRepositorySpec extends AsyncFlatSpec with CustomAsyncIOSpec with EventsQ
         allDbEvents <- findAllEvents()
         updatedEvents = allDbEvents.zipWithIndex.collect { case (e, idx) if idx % 2 == 0 => e }
         _ <- updatedEvents.traverse_(e => execute(repo.markUnderProcessing(e.id))).assertNoException
-        _ <- execute(repo.processEvents(category, _.evalMap(e => readyEvents.update(_ appended e)))).assertNoException
-        res <- readyEvents.get.asserting(
+        res <- execute(repo.fetchEvents(category)).asserting(
                  _.map(_.payload) shouldBe (allEvents.map(_.noSpaces) diff updatedEvents.map(_.payload))
                )
       } yield res
     }
   }
 
-  it should "delete rows so they are gone" in {
+  it should "only delete rows in status PROCESSING" in {
 
-    val allEvents = events.generateList(min = 2)
+    val newEvents        = events.generateList(min = 2).map(_.asJson)
+    val processingEvents = events.generateList(min = 2).map(_.asJson)
+    val allEvents        = newEvents ::: processingEvents
 
     withDB.surround {
       for {
-        _           <- allEvents.traverse_(e => execute(repo.insert(category, e.asJson))).assertNoException
+        _ <- allEvents.traverse_(e => execute(repo.insert(category, e))).assertNoException
+        _ <- processingEvents.traverse_ { event =>
+               update(event.asJson, EnqueueStatus.Processing, OffsetDateTime.now())
+             }
         allDbEvents <- findAllEvents()
         _           <- allDbEvents.traverse_(e => execute(repo.delete(e.id))).assertNoException
-        res         <- findAllEvents().asserting(_ shouldBe Nil)
+        res         <- findAllEvents().asserting(_.map(_.payload) shouldBe newEvents.map(_.noSpaces))
       } yield res
     }
   }
@@ -96,7 +97,6 @@ class DBRepositorySpec extends AsyncFlatSpec with CustomAsyncIOSpec with EventsQ
       val inReclaimTime       = events.generateOne.asJson
       val lessThanReclaimTime = events.generateOne.asJson
       val allEvents           = List(moreThanReclaimTime, inReclaimTime, lessThanReclaimTime)
-      val readyEvents         = Ref.unsafe[IO, List[DequeuedEvent]](Nil)
 
       withDB.surround {
         for {
@@ -112,14 +112,29 @@ class DBRepositorySpec extends AsyncFlatSpec with CustomAsyncIOSpec with EventsQ
                  EnqueueStatus.Processing,
                  reclaimTime.minus(javaDurations(min = JDuration.ofSeconds(1)).generateOne)
                )
-          _ <- execute(repo.processEvents(category, _.evalMap(e => readyEvents.update(_ appended e)))).assertNoException
-          res <-
-            readyEvents.get.asserting(
-              _.map(_.payload) shouldBe List(inReclaimTime.noSpaces, lessThanReclaimTime.noSpaces)
-            )
+          res <- execute(repo.fetchEvents(category)).asserting(
+                   _.map(_.payload) shouldBe List(inReclaimTime.noSpaces, lessThanReclaimTime.noSpaces)
+                 )
         } yield res
       }
     }
+
+  it should "be possible to change status of an event in Processing back to New" in {
+
+    val event = events.generateOne.asJson
+
+    withDB.surround {
+      for {
+        _       <- execute(repo.insert(category, event))
+        _       <- execute(repo.fetchEvents(category)).asserting(_.map(_.payload) shouldBe List(event.noSpaces))
+        dbEvent <- findAllEvents().map(_.headOption.getOrElse(fail("Event expected")))
+        _       <- execute(repo.markUnderProcessing(dbEvent.id))
+        _       <- execute(repo.fetchEvents(category)).asserting(_ shouldBe Nil)
+        _       <- execute(repo.returnToQueue(dbEvent.id))
+        res     <- execute(repo.fetchEvents(category)).asserting(_.map(_.payload) shouldBe List(event.noSpaces))
+      } yield res
+    }
+  }
 
   private def findAllEvents(): IO[List[DequeuedEvent]] = {
     val query: Query[CategoryName, DequeuedEvent] =
@@ -156,7 +171,7 @@ class DBRepositorySpec extends AsyncFlatSpec with CustomAsyncIOSpec with EventsQ
     }
   }
 
-  private lazy val reclaimTime = OffsetDateTime.now().minus(DBRepository.reclaimTime)
+  private lazy val reclaimTime = OffsetDateTime.now().minus(EventsRepository.reclaimTime)
 
-  private lazy val repo = new DBRepositoryImpl[IO, TestDB]
+  private lazy val repo = new EventsRepositoryImpl[IO, TestDB]
 }

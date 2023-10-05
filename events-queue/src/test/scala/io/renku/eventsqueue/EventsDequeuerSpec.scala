@@ -20,132 +20,120 @@ package io.renku.eventsqueue
 
 import Generators.dequeuedEvents
 import cats.effect.testing.scalatest.AsyncIOSpec
-import cats.effect.{IO, Ref, Temporal}
-import cats.syntax.all._
+import cats.effect.{IO, Ref}
+import fs2.concurrent.SignallingRef
 import fs2.{Pipe, Stream}
 import io.circe.Json
 import io.renku.db.syntax._
 import io.renku.events.CategoryName
 import io.renku.events.Generators.categoryNames
 import io.renku.generators.Generators.Implicits._
-import io.renku.generators.Generators.exceptions
 import io.renku.lock.Lock
 import org.scalamock.scalatest.AsyncMockFactory
-import org.scalatest.flatspec.AsyncFlatSpec
 import org.scalatest.matchers.should
-
-import scala.concurrent.duration._
+import org.scalatest.wordspec.AsyncWordSpec
 
 class EventsDequeuerSpec
-    extends AsyncFlatSpec
+    extends AsyncWordSpec
     with AsyncIOSpec
     with EventsQueueDBSpec
     with should.Matchers
     with AsyncMockFactory {
 
-  it should "register the given handler that gets fed with a stream of events found for the category " +
-    "even before any notification is received" in {
+  "acquireEventsStream" should {
 
-      val initialEvents = dequeuedEvents.generateList(min = 1)
-      val repository    = createRepository(initialEvents)
+    "obtain an infinite Stream of events from the repository " +
+      "which status is already updated before passing to the handler " +
+      "and deleted afterwards " +
+      "- case when there are chunks of events in the queue before any notification is received" in {
 
-      val handler = new AccumulatingHandler
+        val initialEvents1 = dequeuedEvents.generateList(min = 1)
+        val initialEvents2 = dequeuedEvents.generateList(min = 1)
+        val repository     = createRepository(initialEvents1, initialEvents2)
 
-      dequeuer(repository).registerHandler(category, handler).assertNoException >>
-        Temporal[IO].sleep(1 second) >>
-        repository.processed.get.asserting(_ shouldBe initialEvents.map(_.id)) >>
-        repository.deleted.get.asserting(_ shouldBe initialEvents.map(_.id)) >>
-        handler.handledEvents.get.asserting(_ shouldBe initialEvents)
-    }
+        val allEvents = initialEvents1 ::: initialEvents2
+        for {
+          _ <- dequeuer(repository)
+                 .acquireEventsStream(category)
+                 .take(allEvents.size)
+                 .compile
+                 .toList
+                 .asserting(_ shouldBe allEvents)
+          _   <- repository.processed.get.asserting(_ shouldBe allEvents.map(_.id))
+          res <- repository.deleted.get.asserting(_ shouldBe allEvents.map(_.id))
+        } yield res
+      }
 
-  it should "fed the given handler with a stream of events " +
-    "after the category event is received" in {
+    "continue receiving subsequent chunks of events on every notification received from the channel" in {
 
       val initialEvents = dequeuedEvents.generateList(min = 1)
       val onNotifEvents = dequeuedEvents.generateList(min = 1)
       val allEvents     = initialEvents ::: onNotifEvents
-      val repository    = createRepository(initialEvents, onNotifEvents)
+      val repository    = createRepository(initialEvents)
 
       val handler = new AccumulatingHandler
 
-      dequeuer(repository).registerHandler(category, handler).assertNoException >>
-        Temporal[IO].sleep(1 second) >>
-        handler.handledEvents.get.asserting(_ shouldBe initialEvents) >>
-        Temporal[IO].sleep(1 second) >>
-        notify(category.asChannelId, onNotifEvents.head.payload) >>
-        Temporal[IO].sleep(2 seconds) >>
-        handler.handledEvents.get.asserting(_ shouldBe allEvents) >>
-        repository.processed.get.asserting(_ shouldBe allEvents.map(_.id)) >>
-        repository.deleted.get.asserting(_ shouldBe allEvents.map(_.id))
+      for {
+        deqFiber <- dequeuer(repository).acquireEventsStream(category).through(handler).compile.drain.start
+        _        <- handler.handledEvents.waitUntil(_ == initialEvents)
+        _        <- repository.addEventBatch(onNotifEvents)
+        _        <- notify(category)
+        _        <- handler.handledEvents.waitUntil(_ == allEvents)
+        _        <- deqFiber.cancel
+        _        <- repository.processed.get.asserting(_ shouldBe allEvents.map(_.id))
+        res      <- repository.deleted.get.asserting(_ shouldBe allEvents.map(_.id))
+      } yield res
     }
+  }
 
-  it should "handle the error occurring during category event processing " +
-    "and prevent the process from dying" in {
+  "returnToQueue" should {
 
-      // batch 1
-      val initialEvents = dequeuedEvents.generateList(min = 1)
+    "change status of the given event to New" in {
 
-      // batch 2
-      val beforeFailingEvent = dequeuedEvents.generateOne
-      val failingEvent       = dequeuedEvents.generateOne
-      val afterFailingEvent  = dequeuedEvents.generateOne
+      val event = dequeuedEvents.generateOne
 
-      // batch 3
-      val onNotifEvents = dequeuedEvents.generateList(min = 1)
+      val repository = createRepository()
 
-      val repository =
-        createRepository(initialEvents, List(beforeFailingEvent, failingEvent, afterFailingEvent), onNotifEvents)
-
-      val handler = new AccumulatingHandler(maybeFailOnEvent = failingEvent.some)
-
-      dequeuer(repository).registerHandler(category, handler).assertNoException >>
-        Temporal[IO].sleep(1 second) >>
-        handler.handledEvents.get.asserting(_ shouldBe initialEvents) >>
-        Temporal[IO].sleep(1 second) >>
-        notify(category.asChannelId, failingEvent.payload) >>
-        Temporal[IO].sleep(2 seconds) >>
-        handler.handledEvents.get.asserting(_ shouldBe initialEvents ::: beforeFailingEvent :: Nil) >>
-        notify(category.asChannelId, onNotifEvents.head.payload) >>
-        Temporal[IO].sleep(2 seconds) >>
-        handler.handledEvents.get.asserting(_ shouldBe (initialEvents ::: beforeFailingEvent :: onNotifEvents)) >>
-        repository.processed.get.asserting(
-          _ shouldBe (initialEvents ::: beforeFailingEvent :: failingEvent :: onNotifEvents).map(_.id)
-        ) >>
-        repository.deleted.get.asserting(_ shouldBe (initialEvents ::: beforeFailingEvent :: onNotifEvents).map(_.id))
+      dequeuer(repository).returnToQueue(event).assertNoException >>
+        repository.returnedToQueue.get.asserting(_ shouldBe List(event.id))
     }
+  }
 
   private lazy val category = categoryNames.generateOne
 
-  private val tsWriteLock: Lock[IO, CategoryName] = Lock.none[IO, CategoryName]
-  private def dequeuer(repository: Repository) = new EventsDequeuerImpl[IO, TestDB](repository, tsWriteLock)
+  private val categoryLock: Lock[IO, CategoryName] = Lock.none[IO, CategoryName]
+  private def dequeuer(repository: Repository) = new EventsDequeuerImpl[IO, TestDB](repository, categoryLock)
 
   private def createRepository(eventBatches: List[DequeuedEvent]*) =
-    new Repository(
-      eventBatches.toList.map(Stream.emits[IO, DequeuedEvent])
-    )
+    new Repository(eventBatches.toList)
 
-  private class Repository(eventBatches: List[Stream[IO, DequeuedEvent]]) extends DBRepository[IO] {
+  private class Repository(initialEventBatches: List[List[DequeuedEvent]]) extends EventsRepository[IO] {
 
     override def insert(category: CategoryName, payload: Json): CommandDef[IO] = fail("Shouldn't be called")
 
-    private val batchesIterator = eventBatches.iterator
+    private val eventBatches = Ref.unsafe[IO, List[List[DequeuedEvent]]](initialEventBatches)
 
-    override def processEvents(category:       CategoryName,
-                               transformation: Pipe[IO, DequeuedEvent, Unit]
-    ): QueryDef[IO, Unit] =
-      QueryDef.liftF(
-        batchesIterator
-          .nextOption()
-          .getOrElse(Stream.empty)
-          .through(transformation)
-          .compile
-          .drain
-      )
+    def addEventBatch(batch: List[DequeuedEvent]): IO[Unit] =
+      eventBatches.update(_ appended batch)
+
+    override def fetchEvents(category: CategoryName): QueryDef[IO, List[DequeuedEvent]] =
+      QueryDef.liftF {
+        eventBatches
+          .modify {
+            case Nil          => Nil  -> List.empty[DequeuedEvent]
+            case head :: tail => tail -> head
+          }
+      }
 
     val processed = Ref.unsafe[IO, List[Int]](Nil)
 
     override def markUnderProcessing(eventId: Int): CommandDef[IO] =
       CommandDef.liftF(processed.update(_ appended eventId))
+
+    val returnedToQueue = Ref.unsafe[IO, List[Int]](Nil)
+
+    override def returnToQueue(eventId: Int): CommandDef[IO] =
+      CommandDef.liftF(returnedToQueue.update(_ appended eventId))
 
     val deleted = Ref.unsafe[IO, List[Int]](Nil)
 
@@ -153,15 +141,11 @@ class EventsDequeuerSpec
       CommandDef.liftF(deleted.update(_ appended eventId))
   }
 
-  private class AccumulatingHandler(maybeFailOnEvent: Option[DequeuedEvent] = None)
-      extends Pipe[IO, DequeuedEvent, DequeuedEvent] {
+  private class AccumulatingHandler() extends Pipe[IO, DequeuedEvent, DequeuedEvent] {
 
-    val handledEvents = Ref.unsafe[IO, List[DequeuedEvent]](Nil)
+    val handledEvents = SignallingRef[IO, List[DequeuedEvent]](Nil).unsafeRunSync()
 
     override def apply(stream: Stream[IO, DequeuedEvent]): Stream[IO, DequeuedEvent] =
-      stream.evalTap {
-        case e if maybeFailOnEvent contains e => exceptions.generateOne.raiseError[IO, Unit]
-        case e                                => handledEvents.update(_ appended e)
-      }
+      stream.evalTap(e => handledEvents.update(_ appended e))
   }
 }

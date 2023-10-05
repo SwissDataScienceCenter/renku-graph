@@ -20,7 +20,7 @@ package io.renku.eventsqueue
 
 import cats.effect.Async
 import cats.syntax.all._
-import io.circe.{Encoder, Json}
+import io.circe.Encoder
 import io.renku.db.SessionResource
 import io.renku.db.syntax.CommandDef
 import io.renku.events.CategoryName
@@ -33,10 +33,10 @@ trait EventsEnqueuer[F[_]] {
 
 object EventsEnqueuer {
   def apply[F[_]: Async, DB](implicit sr: SessionResource[F, DB]): EventsEnqueuer[F] =
-    new EventsEnqueuerImpl[F, DB](DBRepository[F, DB])
+    new EventsEnqueuerImpl[F, DB](EventsRepository[F, DB])
 }
 
-private class EventsEnqueuerImpl[F[_]: Async, DB](repository: DBRepository[F])(implicit sr: SessionResource[F, DB])
+private class EventsEnqueuerImpl[F[_]: Async, DB](repository: EventsRepository[F])(implicit sr: SessionResource[F, DB])
     extends EventsEnqueuer[F] {
 
   override def enqueue[E](category: CategoryName, event: E)(implicit enc: Encoder[E]): F[Unit] =
@@ -45,11 +45,11 @@ private class EventsEnqueuerImpl[F[_]: Async, DB](repository: DBRepository[F])(i
   override def enqueue[E](category: CategoryName, event: E, channel: Identifier)(implicit enc: Encoder[E]): F[Unit] = {
     val encodedEvent = enc(event)
     sr.useK {
-      repository.insert(category, encodedEvent) >> notify(channel, encodedEvent)
+      repository.insert(category, encodedEvent) >> notify(channel, category)
     }
   }
 
-  private def notify(channel: Identifier, event: Json): CommandDef[F] = CommandDef[F] {
-    _.channel(channel).notify(event.noSpaces)
+  private def notify(channel: Identifier, category: CategoryName): CommandDef[F] = CommandDef[F] {
+    _.channel(channel).notify(category.value)
   }
 }

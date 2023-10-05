@@ -47,17 +47,17 @@ class EventsEnqueuerSpec
       givenPersisting(category, event.asJson, returning = CommandDef.pure[IO])
 
       for {
-        conditionMet <- assertNotifications(category.asChannelId, notifs => notifs.contains(event.asJson.noSpaces))
+        conditionMet <- assertNotifications(category.asChannelId, notifs => notifs.contains(category.value))
         _            <- enqueuer.enqueue(category, event)
         _            <- conditionMet.get.flatten
       } yield ()
     }
 
-  private val dbRepository  = mock[DBRepository[IO]]
-  private lazy val enqueuer = new EventsEnqueuerImpl[IO, TestDB](dbRepository)
+  private val eventsRepository = mock[EventsRepository[IO]]
+  private lazy val enqueuer    = new EventsEnqueuerImpl[IO, TestDB](eventsRepository)
 
   private def givenPersisting(category: CategoryName, payload: Json, returning: CommandDef[IO]) =
-    (dbRepository.insert _)
+    (eventsRepository.insert _)
       .expects(category, payload)
       .returning(returning)
       .atLeastOnce()

@@ -24,7 +24,7 @@ import cats.{Eq, MonadThrow}
 import fs2.{Pipe, Stream}
 import io.circe.Error
 import io.circe.parser._
-import io.renku.eventsqueue.DequeuedEvent
+import io.renku.eventsqueue.{DequeuedEvent, EventsDequeuer}
 import io.renku.graph.model.projects
 import io.renku.triplesgenerator.api.events.{ProjectViewedEvent, UserId}
 import io.renku.triplesstore.{ProjectsConnectionConfig, SparqlQueryTimeRecorder}
@@ -33,12 +33,15 @@ import org.typelevel.log4cats.Logger
 private trait EventProcessor[F[_]] extends Pipe[F, DequeuedEvent, DequeuedEvent]
 
 private object EventProcessor {
-  def apply[F[_]: Async: Logger: SparqlQueryTimeRecorder](connConfig: ProjectsConnectionConfig): F[EventProcessor[F]] =
-    EventPersister[F](connConfig).map(new EventProcessorImpl[F](_))
+  def apply[F[_]: Async: Logger: SparqlQueryTimeRecorder](connConfig:     ProjectsConnectionConfig,
+                                                          eventsDequeuer: EventsDequeuer[F]
+  ): F[EventProcessor[F]] =
+    EventPersister[F](connConfig).map(new EventProcessorImpl[F](_, eventsDequeuer))
 }
 
-private class EventProcessorImpl[F[_]: MonadThrow: Logger](eventPersister: EventPersister[F])
-    extends EventProcessor[F] {
+private class EventProcessorImpl[F[_]: MonadThrow: Logger](eventPersister: EventPersister[F],
+                                                           eventsDequeuer: EventsDequeuer[F]
+) extends EventProcessor[F] {
 
   override def apply(in: fs2.Stream[F, DequeuedEvent]): fs2.Stream[F, DequeuedEvent] =
     in
@@ -55,7 +58,7 @@ private class EventProcessorImpl[F[_]: MonadThrow: Logger](eventPersister: Event
         .fold(logParsingFailure(de), Option(_).pure[F])
 
   private def logParsingFailure(de: DequeuedEvent): Error => F[Option[ProjectViewedEvent]] =
-    Logger[F].error(_)(show"Decoding event failed: $de").as(Option.empty[ProjectViewedEvent])
+    Logger[F].error(_)(show"$categoryName: decoding event failed: ${de.id}").as(Option.empty[ProjectViewedEvent])
 
   private implicit lazy val groupByEq: Eq[(projects.Slug, Option[UserId])] = Eq.instance {
     case (slug1 -> maybeUserId1, slug2 -> maybeUserId2) =>
@@ -68,12 +71,13 @@ private class EventProcessorImpl[F[_]: MonadThrow: Logger](eventPersister: Event
       list.reverse.headOption match {
         case Some(de -> Some(ev)) =>
           Logger[F].info(show"$categoryName: ${ev.slug} persisting group of ${list.size}") >>
-            eventPersister.persist(ev).as(list).handleErrorWith(logPersistingFailure(de)(_).as(list.reverse.tail))
+            eventPersister.persist(ev).as(list).handleErrorWith(returnToQueue(de)(_).as(list.reverse.tail))
         case _ =>
           list.pure[F]
       }
   }
 
-  private def logPersistingFailure(de: DequeuedEvent): Throwable => F[Unit] =
-    Logger[F].error(_)(show"Persisting event failed: $de")
+  private def returnToQueue(de: DequeuedEvent): Throwable => F[Unit] =
+    Logger[F].error(_)(show"$categoryName: persisting event failed: ${de.id}; returning to the queue") >>
+      eventsDequeuer.returnToQueue(de)
 }

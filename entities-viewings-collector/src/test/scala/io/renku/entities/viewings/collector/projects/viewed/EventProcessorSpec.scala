@@ -23,7 +23,7 @@ import cats.effect.testing.scalatest.AsyncIOSpec
 import cats.syntax.all._
 import fs2.Stream
 import io.circe.syntax._
-import io.renku.eventsqueue.DequeuedEvent
+import io.renku.eventsqueue.{DequeuedEvent, EventsDequeuer}
 import io.renku.eventsqueue.Generators.dequeuedEvents
 import io.renku.generators.Generators.Implicits._
 import io.renku.generators.Generators.{exceptions, timestamps, timestampsNotInTheFuture}
@@ -40,7 +40,7 @@ class EventProcessorSpec extends AsyncFlatSpec with AsyncIOSpec with should.Matc
 
   it should "define a event transformation that " +
     "decodes the event payload " +
-    "groups by slug when there's no userId " +
+    "groups by slug when there's no userId and " +
     "persists the item with the most recent date for each group" in {
 
       val slug1       = projectSlugs.generateOne
@@ -70,7 +70,7 @@ class EventProcessorSpec extends AsyncFlatSpec with AsyncIOSpec with should.Matc
 
   it should "define a event transformation that " +
     "decodes the event payload " +
-    "groups by slug and userId " +
+    "groups by slug and userId and " +
     "persists the item with the most recent date for each group" in {
 
       val slug       = projectSlugs.generateOne
@@ -93,30 +93,29 @@ class EventProcessorSpec extends AsyncFlatSpec with AsyncIOSpec with should.Matc
       Stream.emits[IO, DequeuedEvent](events).through(processor).compile.toList.asserting(_.toSet shouldBe events.toSet)
     }
 
-  it should "handle parsing/decoding errors by logging them in error statements " +
-    "and keep the event returned back at the end" in {
+  it should "handle parsing/decoding errors by logging them as errors" in {
 
-      val slug       = projectSlugs.generateOne
-      val event1Slug = ProjectViewedEvent.forProject(slug)
-      val event3Slug = event1Slug
-        .copy(dateViewed =
-          timestampsNotInTheFuture(butYoungerThan = event1Slug.dateViewed.value).generateAs(projects.DateViewed)
-        )
-
-      val events = List(
-        dequeuedEvents.map(_.copy(payload = event1Slug.asJson.noSpaces)).generateOne,
-        dequeuedEvents.map(_.copy(payload = "")).generateOne,
-        dequeuedEvents.map(_.copy(payload = event3Slug.asJson.noSpaces)).generateOne
+    val slug       = projectSlugs.generateOne
+    val event1Slug = ProjectViewedEvent.forProject(slug)
+    val event3Slug = event1Slug
+      .copy(dateViewed =
+        timestampsNotInTheFuture(butYoungerThan = event1Slug.dateViewed.value).generateAs(projects.DateViewed)
       )
 
-      givenPersisting(event1Slug, returning = ().pure[IO])
-      givenPersisting(event3Slug, returning = ().pure[IO])
+    val events = List(
+      dequeuedEvents.map(_.copy(payload = event1Slug.asJson.noSpaces)).generateOne,
+      dequeuedEvents.map(_.copy(payload = "")).generateOne,
+      dequeuedEvents.map(_.copy(payload = event3Slug.asJson.noSpaces)).generateOne
+    )
 
-      Stream.emits[IO, DequeuedEvent](events).through(processor).compile.toList.asserting(_.toSet shouldBe events.toSet)
-    }
+    givenPersisting(event1Slug, returning = ().pure[IO])
+    givenPersisting(event3Slug, returning = ().pure[IO])
 
-  it should "handle persisting errors by logging them in error statements " +
-    "and do not return the event back at the end" in {
+    Stream.emits[IO, DequeuedEvent](events).through(processor).compile.toList.asserting(_.toSet shouldBe events.toSet)
+  }
+
+  it should "handle persisting errors by logging them as errors " +
+    "and returning the event back to the queue" in {
 
       val eventSlug1 = projectViewedEvents.generateOne
       val deSlug1    = dequeuedEvents.map(_.copy(payload = eventSlug1.asJson.noSpaces)).generateOne
@@ -130,6 +129,8 @@ class EventProcessorSpec extends AsyncFlatSpec with AsyncIOSpec with should.Matc
       givenPersisting(eventSlug2, returning = exception.raiseError[IO, Unit])
       givenPersisting(eventSlug3, returning = ().pure[IO])
 
+      givenReturningEventToQueue(deSlug2, returning = ().pure[IO])
+
       Stream[IO, DequeuedEvent](deSlug1, deSlug2, deSlug3)
         .through(processor)
         .compile
@@ -139,10 +140,16 @@ class EventProcessorSpec extends AsyncFlatSpec with AsyncIOSpec with should.Matc
 
   private implicit val logger: TestLogger[IO] = TestLogger()
   private val persister      = mock[EventPersister[IO]]
-  private lazy val processor = new EventProcessorImpl[IO](persister)
+  private val eventsDequeuer = mock[EventsDequeuer[IO]]
+  private lazy val processor = new EventProcessorImpl[IO](persister,eventsDequeuer)
 
   private def givenPersisting(event: ProjectViewedEvent, returning: IO[Unit]) =
     (persister.persist _)
+      .expects(event)
+      .returning(returning)
+
+  private def givenReturningEventToQueue(event: DequeuedEvent, returning: IO[Unit]) =
+    (eventsDequeuer.returnToQueue _)
       .expects(event)
       .returning(returning)
 }

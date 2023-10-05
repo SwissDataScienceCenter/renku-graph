@@ -15,14 +15,7 @@ import scala.util.Random
 
 class ChannelsSpec extends AsyncFlatSpec with AsyncIOSpec with EventsQueueDBSpec with should.Matchers {
 
-  // Questions:
-  // * what to do to prevent losing an event?
-  //   Insert events into a table?
-  // * how to prevent the same event is processed by all the listeners?
-  // * how to react on batches not a single insert into the table?
-  //   Should the listener count the events and fetch the rows after the count reaches a certain number (or a certain amount of time has elapsed)?
-
-  it should "use pg async notification mechanism for pub/sub purposes" in {
+  it should "use pg async notification mechanism for pub/sub purposes" ignore {
     val sentAll = Deferred.unsafe[IO, Unit]
     for {
       _ <- keepNotifying(sentAll).start

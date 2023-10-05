@@ -23,6 +23,7 @@ import cats.data.Kleisli
 import cats.effect._
 import cats.syntax.all._
 import io.renku.db.syntax.CommandDef
+import io.renku.events.CategoryName
 import io.renku.interpreters.TestLogger
 import org.scalatest.Suite
 import skunk.data.Identifier
@@ -51,6 +52,9 @@ trait EventsQueueDBSpec extends ContainerDB { self: Suite =>
       }
     }
   }
+
+  def notify(category: CategoryName): IO[Unit] =
+    notify(category.asChannelId, category.value)
 
   def notify(channel: Identifier, payload: String): IO[Unit] =
     withChannel(channel)(_.notify(payload))
