@@ -24,6 +24,7 @@ import cats.effect._
 import cats.syntax.all._
 import eu.timepit.refined.auto._
 import fs2.{Compiler, Stream}
+import io.renku.eventsqueue.EventsQueueStats
 import io.renku.lock.PostgresLockStats
 import io.renku.metrics.MetricsRegistry
 import io.renku.triplesgenerator.TgDB
@@ -45,22 +46,38 @@ trait MetricsService[F[_]] {
 
 object MetricsService {
 
-  def apply[F[_]: Async: MetricsRegistry](dbPool: TgDB.SessionResource[F]): F[MetricsService[F]] = {
-    val pgGauge  = PostgresLockGauge[F]("triples_generator")
-    val pgHg     = PostgresLockHistogram[F]
-    val getStats = dbPool.useK(Kleisli(PostgresLockStats.getStats[F]))
+  def apply[F[_]: Async: MetricsRegistry](dbPool: TgDB.SessionResource[F]): F[MetricsService[F]] =
+    for {
+      locksGauge          <- PostgresLockGauge[F]("triples_generator")
+      locksHg             <- PostgresLockHistogram[F]
+      categoryEventsCount <- CategoryEventsCountGauge[F]
+    } yield new MetricsServiceImpl[F](locksGauge, locksHg, categoryEventsCount)(dbPool)
+}
 
-    (pgGauge, pgHg).mapN { (gauge, hg) =>
-      new MetricsService[F] {
-        override def collect: F[Unit] =
-          getStats.flatMap { stats =>
-            Traverse[List].sequence_(
-              gauge.set(PostgresLockGauge.Label.CurrentLocks -> stats.currentLocks.toDouble) ::
-                gauge.set(PostgresLockGauge.Label.Waiting -> stats.waiting.size.toDouble) ::
-                stats.waiting.map(w => hg.observe(w.objectId.toString, w.waitDuration.toMillis.toDouble))
-            )
-          }
-      }
+private class MetricsServiceImpl[F[_]: Async](lockGauge: PostgresLockGauge[F],
+                                              lockHistogram:            PostgresLockHistogram[F],
+                                              categoryEventsCountGauge: CategoryEventsCountGauge[F]
+)(dbPool: TgDB.SessionResource[F])
+    extends MetricsService[F] {
+
+  override def collect: F[Unit] =
+    updateLocksStats() >> updateCategoryEventCounts()
+
+  private val getPostgresLocksStats = dbPool.useK(Kleisli(PostgresLockStats.getStats[F]))
+
+  private def updateLocksStats() =
+    getPostgresLocksStats >>= { stats =>
+      Traverse[List].sequence_(
+        lockGauge.set(PostgresLockGauge.Label.CurrentLocks -> stats.currentLocks.toDouble) ::
+          lockGauge.set(PostgresLockGauge.Label.Waiting -> stats.waiting.size.toDouble) ::
+          stats.waiting.map(w => lockHistogram.observe(w.objectId.toString, w.waitDuration.toMillis.toDouble))
+      )
     }
-  }
+
+  private val getCategoryCountsStats = dbPool.useK(EventsQueueStats[F, TgDB].countsByCategory)
+
+  private def updateCategoryEventCounts() =
+    getCategoryCountsStats >>= {
+      _.toList.traverse_ { case (category, count) => categoryEventsCountGauge.set(category -> count.toDouble) }
+    }
 }

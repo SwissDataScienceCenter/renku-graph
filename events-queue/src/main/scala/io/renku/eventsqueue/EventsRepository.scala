@@ -20,7 +20,7 @@ package io.renku.eventsqueue
 
 import cats.effect.Async
 import io.circe.Json
-import io.renku.db.syntax.{CommandDef, _}
+import io.renku.db.syntax._
 import io.renku.db.{DbClient, SqlStatement}
 import io.renku.events.CategoryName
 import skunk._
@@ -33,7 +33,7 @@ private trait EventsRepository[F[_]] {
   def insert(category:             CategoryName, payload: Json): CommandDef[F]
   def fetchEvents(category:        CategoryName): QueryDef[F, List[DequeuedEvent]]
   def markUnderProcessing(eventId: Int): CommandDef[F]
-  def returnToQueue(eventId:     Int): CommandDef[F]
+  def returnToQueue(eventId:       Int): CommandDef[F]
   def delete(eventId:              Int): CommandDef[F]
 }
 
@@ -44,7 +44,9 @@ private object EventsRepository {
   val gracePeriod: JDuration = JDuration.ofSeconds((30 minutes).toSeconds)
 }
 
-private class EventsRepositoryImpl[F[_]: Async, DB] extends DbClient[F](maybeHistogram = None) with EventsRepository[F] {
+private class EventsRepositoryImpl[F[_]: Async, DB]
+    extends DbClient[F](maybeHistogram = None)
+    with EventsRepository[F] {
 
   import EventsRepository._
   import TypeSerializers._
