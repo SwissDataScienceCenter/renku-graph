@@ -21,6 +21,7 @@ package finder
 
 import cats.effect.IO
 import cats.syntax.all._
+import io.renku.entities.searchgraphs.SearchInfoDatasets
 import io.renku.generators.CommonGraphGenerators.{authUsers, userAccessTokens}
 import io.renku.generators.Generators.Implicits._
 import io.renku.graph.model.projects
@@ -33,13 +34,17 @@ import io.renku.triplesstore.{InMemoryJenaForSpec, ProjectsDataset, SparqlQueryT
 import org.scalacheck.Gen
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
+import org.typelevel.log4cats.Logger
 
 class TSProjectFinderSpec
     extends AnyWordSpec
     with should.Matchers
     with InMemoryJenaForSpec
     with ProjectsDataset
+    with SearchInfoDatasets
     with IOSpec {
+
+  implicit override val ioLogger: Logger[IO] = TestLogger[IO]()
 
   "findProjectsInTS" should {
 
@@ -63,7 +68,8 @@ class TSProjectFinderSpec
 
       val projectWithoutMatchingMember = projectEntities(visibilityPublic).generateOne
 
-      upload(to = projectsDataset, project1WithMatchingMember, project2WithMatchingMember, projectWithoutMatchingMember)
+      provisionTestProjects(project1WithMatchingMember, project2WithMatchingMember, projectWithoutMatchingMember)
+        .unsafeRunSync()
 
       finder.findProjectsInTS(criteria).unsafeRunSync() should contain theSameElementsAs
         List(project1WithMatchingMember, project2WithMatchingMember).map(_.to[model.Project.Activated])
@@ -95,13 +101,12 @@ class TSProjectFinderSpec
         .map(replaceMembers(Set(authUserMember)))
         .generateOne
 
-      upload(
-        to = projectsDataset,
+      provisionTestProjects(
         privateProjectWithMatchingMemberAndAuthUser,
         privateProjectWithMatchingMemberOnly,
         nonPrivateProjectWithMatchingMemberOnly,
         projectWithMatchingAuthUserOnly
-      )
+      ).unsafeRunSync()
 
       finder.findProjectsInTS(criteria).unsafeRunSync() should contain theSameElementsAs
         List(privateProjectWithMatchingMemberAndAuthUser, nonPrivateProjectWithMatchingMemberOnly)
@@ -115,7 +120,7 @@ class TSProjectFinderSpec
         c.copy(maybeUser = authUsers.generateOne.copy(id = c.userId).some)
       }
 
-      upload(to = projectsDataset, projectEntities(visibilityPublic).generateOne)
+      provisionTestProjects(projectEntities(visibilityPublic).generateOne).unsafeRunSync()
 
       finder.findProjectsInTS(criteria).unsafeRunSync() shouldBe Nil
     }

@@ -217,7 +217,7 @@ class DatasetFinderSpec
         .map(replaceMembers(Set(projectMemberEntities(authUser.id.some).generateOne)))
         .addDataset(datasetEntities(provenanceInternal))
         .generateOne
-      val (_, otherProject) = renkuProjectEntities(visibilityNonPublic)
+      val (_, otherProject) = renkuProjectEntities(visibilityPrivate)
         .map(replaceMembers(Set(projectMemberEntities(withGitLabId).generateOne)))
         .importDataset(dataset)
         .generateOne
@@ -225,8 +225,10 @@ class DatasetFinderSpec
       provisionTestProjects(project, otherProject).unsafeRunSync()
 
       val expectedDS = internalToNonModified(dataset, project)
-      findById(dataset.identifier, authUser, project.slug).value                          shouldBe expectedDS
-      findByTopmostSameAs(dataset.provenance.topmostSameAs, authUser, project.slug).value shouldBe expectedDS
+      val byId       = findById(dataset.identifier, authUser, project.slug).value
+      val byTopmost  = findByTopmostSameAs(dataset.provenance.topmostSameAs, authUser, project.slug).value
+      byId      shouldBe expectedDS
+      byTopmost shouldBe expectedDS
     }
 
     "return dataset with usedIn to which the user has access" in new TestCase {

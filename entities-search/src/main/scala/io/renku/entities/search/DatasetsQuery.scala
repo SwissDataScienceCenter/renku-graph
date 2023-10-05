@@ -46,6 +46,8 @@ object DatasetsQuery extends EntityQuery[Entity.Dataset] {
   val keywordsVar             = VarName("keywords")
   val imagesVar               = VarName("images")
 
+  private val authSnippets = SparqlSnippets(VarName("projId"))
+
   override val selectVariables = Set(
     entityTypeVar,
     matchingScoreVar,
@@ -148,8 +150,7 @@ object DatasetsQuery extends EntityQuery[Entity.Dataset] {
   private def accessRightsAndVisibility(maybeUser: Option[AuthUser], visibilities: Set[Visibility]): Fragment =
     sparql"""
             |?projId renku:projectVisibility ?visibility .
-            |BIND (?projId AS ${SparqlSnippets.projectId})
-            |${SparqlSnippets.visibleProjects(maybeUser.map(_.id), visibilities)}
+            |${authSnippets.visibleProjects(maybeUser.map(_.id), visibilities)}
             """
 
   private def images: Fragment =

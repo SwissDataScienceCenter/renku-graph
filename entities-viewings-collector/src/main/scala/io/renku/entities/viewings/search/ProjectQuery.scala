@@ -26,10 +26,12 @@ import io.renku.graph.model.{GraphClass, Schemas}
 import io.renku.projectauth.util.SparqlSnippets
 import io.renku.triplesstore.SparqlQuery
 import io.renku.triplesstore.SparqlQuery.Prefixes
+import io.renku.triplesstore.client.sparql.VarName
 import io.renku.triplesstore.client.syntax._
 
 object ProjectQuery extends (Criteria => Option[SparqlQuery]) {
-  private[this] val v = Variables.Project
+  private[this] val v            = Variables.Project
+  private[this] val authSnippets = SparqlSnippets(VarName("projectId"))
 
   def apply(criteria: Criteria): Option[SparqlQuery] =
     Option.when(criteria.forType(EntityType.Project))(makeQuery(criteria))
@@ -61,7 +63,7 @@ object ProjectQuery extends (Criteria => Option[SparqlQuery]) {
                |                    schema:identifier ${criteria.authUser.id.value}.
                |    }
                |
-               |    ${SparqlSnippets.visibleProjects(Some(criteria.authUser.id), Visibility.all)}
+               |    ${authSnippets.visibleProjects(Some(criteria.authUser.id), Visibility.all)}
                |
                |    Graph ?projectId {
                |      ?projectId a schema:Project;

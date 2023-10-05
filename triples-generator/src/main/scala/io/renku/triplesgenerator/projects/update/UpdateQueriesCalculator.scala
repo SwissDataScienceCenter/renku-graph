@@ -233,7 +233,7 @@ private class UpdateQueriesCalculatorImpl[F[_]: Applicative: Logger](implicit ru
     SparqlQuery.ofUnsafe(
       show"$reportingPrefix: update visibility in ProjectAuth",
       Prefixes of (renku -> "renku", schema -> "schema"),
-      SparqlSnippets.changeVisibility(slug, newValue)
+      SparqlSnippets.default.changeVisibility(slug, newValue)
     )
 
   private def visibilityInProjectUpdate(slug: projects.Slug, newValue: projects.Visibility) =
