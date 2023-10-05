@@ -40,7 +40,8 @@ import java.time.{OffsetDateTime, Duration => JDuration}
 
 class EventsRepositorySpec extends AsyncFlatSpec with CustomAsyncIOSpec with EventsQueueDBSpec with should.Matchers {
 
-  private val category = categoryNames.generateOne
+  private val category  = categoryNames.generateOne
+  private val chunkSize = 50
 
   it should "insert rows in status New into the DB so they are ready for processing" in {
 
@@ -48,8 +49,9 @@ class EventsRepositorySpec extends AsyncFlatSpec with CustomAsyncIOSpec with Eve
 
     withDB.surround {
       for {
-        _   <- allEvents.traverse_(e => execute(repo.insert(category, e))).assertNoException
-        res <- execute(repo.fetchEvents(category)).asserting(_.map(_.payload) shouldBe allEvents.map(_.noSpaces))
+        _ <- allEvents.traverse_(e => execute(repo.insert(category, e))).assertNoException
+        res <- execute(repo.fetchEvents(category, chunkSize))
+                 .asserting(_.map(_.payload) shouldBe allEvents.map(_.noSpaces))
       } yield res
     }
   }
@@ -64,7 +66,7 @@ class EventsRepositorySpec extends AsyncFlatSpec with CustomAsyncIOSpec with Eve
         allDbEvents <- findAllEvents()
         updatedEvents = allDbEvents.zipWithIndex.collect { case (e, idx) if idx % 2 == 0 => e }
         _ <- updatedEvents.traverse_(e => execute(repo.markUnderProcessing(e.id))).assertNoException
-        res <- execute(repo.fetchEvents(category)).asserting(
+        res <- execute(repo.fetchEvents(category, chunkSize)).asserting(
                  _.map(_.payload) shouldBe (allEvents.map(_.noSpaces) diff updatedEvents.map(_.payload))
                )
       } yield res
@@ -112,7 +114,7 @@ class EventsRepositorySpec extends AsyncFlatSpec with CustomAsyncIOSpec with Eve
                  EnqueueStatus.Processing,
                  gracePeriodFromNow.minus(javaDurations(min = JDuration.ofSeconds(1)).generateOne)
                )
-          res <- execute(repo.fetchEvents(category)).asserting(
+          res <- execute(repo.fetchEvents(category, chunkSize)).asserting(
                    _.map(_.payload) shouldBe List(inGracePeriod.noSpaces, lessThanGracePeriod.noSpaces)
                  )
         } yield res
@@ -125,13 +127,13 @@ class EventsRepositorySpec extends AsyncFlatSpec with CustomAsyncIOSpec with Eve
 
     withDB.surround {
       for {
-        _       <- execute(repo.insert(category, event))
-        _       <- execute(repo.fetchEvents(category)).asserting(_.map(_.payload) shouldBe List(event.noSpaces))
+        _ <- execute(repo.insert(category, event))
+        _ <- execute(repo.fetchEvents(category, chunkSize)).asserting(_.map(_.payload) shouldBe List(event.noSpaces))
         dbEvent <- findAllEvents().map(_.headOption.getOrElse(fail("Event expected")))
         _       <- execute(repo.markUnderProcessing(dbEvent.id))
-        _       <- execute(repo.fetchEvents(category)).asserting(_ shouldBe Nil)
+        _       <- execute(repo.fetchEvents(category, chunkSize)).asserting(_ shouldBe Nil)
         _       <- execute(repo.returnToQueue(dbEvent.id))
-        res     <- execute(repo.fetchEvents(category)).asserting(_.map(_.payload) shouldBe List(event.noSpaces))
+        res <- execute(repo.fetchEvents(category, chunkSize)).asserting(_.map(_.payload) shouldBe List(event.noSpaces))
       } yield res
     }
   }

@@ -22,6 +22,7 @@ import cats.effect.testing.scalatest.AsyncIOSpec
 import cats.effect.{IO, Temporal}
 import fs2.concurrent.SignallingRef
 import fs2.{Chunk, Stream}
+import io.renku.events.CategoryName
 import io.renku.eventsqueue.Generators.dequeuedEvents
 import io.renku.eventsqueue.{DequeuedEvent, EventsDequeuer}
 import io.renku.generators.Generators.Implicits._
@@ -75,7 +76,8 @@ class SubscriptionFactorySpec extends AsyncWordSpec with AsyncIOSpec with should
   private lazy val eventsDequeuer = mock[EventsDequeuer[IO]]
 
   private def givenDequeuer(returning: Stream[IO, Chunk[DequeuedEvent]]) =
-    (eventsDequeuer.acquireEventsStream _)
+    (eventsDequeuer
+      .acquireEventsStream(_: CategoryName))
       .expects(categoryName)
       .returning(returning)
 

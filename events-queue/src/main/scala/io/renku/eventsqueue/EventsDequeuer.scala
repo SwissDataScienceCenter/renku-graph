@@ -29,7 +29,9 @@ import skunk.data.Notification
 import skunk.{Session, SqlState}
 
 trait EventsDequeuer[F[_]] {
-  def acquireEventsStream(category: CategoryName):  Stream[F, Chunk[DequeuedEvent]]
+  def acquireEventsStream(category: CategoryName): Stream[F, Chunk[DequeuedEvent]] =
+    acquireEventsStream(category, chunkSize = 50)
+  def acquireEventsStream(category: CategoryName, chunkSize: Int): Stream[F, Chunk[DequeuedEvent]]
   def returnToQueue(event:          DequeuedEvent): F[Unit]
 }
 
@@ -43,25 +45,28 @@ private class EventsDequeuerImpl[F[_]: Async: Logger, DB](repository: EventsRepo
     implicit sr: SessionResource[F, DB]
 ) extends EventsDequeuer[F] {
 
-  override def acquireEventsStream(category: CategoryName): Stream[F, Chunk[DequeuedEvent]] =
-    fetchAllChunks(category) ++ fetchEventsOnNotif(category)
+  override def acquireEventsStream(category: CategoryName, chunkSize: Int): Stream[F, Chunk[DequeuedEvent]] =
+    fetchAllChunks(category, chunkSize) ++ fetchEventsOnNotif(category, chunkSize)
 
-  private def fetchAllChunks(category: CategoryName): Stream[F, Chunk[DequeuedEvent]] =
-    (Stream.resource(fetchEventsChunk(category)) ++ fetchAllChunks(category)).takeWhile(_.nonEmpty)
+  private def fetchAllChunks(category: CategoryName, chunkSize: Int): Stream[F, Chunk[DequeuedEvent]] =
+    (Stream.resource(fetchEventsChunk(category, chunkSize)) ++ fetchAllChunks(category, chunkSize))
+      .takeWhile(_.nonEmpty)
 
-  private def fetchEventsChunk(category: CategoryName): Resource[F, Chunk[DequeuedEvent]] =
+  private def fetchEventsChunk(category: CategoryName, chunkSize: Int): Resource[F, Chunk[DequeuedEvent]] =
     Resource
-      .make(fetchChunkAndMarkProcessing(category))(chunk => sr.session.use(removeEvents(chunk)))
+      .make(fetchChunkAndMarkProcessing(category, chunkSize))(chunk => sr.session.use(removeEvents(chunk)))
 
-  private def fetchChunkAndMarkProcessing(category: CategoryName) =
+  private def fetchChunkAndMarkProcessing(category: CategoryName, chunkSize: Int) =
     sr.session.use { session =>
       lock
         .run(category)
-        .use(_ => repository.fetchEvents(category)(session).map(Chunk.from).flatTap(updateProcessing(_)(session)))
+        .use(_ =>
+          repository.fetchEvents(category, chunkSize)(session).map(Chunk.from).flatTap(updateProcessing(_)(session))
+        )
     }
 
-  private def fetchEventsOnNotif(category: CategoryName): Stream[F, Chunk[DequeuedEvent]] =
-    dequeueOnEvent(category) >> fetchAllChunks(category)
+  private def fetchEventsOnNotif(category: CategoryName, chunkSize: Int): Stream[F, Chunk[DequeuedEvent]] =
+    dequeueOnEvent(category) >> fetchAllChunks(category, chunkSize)
 
   private def dequeueOnEvent(category: CategoryName): Stream[F, Notification[String]] =
     Stream.resource {

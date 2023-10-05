@@ -117,7 +117,7 @@ class EventsDequeuerSpec
     def addEventBatch(batch: List[DequeuedEvent]): IO[Unit] =
       eventBatches.update(_ appended batch)
 
-    override def fetchEvents(category: CategoryName): QueryDef[IO, List[DequeuedEvent]] =
+    override def fetchEvents(category: CategoryName, chunkSize: Int): QueryDef[IO, List[DequeuedEvent]] =
       QueryDef.liftF {
         eventBatches
           .modify {

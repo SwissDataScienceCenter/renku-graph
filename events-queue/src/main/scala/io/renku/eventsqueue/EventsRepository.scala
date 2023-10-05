@@ -30,8 +30,8 @@ import java.time.{OffsetDateTime, Duration => JDuration}
 import scala.concurrent.duration._
 
 private trait EventsRepository[F[_]] {
-  def insert(category:             CategoryName, payload: Json): CommandDef[F]
-  def fetchEvents(category:        CategoryName): QueryDef[F, List[DequeuedEvent]]
+  def insert(category:             CategoryName, payload:   Json): CommandDef[F]
+  def fetchEvents(category:        CategoryName, chunkSize: Int):  QueryDef[F, List[DequeuedEvent]]
   def markUnderProcessing(eventId: Int): CommandDef[F]
   def returnToQueue(eventId:       Int): CommandDef[F]
   def delete(eventId:              Int): CommandDef[F]
@@ -52,8 +52,6 @@ private class EventsRepositoryImpl[F[_]: Async, DB]
   import TypeSerializers._
   import skunk.codec.all.{int4, text, timestamptz}
 
-  private val eventsChunkSize: Int = 50
-
   override def insert(category: CategoryName, payload: Json): CommandDef[F] = measureExecutionTime {
     val timestamp = OffsetDateTime.now()
     SqlStatement
@@ -67,28 +65,30 @@ private class EventsRepositoryImpl[F[_]: Async, DB]
       .void
   }
 
-  override def fetchEvents(category: CategoryName): QueryDef[F, List[DequeuedEvent]] = measureExecutionTime {
-    SqlStatement
-      .named(s"$queryPrefix fetch")
-      .select[CategoryName *: EnqueueStatus *: EnqueueStatus *: OffsetDateTime *: EmptyTuple, DequeuedEvent](
-        fetchQuery
-      )
-      .arguments(
-        category *: EnqueueStatus.New *: EnqueueStatus.Processing *:
-          (OffsetDateTime.now() minus gracePeriod) *: EmptyTuple
-      )
-      .build(_.toList)
-  }
+  override def fetchEvents(category: CategoryName, chunkSize: Int): QueryDef[F, List[DequeuedEvent]] =
+    measureExecutionTime {
+      SqlStatement
+        .named(s"$queryPrefix fetch")
+        .select[CategoryName *: EnqueueStatus *: EnqueueStatus *: OffsetDateTime *: EmptyTuple, DequeuedEvent](
+          fetchQuery(chunkSize)
+        )
+        .arguments(
+          category *: EnqueueStatus.New *: EnqueueStatus.Processing *:
+            (OffsetDateTime.now() minus gracePeriod) *: EmptyTuple
+        )
+        .build(_.toList)
+    }
 
-  private lazy val fetchQuery
-      : Query[CategoryName *: EnqueueStatus *: EnqueueStatus *: OffsetDateTime *: EmptyTuple, DequeuedEvent] =
+  private def fetchQuery(
+      chunkSize: Int
+  ): Query[CategoryName *: EnqueueStatus *: EnqueueStatus *: OffsetDateTime *: EmptyTuple, DequeuedEvent] =
     sql"""SELECT id, payload
           FROM enqueued_event
           WHERE category = $categoryNameEncoder
                 AND ((status = $enqueueStatusEncoder)
                       OR (status = $enqueueStatusEncoder AND $timestamptz >= updated)
                     )
-          LIMIT #${eventsChunkSize.toString}"""
+          LIMIT #${chunkSize.toString}"""
       .query(int4 ~ text)
       .map { case (id: Int) ~ (payload: String) => DequeuedEvent(id, payload) }
 
