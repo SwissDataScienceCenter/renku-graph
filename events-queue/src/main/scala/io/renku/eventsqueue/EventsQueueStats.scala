@@ -19,8 +19,9 @@
 package io.renku.eventsqueue
 
 import DBInfra.QueueTable
+import cats.syntax.all._
 import DBInfra.QueueTable.Column
-import cats.effect.Async
+import cats.effect.{Async, Ref}
 import io.renku.db.syntax._
 import io.renku.db.{DbClient, SqlStatement}
 import io.renku.events.CategoryName
@@ -42,6 +43,8 @@ private class EventsQueueStatsImpl[F[_]: Async, DB]
     extends DbClient[F](maybeHistogram = None)
     with EventsQueueStats[F] {
 
+  private val categories: Ref[F, List[CategoryName]] = Ref.unsafe(Nil)
+
   override def countsByCategory: QueryDef[F, Map[CategoryName, Long]] = measureExecutionTime {
     SqlStatement
       .named(s"$queryPrefix stats")
@@ -54,7 +57,17 @@ private class EventsQueueStatsImpl[F[_]: Async, DB]
       .arguments(Void)
       .build(_.toList)
       .mapResult(_.toMap)
-  }
+  }.flatMapF(stats => updateCategories(stats).as(stats))
+    .flatMapF(addZerosIfCategoryAbsent)
+
+  private def updateCategories(stats: Map[CategoryName, Long]): F[Unit] =
+    categories.update(cats => (cats ::: stats.keys.toList).distinct)
+
+  private def addZerosIfCategoryAbsent(stats: Map[CategoryName, Long]): F[Map[CategoryName, Long]] =
+    categories.get.map { cats =>
+      (cats diff stats.keys.toList)
+        .foldLeft(stats)((updatedStats, missingCat) => updatedStats + (missingCat -> 0L))
+    }
 
   private lazy val queryPrefix = "queue event -"
 }
