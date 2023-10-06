@@ -22,7 +22,7 @@ import cats.effect.Async
 import cats.effect.kernel.MonadCancelThrow
 import cats.syntax.all._
 import io.renku.graph.model.RenkuUrl
-import io.renku.triplesgenerator.TgLockDB.TsWriteLock
+import io.renku.triplesgenerator.TgDB.TsWriteLock
 import io.renku.triplesgenerator.api.NewProject
 import io.renku.triplesgenerator.projects.ProjectExistenceChecker
 import io.renku.triplesgenerator.tsprovisioning.TSProvisioner

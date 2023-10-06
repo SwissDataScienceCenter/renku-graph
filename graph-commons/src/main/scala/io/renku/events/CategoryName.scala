@@ -20,8 +20,13 @@ package io.renku.events
 
 import io.renku.tinytypes.constraints.NonBlank
 import io.renku.tinytypes.{StringTinyType, TinyTypeFactory}
+import skunk.data.Identifier
 
-final class CategoryName private (val value: String) extends AnyVal with StringTinyType
+final class CategoryName private (val value: String) extends AnyVal with StringTinyType {
+  def asChannelId: Identifier = Identifier
+    .fromString(value.toLowerCase)
+    .fold(err => throw new Exception(s"'$value' not a valid Channel identifier: $err"), identity)
+}
 object CategoryName extends TinyTypeFactory[CategoryName](new CategoryName(_)) with NonBlank[CategoryName] {
   import io.circe.Decoder
   import io.renku.tinytypes.json.TinyTypeDecoders.stringDecoder

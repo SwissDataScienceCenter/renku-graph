@@ -26,7 +26,7 @@ import io.renku.generators.Generators.nonEmptyStrings
 
 object TestDbConfig {
 
-  def newDbConfig[TargetDb]: DBConfig[TargetDb] = DBConfig[TargetDb](
+  def create[TargetDb]: DBConfig[TargetDb] = DBConfig[TargetDb](
     name = Refined.unsafeApply(nonEmptyStrings().map(suffix => s"db_$suffix").generateOne),
     host = "localhost",
     port = 5432,

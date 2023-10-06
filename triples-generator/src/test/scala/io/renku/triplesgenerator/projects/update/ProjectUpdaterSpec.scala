@@ -27,7 +27,7 @@ import io.renku.generators.Generators.Implicits._
 import io.renku.graph.model.RenkuTinyTypeGenerators.projectSlugs
 import io.renku.graph.model.projects
 import io.renku.lock.Lock
-import io.renku.triplesgenerator.TgLockDB.TsWriteLock
+import io.renku.triplesgenerator.TgDB.TsWriteLock
 import io.renku.triplesgenerator.api.Generators.projectUpdatesGen
 import io.renku.triplesgenerator.api.ProjectUpdates
 import io.renku.triplesstore.{SparqlQuery, TSClient}

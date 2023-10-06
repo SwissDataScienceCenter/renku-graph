@@ -20,17 +20,20 @@ package io.renku.entities.viewings.collector.projects.viewed
 
 import cats.effect.IO
 import cats.syntax.all._
+import io.circe.Encoder
 import io.circe.syntax._
-import io.renku.events.EventRequestContent
 import io.renku.events.consumers.ProcessExecutor
+import io.renku.events.{CategoryName, EventRequestContent}
+import io.renku.eventsqueue.EventsQueue
 import io.renku.generators.Generators.Implicits._
 import io.renku.interpreters.TestLogger
 import io.renku.testtools.IOSpec
 import io.renku.triplesgenerator.api.events.Generators._
+import io.renku.triplesgenerator.api.events.ProjectViewedEvent
 import org.scalamock.scalatest.MockFactory
+import org.scalatest.EitherValues
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
-import org.scalatest.EitherValues
 
 class EventHandlerSpec extends AnyWordSpec with should.Matchers with IOSpec with MockFactory with EitherValues {
 
@@ -46,9 +49,12 @@ class EventHandlerSpec extends AnyWordSpec with should.Matchers with IOSpec with
 
   "handlingDefinition.process" should {
 
-    "be the eventPersister.persist" in new TestCase {
+    "be the eventEnqueuer.enqueue" in new TestCase {
 
-      (eventPersister.persist _).expects(event).returns(().pure[IO])
+      (eventsQueue
+        .enqueue[ProjectViewedEvent](_: CategoryName, _: ProjectViewedEvent)(_: Encoder[ProjectViewedEvent]))
+        .expects(categoryName, event, *)
+        .returns(().pure[IO])
 
       handler.createHandlingDefinition().process(event).unsafeRunSync() shouldBe ()
     }
@@ -73,7 +79,7 @@ class EventHandlerSpec extends AnyWordSpec with should.Matchers with IOSpec with
     val event = projectViewedEvents.generateOne
 
     implicit val logger: TestLogger[IO] = TestLogger[IO]()
-    val eventPersister = mock[EventPersister[IO]]
-    val handler        = new EventHandler[IO](eventPersister, mock[ProcessExecutor[IO]])
+    val eventsQueue = mock[EventsQueue[IO]]
+    val handler     = new EventHandler[IO](eventsQueue, mock[ProcessExecutor[IO]])
   }
 }

@@ -27,7 +27,7 @@ import io.renku.graph.http.server.binders.ProjectSlug
 import io.renku.graph.model.RenkuUrl
 import io.renku.http.server.version
 import io.renku.metrics.{MetricsRegistry, RoutesMetrics}
-import io.renku.triplesgenerator.TgLockDB.TsWriteLock
+import io.renku.triplesgenerator.TgDB.TsWriteLock
 import io.renku.triplesgenerator.events.EventEndpoint
 import io.renku.triplesstore.{ProjectSparqlClient, SparqlQueryTimeRecorder}
 import org.http4s.dsl.Http4sDsl

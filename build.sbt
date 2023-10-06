@@ -42,6 +42,7 @@ lazy val root = project
     renkuCliModel,
     renkuModel,
     graphCommons,
+    eventsQueue,
     eventLogApi,
     eventLog,
     tokenRepository,
@@ -111,6 +112,15 @@ lazy val graphCommons = project
   .dependsOn(
     renkuModel  % "compile->compile; test->test",
     projectAuth % "compile->compile; test->test"
+  )
+  .enablePlugins(AutomateHeaderPlugin)
+
+lazy val eventsQueue = project
+  .in(file("events-queue"))
+  .withId("events-queue")
+  .settings(commonSettings)
+  .dependsOn(
+    graphCommons % "compile->compile; test->test"
   )
   .enablePlugins(AutomateHeaderPlugin)
 
@@ -192,7 +202,11 @@ lazy val entitiesViewingsCollector = project
   .in(file("entities-viewings-collector"))
   .withId("entities-viewings-collector")
   .settings(commonSettings)
-  .dependsOn(triplesGeneratorApi % "compile->compile; test->test", entitiesSearch % "compile->compile; test->test")
+  .dependsOn(
+    eventsQueue         % "compile->compile; test->test",
+    triplesGeneratorApi % "compile->compile; test->test",
+    entitiesSearch      % "compile->compile; test->test"
+  )
   .enablePlugins(AutomateHeaderPlugin)
 
 lazy val triplesGenerator = project
