@@ -32,8 +32,8 @@ import monocle.{Lens, Traversal}
 final case class CliDataset(
     resourceId:         ResourceId,
     identifier:         Identifier,
-    title:              Title,
     name:               Name,
+    slug:               Slug,
     createdOrPublished: CreatedOrPublished,
     dateModified:       DateModified,
     creators:           NonEmptyList[CliPerson],
@@ -76,8 +76,8 @@ object CliDataset {
     for {
       resourceId         <- cursor.downEntityId.as[ResourceId]
       identifier         <- cursor.downField(Schema.identifier).as[Identifier]
-      title              <- cursor.downField(Schema.name).as[Title]
-      name               <- cursor.downField(Renku.slug).as[Name]
+      name               <- cursor.downField(Schema.name).as[Name]
+      slug               <- cursor.downField(Renku.slug).as[Slug]
       creators           <- cursor.downField(Schema.creator).as[List[CliPerson]] >>= failIfNoCreators(identifier)
       maybeDateCreated   <- cursor.downField(Schema.dateCreated).as[Option[DateCreated]]
       maybeDatePublished <- cursor.downField(Schema.datePublished).as[Option[DatePublished]]
@@ -112,8 +112,8 @@ object CliDataset {
     } yield CliDataset(
       resourceId,
       identifier,
-      title,
       name,
+      slug,
       date,
       maybeDateModified,
       creators,
@@ -140,8 +140,8 @@ object CliDataset {
       entityTypes,
       List(
         Some(Schema.identifier -> ds.identifier.asJsonLD),
-        Some(Schema.name       -> ds.title.asJsonLD),
-        Some(Renku.slug        -> ds.name.asJsonLD),
+        Some(Schema.name       -> ds.name.asJsonLD),
+        Some(Renku.slug        -> ds.slug.asJsonLD),
         Some(Schema.creator    -> ds.creators.asJsonLD),
         ds.createdOrPublished match {
           case d: DateCreated   => (Schema.dateCreated   -> d.asJsonLD).some
