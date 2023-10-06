@@ -117,6 +117,7 @@ lazy val graphCommons = project
 
 lazy val eventsQueue = project
   .in(file("events-queue"))
+  .withId("events-queue")
   .settings(commonSettings)
   .dependsOn(
     graphCommons % "compile->compile; test->test"

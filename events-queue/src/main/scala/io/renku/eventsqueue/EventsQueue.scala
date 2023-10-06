@@ -73,7 +73,7 @@ private class EventsQueueImpl[F[_]: Async: Logger, DB](repository: EventsReposit
     Resource
       .make(fetchChunkAndMarkProcessing(category, chunkSize))(chunk => sr.session.use(removeEvents(chunk)))
 
-  private def fetchChunkAndMarkProcessing(category: CategoryName, chunkSize: Int) =
+  private def fetchChunkAndMarkProcessing(category: CategoryName, chunkSize: Int): F[Chunk[DequeuedEvent]] =
     sr.session.use { session =>
       lock
         .run(category)
