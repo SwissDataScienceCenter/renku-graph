@@ -61,7 +61,10 @@ object persons {
         extends TinyTypeFactory[OrcidIdBased](new OrcidIdBased(_))
         with Constraints[OrcidIdBased]
         with NonBlank[OrcidIdBased] {
-      private[persons] val validator = "^http(s)?://.*/persons\\/orcid\\/\\d{4}-\\d{4}-\\d{4}-\\d{4}$"
+
+      private[persons] val validator =
+        "^http(s)?://.*/persons\\/orcid\\/[a-zA-Z0-9]{4}-[a-zA-Z0-9]{4}-[a-zA-Z0-9]{4}-[a-zA-Z0-9]{4}$"
+
       addConstraint(
         check = _.trim.matches(validator),
         message = (v: String) => s"$v is not valid $typeName"
