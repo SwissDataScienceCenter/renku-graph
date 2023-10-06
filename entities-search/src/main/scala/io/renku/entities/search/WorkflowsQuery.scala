@@ -48,7 +48,7 @@ private case object WorkflowsQuery extends EntityQuery[model.Entity.Workflow] {
 
   private val authSnippets = SparqlSnippets(VarName("projectId"))
 
-  override def query(criteria: Criteria) = (criteria.filters whenRequesting entityType) {
+  override def query(criteria: Criteria): Option[String] = (criteria.filters whenRequesting entityType) {
     import criteria._
     // format: off
     sparql"""|{
@@ -124,7 +124,7 @@ private case object WorkflowsQuery extends EntityQuery[model.Entity.Workflow] {
             |}
             |""".stripMargin
 
-  def withQuerySnippet(query: LuceneQuery) =
+  private def withQuerySnippet(query: LuceneQuery) =
     sparql"""
             |{
             |  SELECT ?wkId (MAX(?score) AS ?matchingScore) (SAMPLE(?projId) AS ?projectId)

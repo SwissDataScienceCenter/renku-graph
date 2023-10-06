@@ -319,6 +319,9 @@ trait DatasetEntitiesGenerators {
       }
     }
 
+  def replaceDSName[P <: Dataset.Provenance](to: datasets.Name): Dataset[P] => Dataset[P] =
+    identificationLens[P].modify(_.copy(name = to))
+
   def replaceDSSlug[P <: Dataset.Provenance](to: datasets.Slug): Dataset[P] => Dataset[P] =
     identificationLens[P].modify(_.copy(slug = to))
 

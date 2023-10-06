@@ -34,6 +34,7 @@ object DatasetsQuery extends EntityQuery[Entity.Dataset] {
   override val entityType: Filters.EntityType = Filters.EntityType.Dataset
 
   val matchingScoreVar        = VarName("matchingScore")
+  val slugVar                 = VarName("slug")
   val nameVar                 = VarName("name")
   val idsSlugsVisibilitiesVar = VarName("idsSlugsVisibilities")
   val sameAsVar               = VarName("sameAs")
@@ -51,6 +52,7 @@ object DatasetsQuery extends EntityQuery[Entity.Dataset] {
   override val selectVariables = Set(
     entityTypeVar,
     matchingScoreVar,
+    slugVar,
     nameVar,
     idsSlugsVisibilitiesVar,
     sameAsVar,
@@ -69,6 +71,7 @@ object DatasetsQuery extends EntityQuery[Entity.Dataset] {
       fr"""{
           |SELECT DISTINCT $entityTypeVar
           |       $matchingScoreVar
+          |       $slugVar
           |       $nameVar
           |       $idsSlugsVisibilitiesVar
           |       $sameAsVar
@@ -128,7 +131,8 @@ object DatasetsQuery extends EntityQuery[Entity.Dataset] {
           |
           |  GRAPH schema:Dataset {
           |    # name
-          |    $sameAsVar renku:slug $nameVar
+          |    $sameAsVar renku:slug $slugVar;
+          |               schema:name $nameVar.
           |
           |    #description
           |    $description
@@ -249,7 +253,7 @@ object DatasetsQuery extends EntityQuery[Entity.Dataset] {
              |  SELECT $sameAsVar (MAX(?score) AS $matchingScoreVar)
              |  WHERE {
              |    Graph schema:Dataset {
-             |      (?id ?score) text:query (renku:slug schema:keywords schema:description schema:name $luceneQuery).
+             |      (?id ?score) text:query (schema:name renku:slug schema:keywords schema:description $luceneQuery).
              |     {
              |       $sameAsVar a renku:DiscoverableDataset;
              |                  schema:creator ?id
@@ -297,6 +301,7 @@ object DatasetsQuery extends EntityQuery[Entity.Dataset] {
 
     for {
       matchingScore <- read[MatchingScore](matchingScoreVar)
+      slug          <- read[datasets.Slug](slugVar)
       name          <- read[datasets.Name](nameVar)
       sameAs        <- read[datasets.TopmostSameAs](sameAsVar)
       slugAndVisibility <- read[Option[String]](idsSlugsVisibilitiesVar)
@@ -315,6 +320,7 @@ object DatasetsQuery extends EntityQuery[Entity.Dataset] {
     } yield Entity.Dataset(
       matchingScore,
       sameAs,
+      slug,
       name,
       slugAndVisibility._2,
       date,
