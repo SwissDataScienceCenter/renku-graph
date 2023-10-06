@@ -24,7 +24,7 @@ import cats.syntax.all._
 import fs2.{Chunk, Stream}
 import io.circe.syntax._
 import io.renku.eventsqueue.Generators.dequeuedEvents
-import io.renku.eventsqueue.{DequeuedEvent, EventsDequeuer}
+import io.renku.eventsqueue.{DequeuedEvent, EventsQueue}
 import io.renku.generators.Generators.Implicits._
 import io.renku.generators.Generators.{exceptions, timestamps, timestampsNotInTheFuture}
 import io.renku.graph.model.RenkuTinyTypeGenerators.projectSlugs
@@ -139,8 +139,8 @@ class EventProcessorSpec extends AsyncFlatSpec with AsyncIOSpec with should.Matc
 
   private implicit val logger: TestLogger[IO] = TestLogger()
   private val persister      = mock[EventPersister[IO]]
-  private val eventsDequeuer = mock[EventsDequeuer[IO]]
-  private lazy val processor = new EventProcessorImpl[IO](persister, eventsDequeuer)
+  private val eventsQueue    = mock[EventsQueue[IO]]
+  private lazy val processor = new EventProcessorImpl[IO](persister, eventsQueue)
 
   private def givenPersisting(event: ProjectViewedEvent, returning: IO[Unit]) =
     (persister.persist _)
@@ -148,7 +148,7 @@ class EventProcessorSpec extends AsyncFlatSpec with AsyncIOSpec with should.Matc
       .returning(returning)
 
   private def givenReturningEventToQueue(event: DequeuedEvent, returning: IO[Unit]) =
-    (eventsDequeuer.returnToQueue _)
+    (eventsQueue.returnToQueue _)
       .expects(event)
       .returning(returning)
 }

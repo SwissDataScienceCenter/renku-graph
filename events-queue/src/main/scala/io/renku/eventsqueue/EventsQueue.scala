@@ -21,29 +21,46 @@ package io.renku.eventsqueue
 import cats.effect.{Async, Resource}
 import cats.syntax.all._
 import fs2.{Chunk, Stream}
+import io.circe.Encoder
 import io.renku.db.SessionResource
+import io.renku.db.syntax.CommandDef
 import io.renku.events.CategoryName
 import io.renku.lock.Lock
 import org.typelevel.log4cats.Logger
-import skunk.data.Notification
+import skunk.data.{Identifier, Notification}
 import skunk.{Session, SqlState}
 
-trait EventsDequeuer[F[_]] {
+trait EventsQueue[F[_]] {
+
+  def enqueue[E](category: CategoryName, event: E)(implicit enc: Encoder[E]): F[Unit] =
+    enqueue(category, event, category.asChannelId)
+  def enqueue[E](category: CategoryName, event: E, channel: Identifier)(implicit enc: Encoder[E]): F[Unit]
+
   def acquireEventsStream(category: CategoryName): Stream[F, Chunk[DequeuedEvent]] =
     acquireEventsStream(category, chunkSize = 50)
   def acquireEventsStream(category: CategoryName, chunkSize: Int): Stream[F, Chunk[DequeuedEvent]]
-  def returnToQueue(event:          DequeuedEvent): F[Unit]
+
+  def returnToQueue(event: DequeuedEvent): F[Unit]
 }
 
-object EventsDequeuer {
+object EventsQueue {
   def apply[F[_]: Async: Logger, DB](lock: Lock[F, CategoryName])(implicit
       sr: SessionResource[F, DB]
-  ): EventsDequeuer[F] = new EventsDequeuerImpl[F, DB](EventsRepository[F, DB], lock)
+  ): EventsQueue[F] = new EventsQueueImpl[F, DB](EventsRepository[F, DB], lock)
 }
 
-private class EventsDequeuerImpl[F[_]: Async: Logger, DB](repository: EventsRepository[F], lock: Lock[F, CategoryName])(
+private class EventsQueueImpl[F[_]: Async: Logger, DB](repository: EventsRepository[F], lock: Lock[F, CategoryName])(
     implicit sr: SessionResource[F, DB]
-) extends EventsDequeuer[F] {
+) extends EventsQueue[F] {
+
+  override def enqueue[E](category: CategoryName, event: E, channel: Identifier)(implicit enc: Encoder[E]): F[Unit] =
+    sr.useK {
+      repository.insert(category, enc(event)) >> notify(channel, category)
+    }
+
+  private def notify(channel: Identifier, category: CategoryName): CommandDef[F] = CommandDef[F] {
+    _.channel(channel).notify(category.value)
+  }
 
   override def acquireEventsStream(category: CategoryName, chunkSize: Int): Stream[F, Chunk[DequeuedEvent]] =
     fetchAllChunks(category, chunkSize) ++ fetchEventsOnNotif(category, chunkSize)

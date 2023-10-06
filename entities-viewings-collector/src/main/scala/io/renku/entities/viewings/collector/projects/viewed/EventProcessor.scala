@@ -24,7 +24,7 @@ import cats.syntax.all._
 import fs2.{Chunk, Pipe}
 import io.circe.Error
 import io.circe.parser._
-import io.renku.eventsqueue.{DequeuedEvent, EventsDequeuer}
+import io.renku.eventsqueue.{DequeuedEvent, EventsQueue}
 import io.renku.graph.model.projects
 import io.renku.triplesgenerator.api.events.{ProjectViewedEvent, UserId}
 import io.renku.triplesstore.{ProjectsConnectionConfig, SparqlQueryTimeRecorder}
@@ -33,14 +33,14 @@ import org.typelevel.log4cats.Logger
 private trait EventProcessor[F[_]] extends Pipe[F, Chunk[DequeuedEvent], Unit]
 
 private object EventProcessor {
-  def apply[F[_]: Async: Logger: SparqlQueryTimeRecorder](connConfig:     ProjectsConnectionConfig,
-                                                          eventsDequeuer: EventsDequeuer[F]
+  def apply[F[_]: Async: Logger: SparqlQueryTimeRecorder](connConfig:  ProjectsConnectionConfig,
+                                                          eventsQueue: EventsQueue[F]
   ): F[EventProcessor[F]] =
-    EventPersister[F](connConfig).map(new EventProcessorImpl[F](_, eventsDequeuer))
+    EventPersister[F](connConfig).map(new EventProcessorImpl[F](_, eventsQueue))
 }
 
 private class EventProcessorImpl[F[_]: MonadThrow: Logger](eventPersister: EventPersister[F],
-                                                           eventsDequeuer: EventsDequeuer[F]
+                                                           eventsQueue: EventsQueue[F]
 ) extends EventProcessor[F] {
 
   override def apply(in: fs2.Stream[F, Chunk[DequeuedEvent]]): fs2.Stream[F, Unit] =
@@ -78,5 +78,5 @@ private class EventProcessorImpl[F[_]: MonadThrow: Logger](eventPersister: Event
 
   private def returnToQueue(de: DequeuedEvent): Throwable => F[Unit] =
     Logger[F].error(_)(show"$categoryName: persisting event failed: ${de.id}; returning to the queue") >>
-      eventsDequeuer.returnToQueue(de)
+      eventsQueue.returnToQueue(de)
 }

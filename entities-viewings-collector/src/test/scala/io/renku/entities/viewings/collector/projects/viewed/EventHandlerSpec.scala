@@ -24,7 +24,7 @@ import io.circe.Encoder
 import io.circe.syntax._
 import io.renku.events.consumers.ProcessExecutor
 import io.renku.events.{CategoryName, EventRequestContent}
-import io.renku.eventsqueue.EventsEnqueuer
+import io.renku.eventsqueue.EventsQueue
 import io.renku.generators.Generators.Implicits._
 import io.renku.interpreters.TestLogger
 import io.renku.testtools.IOSpec
@@ -51,7 +51,7 @@ class EventHandlerSpec extends AnyWordSpec with should.Matchers with IOSpec with
 
     "be the eventEnqueuer.enqueue" in new TestCase {
 
-      (eventEnqueuer
+      (eventsQueue
         .enqueue[ProjectViewedEvent](_: CategoryName, _: ProjectViewedEvent)(_: Encoder[ProjectViewedEvent]))
         .expects(categoryName, event, *)
         .returns(().pure[IO])
@@ -79,7 +79,7 @@ class EventHandlerSpec extends AnyWordSpec with should.Matchers with IOSpec with
     val event = projectViewedEvents.generateOne
 
     implicit val logger: TestLogger[IO] = TestLogger[IO]()
-    val eventEnqueuer = mock[EventsEnqueuer[IO]]
-    val handler       = new EventHandler[IO](eventEnqueuer, mock[ProcessExecutor[IO]])
+    val eventsQueue = mock[EventsQueue[IO]]
+    val handler     = new EventHandler[IO](eventsQueue, mock[ProcessExecutor[IO]])
   }
 }

@@ -23,7 +23,7 @@ import cats.syntax.all._
 import io.renku.db.SessionResource
 import io.renku.events.consumers.subscriptions.SubscriptionMechanism
 import io.renku.events.{CategoryName, consumers}
-import io.renku.eventsqueue.EventsDequeuer
+import io.renku.eventsqueue.EventsQueue
 import io.renku.lock.Lock
 import io.renku.triplesstore.{ProjectsConnectionConfig, SparqlQueryTimeRecorder}
 import org.typelevel.log4cats.Logger
@@ -38,24 +38,24 @@ object SubscriptionFactory {
   ): F[(consumers.EventHandler[F], SubscriptionMechanism[F])] = {
     implicit val sr: SessionResource[F, DB] = sessionResource
     for {
-      handler <- EventHandler[F, DB]
-      eventsDequeuer = EventsDequeuer[F, DB](categoryLock)
-      eventProcessor <- EventProcessor[F](connConfig, eventsDequeuer)
-      _              <- kickOffEventsDequeueing[F](eventsDequeuer, eventProcessor)
+      eventsQueue    <- EventsQueue[F, DB](categoryLock).pure[F]
+      handler        <- EventHandler[F](eventsQueue)
+      eventProcessor <- EventProcessor[F](connConfig, eventsQueue)
+      _              <- kickOffEventsDequeueing[F](eventsQueue, eventProcessor)
     } yield handler -> SubscriptionMechanism.noOpSubscriptionMechanism(categoryName)
   }
 
-  private[viewed] def kickOffEventsDequeueing[F[_]: Async: Logger](dequeuer:  EventsDequeuer[F],
-                                                                   processor: EventProcessor[F]
+  private[viewed] def kickOffEventsDequeueing[F[_]: Async: Logger](eventsQueue: EventsQueue[F],
+                                                                   processor:   EventProcessor[F]
   ) = Async[F].start {
-    Logger[F].info(show"Starting events dequeuer for $categoryName") >>
-      hookToTheEventsStream(dequeuer, processor)
+    Logger[F].info(show"Starting events dequeueing for $categoryName") >>
+      hookToTheEventsStream(eventsQueue, processor)
         .handleErrorWith(
           Logger[F].error(_)(show"An error in the $categoryName processing pipe; restarting") >>
-            Temporal[F].delayBy(hookToTheEventsStream(dequeuer, processor), 2 seconds)
+            Temporal[F].delayBy(hookToTheEventsStream(eventsQueue, processor), 2 seconds)
         )
   }.void
 
-  private def hookToTheEventsStream[F[_]: Async](dequeuer: EventsDequeuer[F], processor: EventProcessor[F]) =
-    dequeuer.acquireEventsStream(categoryName).through(processor).compile.drain
+  private def hookToTheEventsStream[F[_]: Async](eventsQueue: EventsQueue[F], processor: EventProcessor[F]) =
+    eventsQueue.acquireEventsStream(categoryName).through(processor).compile.drain
 }

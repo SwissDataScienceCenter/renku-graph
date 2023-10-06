@@ -18,12 +18,13 @@
 
 package io.renku.eventsqueue
 
-import Generators.dequeuedEvents
+import Generators._
 import cats.effect.testing.scalatest.AsyncIOSpec
 import cats.effect.{IO, Ref}
 import fs2.concurrent.SignallingRef
 import fs2.{Chunk, Pipe, Stream}
 import io.circe.Json
+import io.circe.syntax._
 import io.renku.db.syntax._
 import io.renku.events.CategoryName
 import io.renku.events.Generators.categoryNames
@@ -33,12 +34,30 @@ import org.scalamock.scalatest.AsyncMockFactory
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AsyncWordSpec
 
-class EventsDequeuerSpec
+class EventsQueueSpec
     extends AsyncWordSpec
     with AsyncIOSpec
     with EventsQueueDBSpec
     with should.Matchers
     with AsyncMockFactory {
+
+  "enqueue" should {
+
+    "encode the payload, " +
+      "persist it in the DB and " +
+      "send a notification over the Channel" in {
+
+        val repository = createRepository()
+        val event      = events.generateOne
+
+        for {
+          conditionMet <- assertNotifications(category.asChannelId, notifs => notifs.contains(category.value))
+          _            <- queue(repository).enqueue(category, event)
+          _            <- conditionMet.get.flatten
+          res          <- repository.inserted.get.asserting(_ shouldBe List(category -> event.asJson))
+        } yield res
+      }
+  }
 
   "acquireEventsStream" should {
 
@@ -56,7 +75,7 @@ class EventsDequeuerSpec
         val allEvents = initialEvents1 ::: initialEvents2
 
         for {
-          deqFiber <- dequeuer(repository).acquireEventsStream(category).through(handler).compile.drain.start
+          deqFiber <- queue(repository).acquireEventsStream(category).through(handler).compile.drain.start
           _        <- handler.handledEvents.waitUntil(_ == allEvents)
           _        <- deqFiber.cancel
           _        <- repository.processed.get.asserting(_ shouldBe allEvents.map(_.id))
@@ -75,7 +94,7 @@ class EventsDequeuerSpec
       val allEvents     = initialEvents ::: onNotifEvents
 
       for {
-        deqFiber <- dequeuer(repository).acquireEventsStream(category).through(handler).compile.drain.start
+        deqFiber <- queue(repository).acquireEventsStream(category).through(handler).compile.drain.start
         _        <- handler.handledEvents.waitUntil(_ == initialEvents)
         _        <- repository.addEventBatch(onNotifEvents)
         _        <- notify(category)
@@ -95,7 +114,7 @@ class EventsDequeuerSpec
 
       val repository = createRepository()
 
-      dequeuer(repository).returnToQueue(event).assertNoException >>
+      queue(repository).returnToQueue(event).assertNoException >>
         repository.returnedToQueue.get.asserting(_ shouldBe List(event.id))
     }
   }
@@ -103,14 +122,19 @@ class EventsDequeuerSpec
   private lazy val category = categoryNames.generateOne
 
   private val categoryLock: Lock[IO, CategoryName] = Lock.none[IO, CategoryName]
-  private def dequeuer(repository: Repository) = new EventsDequeuerImpl[IO, TestDB](repository, categoryLock)
+  private def queue(repository: Repository) = new EventsQueueImpl[IO, TestDB](repository, categoryLock)
 
   private def createRepository(eventBatches: List[DequeuedEvent]*) =
     new Repository(eventBatches.toList)
 
   private class Repository(initialEventBatches: List[List[DequeuedEvent]]) extends EventsRepository[IO] {
 
-    override def insert(category: CategoryName, payload: Json): CommandDef[IO] = fail("Shouldn't be called")
+    val inserted = Ref.unsafe[IO, List[(CategoryName, Json)]](Nil)
+
+    override def insert(category: CategoryName, payload: Json): CommandDef[IO] =
+      CommandDef.liftF[IO] {
+        inserted.update(_ appended category -> payload)
+      }
 
     private val eventBatches = Ref.unsafe[IO, List[List[DequeuedEvent]]](initialEventBatches)
 

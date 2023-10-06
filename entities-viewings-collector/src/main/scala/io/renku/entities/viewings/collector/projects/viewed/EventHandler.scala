@@ -21,15 +21,14 @@ package io.renku.entities.viewings.collector.projects.viewed
 import cats.effect.{Async, MonadCancelThrow}
 import cats.syntax.all._
 import eu.timepit.refined.auto._
-import io.renku.db.SessionResource
 import io.renku.events.consumers.ProcessExecutor
 import io.renku.events.{CategoryName, consumers}
-import io.renku.eventsqueue.EventsEnqueuer
+import io.renku.eventsqueue.EventsQueue
 import io.renku.triplesgenerator.api.events.ProjectViewedEvent
 import org.typelevel.log4cats.Logger
 
 private class EventHandler[F[_]: MonadCancelThrow: Logger](
-    eventEnqueuer:             EventsEnqueuer[F],
+    eventsQueue:               EventsQueue[F],
     processExecutor:           ProcessExecutor[F],
     override val categoryName: CategoryName = categoryName
 ) extends consumers.EventHandlerWithProcessLimiter[F](processExecutor) {
@@ -39,13 +38,13 @@ private class EventHandler[F[_]: MonadCancelThrow: Logger](
   override def createHandlingDefinition(): EventHandlingDefinition =
     EventHandlingDefinition(
       _.event.as[ProjectViewedEvent],
-      e => Logger[F].info(show"$categoryName: $e accepted") >> eventEnqueuer.enqueue(categoryName, e)
+      e => Logger[F].info(show"$categoryName: $e accepted") >> eventsQueue.enqueue(categoryName, e)
     )
 }
 
 private object EventHandler {
-  def apply[F[_]: Async: Logger, DB](implicit sr: SessionResource[F, DB]): F[consumers.EventHandler[F]] =
+  def apply[F[_]: Async: Logger](eventsQueue: EventsQueue[F]): F[consumers.EventHandler[F]] =
     ProcessExecutor
       .concurrent(processesCount = 100)
-      .map(new EventHandler[F](EventsEnqueuer[F, DB], _))
+      .map(new EventHandler[F](eventsQueue, _))
 }

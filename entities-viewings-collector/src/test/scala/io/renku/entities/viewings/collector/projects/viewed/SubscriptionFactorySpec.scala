@@ -24,7 +24,7 @@ import fs2.concurrent.SignallingRef
 import fs2.{Chunk, Stream}
 import io.renku.events.CategoryName
 import io.renku.eventsqueue.Generators.dequeuedEvents
-import io.renku.eventsqueue.{DequeuedEvent, EventsDequeuer}
+import io.renku.eventsqueue.{DequeuedEvent, EventsQueue}
 import io.renku.generators.Generators.Implicits._
 import io.renku.generators.Generators.exceptions
 import io.renku.interpreters.TestLogger
@@ -43,12 +43,12 @@ class SubscriptionFactorySpec extends AsyncWordSpec with AsyncIOSpec with should
 
       val chunk1 = dequeuedEvents.generateList()
       val chunk2 = dequeuedEvents.generateList()
-      givenDequeuer(returning = Stream(Chunk.from(chunk1), Chunk.from(chunk2)))
+      givenStreamAcquiring(returning = Stream(Chunk.from(chunk1), Chunk.from(chunk2)))
 
       val eventProcessor = new AccumulatingHandler
 
       for {
-        _ <- SubscriptionFactory.kickOffEventsDequeueing[IO](eventsDequeuer, eventProcessor).assertNoException
+        _ <- SubscriptionFactory.kickOffEventsDequeueing[IO](eventsQueue, eventProcessor).assertNoException
         _ <- eventProcessor.handledEvents.waitUntil(_ == chunk1 ::: chunk2)
       } yield Succeeded
     }
@@ -56,14 +56,14 @@ class SubscriptionFactorySpec extends AsyncWordSpec with AsyncIOSpec with should
     "handle failures in the dequeueing process so the process does not die" in {
 
       val chunk1 = dequeuedEvents.generateList(min = 1)
-      givenDequeuer(returning = Stream.emit(Chunk.from(chunk1)))
+      givenStreamAcquiring(returning = Stream.emit(Chunk.from(chunk1)))
       val chunk2 = dequeuedEvents.generateList(min = 1)
-      givenDequeuer(returning = Stream.emit(Chunk.from(chunk2)))
+      givenStreamAcquiring(returning = Stream.emit(Chunk.from(chunk2)))
 
       val eventProcessor = new AccumulatingHandler(maybeEventToFail = chunk1.headOption)
 
       for {
-        _ <- SubscriptionFactory.kickOffEventsDequeueing[IO](eventsDequeuer, eventProcessor).assertNoException
+        _ <- SubscriptionFactory.kickOffEventsDequeueing[IO](eventsQueue, eventProcessor).assertNoException
         _ <- IO.race(
                eventProcessor.handledEvents.waitUntil(_ == chunk2),
                Temporal[IO].delayBy(IO(fail("Events dequeuer process doesn't work")), 5 seconds)
@@ -73,10 +73,10 @@ class SubscriptionFactorySpec extends AsyncWordSpec with AsyncIOSpec with should
   }
 
   private implicit lazy val logger: TestLogger[IO] = TestLogger()
-  private lazy val eventsDequeuer = mock[EventsDequeuer[IO]]
+  private lazy val eventsQueue = mock[EventsQueue[IO]]
 
-  private def givenDequeuer(returning: Stream[IO, Chunk[DequeuedEvent]]) =
-    (eventsDequeuer
+  private def givenStreamAcquiring(returning: Stream[IO, Chunk[DequeuedEvent]]) =
+    (eventsQueue
       .acquireEventsStream(_: CategoryName))
       .expects(categoryName)
       .returning(returning)
