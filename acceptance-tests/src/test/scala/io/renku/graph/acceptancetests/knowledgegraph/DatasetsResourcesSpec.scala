@@ -259,7 +259,7 @@ class DatasetsResourcesSpec
         .map(addMemberFrom(project6CreatorPerson, creator.id, Role.Owner))
         .generateOne
 
-      Given("some datasets with title, description, name and author containing some arbitrary chosen text")
+      Given("some datasets with name, description, slug and author containing some arbitrary chosen text")
 
       pushToStore(project1, creator)
       pushToStore(project2, creator)
@@ -290,11 +290,11 @@ class DatasetsResourcesSpec
         )
       }
 
-      When("user calls the GET knowledge-graph/datasets?query=<text>&sort=title:asc")
+      When("user calls the GET knowledge-graph/datasets?query=<text>&sort=name:asc")
       val searchSortedByName =
-        knowledgeGraphClient GET s"knowledge-graph/datasets?query=${urlEncode(text.value)}&sort=title:asc"
+        knowledgeGraphClient GET s"knowledge-graph/datasets?query=${urlEncode(text.value)}&sort=name:asc"
 
-      Then("he should get OK response with some matching datasets sorted by title ASC")
+      Then("he should get OK response with some matching datasets sorted by name ASC")
       searchSortedByName.status shouldBe Ok
 
       val foundDatasetsSortedByName = searchSortedByName.jsonBody.as[List[Json]].value
@@ -303,21 +303,21 @@ class DatasetsResourcesSpec
         searchResultJson(dataset2, 1, project2.slug, foundDatasetsSortedByName),
         searchResultJson(dataset3, 1, project3.slug, foundDatasetsSortedByName),
         searchResultJson(dataset4, 2, project4.slug, foundDatasetsSortedByName)
-      ).sortBy(_.hcursor.downField("title").as[String].getOrElse(fail("No 'title' property found")))
+      ).sortBy(_.hcursor.downField("name").as[String].getOrElse(fail("No 'name' property found")))
       val datasetsSortedByNameProj4ForkSlug = List(
         searchResultJson(dataset1, 1, project1.slug, foundDatasetsSortedByName),
         searchResultJson(dataset2, 1, project2.slug, foundDatasetsSortedByName),
         searchResultJson(dataset3, 1, project3.slug, foundDatasetsSortedByName),
         searchResultJson(dataset4, 2, project4Fork.slug, foundDatasetsSortedByName)
-      ).sortBy(_.hcursor.downField("title").as[String].getOrElse(fail("No 'title' property found")))
+      ).sortBy(_.hcursor.downField("name").as[String].getOrElse(fail("No 'name' property found")))
 
       foundDatasetsSortedByName should {
         be(datasetsSortedByNameProj4Slug) or be(datasetsSortedByNameProj4ForkSlug)
       }
 
-      When("user calls the GET knowledge-graph/datasets?query=<text>&sort=title:asc&page=2&per_page=1")
+      When("user calls the GET knowledge-graph/datasets?query=<text>&sort=name:asc&page=2&per_page=1")
       val searchForPage =
-        knowledgeGraphClient GET s"knowledge-graph/datasets?query=${urlEncode(text.value)}&sort=title:asc&page=2&per_page=1"
+        knowledgeGraphClient GET s"knowledge-graph/datasets?query=${urlEncode(text.value)}&sort=name:asc&page=2&per_page=1"
 
       Then("he should get OK response with the dataset from the requested page")
       val foundDatasetsPage = searchForPage.jsonBody.as[List[Json]].value
@@ -327,7 +327,7 @@ class DatasetsResourcesSpec
       }
 
       When("user calls the GET knowledge-graph/datasets?sort=name:asc")
-      val searchWithoutPhrase = knowledgeGraphClient GET s"knowledge-graph/datasets?sort=title:asc"
+      val searchWithoutPhrase = knowledgeGraphClient GET s"knowledge-graph/datasets?sort=name:asc"
 
       Then("he should get OK response with all the datasets")
       val foundDatasetsWithoutPhrase = searchWithoutPhrase.jsonBody.as[List[Json]].value
@@ -338,14 +338,14 @@ class DatasetsResourcesSpec
           searchResultJson(dataset3, 1, project3.slug, foundDatasetsWithoutPhrase),
           searchResultJson(dataset4, 2, project4.slug, foundDatasetsWithoutPhrase),
           searchResultJson(dataset5WithoutText, 1, project5.slug, foundDatasetsWithoutPhrase)
-        ).sortBy(_.hcursor.downField("title").as[String].getOrElse(fail("No 'title' property found"))) or
+        ).sortBy(_.hcursor.downField("name").as[String].getOrElse(fail("No 'name' property found"))) or
           contain allElementsOf List(
             searchResultJson(dataset1, 1, project1.slug, foundDatasetsWithoutPhrase),
             searchResultJson(dataset2, 1, project2.slug, foundDatasetsWithoutPhrase),
             searchResultJson(dataset3, 1, project3.slug, foundDatasetsWithoutPhrase),
             searchResultJson(dataset4, 2, project4Fork.slug, foundDatasetsWithoutPhrase),
             searchResultJson(dataset5WithoutText, 1, project5.slug, foundDatasetsWithoutPhrase)
-          ).sortBy(_.hcursor.downField("title").as[String].getOrElse(fail("No 'title' property found")))
+          ).sortBy(_.hcursor.downField("name").as[String].getOrElse(fail("No 'name' property found")))
       }
 
       When("user uses the response header link with the rel='first'")
@@ -420,7 +420,7 @@ class DatasetsResourcesSpec
 
       When("user calls the GET knowledge-graph/datasets?query=<text>")
       val datasetsSearchResponse =
-        knowledgeGraphClient GET (s"knowledge-graph/datasets?query=${urlEncode(text.value)}&sort=title:asc", user.accessToken)
+        knowledgeGraphClient GET (s"knowledge-graph/datasets?query=${urlEncode(text.value)}&sort=name:asc", user.accessToken)
 
       Then("he should get OK response with some matching datasets")
       datasetsSearchResponse.status shouldBe Ok
