@@ -109,7 +109,7 @@ trait RenkuTinyTypeGenerators {
     Gen.uuid.map(_ => persons.GitLabId(Random.nextInt(100000000) + 1))
   implicit lazy val personOrcidIds: Gen[persons.OrcidId] =
     Gen
-      .choose(1000, 9999)
+      .listOfN(4, Gen.listOfN(4, Gen.frequency(8 -> Gen.numChar, 2 -> Gen.alphaChar)).map(_.mkString("")))
       .toGeneratorOfList(min = 4, max = 4)
       .map(_.mkString("https://orcid.org/", "-", ""))
       .toGeneratorOf(persons.OrcidId)

@@ -180,8 +180,11 @@ object persons {
       with EntityIdJsonLDOps[OrcidId]
       with Constraints[OrcidId]
       with NonBlank[OrcidId] {
-    private[persons] val validator      = "^https:\\/\\/orcid.org\\/(\\d{4}-\\d{4}-\\d{4}-\\d{4})$"
+
+    private[persons] val validator =
+      "^https:\\/\\/orcid.org\\/([a-zA-Z0-9]{4}-[a-zA-Z0-9]{4}-[a-zA-Z0-9]{4}-[a-zA-Z0-9]{4})$"
     private[OrcidId] val validatorRegex = validator.r
+
     addConstraint(
       check = _.trim.matches(validator),
       message = (v: String) => s"$v is not valid $typeName"
