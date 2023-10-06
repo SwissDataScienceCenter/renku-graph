@@ -391,7 +391,7 @@ class DatasetsFinderSpec
 
         val phrase = phrases.generateOne.value
         val (dataset1, project1) = publicProjectEntities
-          .addDataset(datasetEntities(provenanceInternal).modify(_.makeNameContaining(phrase)))
+          .addDataset(datasetEntities(provenanceInternal).modify(_.makeSlugContaining(phrase)))
           .generateOne
         val (dataset2, project2) = publicProjectEntities
           .addDataset(datasetEntities(provenanceInternal).modify(_.makeDescContaining(phrase)))
@@ -400,7 +400,7 @@ class DatasetsFinderSpec
           .addDataset(datasetEntities(provenanceInternal).modify(_.makeCreatorNameContaining(phrase)))
           .generateOne
         val (dataset4, project4) = publicProjectEntities
-          .addDataset(datasetEntities(provenanceInternal).modify(_.makeTitleContaining(phrase)))
+          .addDataset(datasetEntities(provenanceInternal).modify(_.makeNameContaining(phrase)))
           .generateOne
         val (dataset5, project5) = publicProjectEntities
           .addDataset(datasetEntities(provenanceInternal).modify(_.makeKeywordsContaining(phrase)))
@@ -563,7 +563,7 @@ class DatasetsFinderSpec
     s"return datasets with name, description or creator matching the given phrase sorted by $TitleProperty" in new TestCase {
       val phrase = phrases.generateOne
       val (dataset1, project1) = publicProjectEntities
-        .addDataset(datasetEntities(provenanceInternal).modify(_.makeTitleContaining(phrase.value)))
+        .addDataset(datasetEntities(provenanceInternal).modify(_.makeNameContaining(phrase.value)))
         .generateOne
 
       val (dataset2, project2) = publicProjectEntities
@@ -592,7 +592,7 @@ class DatasetsFinderSpec
     s"return datasets with name, description or creator matching the given phrase sorted by $DatePublishedProperty" in new TestCase {
       val phrase = phrases.generateOne
       val (dataset1, project1) = publicProjectEntities
-        .addDataset(datasetEntities(provenanceImportedExternal).modify(_.makeTitleContaining(phrase.value)))
+        .addDataset(datasetEntities(provenanceImportedExternal).modify(_.makeNameContaining(phrase.value)))
         .generateOne
       val (dataset2, project2) = publicProjectEntities
         .addDataset(datasetEntities(provenanceImportedExternal).modify(_.makeDescContaining(phrase.value)))
@@ -626,7 +626,7 @@ class DatasetsFinderSpec
     s"return datasets with name, description or creator matching the given phrase sorted by $DateProperty" in new TestCase {
       val phrase = phrases.generateOne
       val (dataset1, project1) = publicProjectEntities
-        .addDataset(datasetEntities(provenanceInternal).modify(_.makeTitleContaining(phrase.value)))
+        .addDataset(datasetEntities(provenanceInternal).modify(_.makeNameContaining(phrase.value)))
         .generateOne
       val (dataset2, project2) = publicProjectEntities
         .addDataset(datasetEntities(provenanceInternal).modify(_.makeDescContaining(phrase.value)))
@@ -657,7 +657,7 @@ class DatasetsFinderSpec
       val phrase = phrases.generateOne
 
       val (dataset1, project1 -> project1Fork) = publicProjectEntities
-        .addDataset(datasetEntities(provenanceInternal).modify(_.makeTitleContaining(phrase.value)))
+        .addDataset(datasetEntities(provenanceInternal).modify(_.makeNameContaining(phrase.value)))
         .forkOnce()
         .generateOne
       val (dataset2, project2 -> project2Forks) = publicProjectEntities
@@ -697,7 +697,7 @@ class DatasetsFinderSpec
     "return the requested page of datasets matching the given phrase" in new TestCase {
       val phrase = phrases.generateOne
       val (dataset1, project1) = publicProjectEntities
-        .addDataset(datasetEntities(provenanceInternal).modify(_.makeTitleContaining(phrase.value)))
+        .addDataset(datasetEntities(provenanceInternal).modify(_.makeNameContaining(phrase.value)))
         .generateOne
       val (dataset2, project2) = publicProjectEntities
         .addDataset(datasetEntities(provenanceInternal).modify(_.makeDescContaining(phrase.value)))
@@ -732,7 +732,7 @@ class DatasetsFinderSpec
     "return no results if the requested page does not exist" in new TestCase {
       val phrase = phrases.generateOne
       val (_, project1) = publicProjectEntities
-        .addDataset(datasetEntities(provenanceInternal).modify(_.makeTitleContaining(phrase.value)))
+        .addDataset(datasetEntities(provenanceInternal).modify(_.makeNameContaining(phrase.value)))
         .generateOne
       val (_, project2) = publicProjectEntities
         .addDataset(datasetEntities(provenanceInternal).modify(_.makeDescContaining(phrase.value)))

@@ -137,22 +137,22 @@ object Dataset {
   final case class Identification(
       resourceId: ResourceId,
       identifier: Identifier,
-      title:      Title,
-      name:       Name
+      name:       Name,
+      slug:       Slug
   )
 
   object Identification {
     private[Dataset] implicit lazy val encoder: Identification => Map[Property, JsonLD] = {
-      case Identification(_, identifier, title, name) =>
+      case Identification(_, identifier, name, slug) =>
         Map(
           schema / "identifier" -> identifier.asJsonLD,
-          schema / "name"       -> title.asJsonLD,
-          renku / "slug"        -> name.asJsonLD
+          schema / "name"       -> name.asJsonLD,
+          renku / "slug"        -> slug.asJsonLD
         )
     }
 
     def fromCli(dataset: CliDataset): Identification =
-      Identification(dataset.resourceId, dataset.identifier, dataset.title, dataset.name)
+      Identification(dataset.resourceId, dataset.identifier, dataset.name, dataset.slug)
   }
 
   sealed trait Provenance extends Product with Serializable {

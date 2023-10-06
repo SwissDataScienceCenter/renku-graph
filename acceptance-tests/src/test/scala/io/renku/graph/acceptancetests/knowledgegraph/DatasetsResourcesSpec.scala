@@ -219,7 +219,7 @@ class DatasetsResourcesSpec
 
       val (dataset1, testProject1) = renkuProjectEntities(visibilityPublic, creatorGen = cliShapedPersons)
         .modify(removeMembers())
-        .addDataset(datasetEntities(provenanceInternal(cliShapedPersons)).modify(_.makeTitleContaining(text)))
+        .addDataset(datasetEntities(provenanceInternal(cliShapedPersons)).modify(_.makeNameContaining(text)))
         .generateOne
       val project1 = dataProjects(testProject1).map(addMemberWithId(creator.id, Role.Owner)).generateOne
 
@@ -251,7 +251,7 @@ class DatasetsResourcesSpec
       val project5 = dataProjects(testProject5).map(addMemberWithId(creator.id, Role.Owner)).generateOne
       val (_, testProject6Private) = renkuProjectEntities(visibilityPrivate, creatorGen = cliShapedPersons)
         .modify(removeMembers())
-        .addDataset(datasetEntities(provenanceInternal(cliShapedPersons)).modify(_.makeTitleContaining(text)))
+        .addDataset(datasetEntities(provenanceInternal(cliShapedPersons)).modify(_.makeNameContaining(text)))
         .generateOne
       val project6CreatorPerson = cliShapedPersons.generateOne
       val project6Private = dataProjects(testProject6Private)
@@ -384,7 +384,7 @@ class DatasetsResourcesSpec
 
       val (dataset1, testProject1) = renkuProjectEntities(visibilityPublic, creatorGen = cliShapedPersons)
         .modify(removeMembers())
-        .addDataset(datasetEntities(provenanceInternal(cliShapedPersons)).modify(_.makeTitleContaining(text)))
+        .addDataset(datasetEntities(provenanceInternal(cliShapedPersons)).modify(_.makeNameContaining(text)))
         .generateOne
       val project1CreatorPerson = cliShapedPersons.generateOne
       val project1 = dataProjects(testProject1)
@@ -394,7 +394,7 @@ class DatasetsResourcesSpec
 
       val (_, testProject2Private) = renkuProjectEntities(visibilityPrivate, creatorGen = cliShapedPersons)
         .modify(removeMembers())
-        .addDataset(datasetEntities(provenanceInternal(cliShapedPersons)).modify(_.makeTitleContaining(text)))
+        .addDataset(datasetEntities(provenanceInternal(cliShapedPersons)).modify(_.makeNameContaining(text)))
         .generateOne
       val project2CreatorPerson = cliShapedPersons.generateOne
       val project2Private = dataProjects(testProject2Private)
@@ -405,7 +405,7 @@ class DatasetsResourcesSpec
       val (dataset3PrivateWithAccess, testProject3PrivateWithAccess) =
         renkuProjectEntities(visibilityPrivate, creatorGen = cliShapedPersons)
           .modify(removeMembers())
-          .addDataset(datasetEntities(provenanceInternal(cliShapedPersons)).modify(_.makeTitleContaining(text)))
+          .addDataset(datasetEntities(provenanceInternal(cliShapedPersons)).modify(_.makeNameContaining(text)))
           .generateOne
       val project3CreatorPerson = cliShapedPersons.generateOne
       val project3PrivateWithAccess = dataProjects(testProject3PrivateWithAccess)

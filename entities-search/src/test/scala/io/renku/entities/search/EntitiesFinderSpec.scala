@@ -111,7 +111,7 @@ class EntitiesFinderSpec
         .withActivities(activityEntities(stepPlanEntities(fixed(plans.DateCreated(projectDate)))))
         .withDatasets(
           datasetEntities(provenanceNonModified)
-            .modify(replaceDSName(datasets.Name("hello 2")))
+            .modify(replaceDSSlug(datasets.Name("hello 2")))
             .modify(replaceDSDateCreatedOrPublished(otherDate))
         )
         .generateOne
@@ -169,7 +169,7 @@ class EntitiesFinderSpec
       val dsAndProject @ _ -> dsProject = renkuProjectEntities(visibilityPublic)
         .addDataset(
           datasetEntities(provenanceNonModified).modify(
-            replaceDSName(to = sentenceContaining(query).generateAs(datasets.Name))
+            replaceDSSlug(to = sentenceContaining(query).generateAs(datasets.Name))
           )
         )
         .generateOne
@@ -995,7 +995,7 @@ class EntitiesFinderSpec
       val project = renkuProjectEntities(visibilityPublic)
         .modify(replaceProjectName(projects.Name(s"a$commonPart")))
         .withActivities(activityEntities(stepPlanEntities()))
-        .withDatasets(datasetEntities(provenanceNonModified).modify(replaceDSName(datasets.Name(s"B$commonPart"))))
+        .withDatasets(datasetEntities(provenanceNonModified).modify(replaceDSSlug(datasets.Name(s"B$commonPart"))))
         .generateOne
 
       val direction = sortingDirections.generateOne
@@ -1047,7 +1047,7 @@ class EntitiesFinderSpec
         .withActivities(activityEntities(stepPlanEntities().map(_.replacePlanName(to = plans.Name(s"smth $query")))))
         .addDataset(
           datasetEntities(provenanceNonModified)
-            .modify(replaceDSName(to = sentenceContaining(query).generateAs(datasets.Name)))
+            .modify(replaceDSSlug(to = sentenceContaining(query).generateAs(datasets.Name)))
         )
         .generateOne
       val plan :: Nil = project.plans

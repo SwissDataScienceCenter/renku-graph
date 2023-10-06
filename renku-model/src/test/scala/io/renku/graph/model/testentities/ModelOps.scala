@@ -27,7 +27,7 @@ import io.renku.generators.Generators
 import io.renku.generators.Generators.Implicits._
 import io.renku.generators.Generators._
 import io.renku.graph.model._
-import io.renku.graph.model.datasets.{DateCreated, DerivedFrom, Description, InternalSameAs, Keyword, Name, OriginalIdentifier, SameAs, Title, TopmostSameAs}
+import io.renku.graph.model.datasets.{DateCreated, DerivedFrom, Description, InternalSameAs, Keyword, Name, OriginalIdentifier, SameAs, TopmostSameAs}
 import io.renku.graph.model.images.{Image, ImageUri}
 import io.renku.graph.model.projects.ForksCount
 import io.renku.graph.model.testentities.Dataset.Provenance
@@ -347,16 +347,16 @@ trait ModelOps extends Dataset.ProvenanceOps {
 
     def modifyProvenance(f: P => P): Dataset[P] = provenanceLens[P].modify(f)(dataset)
 
-    def makeNameContaining(phrase: String): Dataset[P] = {
+    def makeSlugContaining(phrase: String): Dataset[P] = {
       val nonEmptyPhrase: Generators.NonBlank = Refined.unsafeApply(phrase)
-      replaceDSName(to = sentenceContaining(nonEmptyPhrase).map(Name.apply).generateOne)(dataset)
+      replaceDSSlug(to = sentenceContaining(nonEmptyPhrase).map(datasets.Slug.apply).generateOne)(dataset)
     }
 
-    def makeTitleContaining(phrase: String): Dataset[P] = {
+    def makeNameContaining(phrase: String): Dataset[P] = {
       val nonEmptyPhrase: Generators.NonBlank = Refined.unsafeApply(phrase)
       dataset.copy(
         identification =
-          dataset.identification.copy(title = sentenceContaining(nonEmptyPhrase).map(Title.apply).generateOne)
+          dataset.identification.copy(name = sentenceContaining(nonEmptyPhrase).map(Name.apply).generateOne)
       )
     }
 
