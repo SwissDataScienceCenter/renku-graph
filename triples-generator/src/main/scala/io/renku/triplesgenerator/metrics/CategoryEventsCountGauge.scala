@@ -38,6 +38,5 @@ private object CategoryEventsCountGauge {
           resetDataFetch = () => Async[F].pure(Map.empty)
         ) with CategoryEventsCountGauge[F]
       )
-      .flatTap(_.startZeroedValuesCleaning())
       .widen
 }
