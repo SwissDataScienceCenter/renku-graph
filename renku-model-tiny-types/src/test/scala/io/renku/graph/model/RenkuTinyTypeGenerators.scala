@@ -176,8 +176,8 @@ trait RenkuTinyTypeGenerators {
 
   implicit val datasetOriginalIdentifiers: Gen[datasets.OriginalIdentifier] =
     datasetIdentifiers map (id => datasets.OriginalIdentifier(id.toString))
-  implicit val datasetTitles: Gen[datasets.Title] = Generators.nonEmptyStrings(minLength = 4) map datasets.Title.apply
-  implicit val datasetNames:  Gen[datasets.Name]  = Generators.nonEmptyStrings(minLength = 4) map datasets.Name.apply
+  implicit val datasetSlugs: Gen[datasets.Slug] = Generators.nonEmptyStrings(minLength = 4) map datasets.Slug.apply
+  implicit val datasetNames: Gen[datasets.Name] = Generators.nonEmptyStrings(minLength = 4) map datasets.Name.apply
   implicit val datasetDescriptions: Gen[datasets.Description] =
     Generators.paragraphs() map (_.value) map datasets.Description.apply
   implicit val imageUris: Gen[ImageUri] =
