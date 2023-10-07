@@ -136,15 +136,15 @@ object Endpoint {
 
     sealed abstract class SearchProperty(override val name: String) extends Property(name)
 
-    final case object TitleProperty         extends SearchProperty("title")
+    final case object NameProperty          extends SearchProperty("name")
     final case object DateProperty          extends SearchProperty("date")
     final case object DatePublishedProperty extends SearchProperty("datePublished")
     final case object ProjectsCountProperty extends SearchProperty("projectsCount")
 
-    val default: Sorting[Sort.type] = Sorting(Sort.By(TitleProperty, io.renku.http.rest.SortBy.Direction.Asc))
+    val default: Sorting[Sort.type] = Sorting(Sort.By(NameProperty, io.renku.http.rest.SortBy.Direction.Asc))
 
     override lazy val properties: Set[SearchProperty] = Set(
-      TitleProperty,
+      NameProperty,
       DateProperty,
       DatePublishedProperty,
       ProjectsCountProperty

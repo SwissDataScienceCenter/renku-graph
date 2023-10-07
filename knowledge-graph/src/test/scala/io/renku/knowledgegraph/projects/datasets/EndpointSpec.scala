@@ -68,10 +68,9 @@ class EndpointSpec
         _ = response.contentType   shouldBe Some(`Content-Type`(MediaType.application.json))
         _ = response.headers.headers should contain allElementsOf PagingHeaders.from[ResourceUrl](pagingResponse)
 
-        _ =
-          logger.loggedOnly(
-            Warn(s"Finding '${criteria.projectSlug}' datasets finished${executionTimeRecorder.executionTimeInfo}")
-          )
+        _ = logger.loggedOnly(
+              Warn(s"Finding '${criteria.projectSlug}' datasets finished${executionTimeRecorder.executionTimeInfo}")
+            )
       } yield ()
     }
 

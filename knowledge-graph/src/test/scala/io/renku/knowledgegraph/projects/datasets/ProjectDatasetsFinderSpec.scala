@@ -63,8 +63,8 @@ class ProjectDatasetsFinderSpec
           ProjectDataset(
             modification2.identification.identifier,
             datasets.OriginalIdentifier(original.identification.identifier),
-            modification2.identification.title,
             modification2.identification.name,
+            modification2.identification.slug,
             original.provenance.date,
             datasets.DateModified(modification2.provenance.date).some,
             modification2.provenance.derivedFrom.asRight,
@@ -87,8 +87,8 @@ class ProjectDatasetsFinderSpec
           ProjectDataset(
             dataset1.identification.identifier,
             datasets.OriginalIdentifier(dataset1.identification.identifier),
-            dataset1.identification.title,
             dataset1.identification.name,
+            dataset1.identification.slug,
             dataset1.provenance.date,
             maybeDateModified = None,
             dataset1.provenance.sameAs.asLeft,
@@ -97,8 +97,8 @@ class ProjectDatasetsFinderSpec
           ProjectDataset(
             modified2.identification.identifier,
             datasets.OriginalIdentifier(dataset2.identification.identifier),
-            modified2.identification.title,
             modified2.identification.name,
+            modified2.identification.slug,
             dataset2.provenance.date,
             datasets.DateModified(modified2.provenance.date).some,
             modified2.provenance.derivedFrom.asRight,
@@ -124,8 +124,8 @@ class ProjectDatasetsFinderSpec
           ProjectDataset(
             dataset1.identification.identifier,
             datasets.OriginalIdentifier(dataset1.identification.identifier),
-            dataset1.identification.title,
             original.identification.name,
+            dataset1.identification.slug,
             dataset1.provenance.date,
             maybeDateModified = None,
             dataset1.provenance.sameAs.asLeft,
@@ -134,8 +134,8 @@ class ProjectDatasetsFinderSpec
           ProjectDataset(
             dataset2.identification.identifier,
             datasets.OriginalIdentifier(dataset2.identification.identifier),
-            dataset2.identification.title,
             original.identification.name,
+            dataset2.identification.slug,
             dataset2.provenance.date,
             maybeDateModified = None,
             dataset2.provenance.sameAs.asLeft,
@@ -162,8 +162,8 @@ class ProjectDatasetsFinderSpec
           ProjectDataset(
             dataset2.identification.identifier,
             datasets.OriginalIdentifier(dataset2.identification.identifier),
-            dataset2.identification.title,
             dataset2.identification.name,
+            dataset2.identification.slug,
             dataset2.provenance.date,
             maybeDateModified = None,
             datasets.SameAs(dataset2.provenance.topmostSameAs.value).asLeft,
@@ -197,8 +197,8 @@ class ProjectDatasetsFinderSpec
             ProjectDataset(
               ds1Modification.identification.identifier,
               datasets.OriginalIdentifier(ds1.identification.identifier),
-              ds1Modification.identification.title,
               ds1Modification.identification.name,
+              ds1Modification.identification.slug,
               ds1.provenance.date,
               datasets.DateModified(ds1Modification.provenance.date).some,
               ds1Modification.provenance.derivedFrom.asRight,
@@ -207,8 +207,8 @@ class ProjectDatasetsFinderSpec
             ProjectDataset(
               ds2Modification.identification.identifier,
               datasets.OriginalIdentifier(ds2.identification.identifier),
-              ds2Modification.identification.title,
               ds2Modification.identification.name,
+              ds2Modification.identification.slug,
               ds2.provenance.date,
               datasets.DateModified(ds2Modification.provenance.date).some,
               ds2Modification.provenance.derivedFrom.asRight,
@@ -234,8 +234,8 @@ class ProjectDatasetsFinderSpec
             ProjectDataset(
               dsImported.identification.identifier,
               datasets.OriginalIdentifier(dsImported.identification.identifier),
-              dsImported.identification.title,
               dsImported.identification.name,
+              dsImported.identification.slug,
               dsImported.provenance.date,
               maybeDateModified = None,
               dsImported.provenance.sameAs.asLeft,
@@ -244,8 +244,8 @@ class ProjectDatasetsFinderSpec
             ProjectDataset(
               dsInternal.identification.identifier,
               datasets.OriginalIdentifier(dsInternal.identification.identifier),
-              dsInternal.identification.title,
               dsInternal.identification.name,
+              dsInternal.identification.slug,
               dsInternal.provenance.date,
               maybeDateModified = None,
               datasets.SameAs(dsInternal.provenance.topmostSameAs.value).asLeft,
@@ -254,8 +254,8 @@ class ProjectDatasetsFinderSpec
             ProjectDataset(
               dsOrigModification.identification.identifier,
               datasets.OriginalIdentifier(dsOrig.identification.identifier),
-              dsOrigModification.identification.title,
               dsOrigModification.identification.name,
+              dsOrigModification.identification.slug,
               dsOrig.provenance.date,
               datasets.DateModified(dsOrigModification.provenance.date).some,
               dsOrigModification.provenance.derivedFrom.asRight,
@@ -276,8 +276,8 @@ class ProjectDatasetsFinderSpec
       ProjectDataset(
         ds1.identification.identifier,
         datasets.OriginalIdentifier(ds1.identification.identifier),
-        ds1.identification.title,
         ds1.identification.name,
+        ds1.identification.slug,
         ds1.provenance.date,
         maybeDateModified = None,
         ds1.provenance.sameAs.asLeft,
@@ -286,14 +286,14 @@ class ProjectDatasetsFinderSpec
       ProjectDataset(
         ds2.identification.identifier,
         datasets.OriginalIdentifier(ds2.identification.identifier),
-        ds2.identification.title,
         ds2.identification.name,
+        ds2.identification.slug,
         ds2.provenance.date,
         maybeDateModified = None,
         datasets.SameAs(ds2.provenance.topmostSameAs.value).asLeft,
         ds2.additionalInfo.images
       )
-    ).sortBy(_.title.value.toLowerCase)
+    ).sortBy(_.slug.value.toLowerCase)
 
     provisionTestProject(project) >>
       datasetsFinder
@@ -319,8 +319,8 @@ class ProjectDatasetsFinderSpec
             ProjectDataset(
               dataset1.identification.identifier,
               datasets.OriginalIdentifier(dataset1.identification.identifier),
-              dataset1.identification.title,
               dataset1.identification.name,
+              dataset1.identification.slug,
               dataset1.provenance.date,
               maybeDateModified = None,
               dataset1.provenance.sameAs.asLeft,
@@ -329,14 +329,14 @@ class ProjectDatasetsFinderSpec
             ProjectDataset(
               modified2.identification.identifier,
               datasets.OriginalIdentifier(dataset2.identification.identifier),
-              modified2.identification.title,
               modified2.identification.name,
+              modified2.identification.slug,
               dataset2.provenance.date,
               datasets.DateModified(modified2.provenance.date).some,
               modified2.provenance.derivedFrom.asRight,
               modified2.additionalInfo.images
             )
-          ).sortBy(_.title.value.toLowerCase).slice(1, 2)
+          ).sortBy(_.slug.value.toLowerCase).slice(1, 2)
         }
   }
 

@@ -27,8 +27,8 @@ private object Generators {
   implicit lazy val projectDatasetGen: Gen[ProjectDataset] = for {
     id                  <- datasetIdentifiers
     originalIdentifier  <- datasetOriginalIdentifiers
-    title               <- datasetTitles
     name                <- datasetNames
+    slug                <- datasetSlugs
     sameAsOrDerivedFrom <- Gen.either(datasetSameAs, datasetDerivedFroms)
     createdOrPublished  <- datasetCreatedOrPublished
     maybeDateModified <- sameAsOrDerivedFrom.fold(
@@ -38,8 +38,8 @@ private object Generators {
     images <- imageUris.toGeneratorOfList()
   } yield ProjectDataset(id,
                          originalIdentifier,
-                         title,
                          name,
+                         slug,
                          createdOrPublished,
                          maybeDateModified,
                          sameAsOrDerivedFrom,
