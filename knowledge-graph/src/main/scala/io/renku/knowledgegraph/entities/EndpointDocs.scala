@@ -72,7 +72,7 @@ private class EndpointDocsImpl()(implicit gitLabUrl: GitLabUrl, renkuApiUrl: ren
   private lazy val query = Parameter.Query(
     "query",
     Schema.String,
-    "to filter by matching value in name/title, namespace, creator, keyword and description".some,
+    "to filter by matching value in name/slug, namespace, creator, keyword and description".some,
     required = false
   )
   private lazy val `type` = Parameter.Query(

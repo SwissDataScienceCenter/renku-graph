@@ -413,7 +413,7 @@ class DatasetsResourcesSpec
         .map(addMemberWithId(user.id, Role.Maintainer) >>> addMemberFrom(project3CreatorPerson, creator.id, Role.Owner))
         .generateOne
 
-      Given("some datasets with title, description, name and author containing some arbitrary chosen text")
+      Given("some datasets with slug, description, name and author containing some arbitrary chosen text")
       pushToStore(project1, creator)
       pushToStore(project2Private, creator)
       pushToStore(project3PrivateWithAccess, creator)

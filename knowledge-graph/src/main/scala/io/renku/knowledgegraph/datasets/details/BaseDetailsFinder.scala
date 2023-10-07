@@ -299,9 +299,9 @@ private object BaseDetailsFinderImpl {
         keywords = List.empty,
         images = List.empty
       ).asRight[DecodingFailure]
-    case (requestedDS, _, title, _, _, _, _, _, _, _, _) =>
+    case (requestedDS, _, name, _, _, _, _, _, _, _, _) =>
       DecodingFailure(
-        show"'$title' dataset with id '$requestedDS' does not meet validation for modified nor non-modified dataset",
+        show"'$name' dataset with id '$requestedDS' does not meet validation for modified nor non-modified dataset",
         Nil
       ).asLeft[Dataset]
   }
