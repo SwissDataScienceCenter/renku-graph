@@ -16,7 +16,8 @@
  * limitations under the License.
  */
 
-package io.renku.entities.searchgraphs.projects
+package io.renku.entities.searchgraphs
+package projects
 package commands
 
 import cats.syntax.all._
@@ -54,9 +55,40 @@ private object Encoders {
       searchInfoQuad(ProjectSearchInfoOntology.keywordsProperty.id, k.asObject)
     }
 
+    val maybeKeywordsConcatQuad =
+      info.keywords match {
+        case Nil => Option.empty[Quad]
+        case keys =>
+          searchInfoQuad(
+            ProjectSearchInfoOntology.keywordsConcatProperty.id,
+            keys.distinct.tail
+              .foldLeft(new StringBuilder(keys.head.value))((acc, k) => acc.append(concatSeparator).append(k.value))
+              .result()
+              .asTripleObject
+          ).some
+      }
+
     val imagesQuads = info.images.toSet.flatMap { (i: Image) =>
       i.asQuads + searchInfoQuad(ProjectSearchInfoOntology.imageProperty, i.resourceId.asEntityId)
     }
+
+    val maybeImagesConcatQuad =
+      info.images match {
+        case Nil => Option.empty[Quad]
+        case images =>
+          def appendImage(builder: StringBuilder)(image: Image): StringBuilder =
+            builder.append(image.position.value).append(":").append(image.uri.value)
+
+          searchInfoQuad(
+            ProjectSearchInfoOntology.imagesConcatProperty.id,
+            images.tail
+              .foldLeft(appendImage(new StringBuilder)(images.head))((acc, i) =>
+                appendImage(acc.append(concatSeparator))(i)
+              )
+              .result()
+              .asTripleObject
+          ).some
+      }
 
     Set(
       searchInfoQuad(rdf / "type", ProjectSearchInfoOntology.typeDef.clazz.id).some,
@@ -66,6 +98,8 @@ private object Encoders {
       searchInfoQuad(ProjectSearchInfoOntology.visibilityProperty.id, info.visibility.asObject).some,
       searchInfoQuad(ProjectSearchInfoOntology.dateCreatedProperty.id, info.dateCreated.asObject).some,
       searchInfoQuad(ProjectSearchInfoOntology.dateModifiedProperty.id, info.dateModified.asObject).some,
+      maybeKeywordsConcatQuad,
+      maybeImagesConcatQuad,
       maybeDescriptionQuad
     ).flatten ++ creatorQuads ++ keywordsQuads ++ imagesQuads
   }
