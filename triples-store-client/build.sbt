@@ -23,6 +23,7 @@ libraryDependencies ++=
   Dependencies.jsonld4s ++
     Dependencies.luceneQueryParser ++
     Dependencies.luceneAnalyzer ++
+    Dependencies.fs2Core ++
     Dependencies.rdf4jQueryParserSparql ++
     Dependencies.http4sClient ++
     Dependencies.http4sCirce

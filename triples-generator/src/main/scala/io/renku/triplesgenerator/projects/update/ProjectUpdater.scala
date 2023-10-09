@@ -24,7 +24,7 @@ import cats.syntax.all._
 import io.renku.graph.model.projects
 import io.renku.lock.Lock
 import io.renku.lock.syntax._
-import io.renku.triplesgenerator.TgLockDB.TsWriteLock
+import io.renku.triplesgenerator.TgDB.TsWriteLock
 import io.renku.triplesgenerator.api.ProjectUpdates
 import io.renku.triplesgenerator.projects.ProjectExistenceChecker
 import io.renku.triplesstore.{ProjectsConnectionConfig, SparqlQueryTimeRecorder, TSClient}

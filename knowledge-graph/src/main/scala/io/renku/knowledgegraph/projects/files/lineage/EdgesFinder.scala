@@ -22,17 +22,17 @@ import cats.effect._
 import cats.syntax.all._
 import eu.timepit.refined.auto._
 import io.renku.graph.config.RenkuUrlLoader
+import io.renku.graph.model.RenkuUrl
 import io.renku.graph.model.Schemas._
-import io.renku.graph.model.entities.Person
-import io.renku.graph.model.projects.{Slug, ResourceId, Visibility}
+import io.renku.graph.model.projects.{ResourceId, Slug, Visibility}
 import io.renku.graph.model.views.RdfResource
-import io.renku.graph.model.{GraphClass, RenkuUrl}
 import io.renku.http.server.security.model.AuthUser
 import io.renku.jsonld.EntityId
+import io.renku.knowledgegraph.projects.files.lineage.model.Node.Location
+import io.renku.knowledgegraph.projects.files.lineage.model._
+import io.renku.projectauth.util.SparqlSnippets
 import io.renku.triplesstore.SparqlQuery.Prefixes
 import io.renku.triplesstore._
-import model.Node.Location
-import model._
 import org.typelevel.log4cats.Logger
 
 private trait EdgesFinder[F[_]] {
@@ -143,23 +143,12 @@ private class EdgesFinderImpl[F[_]: Async: Logger: SparqlQueryTimeRecorder](
     case _                                       => false
   }
 
-  private def projectMemberFilterQuery(projectResourceId: String): Option[AuthUser] => String = {
-    case Some(user) =>
-      s"""|$projectResourceId renku:projectVisibility ?visibility .
-          |OPTIONAL {
-          |  $projectResourceId schema:member ?memberId
-          |  GRAPH <${GraphClass.Persons.id}> {
-          |    ?memberId schema:sameAs ?sameAsId.
-          |    ?sameAsId schema:additionalType '${Person.gitLabSameAsAdditionalType}';
-          |              schema:identifier ?userGitlabId .
-          |  }
-          |}
-          |FILTER ( ?visibility != '${Visibility.Private.value}' || ?userGitlabId = ${user.id.value} )
-          |""".stripMargin
-    case _ =>
-      s"""|$projectResourceId renku:projectVisibility ?visibility .
-          |FILTER(?visibility = '${Visibility.Public.value}')
-          |""".stripMargin
+  private def projectMemberFilterQuery(projectResourceId: String): Option[AuthUser] => String = { user =>
+    s"""
+       |BIND($projectResourceId as ${SparqlSnippets.default.projectId.name})
+       |${SparqlSnippets.default.visibleProjects(user.map(_.id), Visibility.all).sparql}
+       |""".stripMargin
+
   }
 }
 

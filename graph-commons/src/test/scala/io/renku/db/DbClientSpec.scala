@@ -20,61 +20,104 @@ package io.renku.db
 
 import cats.data.Kleisli
 import cats.effect.{IO, Resource}
+import cats.syntax.all._
 import com.dimafeng.testcontainers.{ForAllTestContainer, PostgreSQLContainer}
 import eu.timepit.refined.auto._
-import io.renku.db.TestDbConfig.newDbConfig
-import io.renku.metrics.{LabeledHistogram, TestLabeledHistogram}
-import io.renku.testtools.IOSpec
+import io.renku.db.TestDbConfig.create
+import io.renku.db.syntax.QueryDef
+import io.renku.metrics.LabeledHistogram
+import io.renku.testtools.CustomAsyncIOSpec
 import natchez.Trace.Implicits.noop
+import org.scalamock.scalatest.AsyncMockFactory
 import org.scalatest.Suite
 import org.scalatest.matchers.should
-import org.scalatest.wordspec.AnyWordSpec
+import org.scalatest.wordspec.AsyncWordSpec
 import skunk._
 import skunk.codec.all._
 import skunk.implicits._
 
-class DbClientSpec extends AnyWordSpec with IOSpec with should.Matchers with ContainerTestDb {
+import scala.concurrent.duration.FiniteDuration
 
-  "measureExecutionTime" should {
+class DbClientSpec
+    extends AsyncWordSpec
+    with CustomAsyncIOSpec
+    with should.Matchers
+    with ContainerTestDb
+    with AsyncMockFactory {
+
+  "measureExecutionTime(SqlStatement)" should {
 
     "execute the query and do nothing if no histogram given" in {
       val result = 1
       new TestDbClient(maybeHistogram = None)
-        .executeQuery(expected = result)(sessionPoolResource)
-        .unsafeRunSync() shouldBe result
+        .executeQuery(query(queryName, returning = result))
+        .asserting(_ shouldBe result)
     }
 
     "execute the query and measure execution time with the given histogram" in {
 
-      val histogram = TestLabeledHistogram[SqlStatement.Name]("query_id")
+      val histogram = mock[LabeledHistogram[IO]]
+      val dbClient  = new TestDbClient(histogram.some)
 
-      val dbClient = new TestDbClient(maybeHistogram = Some(histogram))
+      (histogram
+        .observe(_: String, _: FiniteDuration))
+        .expects(queryName.value, *)
+        .returning(().pure[IO])
 
       val result = 1
-      dbClient.executeQuery(expected = result)(sessionPoolResource).unsafeRunSync() shouldBe result
 
-      histogram.verifyExecutionTimeMeasured(forLabelValue = dbClient.queryName)
+      dbClient.executeQuery(query(queryName, returning = result)).asserting(_ shouldBe result)
     }
   }
-}
 
-private class TestDbClient(maybeHistogram: Option[LabeledHistogram[IO]]) extends DbClient(maybeHistogram) {
-  val queryName: SqlStatement.Name = "some_id"
+  "measureExecutionTime(Kleisli)" should {
 
-  private def query(expected: Int) = SqlStatement[IO, Int](Kleisli { session =>
-                                                             val query: Query[Int, Int] =
-                                                               sql"""select $int4;""".query(int4)
-                                                             session.prepare(query).flatMap { pq =>
-                                                               pq.unique(expected)
-                                                             }
-                                                           },
-                                                           queryName
+    "execute the query and do nothing if no histogram given" in {
+      val result = 1
+      new TestDbClient(maybeHistogram = None)
+        .executeQuery(queryName.value, QueryDef[IO, Int](query(queryName, returning = result).queryExecution.run))
+        .asserting(_ shouldBe result)
+    }
+
+    "execute the query and measure execution time with the given histogram" in {
+
+      val histogram = mock[LabeledHistogram[IO]]
+      val dbClient  = new TestDbClient(maybeHistogram = Some(histogram))
+      (histogram
+        .observe(_: String, _: FiniteDuration))
+        .expects(queryName.value, *)
+        .returning(().pure[IO])
+
+      val result = 1
+
+      dbClient
+        .executeQuery(queryName, QueryDef[IO, Int](query(queryName, returning = result).queryExecution.run))
+        .asserting(_ shouldBe result)
+    }
+  }
+
+  private lazy val queryName: SqlStatement.Name = "some_id"
+
+  private def query(name: SqlStatement.Name, returning: Int) = SqlStatement[IO, Int](
+    QueryDef[IO, Int] { session =>
+      val query: Query[Int, Int] = sql"""select $int4;""".query(int4)
+      session.prepare(query).flatMap(_.unique(returning))
+    },
+    name
   )
 
-  def executeQuery(expected: Int)(sessionPoolResource: Resource[IO, Resource[IO, Session[IO]]]): IO[Int] =
-    sessionPoolResource.use {
-      _.use(session => measureExecutionTime[Int](query(expected))(session))
-    }
+  private class TestDbClient(maybeHistogram: Option[LabeledHistogram[IO]]) extends DbClient(maybeHistogram) {
+
+    def executeQuery(query: SqlStatement[IO, Int]): IO[Int] =
+      sessionPoolResource.use {
+        _.use(session => measureExecutionTime[Int](query)(session))
+      }
+
+    def executeQuery(name: String, query: Kleisli[IO, Session[IO], Int]): IO[Int] =
+      sessionPoolResource.use {
+        _.use(session => measureExecutionTime[Int](name, query)(session))
+      }
+  }
 }
 
 trait ContainerTestDb extends ForAllTestContainer {
@@ -82,7 +125,7 @@ trait ContainerTestDb extends ForAllTestContainer {
 
   private trait TestDB
 
-  private val dbConfig: DBConfigProvider.DBConfig[TestDB] = newDbConfig[TestDB]
+  private val dbConfig: DBConfigProvider.DBConfig[TestDB] = create[TestDB]
 
   override val container: PostgreSQLContainer = PostgresContainer.container(dbConfig)
 

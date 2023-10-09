@@ -29,7 +29,7 @@ import io.renku.graph.tokenrepository.AccessTokenFinder
 import io.renku.http.client.GitLabClient
 import io.renku.metrics.MetricsRegistry
 import io.renku.triplesgenerator.Microservice
-import io.renku.triplesgenerator.TgLockDB.TsWriteLock
+import io.renku.triplesgenerator.TgDB.TsWriteLock
 import io.renku.triplesgenerator.events.consumers.tsmigrationrequest.migrations.reprovisioning.ReProvisioningStatus
 import io.renku.triplesstore.{ProjectSparqlClient, SparqlQueryTimeRecorder}
 import org.typelevel.log4cats.Logger

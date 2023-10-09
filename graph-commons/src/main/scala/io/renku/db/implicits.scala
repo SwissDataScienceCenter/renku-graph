@@ -21,7 +21,9 @@ package io.renku.db
 import cats.effect.kernel.Async
 import skunk.PreparedQuery
 
-object implicits {
+object implicits extends implicits
+
+trait implicits {
 
   implicit class PreparedQueryOps[F[_], In, Out](preparedQuery: PreparedQuery[F, In, Out]) {
 
