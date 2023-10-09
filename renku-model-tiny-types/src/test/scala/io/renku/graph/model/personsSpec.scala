@@ -209,7 +209,10 @@ class OrcidIdSpec extends AnyWordSpec with ScalaCheckPropertyChecks with should.
   "id" should {
 
     "return the 'xxxx-xxxx-xxxx-xxxx' part of the full 'https://renku/orcid/xxxx-xxxx-xxxx-xxxx'" in {
-      val id = Gen.listOfN(4, Gen.listOfN(4, Gen.choose(0, 9)).map(_.mkString(""))).generateOne.mkString("-")
+      val id = Gen
+        .listOfN(4, Gen.listOfN(4, Gen.frequency(8 -> numChar, 2 -> alphaChar)).map(_.mkString("")))
+        .generateOne
+        .mkString("-")
       OrcidId(s"https://orcid.org/$id").id shouldBe id
     }
   }

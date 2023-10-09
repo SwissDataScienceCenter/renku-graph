@@ -11,24 +11,24 @@ charts:
       token-repository:
         contextPath: .
         dockerfilePath: token-repository/Dockerfile
-        valuesPath: tokenRepository.image
+        valuesPath: graph.tokenRepository.image
       webhook-service:
         contextPath: .
         dockerfilePath: webhook-service/Dockerfile
-        valuesPath: webhookService.image
+        valuesPath: graph.webhookService.image
       triples-generator:
         contextPath: .
         dockerfilePath: triples-generator/Dockerfile
-        valuesPath: triplesGenerator.image
+        valuesPath: graph.triplesGenerator.image
       knowledge-graph:
         contextPath: .
         dockerfilePath: knowledge-graph/Dockerfile
-        valuesPath: knowledgeGraph.image
+        valuesPath: graph.knowledgeGraph.image
       event-log:
         contextPath: .
         dockerfilePath: event-log/Dockerfile
-        valuesPath: eventLog.image
+        valuesPath: graph.eventLog.image
       commit-event-service:
         contextPath: .
         dockerfilePath: commit-event-service/Dockerfile
-        valuesPath: commitEventService.image
+        valuesPath: graph.commitEventService.image

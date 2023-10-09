@@ -21,6 +21,7 @@ package io.renku.knowledgegraph.projects.details
 import Converters._
 import cats.effect.IO
 import cats.syntax.all._
+import io.renku.entities.searchgraphs.SearchInfoDatasets
 import io.renku.generators.CommonGraphGenerators.authUsers
 import io.renku.generators.Generators.Implicits._
 import io.renku.graph.model.projects.Visibility
@@ -34,6 +35,7 @@ import org.scalacheck.Gen
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
 import org.scalatestplus.scalacheck.ScalaCheckPropertyChecks
+import org.typelevel.log4cats.Logger
 
 class KGProjectFinderSpec
     extends AnyWordSpec
@@ -41,14 +43,17 @@ class KGProjectFinderSpec
     with EntitiesGenerators
     with InMemoryJenaForSpec
     with ProjectsDataset
+    with SearchInfoDatasets
     with ScalaCheckPropertyChecks
     with IOSpec {
+
+  implicit override val ioLogger: Logger[IO] = TestLogger[IO]()
 
   "findProject" should {
 
     "return details of the project with the given slug when there's no parent" in new TestCase {
       forAll(Gen.oneOf(renkuProjectEntities(anyVisibility), nonRenkuProjectEntities(anyVisibility))) { project =>
-        upload(to = projectsDataset, anyProjectEntities.generateOne, project)
+        provisionTestProjects(anyProjectEntities.generateOne, project).unsafeRunSync()
 
         kgProjectFinder.findProject(project.slug, authUsers.generateOption).unsafeRunSync() shouldBe
           project.to(kgProjectConverter).some
@@ -59,7 +64,7 @@ class KGProjectFinderSpec
       forAll(
         Gen.oneOf(renkuProjectWithParentEntities(visibilityPublic), nonRenkuProjectWithParentEntities(visibilityPublic))
       ) { project =>
-        upload(to = projectsDataset, project, project.parent)
+        provisionTestProjects(project, project.parent).unsafeRunSync()
 
         kgProjectFinder.findProject(project.slug, authUsers.generateOption).unsafeRunSync() shouldBe
           project.to(kgProjectConverter).some
@@ -79,7 +84,7 @@ class KGProjectFinderSpec
 
       val parent = replaceMembers(Set(userAsMember))(project.parent)
 
-      upload(to = projectsDataset, project, parent)
+      provisionTestProjects(project, parent).unsafeRunSync()
 
       kgProjectFinder.findProject(project.slug, user.some).unsafeRunSync() shouldBe
         project.to(kgProjectConverter).some
@@ -99,7 +104,7 @@ class KGProjectFinderSpec
 
         val parent = (replaceVisibility[Project](to = Visibility.Private) andThen removeMembers())(project.parent)
 
-        upload(to = projectsDataset, project, parent)
+        provisionTestProjects(project, parent).unsafeRunSync()
 
         kgProjectFinder.findProject(project.slug, Some(user)).unsafeRunSync() shouldBe Some {
           project.to(kgProjectConverter).copy(maybeParent = None)

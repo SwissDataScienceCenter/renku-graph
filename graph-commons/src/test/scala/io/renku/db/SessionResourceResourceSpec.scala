@@ -40,7 +40,7 @@ class SessionResourceResourceSpec extends AnyWordSpec with IOSpec with MockFacto
     import natchez.Trace.Implicits.noop
     trait TestDB
     val transactedBlock  = mockFunction[SessionResource[IO, TestDB], IO[Unit]]
-    val dbConfig         = TestDbConfig.newDbConfig[TestDB]
+    val dbConfig         = TestDbConfig.create[TestDB]
     val ssessionResource = SessionPoolResource[IO, TestDB](dbConfig)
   }
 }

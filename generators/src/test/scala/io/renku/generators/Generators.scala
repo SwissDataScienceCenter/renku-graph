@@ -336,7 +336,7 @@ object Generators {
   }
 
   def countingGen = {
-    var cnt: Int = 0
+    var cnt: Long = 0
     Gen.double.map { _ =>
       cnt += 1
       cnt

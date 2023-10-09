@@ -27,7 +27,7 @@ import io.renku.events.{CategoryName, consumers}
 import io.renku.graph.model.RenkuUrl
 import io.renku.metrics.MetricsRegistry
 import io.renku.lock.syntax._
-import io.renku.triplesgenerator.TgLockDB.TsWriteLock
+import io.renku.triplesgenerator.TgDB.TsWriteLock
 import io.renku.triplesgenerator.api.events.CleanUpEvent
 import io.renku.triplesgenerator.events.consumers.TSReadinessForEventsChecker
 import io.renku.triplesgenerator.events.consumers.tsmigrationrequest.migrations.reprovisioning.ReProvisioningStatus

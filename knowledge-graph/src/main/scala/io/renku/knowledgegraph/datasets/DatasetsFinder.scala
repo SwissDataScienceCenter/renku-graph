@@ -18,8 +18,6 @@
 
 package io.renku.knowledgegraph.datasets
 
-import Endpoint.Query.Phrase
-import Endpoint.Sort
 import cats.Parallel
 import cats.effect.Async
 import cats.syntax.all._
@@ -27,21 +25,23 @@ import eu.timepit.refined.auto._
 import io.circe.DecodingFailure
 import io.circe.literal._
 import io.renku.graph.config.RenkuUrlLoader
-import io.renku.graph.model.{projects, GraphClass, RenkuUrl}
 import io.renku.graph.model.Schemas._
 import io.renku.graph.model.datasets.{DateCreated, DatePublished, Description, Identifier, Keyword, Name, Title}
-import io.renku.graph.model.entities.Person
 import io.renku.graph.model.images.ImageUri
 import io.renku.graph.model.projects.Visibility
+import io.renku.graph.model.{GraphClass, RenkuUrl, projects}
 import io.renku.http.rest.Sorting
-import io.renku.http.rest.paging.{Paging, PagingRequest, PagingResponse}
 import io.renku.http.rest.paging.Paging.PagedResultsFinder
+import io.renku.http.rest.paging.{Paging, PagingRequest, PagingResponse}
 import io.renku.http.server.security.model.AuthUser
 import io.renku.knowledgegraph.datasets.DatasetSearchResult.ExemplarProject
-import io.renku.triplesstore._
+import io.renku.knowledgegraph.datasets.Endpoint.Query.Phrase
+import io.renku.knowledgegraph.datasets.Endpoint.Sort
+import io.renku.projectauth.util.SparqlSnippets
 import io.renku.triplesstore.SparqlQuery.Prefixes
+import io.renku.triplesstore._
 import io.renku.triplesstore.client.model.OrderBy
-import io.renku.triplesstore.client.sparql.SparqlEncoder
+import io.renku.triplesstore.client.sparql.{SparqlEncoder, VarName}
 import org.typelevel.log4cats.Logger
 
 private trait DatasetsFinder[F[_]] {
@@ -120,10 +120,10 @@ private class DatasetsFinderImpl[F[_]: Parallel: Async: Logger: SparqlQueryTimeR
           |                    a schema:Dataset
           |            }
           |          }
+          |          ${projectMemberFilterQuery(maybeUser)}
           |          GRAPH ?projectId {
           |            ?dsId renku:topmostSameAs ?sameAs;
           |                  ^renku:hasDataset ?projectId.
-          |            ${projectMemberFilterQuery(maybeUser)}
           |            OPTIONAL {
           |              ?childDsId prov:wasDerivedFrom/schema:url ?dsId;
           |                         ^renku:hasDataset ?childProjectId.
@@ -172,23 +172,8 @@ private class DatasetsFinderImpl[F[_]: Parallel: Async: Logger: SparqlQueryTimeR
           |""".stripMargin
     )
 
-  private lazy val projectMemberFilterQuery: Option[AuthUser] => String = {
-    case Some(user) =>
-      s"""|?projectId renku:projectVisibility ?visibility .
-          |OPTIONAL { 
-          |    ?projectId schema:member ?memberId.
-          |    GRAPH <${GraphClass.Persons.id}> {
-          |      ?memberId schema:sameAs ?memberSameAs.
-          |      ?memberSameAs schema:additionalType '${Person.gitLabSameAsAdditionalType}';
-          |                    schema:identifier ?userGitlabId
-          |    }
-          |}
-          |FILTER (?visibility != '${Visibility.Private.value}' || ?userGitlabId = ${user.id.value})
-          |""".stripMargin
-    case _ =>
-      s"""|?projectId renku:projectVisibility ?visibility .
-          |FILTER (?visibility = '${Visibility.Public.value}')
-          |""".stripMargin
+  private lazy val projectMemberFilterQuery: Option[AuthUser] => String = { user =>
+    SparqlSnippets(VarName("projectId")).visibleProjects(user.map(_.id), Visibility.all).sparql
   }
 
   private def `ORDER BY`(sort: Sorting[Endpoint.Sort.type])(implicit encoder: SparqlEncoder[OrderBy]): String = {

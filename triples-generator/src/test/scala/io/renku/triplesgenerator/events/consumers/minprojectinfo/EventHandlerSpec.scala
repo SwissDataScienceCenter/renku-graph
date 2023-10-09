@@ -34,7 +34,7 @@ import io.renku.graph.model.projects
 import io.renku.interpreters.TestLogger
 import io.renku.lock.Lock
 import io.renku.testtools.IOSpec
-import io.renku.triplesgenerator.TgLockDB.TsWriteLock
+import io.renku.triplesgenerator.TgDB.TsWriteLock
 import io.renku.triplesgenerator.events.consumers.TSReadinessForEventsChecker
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.EitherValues

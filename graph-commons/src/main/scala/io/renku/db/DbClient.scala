@@ -30,14 +30,19 @@ abstract class DbClient[F[_]: Monad: Clock](maybeHistogram: Option[LabeledHistog
 
   protected def measureExecutionTime[ResultType](
       query: SqlStatement[F, ResultType]
+  ): Kleisli[F, Session[F], ResultType] =
+    measureExecutionTime(query.name.value, query.queryExecution)
+
+  protected def measureExecutionTime[ResultType](
+      name:  String,
+      query: Kleisli[F, Session[F], ResultType]
   ): Kleisli[F, Session[F], ResultType] = Kleisli { session =>
     maybeHistogram match {
-      case None =>
-        query.queryExecution.run(session)
+      case None => query.run(session)
       case Some(histogram) =>
         Clock[F]
-          .timed(query.queryExecution.run(session))
-          .flatMap { case (duration, result) => histogram.observe(query.name.value, duration).as(result) }
+          .timed(query.run(session))
+          .flatMap { case (duration, result) => histogram.observe(name, duration).as(result) }
     }
   }
 
