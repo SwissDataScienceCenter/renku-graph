@@ -293,7 +293,7 @@ class ProjectDatasetsFinderSpec
         datasets.SameAs(ds2.provenance.topmostSameAs.value).asLeft,
         ds2.additionalInfo.images
       )
-    ).sortBy(_.slug.value.toLowerCase)
+    ).sortBy(_.name.value.toLowerCase)
 
     provisionTestProject(project) >>
       datasetsFinder
@@ -336,7 +336,7 @@ class ProjectDatasetsFinderSpec
               modified2.provenance.derivedFrom.asRight,
               modified2.additionalInfo.images
             )
-          ).sortBy(_.slug.value.toLowerCase).slice(1, 2)
+          ).sortBy(_.name.value.toLowerCase).slice(1, 2)
         }
   }
 
