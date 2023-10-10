@@ -26,7 +26,7 @@ object Dependencies {
     val luceneQueryParser      = "9.8.0"
     val owlapi                 = "5.5.0"
     val pureconfig             = "0.17.4"
-    val rdf4jQueryParserSparql = "4.3.6"
+    val rdf4jQueryParserSparql = "4.3.7"
     val refined                = "0.11.0"
     val refinedPureconfig      = "0.11.0"
     val scalacheck             = "1.17.0"
