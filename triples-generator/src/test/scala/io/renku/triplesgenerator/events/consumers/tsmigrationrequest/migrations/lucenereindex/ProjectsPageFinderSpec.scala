@@ -55,7 +55,7 @@ class ProjectsPageFinderSpec
         .sorted
 
       slugs foreach (slug =>
-        runUpdate(on = migrationsDataset, BacklogCreator.asToBeMigratedInserts(slug)).unsafeRunSync()
+        runUpdate(on = migrationsDataset, BacklogCreator.asToBeMigratedInserts(migrationName, slug)).unsafeRunSync()
       )
 
       val (page1, page2) = slugs splitAt pageSize
@@ -74,7 +74,7 @@ class ProjectsPageFinderSpec
     implicit val renkuUrl:             RenkuUrl                    = renkuUrls.generateOne
     private implicit val logger:       TestLogger[IO]              = TestLogger[IO]()
     private implicit val timeRecorder: SparqlQueryTimeRecorder[IO] = TestSparqlQueryTimeRecorder[IO].unsafeRunSync()
-    val finder        = new ProjectsPageFinderImpl[IO](RecordsFinder[IO](migrationsDSConnectionInfo))
-    val donePersister = new ProjectDonePersisterImpl[IO](TSClient[IO](migrationsDSConnectionInfo))
+    val finder        = new ProjectsPageFinderImpl[IO](migrationName, RecordsFinder[IO](migrationsDSConnectionInfo))
+    val donePersister = new ProjectDonePersisterImpl[IO](migrationName, TSClient[IO](migrationsDSConnectionInfo))
   }
 }

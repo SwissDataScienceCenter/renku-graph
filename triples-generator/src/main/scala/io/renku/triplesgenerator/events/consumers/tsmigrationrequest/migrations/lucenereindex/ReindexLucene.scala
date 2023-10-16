@@ -34,6 +34,7 @@ import org.typelevel.log4cats.Logger
 import tooling._
 
 private class ReindexLucene[F[_]: Async: Logger](
+    migrationName:        Migration.Name,
     backlogCreator:       BacklogCreator[F],
     projectsFinder:       ProjectsPageFinder[F],
     progressFinder:       ProgressFinder[F],
@@ -42,7 +43,7 @@ private class ReindexLucene[F[_]: Async: Logger](
     projectDonePersister: ProjectDonePersister[F],
     executionRegister:    MigrationExecutionRegister[F],
     recoveryStrategy:     RecoverableErrorsRecovery = RecoverableErrorsRecovery
-) extends RegisteredMigration[F](ReindexLucene.name, executionRegister, recoveryStrategy) {
+) extends RegisteredMigration[F](migrationName, executionRegister, recoveryStrategy) {
 
   private val applicative = Applicative[F]
   import applicative.whenA
@@ -79,21 +80,22 @@ private class ReindexLucene[F[_]: Async: Logger](
   }
 
   private def logInfo(message: String, progressInfo: String): F[Unit] =
-    Logger[F].info(show"${ReindexLucene.name} - $progressInfo - $message")
+    Logger[F].info(show"$name - $progressInfo - $message")
 }
 
 private[migrations] object ReindexLucene {
-  val name: Migration.Name = Migration.Name("Reindex Lucene")
 
-  def apply[F[_]: Async: Logger: MetricsRegistry: SparqlQueryTimeRecorder]: F[Migration[F]] = for {
-    backlogCreator       <- BacklogCreator[F]
-    projectsFinder       <- ProjectsPageFinder[F]
-    progressFinder       <- ProgressFinder[F]
+  def apply[F[_]: Async: Logger: MetricsRegistry: SparqlQueryTimeRecorder](suffix: String): F[Migration[F]] = for {
+    migrationName        <- Migration.Name(s"Reindex Lucene $suffix").pure[F]
+    backlogCreator       <- BacklogCreator[F](migrationName)
+    projectsFinder       <- ProjectsPageFinder[F](migrationName)
+    progressFinder       <- ProgressFinder[F](migrationName)
     envReadinessChecker  <- EnvReadinessChecker[F]
     elClient             <- eventlog.api.events.Client[F]
-    projectDonePersister <- ProjectDonePersister[F]
+    projectDonePersister <- ProjectDonePersister[F](migrationName)
     executionRegister    <- MigrationExecutionRegister[F]
-  } yield new ReindexLucene(backlogCreator,
+  } yield new ReindexLucene(migrationName,
+                            backlogCreator,
                             projectsFinder,
                             progressFinder,
                             envReadinessChecker,

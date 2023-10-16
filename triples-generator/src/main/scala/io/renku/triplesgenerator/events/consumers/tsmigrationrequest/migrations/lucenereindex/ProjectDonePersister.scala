@@ -22,6 +22,7 @@ import cats.effect.Async
 import cats.syntax.all._
 import io.renku.graph.config.RenkuUrlLoader
 import io.renku.graph.model.{RenkuUrl, projects}
+import io.renku.triplesgenerator.events.consumers.tsmigrationrequest.Migration
 import io.renku.triplesstore.{MigrationsConnectionConfig, SparqlQueryTimeRecorder, TSClient}
 import org.typelevel.log4cats.Logger
 
@@ -30,14 +31,16 @@ private trait ProjectDonePersister[F[_]] {
 }
 
 private object ProjectDonePersister {
-  def apply[F[_]: Async: Logger: SparqlQueryTimeRecorder]: F[ProjectDonePersister[F]] = for {
-    implicit0(ru: RenkuUrl) <- RenkuUrlLoader[F]()
-    tsClient                <- MigrationsConnectionConfig[F]().map(TSClient[F](_))
-  } yield new ProjectDonePersisterImpl[F](tsClient)
+  def apply[F[_]: Async: Logger: SparqlQueryTimeRecorder](migrationName: Migration.Name): F[ProjectDonePersister[F]] =
+    for {
+      implicit0(ru: RenkuUrl) <- RenkuUrlLoader[F]()
+      tsClient                <- MigrationsConnectionConfig[F]().map(TSClient[F](_))
+    } yield new ProjectDonePersisterImpl[F](migrationName, tsClient)
 }
 
-private class ProjectDonePersisterImpl[F[_]](tsClient: TSClient[F])(implicit ru: RenkuUrl)
-    extends ProjectDonePersister[F] {
+private class ProjectDonePersisterImpl[F[_]](migrationName: Migration.Name, tsClient: TSClient[F])(implicit
+    ru: RenkuUrl
+) extends ProjectDonePersister[F] {
 
   import io.renku.graph.model.Schemas.renku
   import io.renku.jsonld.syntax._
@@ -49,9 +52,9 @@ private class ProjectDonePersisterImpl[F[_]](tsClient: TSClient[F])(implicit ru:
     tsClient.updateWithNoResult(deleteTripleQuery(slug))
 
   private def deleteTripleQuery(slug: projects.Slug) = {
-    val triple = Triple(ReindexLucene.name.asEntityId, renku / "toBeMigrated", slug.asObject)
+    val triple = Triple(migrationName.asEntityId, renku / "toBeMigrated", slug.asObject)
     SparqlQuery.ofUnsafe(
-      show"${ReindexLucene.name} - store migrated",
+      show"$migrationName - store migrated",
       sparql"DELETE DATA {$triple}"
     )
   }
