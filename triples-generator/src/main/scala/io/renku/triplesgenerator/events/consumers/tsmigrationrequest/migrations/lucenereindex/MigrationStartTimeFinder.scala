@@ -26,8 +26,9 @@ import io.renku.graph.config.RenkuUrlLoader
 import io.renku.graph.model.RenkuUrl
 import io.renku.graph.model.Schemas.renku
 import io.renku.jsonld.syntax._
-import io.renku.triplesstore._
+import io.renku.triplesgenerator.events.consumers.tsmigrationrequest.Migration
 import io.renku.triplesstore.SparqlQuery.Prefixes
+import io.renku.triplesstore._
 import io.renku.triplesstore.client.model.Triple
 import io.renku.triplesstore.client.syntax._
 import org.typelevel.log4cats.Logger
@@ -39,14 +40,16 @@ private trait MigrationStartTimeFinder[F[_]] {
 }
 
 private object MigrationStartTimeFinder {
-  def apply[F[_]: Async: Logger: SparqlQueryTimeRecorder]: F[MigrationStartTimeFinder[F]] = for {
+  def apply[F[_]: Async: Logger: SparqlQueryTimeRecorder](
+      migrationName: Migration.Name
+  ): F[MigrationStartTimeFinder[F]] = for {
     implicit0(ru: RenkuUrl) <- RenkuUrlLoader[F]()
     tsClient                <- MigrationsConnectionConfig[F]().map(TSClient[F](_))
-  } yield new MigrationStartTimeFinderImpl[F](tsClient)
+  } yield new MigrationStartTimeFinderImpl[F](migrationName, tsClient)
 }
 
-private class MigrationStartTimeFinderImpl[F[_]: Async: Logger: SparqlQueryTimeRecorder](
-    tsClient: TSClient[F]
+private class MigrationStartTimeFinderImpl[F[_]: Async: Logger: SparqlQueryTimeRecorder](migrationName: Migration.Name,
+                                                                                         tsClient: TSClient[F]
 )(implicit ru: RenkuUrl)
     extends MigrationStartTimeFinder[F] {
 
@@ -62,13 +65,13 @@ private class MigrationStartTimeFinderImpl[F[_]: Async: Logger: SparqlQueryTimeR
 
   private lazy val startTimeQuery =
     SparqlQuery.ofUnsafe(
-      show"${ReindexLucene.name} - find start time",
+      show"$migrationName - find start time",
       Prefixes of renku -> "renku",
-      s"""|SELECT ?time
-          |WHERE {
-          |  ${ReindexLucene.name.asEntityId.asSparql.sparql} renku:startTime ?time
-          |}
-          |""".stripMargin
+      sparql"""|SELECT ?time
+               |WHERE {
+               |  ${migrationName.asEntityId} renku:startTime ?time
+               |}
+               |""".stripMargin
     )
 
   private implicit lazy val timeDecoder: Decoder[Option[Instant]] = ResultsDecoder[Option, Instant] { implicit cur =>
@@ -76,9 +79,9 @@ private class MigrationStartTimeFinderImpl[F[_]: Async: Logger: SparqlQueryTimeR
   }
 
   private def startTimeTriple(instant: Instant) = {
-    val triple = Triple(ReindexLucene.name.asEntityId, renku / "startTime", instant.asTripleObject)
+    val triple = Triple(migrationName.asEntityId, renku / "startTime", instant.asTripleObject)
     SparqlQuery.ofUnsafe(
-      show"${ReindexLucene.name} - store start time",
+      show"$migrationName - store start time",
       s"INSERT DATA {${triple.asSparql.sparql}}"
     )
   }

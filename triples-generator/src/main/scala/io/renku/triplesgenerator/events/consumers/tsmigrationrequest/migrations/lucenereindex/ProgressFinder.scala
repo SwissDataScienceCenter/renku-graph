@@ -26,6 +26,7 @@ import io.circe.Decoder
 import io.renku.graph.config.RenkuUrlLoader
 import io.renku.graph.model.RenkuUrl
 import io.renku.graph.model.Schemas.renku
+import io.renku.triplesgenerator.events.consumers.tsmigrationrequest.Migration
 import io.renku.triplesstore.SparqlQuery.Prefixes
 import io.renku.triplesstore._
 import org.typelevel.log4cats.Logger
@@ -36,14 +37,15 @@ private trait ProgressFinder[F[_]] {
 }
 
 private object ProgressFinder {
-  def apply[F[_]: Async: Logger: SparqlQueryTimeRecorder]: F[ProgressFinder[F]] = for {
+  def apply[F[_]: Async: Logger: SparqlQueryTimeRecorder](migrationName: Migration.Name): F[ProgressFinder[F]] = for {
     implicit0(ru: RenkuUrl) <- RenkuUrlLoader[F]()
     migrationsDSClient      <- MigrationsConnectionConfig[F]().map(TSClient[F](_))
-  } yield new ProgressFinderImpl[F](migrationsDSClient)
+  } yield new ProgressFinderImpl[F](migrationName, migrationsDSClient)
 }
 
-private class ProgressFinderImpl[F[_]: Sync](migrationsDSClient: TSClient[F])(implicit ru: RenkuUrl)
-    extends ProgressFinder[F] {
+private class ProgressFinderImpl[F[_]: Sync](migrationName: Migration.Name, migrationsDSClient: TSClient[F])(implicit
+    ru: RenkuUrl
+) extends ProgressFinder[F] {
 
   import io.renku.jsonld.syntax._
   import io.renku.triplesstore.ResultsDecoder._
@@ -59,11 +61,11 @@ private class ProgressFinderImpl[F[_]: Sync](migrationsDSClient: TSClient[F])(im
   override def findLeftInBacklog: F[Int] =
     migrationsDSClient.queryExpecting[Int](
       SparqlQuery.ofUnsafe(
-        show"${ReindexLucene.name} - find left",
+        show"$migrationName - find left",
         Prefixes of (renku -> "renku"),
         sparql"""|SELECT (COUNT(?slug) AS ?count)
                  |WHERE {
-                 |  ${ReindexLucene.name.asEntityId} renku:toBeMigrated ?slug
+                 |  ${migrationName.asEntityId} renku:toBeMigrated ?slug
                  |}
                  |""".stripMargin
       )
