@@ -25,6 +25,7 @@ import io.renku.graph.config.RenkuUrlLoader
 import io.renku.graph.model.Schemas._
 import io.renku.graph.model.{RenkuUrl, projects}
 import io.renku.jsonld.syntax._
+import io.renku.triplesgenerator.events.consumers.tsmigrationrequest.Migration
 import io.renku.triplesstore._
 import io.renku.triplesstore.client.model.Triple
 import io.renku.triplesstore.client.syntax._
@@ -36,27 +37,31 @@ private trait BacklogCreator[F[_]] {
 }
 
 private[lucenereindex] object BacklogCreator {
-  def apply[F[_]: Async: Logger: SparqlQueryTimeRecorder]: F[BacklogCreator[F]] = for {
+
+  def apply[F[_]: Async: Logger: SparqlQueryTimeRecorder](migrationName: Migration.Name): F[BacklogCreator[F]] = for {
     implicit0(ru: RenkuUrl) <- RenkuUrlLoader[F]()
     allProjects             <- ProjectsConnectionConfig[F]().map(AllProjects[F](_))
     migrationsDSClient      <- MigrationsConnectionConfig[F]().map(TSClient[F](_))
-  } yield new BacklogCreatorImpl[F](allProjects, migrationsDSClient)
+  } yield new BacklogCreatorImpl[F](migrationName, allProjects, migrationsDSClient)
 
-  def asToBeMigratedInserts(slug: projects.Slug)(implicit ru: RenkuUrl): SparqlQuery =
-    toInsertQuery(toTriples(slug))
+  def asToBeMigratedInserts(migrationName: Migration.Name, slug: projects.Slug)(implicit ru: RenkuUrl): SparqlQuery =
+    toInsertQuery(migrationName, toTriples(migrationName, slug))
 
-  private def toTriples(slug: projects.Slug)(implicit ru: RenkuUrl): Triple =
-    Triple(ReindexLucene.name.asEntityId, renku / "toBeMigrated", slug.asObject)
+  private def toTriples(migrationName: Migration.Name, slug: projects.Slug)(implicit ru: RenkuUrl): Triple =
+    Triple(migrationName.asEntityId, renku / "toBeMigrated", slug.asObject)
 
-  private def toInsertQuery(triple: Triple): SparqlQuery =
+  private def toInsertQuery(migrationName: Migration.Name, triple: Triple): SparqlQuery =
     SparqlQuery
       .ofUnsafe(
-        show"${ReindexLucene.name} - store to backlog",
+        show"$migrationName - store to backlog",
         sparql"INSERT DATA {$triple}"
       )
 }
 
-private class BacklogCreatorImpl[F[_]: Async](allProjects: AllProjects[F], migrationsDSClient: TSClient[F])(implicit
+private class BacklogCreatorImpl[F[_]: Async](migrationName: Migration.Name,
+                                              allProjects:        AllProjects[F],
+                                              migrationsDSClient: TSClient[F]
+)(implicit
     ru: RenkuUrl
 ) extends BacklogCreator[F] {
 
@@ -67,7 +72,7 @@ private class BacklogCreatorImpl[F[_]: Async](allProjects: AllProjects[F], migra
   override def createBacklog(): F[Unit] =
     allProjects
       .findAll(pageSize)
-      .map(md => asToBeMigratedInserts(md.slug))
+      .map(md => asToBeMigratedInserts(migrationName, md.slug))
       .evalMap(migrationsDSClient.updateWithNoResult)
       .compile
       .drain

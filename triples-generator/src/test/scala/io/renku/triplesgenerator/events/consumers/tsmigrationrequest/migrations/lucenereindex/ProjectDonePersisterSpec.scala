@@ -48,7 +48,7 @@ class ProjectDonePersisterSpec
 
     for {
       _ <- slugs.map { slug =>
-             val insertQuery = BacklogCreator.asToBeMigratedInserts(slug)
+             val insertQuery = BacklogCreator.asToBeMigratedInserts(migrationName, slug)
              runUpdate(on = migrationsDataset, insertQuery)
            }.sequence
 
@@ -64,6 +64,6 @@ class ProjectDonePersisterSpec
   private implicit val logger:        TestLogger[IO]              = TestLogger[IO]()
   private implicit val tr:            SparqlQueryTimeRecorder[IO] = TestSparqlQueryTimeRecorder[IO].unsafeRunSync()
   private lazy val tsClient       = TSClient[IO](migrationsDSConnectionInfo)
-  private lazy val progressFinder = new ProgressFinderImpl[IO](tsClient)
-  private lazy val donePersister  = new ProjectDonePersisterImpl[IO](tsClient)
+  private lazy val progressFinder = new ProgressFinderImpl[IO](migrationName, tsClient)
+  private lazy val donePersister  = new ProjectDonePersisterImpl[IO](migrationName, tsClient)
 }

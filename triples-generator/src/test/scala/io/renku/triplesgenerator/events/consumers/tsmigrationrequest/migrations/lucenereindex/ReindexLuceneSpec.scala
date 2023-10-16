@@ -128,15 +128,15 @@ class ReindexLuceneSpec
       recoverableError.asLeft[OUT].pure[F]
     }
   }
-  private lazy val migration = new ReindexLucene[IO](
-    backlogCreator,
-    projectsFinder,
-    progressFinder,
-    envReadinessChecker,
-    elClient,
-    projectDonePersister,
-    executionRegister,
-    recoveryStrategy
+  private lazy val migration = new ReindexLucene[IO](migrationName,
+                                                     backlogCreator,
+                                                     projectsFinder,
+                                                     progressFinder,
+                                                     envReadinessChecker,
+                                                     elClient,
+                                                     projectDonePersister,
+                                                     executionRegister,
+                                                     recoveryStrategy
   )
 
   private def givenBacklogCreated() =
