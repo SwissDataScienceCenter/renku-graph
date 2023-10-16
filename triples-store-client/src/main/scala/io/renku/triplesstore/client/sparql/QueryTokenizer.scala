@@ -46,7 +46,7 @@ object QueryTokenizer {
     (input: String) => input.split(c).toList
 
   def default: QueryTokenizer =
-    luceneLetters
+    luceneStandard
 
   private final class LuceneTokenizer(createDelegate: AttributeFactory => Tokenizer) extends QueryTokenizer {
     override def split(input: String): List[String] = {
