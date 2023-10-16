@@ -50,7 +50,7 @@ private[tsmigrationrequest] object Migrations {
     addProjectSlug                 <- projectslug.AddProjectSlug[F]
     datasetsGraphPersonRemover     <- DatasetsGraphPersonRemover[F]
     projectsGraphPersonRemover     <- ProjectsGraphPersonRemover[F]
-    reindexLucene                  <- lucenereindex.ReindexLucene[F]
+    reindexLuceneStdTokenizer      <- lucenereindex.ReindexLucene[F](suffix = "- std tokenizer")
     migrations <- validateNames(
                     datasetsCreator,
                     datasetsRemover,
@@ -69,7 +69,7 @@ private[tsmigrationrequest] object Migrations {
                     addProjectSlug,
                     datasetsGraphPersonRemover,
                     projectsGraphPersonRemover,
-                    reindexLucene
+                    reindexLuceneStdTokenizer
                   )
   } yield migrations
 
