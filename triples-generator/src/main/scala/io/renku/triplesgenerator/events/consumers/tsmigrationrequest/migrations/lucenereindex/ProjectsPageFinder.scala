@@ -26,6 +26,7 @@ import eu.timepit.refined.auto._
 import io.circe.Decoder
 import io.renku.graph.config.RenkuUrlLoader
 import io.renku.graph.model.{RenkuUrl, Schemas, projects}
+import io.renku.triplesgenerator.events.consumers.tsmigrationrequest.Migration
 import io.renku.triplesstore.SparqlQuery.Prefixes
 import io.renku.triplesstore._
 import org.typelevel.log4cats.Logger
@@ -36,14 +37,15 @@ private trait ProjectsPageFinder[F[_]] {
 }
 
 private object ProjectsPageFinder {
-  def apply[F[_]: Async: Logger: SparqlQueryTimeRecorder]: F[ProjectsPageFinder[F]] = for {
-    implicit0(ru: RenkuUrl) <- RenkuUrlLoader[F]()
-    recordsFinder           <- MigrationsConnectionConfig[F]().map(RecordsFinder[F](_))
-  } yield new ProjectsPageFinderImpl(recordsFinder)
+  def apply[F[_]: Async: Logger: SparqlQueryTimeRecorder](migrationName: Migration.Name): F[ProjectsPageFinder[F]] =
+    for {
+      implicit0(ru: RenkuUrl) <- RenkuUrlLoader[F]()
+      recordsFinder           <- MigrationsConnectionConfig[F]().map(RecordsFinder[F](_))
+    } yield new ProjectsPageFinderImpl(migrationName, recordsFinder)
 }
 
-private class ProjectsPageFinderImpl[F[_]: Monad](recordsFinder: RecordsFinder[F])(implicit
-    ru: RenkuUrl
+private class ProjectsPageFinderImpl[F[_]: Monad](migrationName: Migration.Name, recordsFinder: RecordsFinder[F])(
+    implicit ru: RenkuUrl
 ) extends ProjectsPageFinder[F]
     with Schemas {
 
@@ -59,11 +61,11 @@ private class ProjectsPageFinderImpl[F[_]: Monad](recordsFinder: RecordsFinder[F
     findRecords[projects.Slug](query)
 
   private lazy val query = SparqlQuery.ofUnsafe(
-    show"${ReindexLucene.name} - find projects",
+    show"$migrationName - find projects",
     Prefixes of renku -> "renku",
     sparql"""|SELECT DISTINCT ?slug
              |WHERE {
-             |  ${ReindexLucene.name.asEntityId} renku:toBeMigrated ?slug
+             |  ${migrationName.asEntityId} renku:toBeMigrated ?slug
              |}
              |ORDER BY ?slug
              |LIMIT $pageSize

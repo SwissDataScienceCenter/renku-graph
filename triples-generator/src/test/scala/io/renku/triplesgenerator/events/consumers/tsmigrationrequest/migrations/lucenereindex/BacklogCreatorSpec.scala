@@ -70,8 +70,10 @@ class BacklogCreatorSpec
 
   private implicit val logger:       TestLogger[IO]              = TestLogger[IO]()
   private implicit val timeRecorder: SparqlQueryTimeRecorder[IO] = TestSparqlQueryTimeRecorder[IO].unsafeRunSync()
-  private lazy val backlogCreator =
-    new BacklogCreatorImpl[IO](AllProjects[IO](projectsDSConnectionInfo), TSClient[IO](migrationsDSConnectionInfo))
+  private lazy val backlogCreator = new BacklogCreatorImpl[IO](migrationName,
+                                                               AllProjects[IO](projectsDSConnectionInfo),
+                                                               TSClient[IO](migrationsDSConnectionInfo)
+  )
 
   private def fetchBacklogProjects =
     runSelect(
@@ -81,7 +83,7 @@ class BacklogCreatorSpec
         Prefixes of renku -> "renku",
         sparql"""|SELECT ?slug
                  |WHERE {
-                 |  ${ReindexLucene.name.asEntityId} renku:toBeMigrated ?slug
+                 |  ${migrationName.asEntityId} renku:toBeMigrated ?slug
                  |}
                  |""".stripMargin
       )
