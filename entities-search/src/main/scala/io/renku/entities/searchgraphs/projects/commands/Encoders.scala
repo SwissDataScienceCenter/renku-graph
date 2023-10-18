@@ -20,6 +20,7 @@ package io.renku.entities.searchgraphs
 package projects
 package commands
 
+import ProjectSearchInfoOntology._
 import cats.syntax.all._
 import io.renku.graph.model.Schemas.rdf
 import io.renku.graph.model.images.Image
@@ -43,61 +44,42 @@ private object Encoders {
     def searchInfoQuad(predicate: Property, obj: TripleObject): Quad =
       ProjectsQuad(info.id, predicate, obj)
 
+    def maybeConcatQuad[A](property: Property, values: List[A], toValue: A => String): Option[Quad] =
+      toConcatValue(values, toValue).map(searchInfoQuad(property, _))
+
     val maybeDescriptionQuad = info.maybeDescription.map { d =>
-      searchInfoQuad(ProjectSearchInfoOntology.descriptionProperty.id, d.asObject)
+      searchInfoQuad(descriptionProperty.id, d.asObject)
     }
 
     val creatorQuads = info.maybeCreator.toSet.map { (resourceId: persons.ResourceId) =>
-      searchInfoQuad(ProjectSearchInfoOntology.creatorProperty, resourceId.asEntityId)
+      searchInfoQuad(creatorProperty, resourceId.asEntityId)
     }
 
     val keywordsQuads = info.keywords.toSet.map { (k: projects.Keyword) =>
-      searchInfoQuad(ProjectSearchInfoOntology.keywordsProperty.id, k.asObject)
+      searchInfoQuad(keywordsProperty.id, k.asObject)
     }
 
     val maybeKeywordsConcatQuad =
-      info.keywords match {
-        case Nil => Option.empty[Quad]
-        case keys =>
-          searchInfoQuad(
-            ProjectSearchInfoOntology.keywordsConcatProperty.id,
-            keys.distinct.tail
-              .foldLeft(new StringBuilder(keys.head.value))((acc, k) => acc.append(concatSeparator).append(k.value))
-              .result()
-              .asTripleObject
-          ).some
-      }
+      maybeConcatQuad[projects.Keyword](keywordsConcatProperty.id, info.keywords.distinct, _.value)
 
     val imagesQuads = info.images.toSet.flatMap { (i: Image) =>
-      i.asQuads + searchInfoQuad(ProjectSearchInfoOntology.imageProperty, i.resourceId.asEntityId)
+      i.asQuads + searchInfoQuad(imageProperty, i.resourceId.asEntityId)
     }
 
     val maybeImagesConcatQuad =
-      info.images match {
-        case Nil => Option.empty[Quad]
-        case images =>
-          def appendImage(builder: StringBuilder)(image: Image): StringBuilder =
-            builder.append(image.position.value).append(":").append(image.uri.value)
-
-          searchInfoQuad(
-            ProjectSearchInfoOntology.imagesConcatProperty.id,
-            images.tail
-              .foldLeft(appendImage(new StringBuilder)(images.head))((acc, i) =>
-                appendImage(acc.append(concatSeparator))(i)
-              )
-              .result()
-              .asTripleObject
-          ).some
-      }
+      maybeConcatQuad[Image](imagesConcatProperty.id,
+        info.images,
+        image => s"${image.position.value}:${image.uri.value}"
+      )
 
     Set(
-      searchInfoQuad(rdf / "type", ProjectSearchInfoOntology.typeDef.clazz.id).some,
-      searchInfoQuad(ProjectSearchInfoOntology.nameProperty.id, info.name.asObject).some,
-      searchInfoQuad(ProjectSearchInfoOntology.slugProperty.id, info.slug.asObject).some,
-      searchInfoQuad(ProjectSearchInfoOntology.pathProperty.id, info.slug.asObject).some,
-      searchInfoQuad(ProjectSearchInfoOntology.visibilityProperty.id, info.visibility.asObject).some,
-      searchInfoQuad(ProjectSearchInfoOntology.dateCreatedProperty.id, info.dateCreated.asObject).some,
-      searchInfoQuad(ProjectSearchInfoOntology.dateModifiedProperty.id, info.dateModified.asObject).some,
+      searchInfoQuad(rdf / "type", typeDef.clazz.id).some,
+      searchInfoQuad(nameProperty.id, info.name.asObject).some,
+      searchInfoQuad(slugProperty.id, info.slug.asObject).some,
+      searchInfoQuad(pathProperty.id, info.slug.asObject).some,
+      searchInfoQuad(visibilityProperty.id, info.visibility.asObject).some,
+      searchInfoQuad(dateCreatedProperty.id, info.dateCreated.asObject).some,
+      searchInfoQuad(dateModifiedProperty.id, info.dateModified.asObject).some,
       maybeKeywordsConcatQuad,
       maybeImagesConcatQuad,
       maybeDescriptionQuad

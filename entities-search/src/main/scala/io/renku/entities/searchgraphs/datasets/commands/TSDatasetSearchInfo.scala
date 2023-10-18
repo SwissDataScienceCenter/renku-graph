@@ -16,23 +16,24 @@
  * limitations under the License.
  */
 
-package io.renku.entities
+package io.renku.entities.searchgraphs.datasets.commands
 
-import io.renku.triplesstore.client.model.TripleObject
-import io.renku.triplesstore.client.syntax._
+import cats.Show
+import cats.syntax.all._
+import io.renku.entities.searchgraphs.datasets.Link
+import io.renku.graph.model.datasets
+import monocle.Lens
 
-package object searchgraphs {
-  val concatSeparator: Char = '\u0000'
+private final case class TSDatasetSearchInfo(topmostSameAs: datasets.TopmostSameAs, links: List[Link])
 
-  private[searchgraphs] def toConcatValue[A](values: List[A], toValue: A => String): Option[TripleObject] =
-    values match {
-      case Nil => Option.empty[TripleObject]
-      case vls =>
-        Option {
-          vls.tail
-            .foldLeft(new StringBuilder(toValue(vls.head)))((acc, v) => acc.append(concatSeparator).append(toValue(v)))
-            .result()
-            .asTripleObject
-        }
+private object TSDatasetSearchInfo {
+
+  val tsSearchInfoLinks: Lens[TSDatasetSearchInfo, List[Link]] =
+    Lens[TSDatasetSearchInfo, List[Link]](_.links) { links => info =>
+      info.copy(links = links)
     }
+
+  implicit lazy val show: Show[TSDatasetSearchInfo] = Show.show { case TSDatasetSearchInfo(topSameAs, links) =>
+    show"topmostSameAs = $topSameAs, links = [${links.mkString_("; ")}]"
+  }
 }

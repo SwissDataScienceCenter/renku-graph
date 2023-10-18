@@ -16,38 +16,36 @@
  * limitations under the License.
  */
 
-package io.renku.entities.searchgraphs.projects.commands
+package io.renku.entities.searchgraphs.datasets.commands
 
 import eu.timepit.refined.auto._
-import io.renku.graph.model.Schemas.schema
-import io.renku.graph.model.{GraphClass, projects}
+import io.renku.entities.searchgraphs.datasets.links
+import io.renku.graph.model.Schemas.{renku, schema}
+import io.renku.graph.model.{GraphClass, datasets}
 import io.renku.jsonld.syntax._
 import io.renku.triplesstore.SparqlQuery
 import io.renku.triplesstore.SparqlQuery.Prefixes
 import io.renku.triplesstore.client.syntax._
 
-private[projects] object ProjectInfoDeleteQuery {
+private object DatasetLinkDeleteQuery {
 
-  def apply(projectId: projects.ResourceId): SparqlQuery =
+  def apply(topmostSameAs: datasets.TopmostSameAs, linkId: links.ResourceId): SparqlQuery =
     SparqlQuery.ofUnsafe(
-      "delete project info",
-      Prefixes of schema -> "schema",
+      "delete dataset info link",
+      Prefixes of (renku -> "renku", schema -> "schema"),
       sparql"""|DELETE {
-               |  GRAPH ${GraphClass.Projects.id} {
-               |    ?imageId ?imagePred ?imageObj.
-               |    ?projId ?projPred ?projObj.
+               |  GRAPH ${GraphClass.Datasets.id} {
+               |    ?topSameAs renku:datasetProjectLink ?linkId.
+               |    ?linkId ?linkPred ?linkObj.
                |  }
                |}
                |WHERE {
-               |  GRAPH ${GraphClass.Projects.id} {
-               |    BIND (${projectId.asEntityId} AS ?projId)
+               |  GRAPH ${GraphClass.Datasets.id} {
+               |    BIND (${topmostSameAs.asEntityId} AS ?topSameAs)
+               |    BIND (${linkId.asEntityId} AS ?linkId)
                |
-               |    OPTIONAL {
-               |      ?projId schema:image ?imageId.
-               |      ?imageId ?imagePred ?imageObj.
-               |    }
-               |
-               |    ?projId ?projPred ?projObj.
+               |    ?topSameAs renku:datasetProjectLink ?linkId.
+               |    ?linkId ?linkPred ?linkObj.
                |  }
                |}
                |""".stripMargin

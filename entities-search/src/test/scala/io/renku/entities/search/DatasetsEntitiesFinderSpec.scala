@@ -49,6 +49,7 @@ class DatasetsEntitiesFinderSpec
   "findEntities - in case of a shared datasets" should {
 
     "de-duplicate datasets having equal sameAs - case of an Internal DS" in new TestCase {
+
       val originalDSAndProject @ originalDS -> originalDSProject = renkuProjectEntities(visibilityPublic)
         .addDataset(datasetEntities(provenanceInternal))
         .generateOne

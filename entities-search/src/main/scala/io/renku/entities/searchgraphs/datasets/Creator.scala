@@ -16,23 +16,20 @@
  * limitations under the License.
  */
 
-package io.renku.entities
+package io.renku.entities.searchgraphs.datasets
 
-import io.renku.triplesstore.client.model.TripleObject
-import io.renku.triplesstore.client.syntax._
+import cats.Show
+import cats.syntax.all._
+import io.renku.graph.model.{entities, persons}
 
-package object searchgraphs {
-  val concatSeparator: Char = '\u0000'
+private final case class Creator(resourceId: persons.ResourceId, name: persons.Name)
 
-  private[searchgraphs] def toConcatValue[A](values: List[A], toValue: A => String): Option[TripleObject] =
-    values match {
-      case Nil => Option.empty[TripleObject]
-      case vls =>
-        Option {
-          vls.tail
-            .foldLeft(new StringBuilder(toValue(vls.head)))((acc, v) => acc.append(concatSeparator).append(toValue(v)))
-            .result()
-            .asTripleObject
-        }
-    }
+private object Creator {
+
+  def from(person: entities.Person): Creator =
+    Creator(person.resourceId, person.name)
+
+  implicit lazy val show: Show[Creator] = Show.show { case Creator(id, name) =>
+    show"id = $id, name = $name"
+  }
 }

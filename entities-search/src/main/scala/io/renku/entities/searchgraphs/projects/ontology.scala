@@ -35,9 +35,9 @@ object ProjectSearchInfoOntology {
   val keywordsProperty:       DataProperty.Def = Project.Ontology.keywordsProperty
   val keywordsConcatProperty: DataProperty.Def = DataProperty(renku / "keywordsConcat", xsd / "string")
   val descriptionProperty:    DataProperty.Def = Project.Ontology.descriptionProperty
-  val imagesConcatProperty:   DataProperty.Def = DataProperty(renku / "imagesConcat", xsd / "string")
   val creatorProperty:        Property         = Project.Ontology.creator
   val imageProperty:          Property         = Project.Ontology.image
+  val imagesConcatProperty:   DataProperty.Def = DataProperty(renku / "imagesConcat", xsd / "string")
 
   lazy val typeDef: Type = Type.Def(
     Class(renku / "DiscoverableProject"),

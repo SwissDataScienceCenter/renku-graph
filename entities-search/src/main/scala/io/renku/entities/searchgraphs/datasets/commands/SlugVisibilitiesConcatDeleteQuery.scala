@@ -16,38 +16,31 @@
  * limitations under the License.
  */
 
-package io.renku.entities.searchgraphs.projects.commands
+package io.renku.entities.searchgraphs.datasets.commands
 
 import eu.timepit.refined.auto._
-import io.renku.graph.model.Schemas.schema
-import io.renku.graph.model.{GraphClass, projects}
+import io.renku.graph.model.Schemas.{renku, schema}
+import io.renku.graph.model.{GraphClass, datasets}
 import io.renku.jsonld.syntax._
 import io.renku.triplesstore.SparqlQuery
 import io.renku.triplesstore.SparqlQuery.Prefixes
 import io.renku.triplesstore.client.syntax._
 
-private[projects] object ProjectInfoDeleteQuery {
+private object SlugVisibilitiesConcatDeleteQuery {
 
-  def apply(projectId: projects.ResourceId): SparqlQuery =
+  def apply(topmostSameAs: datasets.TopmostSameAs): SparqlQuery =
     SparqlQuery.ofUnsafe(
-      "delete project info",
-      Prefixes of schema -> "schema",
+      "delete projectsVisibilitiesConcat",
+      Prefixes of (renku -> "renku", schema -> "schema"),
       sparql"""|DELETE {
-               |  GRAPH ${GraphClass.Projects.id} {
-               |    ?imageId ?imagePred ?imageObj.
-               |    ?projId ?projPred ?projObj.
+               |  GRAPH ${GraphClass.Datasets.id} {
+               |    ?topSameAs renku:projectsVisibilitiesConcat ?vis.
                |  }
                |}
                |WHERE {
-               |  GRAPH ${GraphClass.Projects.id} {
-               |    BIND (${projectId.asEntityId} AS ?projId)
-               |
-               |    OPTIONAL {
-               |      ?projId schema:image ?imageId.
-               |      ?imageId ?imagePred ?imageObj.
-               |    }
-               |
-               |    ?projId ?projPred ?projObj.
+               |  GRAPH ${GraphClass.Datasets.id} {
+               |    BIND (${topmostSameAs.asEntityId} AS ?topSameAs)
+               |    ?topSameAs renku:projectsVisibilitiesConcat ?vis.
                |  }
                |}
                |""".stripMargin

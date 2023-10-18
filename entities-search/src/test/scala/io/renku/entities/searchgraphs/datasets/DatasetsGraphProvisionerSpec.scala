@@ -21,7 +21,7 @@ package io.renku.entities.searchgraphs.datasets
 import cats.syntax.all._
 import io.renku.entities.searchgraphs.Generators.updateCommands
 import io.renku.entities.searchgraphs.datasets.DatasetsCollector._
-import io.renku.entities.searchgraphs.datasets.SearchInfoExtractor._
+import io.renku.entities.searchgraphs.datasets.ModelSearchInfoExtractor._
 import io.renku.entities.searchgraphs.datasets.commands.UpdateCommandsProducer
 import io.renku.entities.searchgraphs.{UpdateCommand, UpdateCommandsUploader}
 import io.renku.generators.Generators.Implicits._
@@ -94,14 +94,14 @@ class DatasetsGraphProvisionerSpec extends AnyWordSpec with should.Matchers with
     private val commandsUploader = mock[UpdateCommandsUploader[Try]]
     val provisioner              = new DatasetsGraphProvisionerImpl[Try](commandsProducer, commandsUploader)
 
-    def givenSearchInfoExtraction(project: entities.Project): Try[List[DatasetSearchInfo]] =
-      (collectLastVersions >>> extractSearchInfo[Try](project))(project)
+    def givenSearchInfoExtraction(project: entities.Project): Try[List[ModelDatasetSearchInfo]] =
+      (collectLastVersions >>> extractModelSearchInfo[Try](project))(project)
 
     def givenUpdatesProducing(project:     entities.ProjectIdentification,
-                              searchInfos: List[DatasetSearchInfo],
+                              searchInfos: List[ModelDatasetSearchInfo],
                               returning:   Try[List[UpdateCommand]]
     ) = (commandsProducer
-      .toUpdateCommands(_: entities.ProjectIdentification)(_: List[DatasetSearchInfo]))
+      .toUpdateCommands(_: entities.ProjectIdentification)(_: List[ModelDatasetSearchInfo]))
       .expects(project, searchInfos)
       .returning(returning)
 
