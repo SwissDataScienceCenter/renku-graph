@@ -25,15 +25,15 @@ import io.renku.tinytypes._
 
 object DecodingTools {
 
-  def toListOf[TT <: StringTinyType, TTF <: TinyTypeFactory[TT]](implicit
+  def toListOf[TT <: StringTinyType, TTF <: TinyTypeFactory[TT]](separator: Char = ',')(implicit
       ttFactory: TTF
   ): Option[String] => Decoder.Result[List[TT]] =
-    _.map(_.split(',').toList.distinct.map(v => ttFactory.from(v)).sequence.map(_.sortBy(_.value))).sequence
+    _.map(_.split(separator).toList.distinct.map(v => ttFactory.from(v)).sequence.map(_.sortBy(_.value))).sequence
       .leftMap(ex => DecodingFailure(ex.getMessage, Nil))
       .map(_.getOrElse(List.empty))
 
-  def toListOfImageUris: Option[String] => Decoder.Result[List[ImageUri]] =
-    _.map(ImageUri.fromSplitString(','))
+  def toListOfImageUris(separator: Char = ','): Option[String] => Decoder.Result[List[ImageUri]] =
+    _.map(ImageUri.fromSplitString(separator))
       .map(_.leftMap(ex => DecodingFailure(ex.getMessage, Nil)))
       .getOrElse(Nil.asRight)
 }

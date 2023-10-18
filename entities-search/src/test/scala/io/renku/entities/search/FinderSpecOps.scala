@@ -28,16 +28,15 @@ import io.renku.http.rest.paging.PagingResponse
 import io.renku.http.server.security.model.AuthUser
 import io.renku.interpreters.TestLogger
 import io.renku.logging.TestSparqlQueryTimeRecorder
-import io.renku.testtools.IOSpec
 import io.renku.tinytypes.StringTinyType
 import io.renku.triplesstore.{InMemoryJenaForSpec, ProjectsDataset, SparqlQueryTimeRecorder}
-import org.scalatest.TestSuite
+import org.scalatest.Suite
 import org.typelevel.log4cats.Logger
 
 import java.time.Instant
 
 trait FinderSpecOps {
-  self: TestSuite with InMemoryJenaForSpec with ProjectsDataset with IOSpec =>
+  self: Suite with InMemoryJenaForSpec with ProjectsDataset =>
 
   protected implicit val logger: TestLogger[IO] = TestLogger[IO]()
   implicit val ioLogger:         Logger[IO]     = logger

@@ -82,11 +82,11 @@ object Variables {
           Either.fromOption(maybeDateModified.orElse(maybeDateCreated.orElse(maybeDatePublished)),
                             ifNone = DecodingFailure("No dataset date", Nil)
           )
-        creators <- read[Option[String]](creatorNames) >>= toListOf[persons.Name, persons.Name.type](persons.Name)
+        creators <- read[Option[String]](creatorNames) >>= toListOf[persons.Name, persons.Name.type]()(persons.Name)
         keywords <-
-          read[Option[String]](keywords) >>= toListOf[datasets.Keyword, datasets.Keyword.type](datasets.Keyword)
+          read[Option[String]](keywords) >>= toListOf[datasets.Keyword, datasets.Keyword.type]()(datasets.Keyword)
         maybeDesc <- read[Option[datasets.Description]](description)
-        images    <- read[Option[String]](images) >>= toListOfImageUris
+        images    <- read[Option[String]](images) >>= toListOfImageUris()
       } yield SearchEntity.Dataset(
         matchingScore,
         sameAs,
@@ -143,9 +143,9 @@ object Variables {
         dateModified     <- read[projects.DateModified](dateModified)
         maybeCreatorName <- read[Option[persons.Name]](creatorNames)
         keywords <-
-          read[Option[String]](keywords) >>= toListOf[projects.Keyword, projects.Keyword.type](projects.Keyword)
+          read[Option[String]](keywords) >>= toListOf[projects.Keyword, projects.Keyword.type]()(projects.Keyword)
         maybeDescription <- read[Option[projects.Description]](description)
-        images           <- read[Option[String]](images) >>= toListOfImageUris
+        images           <- read[Option[String]](images) >>= toListOfImageUris()
       } yield SearchEntity.Project(
         matchingScore,
         slug,
