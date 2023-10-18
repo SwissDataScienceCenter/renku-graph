@@ -53,8 +53,9 @@ private object CalculatorInfoSet {
     override lazy val asDatasetSearchInfo: Option[DatasetSearchInfo] =
       modelInfo.toDatasetSearchInfo.some
         .map(
-          searchInfoLinks
-            .replace(NonEmptyList.of(modelInfo.link, tsInfo.links.filterNot(_.projectId == project.resourceId): _*))
+          searchInfoLinks.replace {
+            NonEmptyList.one(modelInfo.link).prependList(tsInfo.links.filterNot(_.projectId == project.resourceId))
+          }
         )
   }
 
