@@ -28,7 +28,7 @@ import io.renku.entities.searchgraphs.datasets.Generators.{linkObjectsGen, model
 import io.renku.entities.searchgraphs.datasets.ModelDatasetSearchInfo
 import io.renku.entities.searchgraphs.datasets.commands.CalculatorInfoSetGenerators.tsDatasetSearchInfoObjects
 import io.renku.generators.Generators.Implicits._
-import io.renku.graph.model.entities
+import io.renku.graph.model.{datasets, entities}
 import io.renku.graph.model.testentities._
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.TryValues
@@ -49,7 +49,7 @@ class UpdateCommandsProducerSpec extends AnyFlatSpec with should.Matchers with M
       val tsInfos =
         modelInfos.map(info => tsDatasetSearchInfoObjects(withLinkTo = project, info.topmostSameAs).generateOne)
 
-      givenTSInfoFetcher(project, returning = Random.shuffle(tsInfos).pure[Try])
+      givenTSFetchingByProject(project, returning = Random.shuffle(tsInfos).pure[Try])
 
       val expectedCommands =
         toInfoSets(project, modelInfos.map(Option(_)), tsInfos.map(Option(_)))
@@ -78,7 +78,7 @@ class UpdateCommandsProducerSpec extends AnyFlatSpec with should.Matchers with M
         }.generateOne
       val tsInfos = List(tsInfo1, tsInfo2)
 
-      givenTSInfoFetcher(project, returning = Random.shuffle(tsInfos).pure[Try])
+      givenTSFetchingByProject(project, returning = Random.shuffle(tsInfos).pure[Try])
 
       val expectedCommands =
         toInfoSets(project, modelInfos.map(Option(_)), tsInfos.map(Option(_)))
@@ -99,10 +99,33 @@ class UpdateCommandsProducerSpec extends AnyFlatSpec with should.Matchers with M
       val tsInfos =
         modelInfos.tail.map(info => tsDatasetSearchInfoObjects(withLinkTo = project, info.topmostSameAs).generateOne)
 
-      givenTSInfoFetcher(project, returning = Random.shuffle(tsInfos).pure[Try])
+      givenTSFetchingByProject(project, returning = Random.shuffle(tsInfos).pure[Try])
+      givenTSFetchingByTopSameAs(modelInfos.head.topmostSameAs, returning = None.pure[Try])
 
       val expectedCommands =
         toInfoSets(project, modelInfos.map(_.some), None :: tsInfos.map(_.some))
+          .flatMap(givenCommandsCalculation(_, returning = updateCommands.generateList()))
+
+      commandsProducer.toUpdateCommands(project.identification)(modelInfos).map(_.toSet).success.value shouldBe
+        expectedCommands.toSet
+    }
+
+  it should "produce commands - " +
+    "case when not all model infos have counterparts in the TS where the project is linked, " +
+    "however, the dataset exists already for other project" in {
+
+      val project    = anyProjectEntities.generateOne.to[entities.Project]
+      val modelInfos = modelDatasetSearchInfoObjects(withLinkTo = project).generateList(min = 2)
+      val tsInfos =
+        modelInfos.tail.map(info => tsDatasetSearchInfoObjects(withLinkTo = project, info.topmostSameAs).generateOne)
+
+      givenTSFetchingByProject(project, returning = Random.shuffle(tsInfos).pure[Try])
+
+      val tsInfoBySameAs = tsDatasetSearchInfoObjects(withLinkTo = project, modelInfos.head.topmostSameAs).generateOne
+      givenTSFetchingByTopSameAs(modelInfos.head.topmostSameAs, returning = tsInfoBySameAs.some.pure[Try])
+
+      val expectedCommands =
+        toInfoSets(project, modelInfos.map(_.some), tsInfoBySameAs.some :: tsInfos.map(_.some))
           .flatMap(givenCommandsCalculation(_, returning = updateCommands.generateList()))
 
       commandsProducer.toUpdateCommands(project.identification)(modelInfos).map(_.toSet).success.value shouldBe
@@ -118,7 +141,7 @@ class UpdateCommandsProducerSpec extends AnyFlatSpec with should.Matchers with M
       val tsInfos =
         initialModelInfos.map(info => tsDatasetSearchInfoObjects(withLinkTo = project, info.topmostSameAs).generateOne)
 
-      givenTSInfoFetcher(project, returning = Random.shuffle(tsInfos).pure[Try])
+      givenTSFetchingByProject(project, returning = Random.shuffle(tsInfos).pure[Try])
 
       val expectedCommands =
         toInfoSets(project, None :: modelInfos.map(_.some), tsInfos.map(_.some))
@@ -137,10 +160,16 @@ class UpdateCommandsProducerSpec extends AnyFlatSpec with should.Matchers with M
     }
   )
 
-  private def givenTSInfoFetcher(project: entities.Project, returning: Try[List[TSDatasetSearchInfo]]) =
+  private def givenTSFetchingByProject(project: entities.Project, returning: Try[List[TSDatasetSearchInfo]]) =
     (tsInfoFetcher.findTSInfosByProject _)
       .expects(project.resourceId)
       .returning(returning)
+
+  private def givenTSFetchingByTopSameAs(topSameAs: datasets.TopmostSameAs,
+                                         returning: Try[Option[TSDatasetSearchInfo]]
+  ) = (tsInfoFetcher.findTSInfoBySameAs _)
+    .expects(topSameAs)
+    .returning(returning)
 
   private def givenCommandsCalculation(infoSet: CalculatorInfoSet, returning: List[UpdateCommand]) = {
     calculateCommand.expects(infoSet).returning(returning)

@@ -43,32 +43,41 @@ private class UpdateCommandsProducerImpl[F[_]: MonadThrow](tsInfoFetcher: TSSear
                                                            commandsCalculator: CommandsCalculator
 ) extends UpdateCommandsProducer[F] {
 
-  import tsInfoFetcher.findTSInfosByProject
+  import tsInfoFetcher.{findTSInfoBySameAs, findTSInfosByProject}
 
   def toUpdateCommands(
       project: ProjectIdentification
   )(modelInfos: List[ModelDatasetSearchInfo]): F[List[UpdateCommand]] =
     for {
-      tsInfos  <- findTSInfosByProject(project.resourceId)
-      infoSets <- toInfoSets(project, modelInfos, tsInfos)
+      tsInfosByProject <- findTSInfosByProject(project.resourceId)
+      infoSets         <- toInfoSets(project, modelInfos, tsInfosByProject)
     } yield infoSets >>= commandsCalculator.calculateCommands
 
-  private def toInfoSets(project:    ProjectIdentification,
-                         modelInfos: List[ModelDatasetSearchInfo],
-                         tsInfos:    List[TSDatasetSearchInfo]
-  ) = MonadThrow[F].fromEither {
-    matchInfosBySameAs(modelInfos, tsInfos)
-      .map { case (maybeModelInfo, maybeTsInfo) =>
-        CalculatorInfoSet.from(project, maybeModelInfo, maybeTsInfo)
+  private def toInfoSets(project:          ProjectIdentification,
+                         modelInfos:       List[ModelDatasetSearchInfo],
+                         tsInfosByProject: List[TSDatasetSearchInfo]
+  ): F[List[CalculatorInfoSet]] =
+    matchInfosBySameAs(modelInfos, tsInfosByProject).toList
+      .map {
+        case (Some(mi), None) => findTSInfoBySameAs(mi.topmostSameAs).map(mi.some -> _)
+        case tuple            => tuple.pure[F]
       }
-      .toList
       .sequence
-  }
+      .flatMap(_.map(toInfoSet(project)).sequence)
 
   private def matchInfosBySameAs(modelInfos: List[ModelDatasetSearchInfo], tsInfos: List[TSDatasetSearchInfo]) = {
     val distinctDatasets = modelInfos.map(_.topmostSameAs).toSet ++ tsInfos.map(_.topmostSameAs)
     distinctDatasets.map(topSameAs =>
       modelInfos.find(_.topmostSameAs == topSameAs) -> tsInfos.find(_.topmostSameAs == topSameAs)
     )
+  }
+
+  private def toInfoSet(
+      project: ProjectIdentification
+  ): ((Option[ModelDatasetSearchInfo], Option[TSDatasetSearchInfo])) => F[CalculatorInfoSet] = {
+    case (maybeModelInfo, maybeTsInfo) =>
+      MonadThrow[F].fromEither {
+        CalculatorInfoSet.from(project, maybeModelInfo, maybeTsInfo)
+      }
   }
 }
