@@ -59,10 +59,10 @@ private class TSSearchInfoFetcherImpl[F[_]: Async: Logger: SparqlQueryTimeRecord
 
   override def findTSInfoBySameAs(topSameAs: datasets.TopmostSameAs): F[Option[TSDatasetSearchInfo]] =
     queryExpecting[List[TSDatasetSearchInfo]](queryByTopSameAs(topSameAs)) >>= {
-        case Nil         => Option.empty[TSDatasetSearchInfo].pure[F]
-        case head :: Nil => Option(head).pure[F]
-        case other       => new Exception(show"${other.size} datasets found for $topSameAs").raiseError
-      }
+      case Nil         => Option.empty[TSDatasetSearchInfo].pure[F]
+      case head :: Nil => Option(head).pure[F]
+      case other       => new Exception(show"${other.size} datasets found for $topSameAs").raiseError
+    }
 
   private def queryByProject(resourceId: projects.ResourceId) = SparqlQuery.of(
     name = "ds search infos by project",
