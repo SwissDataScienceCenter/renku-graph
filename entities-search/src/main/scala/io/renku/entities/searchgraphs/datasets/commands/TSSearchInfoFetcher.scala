@@ -23,12 +23,13 @@ import io.circe.DecodingFailure.Reason.CustomReason
 import io.renku.entities.searchgraphs.datasets.{Link, links}
 import io.renku.graph.model.datasets.TopmostSameAs
 import io.renku.graph.model.{GraphClass, projects}
+import io.renku.jsonld.syntax._
 import io.renku.projectauth.ProjectAuth
 import io.renku.triplesstore.{ProjectsConnectionConfig, SparqlQueryTimeRecorder, TSClientImpl}
 import org.typelevel.log4cats.Logger
 
 private trait TSSearchInfoFetcher[F[_]] {
-  def fetchTSSearchInfos(projectId: projects.ResourceId): F[List[TSDatasetSearchInfo]]
+  def findTSInfosByProject(projectId: projects.ResourceId): F[List[TSDatasetSearchInfo]]
 }
 
 private object TSSearchInfoFetcher {
@@ -47,17 +48,16 @@ private class TSSearchInfoFetcherImpl[F[_]: Async: Logger: SparqlQueryTimeRecord
   import eu.timepit.refined.auto._
   import io.circe.Decoder
   import io.renku.graph.model.Schemas._
-  import io.renku.jsonld.syntax._
   import io.renku.triplesstore.ResultsDecoder._
   import io.renku.triplesstore.SparqlQuery.Prefixes
   import io.renku.triplesstore._
   import io.renku.triplesstore.client.syntax._
 
-  override def fetchTSSearchInfos(projectId: projects.ResourceId): F[List[TSDatasetSearchInfo]] =
+  override def findTSInfosByProject(projectId: projects.ResourceId): F[List[TSDatasetSearchInfo]] =
     queryExpecting[List[TSDatasetSearchInfo]](query(projectId))
 
   private def query(resourceId: projects.ResourceId) = SparqlQuery.of(
-    name = "ds search infos",
+    name = "ds search infos by project",
     Prefixes of (renku -> "renku", schema -> "schema"),
     sparql"""|SELECT DISTINCT ?topSameAs 
              |       (GROUP_CONCAT(DISTINCT ?link; separator=${rowsSeparator.asTripleObject}) AS ?links)

@@ -33,46 +33,49 @@ import io.renku.interpreters.TestLogger
 import io.renku.logging.TestSparqlQueryTimeRecorder
 import io.renku.triplesstore.client.syntax._
 import io.renku.triplesstore.{InMemoryJenaForSpec, ProjectsDataset, SparqlQueryTimeRecorder}
-import org.scalatest.flatspec.AsyncFlatSpec
 import org.scalatest.matchers.should
+import org.scalatest.wordspec.AsyncWordSpec
 
 class TSSearchInfoFetcherSpec
-    extends AsyncFlatSpec
+    extends AsyncWordSpec
     with AsyncIOSpec
     with should.Matchers
     with InMemoryJenaForSpec
     with ProjectsDataset
     with SearchInfoDatasets {
 
-  it should "find info about all Datasets that are linked to the Project" in {
+  "findTSInfosByProject" should {
 
-    val project      = anyRenkuProjectEntities.generateOne.to[entities.RenkuProject]
-    val otherProject = anyRenkuProjectEntities.generateOne.to[entities.RenkuProject]
-    val infos = datasetSearchInfoObjects(project)
-      .generateList(min = 1)
-      .map { si =>
-        val linkToOtherProject =
-          updateLinkProject(otherProject)(linkObjectsGen(si.topmostSameAs).generateOne)
+    "find info about all Datasets that are linked to the Project" in {
 
-        searchInfoLinks.modify(_ append linkToOtherProject)(si)
-      }
+      val project      = anyRenkuProjectEntities.generateOne.to[entities.RenkuProject]
+      val otherProject = anyRenkuProjectEntities.generateOne.to[entities.RenkuProject]
+      val infos = datasetSearchInfoObjects(project)
+        .generateList(min = 1)
+        .map { si =>
+          val linkToOtherProject =
+            updateLinkProject(otherProject)(linkObjectsGen(si.topmostSameAs).generateOne)
 
-    insert(projectsDataset, infos.map(_.asQuads).toSet.flatten)
+          searchInfoLinks.modify(_ append linkToOtherProject)(si)
+        }
 
-    // other project DS
-    insert(projectsDataset, datasetSearchInfoObjects.generateOne.asQuads)
+      insert(projectsDataset, infos.map(_.asQuads).toSet.flatten)
 
-    List(project, otherProject).traverse_(insertProjectAuth) >>
-      fetcher
-        .fetchTSSearchInfos(project.resourceId)
-        .asserting(_ should contain theSameElementsAs infos.map(toTSSearchInfo).map(orderValues))
-  }
+      // other project DS
+      insert(projectsDataset, datasetSearchInfoObjects.generateOne.asQuads)
 
-  it should "return nothing if no Datasets for the Project" in {
+      List(project, otherProject).traverse_(insertProjectAuth) >>
+        fetcher
+          .findTSInfosByProject(project.resourceId)
+          .asserting(_ should contain theSameElementsAs infos.map(toTSSearchInfo).map(orderValues))
+    }
 
-    insert(projectsDataset, datasetSearchInfoObjects.generateOne.asQuads)
+    "return nothing if no Datasets for the Project" in {
 
-    fetcher.fetchTSSearchInfos(projectResourceIds.generateOne).asserting(_ shouldBe Nil)
+      insert(projectsDataset, datasetSearchInfoObjects.generateOne.asQuads)
+
+      fetcher.findTSInfosByProject(projectResourceIds.generateOne).asserting(_ shouldBe Nil)
+    }
   }
 
   implicit val ioLogger:             TestLogger[IO]              = TestLogger[IO]()

@@ -138,7 +138,7 @@ class UpdateCommandsProducerSpec extends AnyFlatSpec with should.Matchers with M
   )
 
   private def givenTSInfoFetcher(project: entities.Project, returning: Try[List[TSDatasetSearchInfo]]) =
-    (tsInfoFetcher.fetchTSSearchInfos _)
+    (tsInfoFetcher.findTSInfosByProject _)
       .expects(project.resourceId)
       .returning(returning)
 

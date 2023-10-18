@@ -43,13 +43,13 @@ private class UpdateCommandsProducerImpl[F[_]: MonadThrow](tsInfoFetcher: TSSear
                                                            commandsCalculator: CommandsCalculator
 ) extends UpdateCommandsProducer[F] {
 
-  import tsInfoFetcher.fetchTSSearchInfos
+  import tsInfoFetcher.findTSInfosByProject
 
   def toUpdateCommands(
       project: ProjectIdentification
   )(modelInfos: List[ModelDatasetSearchInfo]): F[List[UpdateCommand]] =
     for {
-      tsInfos  <- fetchTSSearchInfos(project.resourceId)
+      tsInfos  <- findTSInfosByProject(project.resourceId)
       infoSets <- toInfoSets(project, modelInfos, tsInfos)
     } yield infoSets >>= commandsCalculator.calculateCommands
 
