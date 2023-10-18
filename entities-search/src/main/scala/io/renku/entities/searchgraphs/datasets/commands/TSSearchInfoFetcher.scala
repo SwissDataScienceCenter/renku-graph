@@ -22,14 +22,15 @@ import cats.effect.Async
 import io.circe.DecodingFailure.Reason.CustomReason
 import io.renku.entities.searchgraphs.datasets.{Link, links}
 import io.renku.graph.model.datasets.TopmostSameAs
-import io.renku.graph.model.{GraphClass, projects}
+import io.renku.graph.model.{GraphClass, datasets, projects}
 import io.renku.jsonld.syntax._
 import io.renku.projectauth.ProjectAuth
 import io.renku.triplesstore.{ProjectsConnectionConfig, SparqlQueryTimeRecorder, TSClientImpl}
 import org.typelevel.log4cats.Logger
 
 private trait TSSearchInfoFetcher[F[_]] {
-  def findTSInfosByProject(projectId: projects.ResourceId): F[List[TSDatasetSearchInfo]]
+  def findTSInfosByProject(projectId: projects.ResourceId):    F[List[TSDatasetSearchInfo]]
+  def findTSInfoBySameAs(topSameAs:   datasets.TopmostSameAs): F[Option[TSDatasetSearchInfo]]
 }
 
 private object TSSearchInfoFetcher {
@@ -54,9 +55,16 @@ private class TSSearchInfoFetcherImpl[F[_]: Async: Logger: SparqlQueryTimeRecord
   import io.renku.triplesstore.client.syntax._
 
   override def findTSInfosByProject(projectId: projects.ResourceId): F[List[TSDatasetSearchInfo]] =
-    queryExpecting[List[TSDatasetSearchInfo]](query(projectId))
+    queryExpecting[List[TSDatasetSearchInfo]](queryByProject(projectId))
 
-  private def query(resourceId: projects.ResourceId) = SparqlQuery.of(
+  override def findTSInfoBySameAs(topSameAs: datasets.TopmostSameAs): F[Option[TSDatasetSearchInfo]] =
+    queryExpecting[List[TSDatasetSearchInfo]](queryByTopSameAs(topSameAs)) >>= {
+        case Nil         => Option.empty[TSDatasetSearchInfo].pure[F]
+        case head :: Nil => Option(head).pure[F]
+        case other       => new Exception(show"${other.size} datasets found for $topSameAs").raiseError
+      }
+
+  private def queryByProject(resourceId: projects.ResourceId) = SparqlQuery.of(
     name = "ds search infos by project",
     Prefixes of (renku -> "renku", schema -> "schema"),
     sparql"""|SELECT DISTINCT ?topSameAs 
@@ -86,6 +94,28 @@ private class TSSearchInfoFetcherImpl[F[_]: Async: Logger: SparqlQueryTimeRecord
              |}
              |GROUP BY ?topSameAs
              |ORDER BY ?name
+             |""".stripMargin
+  )
+
+  private def queryByTopSameAs(topSameAs: datasets.TopmostSameAs) = SparqlQuery.of(
+    name = "ds search info by topSameAs",
+    Prefixes of (renku -> "renku", schema -> "schema"),
+    sparql"""|SELECT DISTINCT ?topSameAs
+             |       (GROUP_CONCAT(DISTINCT ?link; separator=${rowsSeparator.asTripleObject}) AS ?links)
+             |WHERE {
+             |  BIND (${topSameAs.asEntityId} AS ?topSameAs)
+             |  GRAPH ${GraphClass.Datasets.id} {
+             |    ?topSameAs renku:datasetProjectLink ?linkId.
+             |    ?linkId renku:project ?linkProjectId;
+             |            renku:dataset ?linkDatasetId.
+             |    GRAPH ${ProjectAuth.graph} {
+             |      ?linkProjectId renku:slug ?slug;
+             |                     renku:visibility ?visibility.
+             |    }
+             |    BIND (CONCAT(STR(?linkId), STR(';;'), STR(?linkProjectId), STR(';;'), STR(?linkDatasetId), STR(';;'), STR(?slug), STR(';;'), STR(?visibility)) AS ?link)
+             |  }
+             |}
+             |GROUP BY ?topSameAs
              |""".stripMargin
   )
 

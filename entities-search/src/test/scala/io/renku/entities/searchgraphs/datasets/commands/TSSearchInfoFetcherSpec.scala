@@ -33,6 +33,7 @@ import io.renku.interpreters.TestLogger
 import io.renku.logging.TestSparqlQueryTimeRecorder
 import io.renku.triplesstore.client.syntax._
 import io.renku.triplesstore.{InMemoryJenaForSpec, ProjectsDataset, SparqlQueryTimeRecorder}
+import org.scalatest.OptionValues
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AsyncWordSpec
 
@@ -40,6 +41,7 @@ class TSSearchInfoFetcherSpec
     extends AsyncWordSpec
     with AsyncIOSpec
     with should.Matchers
+    with OptionValues
     with InMemoryJenaForSpec
     with ProjectsDataset
     with SearchInfoDatasets {
@@ -59,22 +61,44 @@ class TSSearchInfoFetcherSpec
           searchInfoLinks.modify(_ append linkToOtherProject)(si)
         }
 
-      insert(projectsDataset, infos.map(_.asQuads).toSet.flatten)
-
-      // other project DS
-      insert(projectsDataset, datasetSearchInfoObjects.generateOne.asQuads)
-
-      List(project, otherProject).traverse_(insertProjectAuth) >>
+      insertIO(projectsDataset, infos.flatMap(_.asQuads)) >>
+        insertIO(projectsDataset, datasetSearchInfoObjects.generateOne.asQuads.toList) >>
+        List(project, otherProject).traverse_(insertProjectAuth) >>
         fetcher
           .findTSInfosByProject(project.resourceId)
           .asserting(_ should contain theSameElementsAs infos.map(toTSSearchInfo).map(orderValues))
     }
 
     "return nothing if no Datasets for the Project" in {
+      insertIO(projectsDataset, datasetSearchInfoObjects.generateOne.asQuads.toList) >>
+        fetcher.findTSInfosByProject(projectResourceIds.generateOne).asserting(_ shouldBe Nil)
+    }
+  }
 
-      insert(projectsDataset, datasetSearchInfoObjects.generateOne.asQuads)
+  "findTSInfoBySameAs" should {
 
-      fetcher.findTSInfosByProject(projectResourceIds.generateOne).asserting(_ shouldBe Nil)
+    "find an info if exists in the TS" in {
+
+      val project      = anyRenkuProjectEntities.generateOne.to[entities.RenkuProject]
+      val otherProject = anyRenkuProjectEntities.generateOne.to[entities.RenkuProject]
+      val info = datasetSearchInfoObjects(project).map { si =>
+        val linkToOtherProject =
+          updateLinkProject(otherProject)(linkObjectsGen(si.topmostSameAs).generateOne)
+        searchInfoLinks.modify(_ append linkToOtherProject)(si)
+      }.generateOne
+
+      insertIO(projectsDataset, info.asQuads.toList) >>
+        insertIO(projectsDataset, datasetSearchInfoObjects.generateOne.asQuads.toList) >>
+        List(project, otherProject).traverse_(insertProjectAuth) >>
+        fetcher
+          .findTSInfoBySameAs(info.topmostSameAs)
+          .asserting(_.value shouldBe orderValues(toTSSearchInfo(info)))
+    }
+
+    "return None if there's no DS with the given topmostSameAs" in {
+      fetcher
+        .findTSInfoBySameAs(datasetTopmostSameAs.generateOne)
+        .asserting(_ shouldBe None)
     }
   }
 
