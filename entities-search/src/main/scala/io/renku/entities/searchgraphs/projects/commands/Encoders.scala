@@ -68,8 +68,8 @@ private object Encoders {
 
     val maybeImagesConcatQuad =
       maybeConcatQuad[Image](imagesConcatProperty.id,
-        info.images,
-        image => s"${image.position.value}:${image.uri.value}"
+                             info.images,
+                             image => s"${image.position.value}:${image.uri.value}"
       )
 
     Set(
