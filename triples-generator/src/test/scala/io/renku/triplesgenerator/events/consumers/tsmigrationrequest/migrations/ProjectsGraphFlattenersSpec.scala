@@ -39,7 +39,7 @@ import org.scalatest.matchers.should
 import org.typelevel.log4cats.Logger
 import tooling.RegisteredUpdateQueryMigration
 
-class ProjectsGraphFlattenerSpec
+class ProjectsGraphFlattenersSpec
     extends AsyncFlatSpec
     with CustomAsyncIOSpec
     with should.Matchers
@@ -52,7 +52,10 @@ class ProjectsGraphFlattenerSpec
     implicit val metricsRegistry: TestMetricsRegistry[IO]     = TestMetricsRegistry[IO]
     implicit val timeRecorder:    SparqlQueryTimeRecorder[IO] = TestSparqlQueryTimeRecorder[IO].unsafeRunSync()
 
-    ProjectsGraphFlattener[IO].asserting(
+    ProjectsGraphKeywordsFlattener[IO].asserting(
+      _.getClass shouldBe classOf[RegisteredUpdateQueryMigration[IO]]
+    )
+    ProjectsGraphImagesFlattener[IO].asserting(
       _.getClass shouldBe classOf[RegisteredUpdateQueryMigration[IO]]
     )
   }
@@ -61,12 +64,12 @@ class ProjectsGraphFlattenerSpec
 
     val project1 = anyRenkuProjectEntities
       .modify(replaceProjectKeywords(Set.empty))
-      .modify(replaceImages(Nil))
+      .modify(replaceImages(imageUris.generateList(min = 1)))
       .generateOne
       .to[entities.Project]
     val project2 = anyRenkuProjectEntities
       .modify(replaceProjectKeywords(projectKeywords.generateSet(min = 1)))
-      .modify(replaceImages(imageUris.generateList(min = 1)))
+      .modify(replaceImages(Nil))
       .generateOne
       .to[entities.Project]
 
@@ -88,7 +91,8 @@ class ProjectsGraphFlattenerSpec
       _ <- fetchKeywords(project2.resourceId).asserting(_ shouldBe Set.empty)
       _ <- fetchImages(project2.resourceId).asserting(_ shouldBe Nil)
 
-      _ <- runUpdate(projectsDataset, ProjectsGraphFlattener.query).assertNoException
+      _ <- runUpdate(projectsDataset, ProjectsGraphKeywordsFlattener.query).assertNoException
+      _ <- runUpdate(projectsDataset, ProjectsGraphImagesFlattener.query).assertNoException
 
       _ <- fetchKeywords(project1.resourceId).asserting(_ shouldBe project1.keywords)
       _ <- fetchImages(project1.resourceId).asserting(_ shouldBe project1.images.map(_.uri))

@@ -32,9 +32,9 @@ import io.renku.triplesstore.{SparqlQuery, SparqlQueryTimeRecorder}
 import migrations.tooling.RegisteredUpdateQueryMigration
 import org.typelevel.log4cats.Logger
 
-private object ProjectsGraphFlattener {
+private object DatasetsGraphCreatorsFlattener {
 
-  private lazy val name = Migration.Name("Flatten Projects graph")
+  private lazy val name = Migration.Name("Flatten Datasets graph creators")
 
   def apply[F[_]: Async: Logger: SparqlQueryTimeRecorder: MetricsRegistry]: F[Migration[F]] =
     RegisteredUpdateQueryMigration[F](name, query).widen
@@ -43,42 +43,30 @@ private object ProjectsGraphFlattener {
     name.asRefined,
     Prefixes of (renku -> "renku", schema -> "schema"),
     sparql"""|DELETE {
-             |  GRAPH ${GraphClass.Projects.id} {
-             |    ?id renku:keywordsConcat ?currentKeysConcat.
-             |    ?id renku:imagesConcat ?currentImgsConcat.
+             |  GRAPH ${GraphClass.Datasets.id} {
+             |    ?topSameAs renku:creatorsNamesConcat ?currentCreatorsConcat.
              |  }
              |}
              |INSERT {
-             |  GRAPH ${GraphClass.Projects.id} {
-             |    ?id renku:keywordsConcat ?keysConcat.
-             |    ?id renku:imagesConcat ?imagesConcat.
+             |  GRAPH ${GraphClass.Datasets.id} {
+             |    ?topSameAs renku:creatorsNamesConcat ?creatorsConcat.
              |  }
              |}
              |WHERE {
-             |   SELECT ?id ?currentKeysConcat ?currentImgsConcat
-             |     (GROUP_CONCAT(DISTINCT ?keys; separator=${concatSeparator.asTripleObject}) AS ?keysConcat)
-             |     (GROUP_CONCAT(DISTINCT ?img; separator=${concatSeparator.asTripleObject}) AS ?imagesConcat)
+             |   SELECT ?topSameAs ?currentCreatorsConcat
+             |     (GROUP_CONCAT(DISTINCT ?creatorName; separator=${concatSeparator.asTripleObject}) AS ?creatorsConcat)
              |   WHERE {
-             |     GRAPH ${GraphClass.Projects.id} {
-             |       OPTIONAL {
-             |         ?id schema:keywords ?keys
+             |     GRAPH ${GraphClass.Datasets.id} {
+             |       ?topSameAs schema:creator ?creatorId.
+             |       GRAPH ${GraphClass.Persons.id} {
+             |         ?creatorId schema:name ?creatorName
              |       }
              |       OPTIONAL {
-             |         ?id renku:keywordsConcat ?currentKeysConcat.
-             |       }
-             |       
-             |       OPTIONAL {
-             |         ?id schema:image ?imageId.
-             |         ?imageId schema:position ?imagePosition;
-             |                  schema:contentUrl ?imageUrl.
-             |         BIND (CONCAT(STR(?imagePosition), STR(':'), STR(?imageUrl)) AS ?img)
-             |       }
-             |       OPTIONAL {
-             |         ?id renku:imagesConcat ?currentImgsConcat.
+             |         ?topSameAs renku:creatorsNamesConcat ?currentCreatorsConcat
              |       }
              |     }
              |   }
-             |   GROUP BY ?id ?currentKeysConcat ?currentImgsConcat
+             |   GROUP BY ?topSameAs ?currentCreatorsConcat
              |}
              |""".stripMargin
   )

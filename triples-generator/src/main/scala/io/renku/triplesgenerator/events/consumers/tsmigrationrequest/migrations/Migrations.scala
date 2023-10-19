@@ -53,6 +53,12 @@ private[tsmigrationrequest] object Migrations {
     projectsGraphPersonRemover          <- ProjectsGraphPersonRemover[F]
     reindexLuceneStdTokenizer           <- lucenereindex.ReindexLucene[F](suffix = "- std tokenizer")
     projectsDSRecreatorSearchFlattening <- TSDatasetRecreator[F, ProjectsTTL]("- search flattening", ProjectsTTL)
+    projectsGraphKeywordsFlattener      <- ProjectsGraphKeywordsFlattener[F]
+    projectsGraphImagesFlattener        <- ProjectsGraphImagesFlattener[F]
+    datasetsGraphKeywordsFlattener      <- DatasetsGraphKeywordsFlattener[F]
+    datasetsGraphImagesFlattener        <- DatasetsGraphImagesFlattener[F]
+    datasetsGraphCreatorsFlattener      <- DatasetsGraphCreatorsFlattener[F]
+    datasetsGraphSlugsVisibsFlattener   <- DatasetsGraphSlugsVisibilitiesFlattener[F]
     migrations <- validateNames(
                     datasetsCreator,
                     datasetsRemover,
@@ -72,7 +78,13 @@ private[tsmigrationrequest] object Migrations {
                     datasetsGraphPersonRemover,
                     projectsGraphPersonRemover,
                     reindexLuceneStdTokenizer,
-                    projectsDSRecreatorSearchFlattening
+                    projectsDSRecreatorSearchFlattening,
+                    projectsGraphKeywordsFlattener,
+                    projectsGraphImagesFlattener,
+                    datasetsGraphKeywordsFlattener,
+                    datasetsGraphImagesFlattener,
+                    datasetsGraphCreatorsFlattener,
+                    datasetsGraphSlugsVisibsFlattener
                   )
   } yield migrations
 
