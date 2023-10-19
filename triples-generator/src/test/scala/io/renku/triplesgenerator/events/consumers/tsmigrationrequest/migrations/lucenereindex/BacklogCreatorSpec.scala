@@ -25,7 +25,6 @@ import io.renku.generators.Generators.Implicits._
 import io.renku.graph.model._
 import io.renku.graph.model.entities.EntityFunctions
 import io.renku.graph.model.testentities._
-import io.renku.graph.model.versions.SchemaVersion
 import io.renku.interpreters.TestLogger
 import io.renku.jsonld.syntax._
 import io.renku.logging.TestSparqlQueryTimeRecorder
@@ -88,7 +87,4 @@ class BacklogCreatorSpec
                  |""".stripMargin
       )
     ).map(_.flatMap(_.get("slug").map(projects.Slug)))
-
-  private def setSchema(version: SchemaVersion): Project => Project =
-    _.fold(_.copy(version = version), _.copy(version = version), identity, identity)
 }

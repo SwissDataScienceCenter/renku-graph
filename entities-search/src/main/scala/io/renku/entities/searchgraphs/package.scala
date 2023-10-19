@@ -22,7 +22,7 @@ import io.renku.triplesstore.client.model.TripleObject
 import io.renku.triplesstore.client.syntax._
 
 package object searchgraphs {
-  val concatSeparator: Char = '\u0000'
+  val concatSeparator: Char = ';'
 
   private[searchgraphs] def toConcatValue[A](values: List[A], toValue: A => String): Option[TripleObject] =
     values match {
