@@ -81,7 +81,7 @@ private case object ProjectsQuery extends EntityQuery[model.Entity.Project] {
              |    GRAPH ${GraphClass.Projects.id} {
              |      $projectIdVar a renku:DiscoverableProject;
              |                    schema:name $nameVar;
-             |                    renku:projectPath $slugVar;
+             |                    renku:slug $slugVar;
              |                    schema:dateModified $dateModifiedVar;
              |                    schema:dateCreated $maybeDateCreatedVar.
              |
