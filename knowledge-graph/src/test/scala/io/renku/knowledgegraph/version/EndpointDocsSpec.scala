@@ -16,26 +16,15 @@
  * limitations under the License.
  */
 
-package io.renku.http.server.version
+package io.renku.knowledgegraph.version
 
-import cats.MonadThrow
-import cats.effect.Async
-import cats.syntax.all._
-import org.http4s.HttpRoutes
-import org.http4s.Uri.Path
-import org.http4s.dsl.Http4sDsl
+import io.renku.knowledgegraph.docs.OpenApiTester._
+import org.scalatest.flatspec.AnyFlatSpec
+import org.scalatest.matchers.should
 
-trait Routes[F[_]] {
-  def apply(): HttpRoutes[F]
-  def on(path: Path): HttpRoutes[F]
-}
+class EndpointDocsSpec extends AnyFlatSpec with should.Matchers {
 
-class RoutesImpl[F[_]: MonadThrow](endpoint: Endpoint[F]) extends Http4sDsl[F] with Routes[F] {
-  import endpoint._
-  override def apply(): HttpRoutes[F] = HttpRoutes.of[F] { case GET -> Root / "version" => `GET /version` }
-  override def on(path: Path): HttpRoutes[F] = HttpRoutes.of[F] { case GET -> `path` => `GET /version` }
-}
-
-object Routes {
-  def apply[F[_]: Async]: F[Routes[F]] = Endpoint[F].map(new RoutesImpl(_))
+  it should "return a valid Path object" in {
+    validatePath(EndpointDocs.path)
+  }
 }
