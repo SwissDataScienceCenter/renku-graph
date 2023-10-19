@@ -117,7 +117,7 @@ private case object ProjectsQuery extends EntityQuery[model.Entity.Project] {
            |  SELECT $projectIdVar (MAX(?score) AS $matchingScoreVar)
            |  WHERE {
            |    {
-           |      (?id ?score) text:query (schema:name schema:keywords schema:description renku:projectNamespaces $luceneQuery)
+           |      (?id ?score) text:query (schema:name renku:keywordsConcat schema:description renku:projectNamespaces $luceneQuery)
            |    } {
            |      GRAPH ${GraphClass.Projects.id} {
            |        ?id a renku:DiscoverableProject

@@ -220,7 +220,7 @@ object DatasetsQuery extends EntityQuery[Entity.Dataset] {
              |  SELECT $sameAsVar (MAX(?score) AS $matchingScoreVar)
              |  WHERE {
              |    Graph schema:Dataset {
-             |      (?id ?score) text:query (renku:slug schema:keywords schema:description schema:name $luceneQuery).
+             |      (?id ?score) text:query (renku:slug renku:keywordsConcat schema:description schema:name $luceneQuery).
              |     {
              |       $sameAsVar a renku:DiscoverableDataset;
              |                  schema:creator ?id
