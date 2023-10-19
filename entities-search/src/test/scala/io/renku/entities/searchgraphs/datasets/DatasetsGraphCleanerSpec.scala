@@ -81,7 +81,7 @@ class DatasetsGraphCleanerSpec extends AnyWordSpec with should.Matchers with Moc
 
     def givenUpdatesProducing(project: entities.ProjectIdentification, returning: Try[List[UpdateCommand]]) =
       (commandsProducer
-        .toUpdateCommands(_: entities.ProjectIdentification)(_: List[DatasetSearchInfo]))
+        .toUpdateCommands(_: entities.ProjectIdentification)(_: List[ModelDatasetSearchInfo]))
         .expects(project, Nil)
         .returning(returning)
 

@@ -27,6 +27,7 @@ import io.renku.jsonld.syntax._
 final case class Image(resourceId: ImageResourceId, uri: ImageUri, position: ImagePosition)
 
 object Image {
+
   def projectImage(projectId: projects.ResourceId, uris: List[ImageUri]): List[Image] =
     uris.zipWithIndex.map { case (uri, index) =>
       Image(ImageResourceId((projectId / "images" / index.toString).value), uri, ImagePosition(index))

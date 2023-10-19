@@ -18,44 +18,33 @@
 
 package io.renku.entities.searchgraphs.datasets
 
+import Generators._
 import cats.syntax.all._
-import io.renku.entities.searchgraphs.datasets.Generators._
-import io.renku.generators.Generators.Implicits._
 import io.renku.graph.model.datasets
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
 import org.scalatestplus.scalacheck.ScalaCheckPropertyChecks
 
-class DatasetSearchInfoSpec extends AnyWordSpec with should.Matchers with ScalaCheckPropertyChecks {
-
-  "visibility" should {
-
-    "return the max visibility from all the links" in {
-
-      val info = datasetSearchInfoObjects.generateOne
-
-      info.visibility shouldBe info.links.map(_.visibility).sorted.last
-    }
-  }
+class ModelDatasetSearchInfoSpec extends AnyWordSpec with should.Matchers with ScalaCheckPropertyChecks {
 
   "show" should {
 
     "return String representation of the Info" in {
-      forAll(datasetSearchInfoObjects) {
-        case info @ DatasetSearchInfo(topSameAs,
-                                      name,
-                                      createdOrPublished,
-                                      maybeDateModified,
-                                      creators,
-                                      keywords,
-                                      maybeDescription,
-                                      images,
-                                      links
+      forAll(modelDatasetSearchInfoObjects) {
+        case info @ ModelDatasetSearchInfo(topSameAs,
+                                           name,
+                                           createdOrPublished,
+                                           maybeDateModified,
+                                           creators,
+                                           keywords,
+                                           maybeDescription,
+                                           images,
+                                           link
             ) =>
           info.show shouldBe List(
             show"topmostSameAs = $topSameAs".some,
             show"name = $name".some,
-            show"visibility = ${info.visibility}".some,
+            show"visibility = ${link.visibility}".some,
             createdOrPublished match {
               case d: datasets.DateCreated   => show"dateCreated = $d".some
               case d: datasets.DatePublished => show"datePublished = $d".some
@@ -71,7 +60,7 @@ class DatasetSearchInfoSpec extends AnyWordSpec with should.Matchers with ScalaC
               case Nil => None
               case i   => show"images = [${i.sortBy(_.position).map(_.uri).mkString_("; ")}]".some
             },
-            show"links = [${links.mkString_("; ")}]".some
+            show"link = $link".some
           ).flatten.mkString(", ")
       }
     }

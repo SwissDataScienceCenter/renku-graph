@@ -35,9 +35,11 @@
   text:defaultField "name" ;
   text:entityField  "uri" ;
   text:map (
-    [ text:field "name" ;              text:predicate schema:name ]
-    [ text:field "description" ;       text:predicate schema:description ]
-    [ text:field "slug" ;              text:predicate renku:slug ]
-    [ text:field "projectNamespaces" ; text:predicate renku:projectNamespaces ]
-    [ text:field "keywords" ;          text:predicate schema:keywords ]
+    [ text:field "name" ;                text:predicate schema:name ]
+    [ text:field "description" ;         text:predicate schema:description ]
+    [ text:field "slug" ;                text:predicate renku:slug ]
+    [ text:field "projectNamespaces" ;   text:predicate renku:projectNamespaces ]
+    [ text:field "keywords" ;            text:predicate schema:keywords ]
+    [ text:field "keywordsConcat" ;      text:predicate renku:keywordsConcat ]
+    [ text:field "creatorsNamesConcat" ; text:predicate renku:creatorsNamesConcat ]
   ) .
