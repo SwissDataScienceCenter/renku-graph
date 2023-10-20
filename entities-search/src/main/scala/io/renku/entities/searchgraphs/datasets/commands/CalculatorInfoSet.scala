@@ -16,81 +16,118 @@
  * limitations under the License.
  */
 
-package io.renku.entities.searchgraphs.datasets.commands
+package io.renku.entities.searchgraphs.datasets
+package commands
 
+import SearchInfoLens.searchInfoLinks
 import cats.Show
+import cats.data.{NonEmptyList, Validated, ValidatedNel}
 import cats.syntax.all._
-import io.renku.entities.searchgraphs.datasets.DatasetSearchInfo
+import io.renku.graph.model.datasets
 import io.renku.graph.model.entities.ProjectIdentification
-import io.renku.graph.model.projects
 
 private sealed trait CalculatorInfoSet {
-  val project: ProjectIdentification
+  val project:       ProjectIdentification
+  val topmostSameAs: datasets.TopmostSameAs
+  def asDatasetSearchInfo: Option[DatasetSearchInfo]
 }
 
 private object CalculatorInfoSet {
 
-  final case class ModelInfoOnly(project: ProjectIdentification, modelInfo: DatasetSearchInfo) extends CalculatorInfoSet
+  final case class ModelInfoOnly(project: ProjectIdentification, modelInfo: ModelDatasetSearchInfo)
+      extends CalculatorInfoSet {
+    override val topmostSameAs:            datasets.TopmostSameAs    = modelInfo.topmostSameAs
+    override lazy val asDatasetSearchInfo: Option[DatasetSearchInfo] = modelInfo.toDatasetSearchInfo.some
+  }
 
-  final case class TSInfoOnly(project:        ProjectIdentification,
-                              tsInfo:         DatasetSearchInfo,
-                              tsVisibilities: Map[projects.ResourceId, projects.Visibility]
-  ) extends CalculatorInfoSet
+  final case class TSInfoOnly(project: ProjectIdentification, tsInfo: TSDatasetSearchInfo) extends CalculatorInfoSet {
+    override val topmostSameAs:       datasets.TopmostSameAs    = tsInfo.topmostSameAs
+    override val asDatasetSearchInfo: Option[DatasetSearchInfo] = None
+  }
 
-  final case class AllInfos(project:        ProjectIdentification,
-                            modelInfo:      DatasetSearchInfo,
-                            tsInfo:         DatasetSearchInfo,
-                            tsVisibilities: Map[projects.ResourceId, projects.Visibility]
-  ) extends CalculatorInfoSet
+  final case class BothInfos(project:   ProjectIdentification,
+                             modelInfo: ModelDatasetSearchInfo,
+                             tsInfo:    TSDatasetSearchInfo
+  ) extends CalculatorInfoSet {
+    override val topmostSameAs: datasets.TopmostSameAs = modelInfo.topmostSameAs
+    override lazy val asDatasetSearchInfo: Option[DatasetSearchInfo] =
+      modelInfo.toDatasetSearchInfo.some
+        .map(
+          searchInfoLinks.replace {
+            NonEmptyList.one(modelInfo.link).prependList(tsInfo.links.filterNot(_.projectId == project.resourceId))
+          }
+        )
+  }
 
   def from(project:        ProjectIdentification,
-           maybeModelInfo: Option[DatasetSearchInfo],
-           maybeTSInfo:    Option[DatasetSearchInfo],
-           tsVisibilities: Map[projects.ResourceId, projects.Visibility]
+           maybeModelInfo: Option[ModelDatasetSearchInfo],
+           maybeTSInfo:    Option[TSDatasetSearchInfo]
   ): Either[Exception, CalculatorInfoSet] =
-    validate(project, maybeModelInfo, maybeTSInfo) >>= { _ =>
-      instantiate(project, maybeModelInfo, maybeTSInfo, tsVisibilities)
-    }
+    validate(project, maybeModelInfo, maybeTSInfo) >>
+      instantiate(project, maybeModelInfo, maybeTSInfo)
 
   private def validate(project:        ProjectIdentification,
-                       maybeModelInfo: Option[DatasetSearchInfo],
-                       maybeTSInfo:    Option[DatasetSearchInfo]
+                       maybeModelInfo: Option[ModelDatasetSearchInfo],
+                       maybeTSInfo:    Option[TSDatasetSearchInfo]
   ): Either[Exception, Unit] =
-    (maybeModelInfo, maybeTSInfo) match {
-      case (Some(modelInfo), _) if modelInfo.links.size > 1 =>
-        new Exception(show"CalculatorInfoSet for ${project.resourceId} is linked to many projects").asLeft
-      case (Some(modelInfo), _) if modelInfo.links.head.projectId != project.resourceId =>
-        new Exception(
-          show"CalculatorInfoSet for ${project.resourceId} has model linked to ${modelInfo.links.head.projectId}"
-        ).asLeft
-      case _ => ().asRight
-    }
+    (validateTopSameAs(project)(maybeModelInfo -> maybeTSInfo) |+|
+      validateModelProject(project)(maybeModelInfo)).toEither.leftMap(errs => new Exception(errs.mkString_("; ")))
+
+  private def validateTopSameAs(
+      project: ProjectIdentification
+  ): ((Option[ModelDatasetSearchInfo], Option[TSDatasetSearchInfo])) => ValidatedNel[String, Unit] = {
+    case (Some(modelInfo), Some(tsInfo)) if modelInfo.topmostSameAs != tsInfo.topmostSameAs =>
+      Validated.invalidNel(show"CalculatorInfoSet for ${project.resourceId} has different TopmostSameAs")
+    case _ => Validated.validNel(())
+  }
+
+  private def validateModelProject(
+      project: ProjectIdentification
+  ): Option[ModelDatasetSearchInfo] => ValidatedNel[String, Unit] = {
+    case Some(modelInfo) if modelInfo.link.projectId != project.resourceId =>
+      Validated.invalidNel(show"CalculatorInfoSet for ${project.resourceId} has link to ${modelInfo.link.projectId}")
+    case _ => Validated.validNel(())
+  }
 
   private lazy val instantiate: (ProjectIdentification,
-                                 Option[DatasetSearchInfo],
-                                 Option[DatasetSearchInfo],
-                                 Map[projects.ResourceId, projects.Visibility]
+                                 Option[ModelDatasetSearchInfo],
+                                 Option[TSDatasetSearchInfo]
   ) => Either[Exception, CalculatorInfoSet] = {
-    case (project, Some(modelInfo), None, _)             => ModelInfoOnly(project, modelInfo).asRight
-    case (project, None, Some(tsInfo), tsVisibilities)   => TSInfoOnly(project, tsInfo, tsVisibilities).asRight
-    case (project, Some(modelInfo), Some(tsInfo), tsVis) => AllInfos(project, modelInfo, tsInfo, tsVis).asRight
-    case (project, None, None, _) =>
-      new Exception(show"CalculatorInfoSet for ${project.resourceId} has no infos").asLeft
+    case (project, Some(modelInfo), None)         => ModelInfoOnly(project, modelInfo).asRight
+    case (project, None, Some(tsInfo))            => TSInfoOnly(project, tsInfo).asRight
+    case (project, Some(modelInfo), Some(tsInfo)) => BothInfos(project, modelInfo, tsInfo).asRight
+    case (project, None, None) => new Exception(show"CalculatorInfoSet for ${project.resourceId} has no infos").asLeft
+  }
+
+  private implicit class ModelInfoOps(modelInfo: ModelDatasetSearchInfo) {
+    lazy val toDatasetSearchInfo: DatasetSearchInfo = DatasetSearchInfo(
+      modelInfo.topmostSameAs,
+      modelInfo.name,
+      modelInfo.slug,
+      modelInfo.createdOrPublished,
+      modelInfo.maybeDateModified,
+      modelInfo.creators,
+      modelInfo.keywords,
+      modelInfo.maybeDescription,
+      modelInfo.images,
+      NonEmptyList.one(modelInfo.link)
+    )
   }
 
   implicit val show: Show[CalculatorInfoSet] = Show.show {
     case CalculatorInfoSet.ModelInfoOnly(project, modelInfo) =>
       show"$project, modelInfo = [${toString(modelInfo)}]"
-    case CalculatorInfoSet.TSInfoOnly(project, tsInfo, _) =>
-      show"$project, tsInfo = [${toString(tsInfo)}]"
-    case CalculatorInfoSet.AllInfos(project, modelInfo, tsInfo, _) =>
-      show"$project, modelInfo = [${toString(modelInfo)}], tsInfo = [${toString(tsInfo)}]"
+    case CalculatorInfoSet.TSInfoOnly(project, tsInfo) =>
+      show"$project, tsInfo = [$tsInfo]"
+    case CalculatorInfoSet.BothInfos(project, modelInfo, tsInfo) =>
+      show"$project, modelInfo = [${toString(modelInfo)}], tsInfo = [$tsInfo]"
   }
 
-  private def toString(info: DatasetSearchInfo) = List(
+  private def toString(info: ModelDatasetSearchInfo) = List(
     show"topmostSameAs = ${info.topmostSameAs}",
+    show"name = ${info.name}",
     show"slug = ${info.slug}",
-    show"visibility = ${info.visibility}",
-    show"links = [${info.links.map(link => show"projectId = ${link.projectId}, datasetId = ${link.datasetId}").intercalate("; ")}}]"
+    show"visibility = ${info.link.visibility}",
+    show"link = ${info.link}"
   ).mkString(", ")
 }

@@ -49,12 +49,12 @@ private class DatasetsGraphProvisionerImpl[F[_]: MonadThrow](updatesProducer: Up
 ) extends DatasetsGraphProvisioner[F] {
 
   import DatasetsCollector.collectLastVersions
-  import SearchInfoExtractor.extractSearchInfo
+  import ModelSearchInfoExtractor.extractModelSearchInfo
   import updatesProducer.toUpdateCommands
 
   override def provisionDatasetsGraph(project: Project): F[Unit] =
     collectLastVersions
-      .andThen(extractSearchInfo[F](project))
+      .andThen(extractModelSearchInfo[F](project))
       .andThenF(toUpdateCommands(project.identification))(project)
       .flatMap(searchInfoUploader.upload)
 }

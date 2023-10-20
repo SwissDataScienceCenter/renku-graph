@@ -19,7 +19,7 @@
 package io.renku.entities.searchgraphs.datasets
 
 import cats.data.NonEmptyList
-import io.renku.graph.model.projects
+import io.renku.graph.model.{entities, projects}
 import monocle.Lens
 
 private object SearchInfoLens {
@@ -29,6 +29,9 @@ private object SearchInfoLens {
       info.copy(links = links)
     }
 
+  val modelSearchInfoLink: Lens[ModelDatasetSearchInfo, Link] =
+    Lens[ModelDatasetSearchInfo, Link](_.link)(link => _.copy(link = link))
+
   val linkProjectId: Lens[Link, projects.ResourceId] =
     Lens[Link, projects.ResourceId](_.projectId) { projectId =>
       {
@@ -36,4 +39,25 @@ private object SearchInfoLens {
         case link: Link.ImportedDataset => link.copy(projectId = projectId)
       }
     }
+
+  val linkProjectSlug: Lens[Link, projects.Slug] =
+    Lens[Link, projects.Slug](_.projectSlug) { projectSlug =>
+      {
+        case link: Link.OriginalDataset => link.copy(projectSlug = projectSlug)
+        case link: Link.ImportedDataset => link.copy(projectSlug = projectSlug)
+      }
+    }
+
+  val linkVisibility: Lens[Link, projects.Visibility] =
+    Lens[Link, projects.Visibility](_.visibility) { visibility =>
+      {
+        case link: Link.OriginalDataset => link.copy(visibility = visibility)
+        case link: Link.ImportedDataset => link.copy(visibility = visibility)
+      }
+    }
+
+  def updateLinkProject(project: entities.Project): Link => Link =
+    (linkProjectId replace project.resourceId) andThen
+      (linkVisibility replace project.visibility) andThen
+      (linkProjectSlug replace project.slug)
 }

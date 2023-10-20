@@ -180,7 +180,7 @@ private case object WorkflowsQuery extends EntityQuery[model.Entity.Workflow] {
       visibility <- extract[Option[String]]("projectIdVisibilities")
                       .flatMap(toListOfProjectIdsAndVisibilities)
                       .map(selectBroaderVisibility)
-      keywords <- extract[Option[String]]("keywords") >>= toListOf[plans.Keyword, plans.Keyword.type](plans.Keyword)
+      keywords <- extract[Option[String]]("keywords") >>= toListOf[plans.Keyword, plans.Keyword.type]()(plans.Keyword)
       maybeDescription <- extract[Option[plans.Description]]("maybeDescription")
       workflowTypes    <- extract[WorkflowType]("workflowTypes")
     } yield Entity.Workflow(matchingScore, name, visibility, dateCreated, keywords, maybeDescription, workflowTypes)

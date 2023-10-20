@@ -23,6 +23,7 @@ import cats.syntax.all._
 import io.circe.{Decoder, DecodingFailure}
 import io.renku.entities.search.Criteria.Filters
 import io.renku.entities.search.model.{Entity, MatchingScore}
+import io.renku.entities.searchgraphs.concatSeparator
 import io.renku.graph.model._
 import io.renku.graph.model.projects.Visibility
 import io.renku.http.server.security.model.AuthUser
@@ -87,30 +88,25 @@ object DatasetsQuery extends EntityQuery[Entity.Dataset] {
           |  BIND ('dataset' AS $entityTypeVar)
           |
           |  { # start sub select
-          |    SELECT $sameAsVar $matchingScoreVar
-          |      (GROUP_CONCAT(DISTINCT ?creatorName; separator=',') AS $creatorsNamesVar)
-          |      (GROUP_CONCAT(DISTINCT ?idSlugVisibility; separator=',') AS $idsSlugsVisibilitiesVar)
-          |      (GROUP_CONCAT(DISTINCT ?keyword; separator=',') AS $keywordsVar)
-          |      (GROUP_CONCAT(DISTINCT ?encodedImageUrl; separator=',') AS $imagesVar)
+          |    SELECT DISTINCT $sameAsVar $matchingScoreVar
+          |      $creatorsNamesVar
+          |      $idsSlugsVisibilitiesVar
+          |      $keywordsVar
+          |      $imagesVar
           |    WHERE {
           |      # textQuery
           |      ${textQueryPart(criteria.filters.maybeQuery)}
           |
           |      GRAPH schema:Dataset {
           |        #creator
-          |        $sameAsVar schema:creator ?creatorId.
-          |        GRAPH ${GraphClass.Persons.id} {
-          |          ?creatorId schema:name ?creatorName
-          |        }
+          |        $sameAsVar renku:creatorsNamesConcat $creatorsNamesVar;
+          |                   renku:projectsVisibilitiesConcat $idsSlugsVisibilitiesVar.
           |
-          |        #keywords
-          |        $keywords
+          |        OPTIONAL { $sameAsVar renku:keywordsConcat $keywordsVar }
+          |        OPTIONAL { $sameAsVar renku:imagesConcat $imagesVar }
           |
           |        # resolve project
           |        $resolveProject
-          |
-          |        # images
-          |        $images
           |      }
           |
           |      GRAPH ?projId {
@@ -119,12 +115,8 @@ object DatasetsQuery extends EntityQuery[Entity.Dataset] {
           |
           |        # access restriction
           |        ${accessRightsAndVisibility(criteria.maybeUser, criteria.filters.visibilities)}
-          |
-          |        # slug and visibility
-          |        $slugVisibility
           |      }
           |    }
-          |    GROUP BY $sameAsVar $matchingScoreVar
           |  }# end sub select
           |
           |  ${creatorsPart(criteria.filters.creators)}
@@ -145,26 +137,11 @@ object DatasetsQuery extends EntityQuery[Entity.Dataset] {
           |""".stripMargin.sparql
     }
 
-  private def slugVisibility: Fragment =
-    fr"""|  # Return all visibilities and select the broadest in decoding
-         |  BIND (CONCAT(STR(?projectSlug), STR(':'),
-         |               STR(?visibility)) AS ?idSlugVisibility)
-         |""".stripMargin
-
   private def accessRightsAndVisibility(maybeUser: Option[AuthUser], visibilities: Set[Visibility]): Fragment =
     sparql"""
             |?projId renku:projectVisibility ?visibility .
             |${authSnippets.visibleProjects(maybeUser.map(_.id), visibilities)}
             """
-
-  private def images: Fragment =
-    fr"""|       OPTIONAL {
-         |          ?sameAs schema:image ?imageId .
-         |          ?imageId schema:position ?imagePosition ;
-         |                   schema:contentUrl ?imageUrl .
-         |          BIND (CONCAT(STR(?imagePosition), STR(':'), STR(?imageUrl)) AS ?encodedImageUrl)
-         |       }
-         |""".stripMargin
 
   private def resolveProject: Fragment =
     fr"""|    $sameAsVar a renku:DiscoverableDataset;
@@ -210,12 +187,6 @@ object DatasetsQuery extends EntityQuery[Entity.Dataset] {
          |""".stripMargin
   }
 
-  private def keywords: Fragment =
-    fr"""|OPTIONAL {
-         |  $sameAsVar schema:keywords ?keyword
-         |}
-         |""".stripMargin
-
   private def description: Fragment =
     fr"""| OPTIONAL {
          |   $sameAsVar schema:description $maybeDescriptionVar
@@ -226,7 +197,7 @@ object DatasetsQuery extends EntityQuery[Entity.Dataset] {
       if (ns.isEmpty) Fragment.empty
       else fr"Values (?namespace) { ${ns.map(_.value)}  }"
 
-    fr"""|  ?projId renku:projectPath ?projectSlug;
+    fr"""|  ?projId renku:slug ?projectSlug;
          |          renku:projectNamespace ?namespace.
          |  $matchFrag
       """.stripMargin
@@ -253,7 +224,7 @@ object DatasetsQuery extends EntityQuery[Entity.Dataset] {
              |  SELECT $sameAsVar (MAX(?score) AS $matchingScoreVar)
              |  WHERE {
              |    Graph schema:Dataset {
-             |      (?id ?score) text:query (schema:name renku:slug schema:keywords schema:description $luceneQuery).
+             |      (?id ?score) text:query (schema:name renku:slug renku:keywordsConcat schema:description $luceneQuery).
              |     {
              |       $sameAsVar a renku:DiscoverableDataset;
              |                  schema:creator ?id
@@ -281,7 +252,7 @@ object DatasetsQuery extends EntityQuery[Entity.Dataset] {
     lazy val toListOfIdsSlugsAndVisibilities
         : Option[String] => Decoder.Result[NonEmptyList[(projects.Slug, projects.Visibility)]] =
       _.map(
-        _.split(",")
+        _.split(concatSeparator)
           .map(_.trim)
           .map { case s"$projectSlug:$visibility" =>
             (projects.Slug.from(projectSlug), projects.Visibility.from(visibility)).mapN((_, _))
@@ -312,11 +283,11 @@ object DatasetsQuery extends EntityQuery[Entity.Dataset] {
       maybeDateModified  <- read[Option[datasets.DateCreated]](maybeDateModified)
       date <-
         Either.fromOption(maybeDateCreated.orElse(maybeDatePublished), ifNone = DecodingFailure("No dataset date", Nil))
-      creators <- read[Option[String]](creatorsNamesVar) >>= toListOf[persons.Name, persons.Name.type](persons.Name)
+      creators <- read[Option[String]](creatorsNamesVar) >>= toListOf[persons.Name, persons.Name.type](concatSeparator)
       keywords <-
-        read[Option[String]](keywordsVar) >>= toListOf[datasets.Keyword, datasets.Keyword.type](datasets.Keyword)
+        read[Option[String]](keywordsVar) >>= toListOf[datasets.Keyword, datasets.Keyword.type](concatSeparator)
       maybeDesc <- read[Option[datasets.Description]](maybeDescriptionVar)
-      images    <- read[Option[String]](imagesVar) >>= toListOfImageUris
+      images    <- read[Option[String]](imagesVar) >>= toListOfImageUris(concatSeparator)
     } yield Entity.Dataset(
       matchingScore,
       sameAs,

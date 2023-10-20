@@ -40,100 +40,69 @@ object DatasetQuery extends (Criteria => Option[SparqlQuery]) {
     SparqlQuery.of(
       name = "recent-entity projects",
       Prefixes.of(Schemas.prov -> "prov", Schemas.renku -> "renku", Schemas.schema -> "schema", Schemas.xsd -> "xsd"),
-      sparql"""|SELECT DISTINCT
-               |  ${v.all}
+      sparql"""|SELECT DISTINCT ${v.all}
+               |WHERE {
+               |  BIND (1.0 AS ${v.matchingScore})
+               |  BIND ('dataset' AS ${v.entityType})
                |
-               |  WHERE {
-               |    Bind(1.0 AS ${v.matchingScore})
-               |    Bind('dataset' as ${v.entityType})
+               |  GRAPH ${GraphClass.PersonViewings.id} {
+               |    ?personId a renku:PersonViewing;
+               |              renku:viewedDataset ?viewedDataset.
                |
-               |    Graph ${GraphClass.PersonViewings.id} {
-               |      ?personId a renku:PersonViewing;
-               |                renku:viewedDataset ?viewedDataset.
-               |
-               |      ?viewedDataset renku:dataset ?datasetId;
-               |                     renku:dateViewed ${v.viewedDate}
-               |    }
-               |    Graph ${GraphClass.Datasets.id} {
-               |      ${v.datasetSameAs} a renku:DiscoverableDataset;
-               |                         renku:datasetProjectLink ?projectLink.
-               |
-               |      ?projectLink renku:dataset ?datasetId;
-               |                    renku:project ?projectId.
-               |    }
-               |
-               |    ${authSnippets.visibleProjects(Some(criteria.authUser.id), Visibility.all)}
-               |    
-               |    Graph ${GraphClass.Persons.id} {
-               |      ?personId a schema:Person;
-               |                schema:sameAs ?personSameAs.
-               |      ?personSameAs schema:additionalType ${Person.gitLabSameAsAdditionalType};
-               |                    schema:identifier ${criteria.authUser.id.value}.
-               |    }
-               |
-               |    {
-               |      SELECT DISTINCT
-               |        ${v.datasetSameAs}
-               |        (GROUP_CONCAT(DISTINCT ?creatorName; separator=',') AS ${v.creatorNames})
-               |        (GROUP_CONCAT(DISTINCT ?keyword; separator=',') AS ${v.keywords})
-               |        (GROUP_CONCAT(DISTINCT ?encodedImageUrl; separator=',') AS ${v.images})
-               |      WHERE {
-               |        Graph ${GraphClass.Datasets.id} {
-               |          ${v.datasetSameAs} a renku:DiscoverableDataset;
-               |
-               |          Optional {
-               |            ${v.datasetSameAs} schema:image ?imageId.
-               |            ?imageId schema:position ?imagePosition;
-               |                     schema:contentUrl ?imageUrl.
-               |            BIND(CONCAT(STR(?imagePosition), STR(':'), STR(?imageUrl)) AS ?encodedImageUrl)
-               |          }
-               |
-               |          Optional {
-               |            ${v.datasetSameAs} schema:creator ?creatorId.
-               |            GRAPH ${GraphClass.Persons.id} {
-               |              ?creatorId schema:name ?creatorName
-               |            }
-               |          }
-               |          Optional {
-               |            ${v.datasetSameAs} schema:keywords ?keyword
-               |          }
-               |        }
-               |      }
-               |      GROUP BY ${v.datasetSameAs}
-               |    }
-               |
-               |    Graph ${GraphClass.Datasets.id} {
-               |      ${v.datasetSameAs} renku:slug ${v.datasetSlug};
-               |                         schema:name ${v.datasetName}.
-               |
-               |      Optional {
-               |        ${v.datasetSameAs} schema:description ${v.description}.
-               |      }
-               |
-               |      Optional {
-               |        ${v.datasetSameAs} schema:dateCreated ${v.dateCreated}.
-               |        BIND(xsd:date(substr(str(${v.dateCreated}), 1, 10)) AS ?createdAt)
-               |      }
-               |      Optional {
-               |        ${v.datasetSameAs} schema:datePublished ${v.datePublished}.
-               |        BIND(xsd:date(${v.datePublished}) AS ?publishedAt)
-               |      }
-               |      Optional {
-               |        ${v.datasetSameAs} schema:dateModified ${v.dateModified}.
-               |        BIND(xsd:date(substr(str(${v.dateModified}),1,10)) AS ?modifiedAt)
-               |      }
-               |      BIND(IF (BOUND(?modifiedAt), ?modifiedAt,
-               |               IF (BOUND(?createdAt), ?createdAt, ?publishedAt)) AS ${v.date}
-               |           )
-               |    }
-               |
-               |    Graph ?projectId {
-               |      ?projectId a schema:Project;
-               |                 renku:projectPath ${v.projectSlug};
-               |                 renku:projectVisibility ${v.projectVisibility}.
-               |    }
+               |    ?viewedDataset renku:dataset ?datasetId;
+               |                   renku:dateViewed ${v.viewedDate}
                |  }
+               |
+               |  GRAPH ${GraphClass.Datasets.id} {
+               |    ${v.datasetSameAs} a renku:DiscoverableDataset;
+               |                       renku:datasetProjectLink ?projectLink.
+               |
+               |    ?projectLink renku:dataset ?datasetId;
+               |                  renku:project ?projectId.
+               |  }
+               |
+               |  ${authSnippets.visibleProjects(Some(criteria.authUser.id), Visibility.all)}
+               |
+               |  GRAPH ${GraphClass.Persons.id} {
+               |    ?personId a schema:Person;
+               |              schema:sameAs ?personSameAs.
+               |    ?personSameAs schema:additionalType ${Person.gitLabSameAsAdditionalType};
+               |                  schema:identifier ${criteria.authUser.id.value}.
+               |  }
+               |
+               |  GRAPH ${GraphClass.Datasets.id} {
+               |    ${v.datasetSameAs} a renku:DiscoverableDataset;
+               |                       renku:creatorsNamesConcat ${v.creatorNames};
+               |                       schema:name ${v.datasetName};
+               |                       renku:slug ${v.datasetSlug}.
+               |
+               |    OPTIONAL { ${v.datasetSameAs} renku:imagesConcat ${v.images} }
+               |    OPTIONAL { ${v.datasetSameAs} renku:keywordsConcat ${v.keywords} }
+               |    OPTIONAL { ${v.datasetSameAs} schema:description ${v.description} }
+               |
+               |    OPTIONAL {
+               |      ${v.datasetSameAs} schema:dateCreated ${v.dateCreated}.
+               |      BIND (xsd:date(substr(str(${v.dateCreated}), 1, 10)) AS ?createdAt)
+               |    }
+               |    OPTIONAL {
+               |      ${v.datasetSameAs} schema:datePublished ${v.datePublished}.
+               |      BIND (xsd:date(${v.datePublished}) AS ?publishedAt)
+               |    }
+               |    OPTIONAL {
+               |      ${v.datasetSameAs} schema:dateModified ${v.dateModified}.
+               |      BIND (xsd:date(substr(str(${v.dateModified}),1,10)) AS ?modifiedAt)
+               |    }
+               |    BIND (IF (BOUND(?modifiedAt), ?modifiedAt,
+               |             IF (BOUND(?createdAt), ?createdAt, ?publishedAt)) AS ${v.date}
+               |         )
+               |  }
+               |
+               |  GRAPH ?projectId {
+               |    ?projectId a schema:Project;
+               |               renku:projectPath ${v.projectSlug};
+               |               renku:projectVisibility ${v.projectVisibility}.
+               |  }
+               |}
         """.stripMargin
     )
-
 }

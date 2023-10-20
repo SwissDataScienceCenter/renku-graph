@@ -48,13 +48,18 @@ object SubscriptionFactory {
   private[viewed] def kickOffEventsDequeueing[F[_]: Async: Logger](eventsQueue: EventsQueue[F],
                                                                    processor:   EventProcessor[F]
   ) = Async[F].start {
+    startDequeueingEvents(eventsQueue, processor)
+  }.void
+
+  private def startDequeueingEvents[F[_]: Async: Logger](eventsQueue: EventsQueue[F],
+                                                         processor:   EventProcessor[F]
+  ): F[Unit] =
     Logger[F].info(show"Starting events dequeueing for $categoryName") >>
       hookToTheEventsStream(eventsQueue, processor)
-        .handleErrorWith(
+        .handleErrorWith {
           Logger[F].error(_)(show"An error in the $categoryName processing pipe; restarting") >>
-            Temporal[F].delayBy(hookToTheEventsStream(eventsQueue, processor), 2 seconds)
-        )
-  }.void
+            Temporal[F].delayBy(startDequeueingEvents(eventsQueue, processor), 2 seconds)
+        }
 
   private def hookToTheEventsStream[F[_]: Async](eventsQueue: EventsQueue[F], processor: EventProcessor[F]) =
     eventsQueue.acquireEventsStream(categoryName).through(processor).compile.drain

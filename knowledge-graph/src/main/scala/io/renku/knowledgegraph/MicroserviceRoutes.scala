@@ -92,7 +92,9 @@ private class MicroserviceRoutes[F[_]: Async](
   import routesMetrics._
 
   lazy val routes: Resource[F, HttpRoutes[F]] =
-    (versionRoutes() <+> nonAuthorizedRoutes <+> authorizedRoutes).withMetrics
+    (versionRoutes() <+>
+      versionRoutes.on(Root / "knowledge-graph" / "version") <+>
+      nonAuthorizedRoutes <+> authorizedRoutes).withMetrics
 
   private lazy val authorizedRoutes: HttpRoutes[F] = authMiddleware {
     `GET /datasets/*` <+> `GET /entities/*` <+> `GET /projects/*` <+> `GET /users/*` <+> getRecentEntities

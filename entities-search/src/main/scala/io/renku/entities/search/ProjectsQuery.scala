@@ -21,6 +21,7 @@ package io.renku.entities.search
 import io.circe.Decoder
 import io.renku.entities.search.Criteria.Filters.EntityType
 import io.renku.entities.search.model.{Entity, MatchingScore}
+import io.renku.entities.searchgraphs.concatSeparator
 import io.renku.graph.model.{GraphClass, persons, projects}
 import io.renku.http.server.security.model.AuthUser
 import io.renku.projectauth.util.SparqlSnippets
@@ -44,13 +45,8 @@ private case object ProjectsQuery extends EntityQuery[model.Entity.Project] {
   private val imagesVar           = VarName("images")
 
   // local vars
-  private val projectIdVar        = VarName("projectId")
-  private val someDateCreatedVar  = VarName("someDateCreated")
-  private val someDateModifiedVar = VarName("someDateModified")
-  private val someCreatorNameVar  = VarName("someCreatorName")
-  private val keywordVar          = VarName("keyword")
-  private val encodedImageUrlVar  = VarName("encodedImageUrl")
-  private val authSnippets        = SparqlSnippets(projectIdVar)
+  private val projectIdVar = VarName("projectId")
+  private val authSnippets = SparqlSnippets(projectIdVar)
 
   override val selectVariables: Set[String] =
     Set(
@@ -70,14 +66,12 @@ private case object ProjectsQuery extends EntityQuery[model.Entity.Project] {
   override def query(criteria: Criteria): Option[String] = (criteria.filters whenRequesting entityType) {
     import criteria._
     sparql"""|{
-             |  SELECT $entityTypeVar $matchingScoreVar $nameVar $slugVar $visibilityVar
-             |    (MIN($someDateCreatedVar) AS $maybeDateCreatedVar)
-             |    (MAX($someDateModifiedVar) AS $dateModifiedVar)
-             |    (MAX($someDateModifiedVar) AS $dateVar)
-             |    (SAMPLE($someCreatorNameVar) AS $maybeCreatorNameVar)
+             |  SELECT DISTINCT $entityTypeVar $matchingScoreVar $nameVar $slugVar $visibilityVar
+             |    $maybeDateCreatedVar $dateModifiedVar ($dateModifiedVar AS $dateVar)
+             |    $maybeCreatorNameVar
              |    $maybeDescriptionVar
-             |    (GROUP_CONCAT(DISTINCT $keywordVar; separator=',') AS $keywordsVar)
-             |    (GROUP_CONCAT($encodedImageUrlVar; separator=',') AS $imagesVar)
+             |    $keywordsVar
+             |    $imagesVar
              |  WHERE {
              |    BIND (${entityType.value.asTripleObject} AS $entityTypeVar)
              |
@@ -87,11 +81,11 @@ private case object ProjectsQuery extends EntityQuery[model.Entity.Project] {
              |    GRAPH ${GraphClass.Projects.id} {
              |      $projectIdVar a renku:DiscoverableProject;
              |                    schema:name $nameVar;
-             |                    renku:projectPath $slugVar;
-             |                    schema:dateModified $someDateModifiedVar;
-             |                    schema:dateCreated $someDateCreatedVar.
+             |                    renku:slug $slugVar;
+             |                    schema:dateModified $dateModifiedVar;
+             |                    schema:dateCreated $maybeDateCreatedVar.
              |
-             |      ${filters.maybeOnDateCreated(someDateCreatedVar)}
+             |      ${filters.maybeOnDateCreated(maybeDateCreatedVar)}
              |
              |      ${accessRightsAndVisibility(criteria.maybeUser, criteria.filters.visibilities)}
              |
@@ -102,17 +96,16 @@ private case object ProjectsQuery extends EntityQuery[model.Entity.Project] {
              |      OPTIONAL {
              |        $projectIdVar schema:creator ?creatorId.
              |        GRAPH ${GraphClass.Persons.id} {
-             |          ?creatorId schema:name $someCreatorNameVar
+             |          ?creatorId schema:name $maybeCreatorNameVar
              |        }
              |      }
-             |      ${filters.maybeOnCreatorName(someCreatorNameVar)}
+             |      ${filters.maybeOnCreatorName(maybeCreatorNameVar)}
              |
              |      OPTIONAL { $projectIdVar schema:description $maybeDescriptionVar }
-             |      OPTIONAL { $projectIdVar schema:keywords $keywordVar }
-             |      $imagesPart
+             |      OPTIONAL { $projectIdVar renku:keywordsConcat $keywordsVar }
+             |      OPTIONAL { $projectIdVar renku:imagesConcat $imagesVar }
              |    }
              |  }
-             |  GROUP BY $entityTypeVar $matchingScoreVar $nameVar $slugVar $visibilityVar $maybeDescriptionVar
              |}
              |""".stripMargin.sparql
   }
@@ -124,7 +117,7 @@ private case object ProjectsQuery extends EntityQuery[model.Entity.Project] {
            |  SELECT $projectIdVar (MAX(?score) AS $matchingScoreVar)
            |  WHERE {
            |    {
-           |      (?id ?score) text:query (schema:name schema:keywords schema:description renku:projectNamespaces $luceneQuery)
+           |      (?id ?score) text:query (schema:name renku:keywordsConcat schema:description renku:projectNamespaces $luceneQuery)
            |    } {
            |      GRAPH ${GraphClass.Projects.id} {
            |        ?id a renku:DiscoverableProject
@@ -161,15 +154,6 @@ private case object ProjectsQuery extends EntityQuery[model.Entity.Project] {
     """.stripMargin
   }
 
-  private lazy val imagesPart =
-    fr"""|OPTIONAL {
-         |  $projectIdVar schema:image ?imageId.
-         |  ?imageId schema:position ?imagePosition;
-         |           schema:contentUrl ?imageUrl.
-         |  BIND (CONCAT(STR(?imagePosition), STR(':'), STR(?imageUrl)) AS $encodedImageUrlVar)
-         |}
-         |""".stripMargin
-
   override def decoder[EE >: Entity.Project]: Decoder[EE] = { implicit cursor =>
     import DecodingTools._
     import cats.syntax.all._
@@ -184,9 +168,9 @@ private case object ProjectsQuery extends EntityQuery[model.Entity.Project] {
       dateModified     <- read[projects.DateModified](dateModifiedVar)
       maybeCreatorName <- read[Option[persons.Name]](maybeCreatorNameVar)
       maybeDescription <- read[Option[projects.Description]](maybeDescriptionVar)
-      images           <- read[Option[String]](imagesVar) >>= toListOfImageUris
+      images           <- read[Option[String]](imagesVar) >>= toListOfImageUris(concatSeparator)
       keywords <-
-        read[Option[String]](keywordsVar) >>= toListOf[projects.Keyword, projects.Keyword.type](projects.Keyword)
+        read[Option[String]](keywordsVar) >>= toListOf[projects.Keyword, projects.Keyword.type](concatSeparator)
     } yield Entity.Project(matchingScore,
                            slug,
                            name,

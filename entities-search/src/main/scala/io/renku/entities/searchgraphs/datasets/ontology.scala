@@ -26,17 +26,22 @@ import io.renku.jsonld.ontology._
 
 object DatasetSearchInfoOntology {
 
-  val nameProperty:          DataProperty.Def = Dataset.Ontology.nameProperty
-  val slugProperty:          DataProperty.Def = Dataset.Ontology.slugProperty
-  val visibilityProperty:    DataProperty.Def = Project.Ontology.visibilityProperty
-  val dateCreatedProperty:   DataProperty.Def = Dataset.Ontology.dateCreatedProperty
-  val datePublishedProperty: DataProperty.Def = Dataset.Ontology.datePublishedProperty
-  val dateModifiedProperty:  DataProperty.Def = DataProperty(schema / "dateModified", xsd / "dateTime")
-  val keywordsProperty:      DataProperty.Def = Dataset.Ontology.keywordsProperty
-  val descriptionProperty:   DataProperty.Def = Dataset.Ontology.descriptionProperty
-  val creatorProperty:       Property         = Dataset.Ontology.creator
-  val imageProperty:         Property         = Dataset.Ontology.image
-  val linkProperty:          Property         = renku / "datasetProjectLink"
+  val nameProperty:                DataProperty.Def = Dataset.Ontology.nameProperty
+  val slugProperty:                DataProperty.Def = Dataset.Ontology.slugProperty
+  val visibilityProperty:          DataProperty.Def = Project.Ontology.visibilityProperty
+  val dateCreatedProperty:         DataProperty.Def = Dataset.Ontology.dateCreatedProperty
+  val datePublishedProperty:       DataProperty.Def = Dataset.Ontology.datePublishedProperty
+  val dateModifiedProperty:        DataProperty.Def = DataProperty(schema / "dateModified", xsd / "dateTime")
+  val keywordsProperty:            DataProperty.Def = Dataset.Ontology.keywordsProperty
+  val keywordsConcatProperty:      DataProperty.Def = DataProperty(renku / "keywordsConcat", xsd / "string")
+  val descriptionProperty:         DataProperty.Def = Dataset.Ontology.descriptionProperty
+  val creatorProperty:             Property         = Dataset.Ontology.creator
+  val creatorsNamesConcatProperty: DataProperty.Def = DataProperty(renku / "creatorsNamesConcat", xsd / "string")
+  val imageProperty:               Property         = Dataset.Ontology.image
+  val imagesConcatProperty:        DataProperty.Def = DataProperty(renku / "imagesConcat", xsd / "string")
+  val linkProperty:                Property         = renku / "datasetProjectLink"
+  val projectsVisibilitiesConcatProperty: DataProperty.Def =
+    DataProperty(renku / "projectsVisibilitiesConcat", xsd / "string")
 
   lazy val typeDef: Type = Type.Def(
     Class(renku / "DiscoverableDataset"),
@@ -45,26 +50,20 @@ object DatasetSearchInfoOntology {
       ObjectProperty(imageProperty, Image.Ontology.typeDef),
       ObjectProperty(linkProperty, LinkOntology.typeDef)
     ),
-    DataProperties(nameProperty,
-                   slugProperty,
-                   visibilityProperty,
-                   dateCreatedProperty,
-                   datePublishedProperty,
-                   dateModifiedProperty,
-                   keywordsProperty,
-                   descriptionProperty
+    DataProperties(
+      nameProperty,
+      slugProperty,
+      visibilityProperty,
+      dateCreatedProperty,
+      datePublishedProperty,
+      dateModifiedProperty,
+      keywordsProperty,
+      keywordsConcatProperty,
+      descriptionProperty,
+      creatorsNamesConcatProperty,
+      imagesConcatProperty,
+      projectsVisibilitiesConcatProperty
     )
-  )
-}
-
-object PersonInfoOntology {
-
-  val nameProperty: DataProperty.Def = Person.Ontology.nameProperty
-
-  lazy val typeDef: Type = Type.Def(
-    Class(renku / "DiscoverableDatasetPerson"),
-    ObjectProperties(),
-    DataProperties(nameProperty)
   )
 }
 

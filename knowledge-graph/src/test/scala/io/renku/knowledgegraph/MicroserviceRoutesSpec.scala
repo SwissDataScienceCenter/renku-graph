@@ -1022,6 +1022,12 @@ class MicroserviceRoutesSpec
     }
   }
 
+  "GET /knowledge-graph/version" should {
+    "return response from the version endpoint - the same as /version" in new TestCase {
+      routes().call(Request(GET, uri"/knowledge-graph/version")).status shouldBe versionEndpointResponse.status
+    }
+  }
+
   private trait TestCase {
 
     private implicit val ru: RenkuUrl = renkuUrls.generateOne
@@ -1083,6 +1089,16 @@ class MicroserviceRoutesSpec
         HttpRoutes.of[IO] { case GET -> Root / "version" => versionEndpointResponse.pure[IO] }
       }
       .atLeastOnce()
+
+    {
+      import org.http4s.dsl.io.{GET => _, _}
+      (versionRoutes.on _)
+        .expects(Root / "knowledge-graph" / "version")
+        .returning {
+          HttpRoutes.of[IO] { case GET -> Root / "knowledge-graph" / "version" => versionEndpointResponse.pure[IO] }
+        }
+        .atLeastOnce()
+    }
 
     def givenDSAuthorizer(requestedDS:   RequestedDataset,
                           maybeAuthUser: Option[AuthUser],

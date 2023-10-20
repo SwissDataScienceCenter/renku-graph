@@ -25,7 +25,6 @@ import io.renku.generators.Generators.Implicits._
 import io.renku.graph.model._
 import io.renku.graph.model.entities.EntityFunctions
 import io.renku.graph.model.testentities._
-import io.renku.graph.model.versions.SchemaVersion
 import io.renku.interpreters.TestLogger
 import io.renku.jsonld.syntax._
 import io.renku.logging.TestSparqlQueryTimeRecorder
@@ -70,8 +69,10 @@ class BacklogCreatorSpec
 
   private implicit val logger:       TestLogger[IO]              = TestLogger[IO]()
   private implicit val timeRecorder: SparqlQueryTimeRecorder[IO] = TestSparqlQueryTimeRecorder[IO].unsafeRunSync()
-  private lazy val backlogCreator =
-    new BacklogCreatorImpl[IO](AllProjects[IO](projectsDSConnectionInfo), TSClient[IO](migrationsDSConnectionInfo))
+  private lazy val backlogCreator = new BacklogCreatorImpl[IO](migrationName,
+                                                               AllProjects[IO](projectsDSConnectionInfo),
+                                                               TSClient[IO](migrationsDSConnectionInfo)
+  )
 
   private def fetchBacklogProjects =
     runSelect(
@@ -81,12 +82,9 @@ class BacklogCreatorSpec
         Prefixes of renku -> "renku",
         sparql"""|SELECT ?slug
                  |WHERE {
-                 |  ${ReindexLucene.name.asEntityId} renku:toBeMigrated ?slug
+                 |  ${migrationName.asEntityId} renku:toBeMigrated ?slug
                  |}
                  |""".stripMargin
       )
     ).map(_.flatMap(_.get("slug").map(projects.Slug)))
-
-  private def setSchema(version: SchemaVersion): Project => Project =
-    _.fold(_.copy(version = version), _.copy(version = version), identity, identity)
 }

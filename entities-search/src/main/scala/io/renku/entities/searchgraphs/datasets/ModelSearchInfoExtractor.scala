@@ -19,16 +19,15 @@
 package io.renku.entities.searchgraphs.datasets
 
 import cats.MonadThrow
-import cats.data.NonEmptyList
 import cats.syntax.all._
 import io.renku.graph.model.datasets
 import io.renku.graph.model.entities.{Dataset, Project}
 
-private object SearchInfoExtractor {
+private object ModelSearchInfoExtractor {
 
-  def extractSearchInfo[F[_]: MonadThrow](
+  def extractModelSearchInfo[F[_]: MonadThrow](
       project: Project
-  )(datasets: List[Dataset[Dataset.Provenance]]): F[List[DatasetSearchInfo]] =
+  )(datasets: List[Dataset[Dataset.Provenance]]): F[List[ModelDatasetSearchInfo]] =
     datasets
       .map(toSearchInfo[F](project))
       .sequence
@@ -58,19 +57,21 @@ private object SearchInfoExtractor {
                                createdOrPublished: datasets.CreatedOrPublished,
                                maybeDateModified:  Option[datasets.DateModified],
                                project:            Project
-  ) = DatasetSearchInfo(
+  ) = ModelDatasetSearchInfo(
     ds.provenance.topmostSameAs,
     ds.identification.name,
     ds.identification.slug,
-    project.visibility,
     createdOrPublished,
     maybeDateModified,
-    ds.provenance.creators.map(_.resourceId),
+    ds.provenance.creators.map(Creator.from),
     ds.additionalInfo.keywords,
     ds.additionalInfo.maybeDescription,
     ds.additionalInfo.images,
-    NonEmptyList.one(
-      Link(ds.provenance.topmostSameAs, ds.identification.resourceId, project.resourceId, project.slug)
+    Link.from(ds.provenance.topmostSameAs,
+              ds.identification.resourceId,
+              project.resourceId,
+              project.slug,
+              project.visibility
     )
   )
 }

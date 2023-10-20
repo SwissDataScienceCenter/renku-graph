@@ -60,6 +60,7 @@ class DatasetQuerySpec extends SearchTestBase with OptionValues {
   }
 
   it should "find and decode datasets" in {
+
     val project = renkuProjectEntities(visibilityPublic)
       .withDatasets(datasetEntities(provenanceNonModified))
       .generateOne
