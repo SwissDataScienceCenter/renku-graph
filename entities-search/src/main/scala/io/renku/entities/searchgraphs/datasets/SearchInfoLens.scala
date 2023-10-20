@@ -32,6 +32,11 @@ private object SearchInfoLens {
   val modelSearchInfoLink: Lens[ModelDatasetSearchInfo, Link] =
     Lens[ModelDatasetSearchInfo, Link](_.link)(link => _.copy(link = link))
 
+  val tsSearchInfoLinks: Lens[TSDatasetSearchInfo, List[Link]] =
+    Lens[TSDatasetSearchInfo, List[Link]](_.links) { links => info =>
+      info.copy(links = links)
+    }
+
   val linkProjectId: Lens[Link, projects.ResourceId] =
     Lens[Link, projects.ResourceId](_.projectId) { projectId =>
       {

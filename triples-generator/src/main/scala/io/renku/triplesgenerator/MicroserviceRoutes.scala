@@ -24,8 +24,9 @@ import cats.syntax.all._
 import com.typesafe.config.Config
 import io.renku.events.consumers.EventConsumersRegistry
 import io.renku.graph.http.server.binders.ProjectSlug
-import io.renku.graph.model.RenkuUrl
+import io.renku.graph.model.{RenkuUrl, datasets}
 import io.renku.http.server.version
+import io.renku.lock.Lock
 import io.renku.metrics.{MetricsRegistry, RoutesMetrics}
 import io.renku.triplesgenerator.TgDB.TsWriteLock
 import io.renku.triplesgenerator.events.EventEndpoint
@@ -71,11 +72,12 @@ private object MicroserviceRoutes {
   def apply[F[_]: Async: Logger: MetricsRegistry: SparqlQueryTimeRecorder](
       consumersRegistry:   EventConsumersRegistry[F],
       tsWriteLock:         TsWriteLock[F],
+      topSameAsLock:       Lock[F, datasets.TopmostSameAs],
       projectSparqlClient: ProjectSparqlClient[F],
       config:              Config
   )(implicit renkuUrl: RenkuUrl): F[MicroserviceRoutes[F]] = (
     EventEndpoint(consumersRegistry),
-    projects.create.Endpoint[F](tsWriteLock, projectSparqlClient),
+    projects.create.Endpoint[F](tsWriteLock, topSameAsLock, projectSparqlClient),
     projects.update.Endpoint[F](tsWriteLock),
     version.Routes[F],
   ).mapN(new MicroserviceRoutes(_, _, _, new RoutesMetrics[F], _, config))

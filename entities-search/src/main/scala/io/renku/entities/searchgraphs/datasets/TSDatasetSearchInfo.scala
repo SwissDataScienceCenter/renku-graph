@@ -16,22 +16,15 @@
  * limitations under the License.
  */
 
-package io.renku.entities.searchgraphs.datasets.commands
+package io.renku.entities.searchgraphs.datasets
 
 import cats.Show
 import cats.syntax.all._
-import io.renku.entities.searchgraphs.datasets.Link
 import io.renku.graph.model.datasets
-import monocle.Lens
 
 private final case class TSDatasetSearchInfo(topmostSameAs: datasets.TopmostSameAs, links: List[Link])
 
 private object TSDatasetSearchInfo {
-
-  val tsSearchInfoLinks: Lens[TSDatasetSearchInfo, List[Link]] =
-    Lens[TSDatasetSearchInfo, List[Link]](_.links) { links => info =>
-      info.copy(links = links)
-    }
 
   implicit lazy val show: Show[TSDatasetSearchInfo] = Show.show { case TSDatasetSearchInfo(topSameAs, links) =>
     show"topmostSameAs = $topSameAs, links = [${links.mkString_("; ")}]"

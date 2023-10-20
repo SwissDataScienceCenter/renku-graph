@@ -18,76 +18,97 @@
 
 package io.renku.entities.searchgraphs.datasets
 
+import cats.effect.IO
+import cats.effect.testing.scalatest.AsyncIOSpec
 import cats.syntax.all._
-import io.renku.entities.searchgraphs.Generators.updateCommands
+import io.renku.entities.searchgraphs.Generators._
+import io.renku.entities.searchgraphs.datasets.Generators.tsDatasetSearchInfoObjects
 import io.renku.entities.searchgraphs.datasets.commands.UpdateCommandsProducer
 import io.renku.entities.searchgraphs.{UpdateCommand, UpdateCommandsUploader}
 import io.renku.generators.Generators.Implicits._
 import io.renku.generators.Generators.exceptions
-import io.renku.graph.model.entities
 import io.renku.graph.model.testentities.projectIdentifications
-import org.scalamock.scalatest.MockFactory
+import io.renku.graph.model.{datasets, entities}
+import io.renku.lock.Lock
+import org.scalamock.scalatest.AsyncMockFactory
 import org.scalatest.matchers.should
-import org.scalatest.wordspec.AnyWordSpec
+import org.scalatest.wordspec.AsyncWordSpec
 
-import scala.util.Try
-
-class DatasetsGraphCleanerSpec extends AnyWordSpec with should.Matchers with MockFactory {
+class DatasetsGraphCleanerSpec extends AsyncWordSpec with AsyncIOSpec with should.Matchers with AsyncMockFactory {
 
   "cleanDatasetsGraph" should {
 
-    "produce TS update commands and " +
-      "push the commands into the TS" in new TestCase {
+    "fetch datasets infos from TS," +
+      "produce TS update commands and " +
+      "push them to the TS" in {
 
         val project = projectIdentifications.generateOne
 
-        val updates = updateCommands.generateList()
-        givenUpdatesProducing(project, returning = updates.pure[Try])
+        val tsInfos = tsDatasetSearchInfoObjects(project.resourceId).generateList(min = 1)
+        givenTSSearchInfosForProject(project, returning = tsInfos.pure[IO])
 
-        givenUploading(updates, returning = ().pure[Try])
+        tsInfos foreach { tsInfo =>
+          val updates = updateCommands.generateList(min = 1)
+          givenUpdatesProducing(project, tsInfo, returning = updates.pure[IO])
 
-        cleaner.cleanDatasetsGraph(project) shouldBe ().pure[Try]
+          givenUploading(updates, returning = ().pure[IO])
+        }
+
+        cleaner.cleanDatasetsGraph(project).assertNoException
       }
 
-    "fail if updates producing step fails" in new TestCase {
+    "fail if updates producing step fails" in {
 
       val project = projectIdentifications.generateOne
 
-      val failure = exceptions.generateOne.raiseError[Try, List[UpdateCommand]]
-      givenUpdatesProducing(project, returning = failure)
+      val tsInfo = tsDatasetSearchInfoObjects(project.resourceId).generateOne
+      givenTSSearchInfosForProject(project, returning = List(tsInfo).pure[IO])
 
-      cleaner.cleanDatasetsGraph(project) shouldBe failure
+      val failure = exceptions.generateOne
+      givenUpdatesProducing(project, tsInfo, returning = failure.raiseError[IO, List[UpdateCommand]])
+
+      cleaner.cleanDatasetsGraph(project).assertThrowsError[Exception](_ shouldBe failure)
     }
 
-    "fail if updates uploading fails" in new TestCase {
+    "fail if updates uploading fails" in {
 
       val project = projectIdentifications.generateOne
 
-      val updates = updateCommands.generateList()
-      givenUpdatesProducing(project, returning = updates.pure[Try])
+      val tsInfo = tsDatasetSearchInfoObjects(project.resourceId).generateOne
+      givenTSSearchInfosForProject(project, returning = List(tsInfo).pure[IO])
 
-      val failure = exceptions.generateOne.raiseError[Try, Unit]
-      givenUploading(updates, returning = failure)
+      val updates = updateCommands.generateList(min = 1)
+      givenUpdatesProducing(project, tsInfo, returning = updates.pure[IO])
+      val failure = exceptions.generateOne
+      givenUploading(updates, returning = failure.raiseError[IO, Unit])
 
-      cleaner.cleanDatasetsGraph(project) shouldBe failure
+      cleaner.cleanDatasetsGraph(project).assertThrowsError[Exception](_ shouldBe failure)
     }
   }
 
-  private trait TestCase {
+  private val tsSearchInfoFetcher = mock[TSSearchInfoFetcher[IO]]
+  private val commandsProducer    = mock[UpdateCommandsProducer[IO]]
+  private val commandsUploader    = mock[UpdateCommandsUploader[IO]]
+  private val topSameAsLock: Lock[IO, datasets.TopmostSameAs] = Lock.none[IO, datasets.TopmostSameAs]
+  private lazy val cleaner =
+    new DatasetsGraphCleanerImpl[IO](tsSearchInfoFetcher, commandsProducer, commandsUploader, topSameAsLock)
 
-    private val commandsProducer = mock[UpdateCommandsProducer[Try]]
-    private val commandsUploader = mock[UpdateCommandsUploader[Try]]
-    val cleaner                  = new DatasetsGraphCleanerImpl[Try](commandsProducer, commandsUploader)
+  private def givenTSSearchInfosForProject(project:   entities.ProjectIdentification,
+                                           returning: IO[List[TSDatasetSearchInfo]]
+  ) = (tsSearchInfoFetcher.findTSInfosByProject _)
+    .expects(project.resourceId)
+    .returning(returning)
 
-    def givenUpdatesProducing(project: entities.ProjectIdentification, returning: Try[List[UpdateCommand]]) =
-      (commandsProducer
-        .toUpdateCommands(_: entities.ProjectIdentification)(_: List[ModelDatasetSearchInfo]))
-        .expects(project, Nil)
-        .returning(returning)
+  private def givenUpdatesProducing(project:   entities.ProjectIdentification,
+                                    tsInfo:    TSDatasetSearchInfo,
+                                    returning: IO[List[UpdateCommand]]
+  ) = (commandsProducer
+    .toUpdateCommands(_: entities.ProjectIdentification, _: TSDatasetSearchInfo))
+    .expects(project, tsInfo)
+    .returning(returning)
 
-    def givenUploading(commands: List[UpdateCommand], returning: Try[Unit]) =
-      (commandsUploader.upload _)
-        .expects(commands)
-        .returning(returning)
-  }
+  private def givenUploading(commands: List[UpdateCommand], returning: IO[Unit]) =
+    (commandsUploader.upload _)
+      .expects(commands)
+      .returning(returning)
 }

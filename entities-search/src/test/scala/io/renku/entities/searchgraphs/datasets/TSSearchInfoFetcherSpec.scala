@@ -17,12 +17,11 @@
  */
 
 package io.renku.entities.searchgraphs.datasets
-package commands
 
-import Encoders._
 import cats.effect.IO
 import cats.effect.testing.scalatest.AsyncIOSpec
 import cats.syntax.all._
+import commands.Encoders._
 import io.renku.entities.searchgraphs.SearchInfoDatasets
 import io.renku.entities.searchgraphs.datasets.Generators._
 import io.renku.entities.searchgraphs.datasets.SearchInfoLens._

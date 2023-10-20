@@ -16,11 +16,10 @@
  * limitations under the License.
  */
 
-package io.renku.entities.searchgraphs.datasets.commands
+package io.renku.entities.searchgraphs.datasets
 
 import cats.effect.Async
 import io.circe.DecodingFailure.Reason.CustomReason
-import io.renku.entities.searchgraphs.datasets.{Link, links}
 import io.renku.graph.model.datasets.TopmostSameAs
 import io.renku.graph.model.{GraphClass, datasets, projects}
 import io.renku.jsonld.syntax._

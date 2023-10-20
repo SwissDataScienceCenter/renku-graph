@@ -18,12 +18,13 @@
 
 package io.renku.entities.searchgraphs.datasets
 
-import cats.MonadThrow
 import cats.effect.Async
 import cats.syntax.all._
 import io.renku.entities.searchgraphs.UpdateCommandsUploader
 import io.renku.entities.searchgraphs.datasets.commands.UpdateCommandsProducer
+import io.renku.graph.model.datasets
 import io.renku.graph.model.entities.Project
+import io.renku.lock.Lock
 import io.renku.triplesstore.{ProjectsConnectionConfig, SparqlQueryTimeRecorder}
 import org.typelevel.log4cats.Logger
 
@@ -32,29 +33,49 @@ trait DatasetsGraphProvisioner[F[_]] {
 }
 
 object DatasetsGraphProvisioner {
-  def apply[F[_]: Async: Logger: SparqlQueryTimeRecorder](
-      connectionConfig: ProjectsConnectionConfig
+  def apply[F[_]: Async: Logger: SparqlQueryTimeRecorder](lock:             Lock[F, datasets.TopmostSameAs],
+                                                          connectionConfig: ProjectsConnectionConfig
   ): DatasetsGraphProvisioner[F] = {
-    val updatesProducer    = UpdateCommandsProducer[F](connectionConfig)
-    val searchInfoUploader = UpdateCommandsUploader[F](connectionConfig)
-    new DatasetsGraphProvisionerImpl[F](updatesProducer, searchInfoUploader)
+    val tsSearchInfoFetcher = TSSearchInfoFetcher[F](connectionConfig)
+    val updatesProducer     = UpdateCommandsProducer[F](connectionConfig)
+    val searchInfoUploader  = UpdateCommandsUploader[F](connectionConfig)
+    new DatasetsGraphProvisionerImpl[F](tsSearchInfoFetcher, updatesProducer, searchInfoUploader, lock)
   }
 
-  def default[F[_]: Async: Logger: SparqlQueryTimeRecorder]: F[DatasetsGraphProvisioner[F]] =
-    ProjectsConnectionConfig[F]().map(apply(_))
+  def default[F[_]: Async: Logger: SparqlQueryTimeRecorder](
+      lock: Lock[F, datasets.TopmostSameAs]
+  ): F[DatasetsGraphProvisioner[F]] =
+    ProjectsConnectionConfig[F]().map(apply(lock, _))
 }
 
-private class DatasetsGraphProvisionerImpl[F[_]: MonadThrow](updatesProducer: UpdateCommandsProducer[F],
-                                                             searchInfoUploader: UpdateCommandsUploader[F]
+private class DatasetsGraphProvisionerImpl[F[_]: Async](tsSearchInfoFetcher: TSSearchInfoFetcher[F],
+                                                        updatesProducer:    UpdateCommandsProducer[F],
+                                                        searchInfoUploader: UpdateCommandsUploader[F],
+                                                        lock:               Lock[F, datasets.TopmostSameAs]
 ) extends DatasetsGraphProvisioner[F] {
 
   import DatasetsCollector.collectLastVersions
-  import ModelSearchInfoExtractor.extractModelSearchInfo
+  import ModelSearchInfoExtractor.extractModelSearchInfos
   import updatesProducer.toUpdateCommands
 
   override def provisionDatasetsGraph(project: Project): F[Unit] =
     collectLastVersions
-      .andThen(extractModelSearchInfo[F](project))
-      .andThenF(toUpdateCommands(project.identification))(project)
-      .flatMap(searchInfoUploader.upload)
+      .andThen(extractModelSearchInfos[F](project))(project)
+      .flatTap(_.map(update(project, _)).sequence.void)
+      .flatMap(findDatasetsNoLongerOnModel(project, _).flatMap(_.map(update(project, _)).sequence).void)
+
+  private def findDatasetsNoLongerOnModel(project: Project, modelInfos: List[ModelDatasetSearchInfo]) =
+    tsSearchInfoFetcher
+      .findTSInfosByProject(project.resourceId)
+      .map(_.filterNot(tsDS => modelInfos.exists(_.topmostSameAs == tsDS.topmostSameAs)))
+
+  private def update(project: Project, mi: ModelDatasetSearchInfo) =
+    lock
+      .run(mi.topmostSameAs)
+      .use(_ => toUpdateCommands(project.identification, mi).flatMap(searchInfoUploader.upload))
+
+  private def update(project: Project, tsi: TSDatasetSearchInfo) =
+    lock
+      .run(tsi.topmostSameAs)
+      .use(_ => toUpdateCommands(project.identification, tsi).flatMap(searchInfoUploader.upload))
 }

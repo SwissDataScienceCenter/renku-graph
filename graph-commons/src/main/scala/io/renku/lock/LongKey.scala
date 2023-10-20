@@ -20,7 +20,7 @@ package io.renku.lock
 
 import io.renku.events.CategoryName
 import io.renku.graph.model.entities.Project
-import io.renku.graph.model.projects
+import io.renku.graph.model.{datasets, projects}
 
 import scala.util.hashing.MurmurHash3
 
@@ -50,6 +50,9 @@ object LongKey {
     forString.contramap(_.value)
 
   implicit val forCategoryName: LongKey[CategoryName] =
+    forString.contramap(_.value)
+
+  implicit val forDSTopmostSameAs: LongKey[datasets.TopmostSameAs] =
     forString.contramap(_.value)
 
   implicit val forProject: LongKey[Project] =

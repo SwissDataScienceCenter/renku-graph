@@ -25,7 +25,7 @@ import io.renku.graph.model.entities.{Dataset, Project}
 
 private object ModelSearchInfoExtractor {
 
-  def extractModelSearchInfo[F[_]: MonadThrow](
+  def extractModelSearchInfos[F[_]: MonadThrow](
       project: Project
   )(datasets: List[Dataset[Dataset.Provenance]]): F[List[ModelDatasetSearchInfo]] =
     datasets
