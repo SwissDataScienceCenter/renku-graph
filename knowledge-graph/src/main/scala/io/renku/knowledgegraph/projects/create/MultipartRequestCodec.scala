@@ -101,7 +101,7 @@ private class MultipartRequestDecoderImpl[F[_]: Async] extends MultipartRequestD
      multipart.filterParts(PartName.keywords).map(_.as[projects.Keyword]).sequence.map(_.toSet),
      multipart.part(PartName.visibility).flatMap(_.as[projects.Visibility]),
      templateDecoder(multipart),
-     multipart.findPart(PartName.image).map(_.as[Option[Image]]).sequence.map(_.flatten),
+     multipart.findPart(PartName.image).map(_.as[Option[Image]]).sequence.map(_.flatten)
     ).mapN(NewProject.apply)
 
   private def templateDecoder(multipart: Multipart[F]) =
