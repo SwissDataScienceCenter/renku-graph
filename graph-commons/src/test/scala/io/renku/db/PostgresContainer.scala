@@ -22,7 +22,7 @@ import com.dimafeng.testcontainers.PostgreSQLContainer
 import org.testcontainers.utility.DockerImageName
 
 object PostgresContainer {
-  val version = "15.3-alpine"
+  val version = "16.0-alpine"
 
   val image = s"postgres:$version"
 
