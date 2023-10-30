@@ -144,7 +144,7 @@ object EventLogClient {
 
     override val baseUrl: String Refined Url = "http://localhost:9005"
 
-    def waitForReadiness(implicit ioRuntime: IORuntime): IO[Unit] =
+    def waitForReadiness: IO[Unit] =
       Monad[IO].whileM_(isRunning)(Temporal[IO] sleep (100 millis))
 
     def sendEvent(event: Json)(implicit ioRuntime: IORuntime): Unit = {
@@ -173,7 +173,7 @@ object EventLogClient {
         .addPart("event", event)
         .build()
 
-    private def isRunning(implicit ioRuntime: IORuntime) = getStatus.flatMap { jsonBody =>
+    private def isRunning = getStatus.flatMap { jsonBody =>
       jsonBody.hcursor
         .downField("isMigrating")
         .as[Boolean]

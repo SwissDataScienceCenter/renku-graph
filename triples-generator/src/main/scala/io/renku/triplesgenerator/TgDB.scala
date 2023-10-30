@@ -63,7 +63,7 @@ object TgDB {
   }
 }
 
-class TgLockDbConfigProvider[F[_]: MonadThrow]()
+class TgDbConfigProvider[F[_]: MonadThrow]()
     extends DBConfigProvider[F, TgDB](
       namespace = "triples-generator-db",
       dbName = "triples_generator"

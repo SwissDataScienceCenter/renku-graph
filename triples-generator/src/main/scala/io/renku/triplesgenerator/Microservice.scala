@@ -67,7 +67,7 @@ object Microservice extends IOMicroservice {
     val resources = for {
       config <- Resource.eval(parseConfigArgs(args))
       dbSessionPool <- Resource
-                         .eval(new TgLockDbConfigProvider[IO].map(SessionPoolResource[IO, TgDB]))
+                         .eval(new TgDbConfigProvider[IO].map(SessionPoolResource[IO, TgDB]))
                          .flatMap(identity)
       implicit0(mr: MetricsRegistry[IO])           <- Resource.eval(MetricsRegistry[IO]())
       implicit0(sqtr: SparqlQueryTimeRecorder[IO]) <- Resource.eval(SparqlQueryTimeRecorder.create[IO]())
