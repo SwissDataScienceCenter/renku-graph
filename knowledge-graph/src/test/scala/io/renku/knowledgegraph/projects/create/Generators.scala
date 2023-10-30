@@ -41,7 +41,7 @@ private object Generators {
      projectKeywords.toGeneratorOfSet(),
      projectVisibilities,
      templatesGen,
-     ImageGenerators.images.toGeneratorOfOptions,
+     ImageGenerators.images.toGeneratorOfOptions
     ).mapN(NewProject.apply)
 
   implicit val glCreatedProjectCreatorsGen: Gen[GLCreatedProject.Creator] =
