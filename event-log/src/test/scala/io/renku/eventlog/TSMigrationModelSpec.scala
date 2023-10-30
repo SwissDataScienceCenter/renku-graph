@@ -19,7 +19,7 @@
 package io.renku.eventlog
 
 import io.circe.Json
-import io.renku.data.ErrorMessage
+import io.renku.data.Message
 import io.renku.generators.Generators.Implicits._
 import io.renku.generators.Generators.{nestedExceptions, nonEmptyStrings, timestamps}
 import io.renku.tinytypes.constraints.NonBlank
@@ -109,7 +109,7 @@ class MigrationMessageSpec extends AnyWordSpec with ScalaCheckPropertyChecks wit
 
     "be instantiatable from an exception and contain the stack trace" in {
       forAll(nestedExceptions) { exception =>
-        MigrationMessage(exception).value shouldBe ErrorMessage.withStackTrace(exception).show
+        MigrationMessage(exception).value shouldBe Message.Error.fromStackTrace(exception).show
       }
     }
   }

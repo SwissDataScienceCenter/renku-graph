@@ -18,23 +18,23 @@
 
 package io.renku.knowledgegraph.projects.details
 
-import KGProjectFinder._
 import cats.effect.Async
 import cats.syntax.all._
 import io.circe.DecodingFailure
 import io.renku.graph.config.RenkuUrlLoader
 import io.renku.graph.model._
-import io.renku.graph.model.entities.Person
 import io.renku.graph.model.images.ImageUri
 import io.renku.graph.model.projects._
 import io.renku.graph.model.versions.SchemaVersion
 import io.renku.http.server.security.model.AuthUser
+import io.renku.knowledgegraph.projects.details.KGProjectFinder._
+import io.renku.projectauth.util.SparqlSnippets
 import io.renku.triplesstore._
-import io.renku.triplesstore.client.sparql.Fragment
+import io.renku.triplesstore.client.sparql.{Fragment, VarName}
 import org.typelevel.log4cats.Logger
 
 private trait KGProjectFinder[F[_]] {
-  def findProject(path: Path, maybeAuthUser: Option[AuthUser]): F[Option[KGProject]]
+  def findProject(slug: Slug, maybeAuthUser: Option[AuthUser]): F[Option[KGProject]]
 }
 
 private class KGProjectFinderImpl[F[_]: Async: Logger: SparqlQueryTimeRecorder](storeConfig: ProjectsConnectionConfig)(
@@ -42,24 +42,24 @@ private class KGProjectFinderImpl[F[_]: Async: Logger: SparqlQueryTimeRecorder](
 ) extends TSClientImpl(storeConfig)
     with KGProjectFinder[F] {
 
+  import ResultsDecoder._
+  import SparqlQuery.Prefixes
   import cats.syntax.all._
+  import client.syntax._
   import eu.timepit.refined.auto._
   import io.circe.Decoder
   import io.renku.graph.model.Schemas._
   import io.renku.jsonld.syntax._
-  import SparqlQuery.Prefixes
-  import client.syntax._
-  import ResultsDecoder._
 
-  override def findProject(path: Path, maybeAuthUser: Option[AuthUser]): F[Option[KGProject]] =
-    queryExpecting[Option[KGProject]](query(ResourceId(path), maybeAuthUser))(recordsDecoder(path))
+  override def findProject(slug: Slug, maybeAuthUser: Option[AuthUser]): F[Option[KGProject]] =
+    queryExpecting[Option[KGProject]](query(ResourceId(slug), maybeAuthUser))(recordsDecoder(slug))
 
   private def query(resourceId: ResourceId, maybeAuthUser: Option[AuthUser]) = SparqlQuery.of(
     name = "project by id",
     Prefixes of (prov -> "prov", renku -> "renku", schema -> "schema"),
     sparql"""|SELECT ?resourceId ?name ?visibility ?maybeDescription ?dateCreated ?dateModified
              |       ?maybeCreatorResourceId ?maybeCreatorName ?maybeCreatorEmail ?maybeCreatorAffiliation
-             |       ?maybeParentResourceId ?maybeParentPath ?maybeParentName ?maybeParentDateCreated 
+             |       ?maybeParentResourceId ?maybeParentSlug ?maybeParentName ?maybeParentDateCreated
              |       ?maybeParentCreatorResourceId ?maybeParentCreatorName ?maybeParentCreatorEmail ?maybeParentCreatorAffiliation
              |       ?maybeSchemaVersion (GROUP_CONCAT(?keyword; separator=',') AS ?keywords)
              |       (GROUP_CONCAT(?encodedImageUrl; separator=',') AS ?images)
@@ -90,9 +90,11 @@ private class KGProjectFinderImpl[F[_]: Async: Logger: SparqlQueryTimeRecorder](
              |    }
              |    OPTIONAL {
              |      ?resourceId prov:wasDerivedFrom ?maybeParentResourceId.
+             |
+             |      ${parentMemberFilterQuery(maybeAuthUser)}
+             |
              |      GRAPH ?maybeParentResourceId {
-             |        ${parentMemberFilterQuery(maybeAuthUser)}
-             |        ?maybeParentResourceId renku:projectPath ?maybeParentPath;
+             |        ?maybeParentResourceId renku:projectPath ?maybeParentSlug;
              |                               schema:name ?maybeParentName;
              |                               schema:dateCreated ?maybeParentDateCreated.
              |        OPTIONAL {
@@ -109,36 +111,17 @@ private class KGProjectFinderImpl[F[_]: Async: Logger: SparqlQueryTimeRecorder](
              |}
              |GROUP BY ?resourceId ?name ?visibility ?maybeDescription ?dateCreated ?dateModified
              |         ?maybeCreatorResourceId ?maybeCreatorName ?maybeCreatorEmail ?maybeCreatorAffiliation
-             |         ?maybeParentResourceId ?maybeParentPath ?maybeParentName ?maybeParentDateCreated 
+             |         ?maybeParentResourceId ?maybeParentSlug ?maybeParentName ?maybeParentDateCreated
              |         ?maybeParentCreatorResourceId ?maybeParentCreatorName ?maybeParentCreatorEmail ?maybeParentCreatorAffiliation
              |         ?maybeSchemaVersion
              |""".stripMargin
   )
 
-  private lazy val parentMemberFilterQuery: Option[AuthUser] => Fragment = {
-    case Some(user) =>
-      fr"""|{
-           |  ?maybeParentResourceId renku:projectVisibility ?parentVisibility
-           |  VALUES (?parentVisibility) {
-           |    (${Visibility.Public.asObject})
-           |    (${Visibility.Internal.asObject})
-           |  }
-           |} UNION {
-           |  ?maybeParentResourceId renku:projectVisibility ${Visibility.Private.asObject} .
-           |  ?maybeParentResourceId schema:member ?memberId.
-           |  GRAPH ${GraphClass.Persons.id} {
-           |    ?memberId schema:sameAs ?memberSameAs.
-           |    ?memberSameAs schema:additionalType ${Person.gitLabSameAsAdditionalType.asTripleObject};
-           |                  schema:identifier ${user.id.asObject}
-           |  }
-           |}
-           |""".stripMargin
-    case _ =>
-      fr"""|?maybeParentResourceId renku:projectVisibility ${Visibility.Public.asObject} .
-           |""".stripMargin
+  private lazy val parentMemberFilterQuery: Option[AuthUser] => Fragment = { user =>
+    SparqlSnippets(VarName("maybeParentResourceId")).visibleProjects(user.map(_.id), Visibility.all)
   }
 
-  private def recordsDecoder(path: Path): Decoder[Option[KGProject]] = {
+  private def recordsDecoder(slug: Slug): Decoder[Option[KGProject]] = {
     import Decoder._
     import io.circe.DecodingFailure
     import io.renku.graph.model.persons
@@ -164,7 +147,7 @@ private class KGProjectFinderImpl[F[_]: Async: Logger: SparqlQueryTimeRecorder](
         maybeCreatorEmail             <- extract[Option[persons.Email]]("maybeCreatorEmail")
         maybeCreatorAffiliation       <- extract[Option[persons.Affiliation]]("maybeCreatorAffiliation")
         maybeParentResourceId         <- extract[Option[ResourceId]]("maybeParentResourceId")
-        maybeParentPath               <- extract[Option[Path]]("maybeParentPath")
+        maybeParentSlug               <- extract[Option[Slug]]("maybeParentSlug")
         maybeParentName               <- extract[Option[Name]]("maybeParentName")
         maybeParentDateCreated        <- extract[Option[DateCreated]]("maybeParentDateCreated")
         maybeParentCreatorResourceId  <- extract[Option[persons.ResourceId]]("maybeParentCreatorResourceId")
@@ -175,7 +158,7 @@ private class KGProjectFinderImpl[F[_]: Async: Logger: SparqlQueryTimeRecorder](
         images                        <- extract[Option[String]]("images") >>= toListOfImageUris
       } yield KGProject(
         resourceId,
-        path,
+        slug,
         name,
         ProjectCreation(dateCreated,
                         (maybeCreatorResourceId, maybeCreatorName).mapN { case (id, name) =>
@@ -184,11 +167,11 @@ private class KGProjectFinderImpl[F[_]: Async: Logger: SparqlQueryTimeRecorder](
         ),
         dateModified,
         visibility,
-        maybeParent = (maybeParentResourceId, maybeParentPath, maybeParentName, maybeParentDateCreated) mapN {
-          case (parentId, path, name, dateCreated) =>
+        maybeParent = (maybeParentResourceId, maybeParentSlug, maybeParentName, maybeParentDateCreated) mapN {
+          case (parentId, slug, name, dateCreated) =>
             KGParent(
               parentId,
-              path,
+              slug,
               name,
               ProjectCreation(
                 dateCreated,
@@ -203,7 +186,7 @@ private class KGProjectFinderImpl[F[_]: Async: Logger: SparqlQueryTimeRecorder](
         keywords,
         images
       )
-    }(toOption(show"Multiple projects or values for $path"))
+    }(toOption(show"Multiple projects or values for $slug"))
   }
 
   private def toListOfImageUris: Option[String] => Decoder.Result[List[ImageUri]] =
@@ -216,7 +199,7 @@ private object KGProjectFinder {
 
   final case class KGProject(
       resourceId:       ResourceId,
-      path:             Path,
+      slug:             Slug,
       name:             Name,
       created:          ProjectCreation,
       dateModified:     DateModified,
@@ -230,7 +213,7 @@ private object KGProjectFinder {
 
   final case class ProjectCreation(date: DateCreated, maybeCreator: Option[ProjectCreator])
 
-  final case class KGParent(resourceId: ResourceId, path: Path, name: Name, created: ProjectCreation)
+  final case class KGParent(resourceId: ResourceId, slug: Slug, name: Name, created: ProjectCreation)
 
   final case class ProjectCreator(resourceId:       persons.ResourceId,
                                   name:             persons.Name,

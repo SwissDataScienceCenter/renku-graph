@@ -29,9 +29,8 @@ trait TokenRepositoryTypeSerializers {
   val projectIdDecoder: Decoder[projects.GitLabId] = int4.map(projects.GitLabId.apply)
   val projectIdEncoder: Encoder[projects.GitLabId] = int4.values.contramap(_.value)
 
-  val projectPathDecoder: Decoder[projects.Path] = varchar.map(projects.Path.apply)
-  val projectPathEncoder: Encoder[projects.Path] =
-    varchar.values.contramap((b: projects.Path) => b.value)
+  val projectSlugDecoder: Decoder[projects.Slug] = varchar.map(projects.Slug.apply)
+  val projectSlugEncoder: Encoder[projects.Slug] = varchar.values.contramap((b: projects.Slug) => b.value)
 
   private[repository] val encryptedAccessTokenDecoder: Decoder[EncryptedAccessToken] =
     varchar.emap(s => EncryptedAccessToken.from(s).leftMap(_.getMessage))

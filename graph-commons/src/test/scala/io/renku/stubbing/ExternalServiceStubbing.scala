@@ -18,6 +18,7 @@
 
 package io.renku.stubbing
 
+import cats.effect.{IO, Resource}
 import com.github.tomakehurst.wiremock.WireMockServer
 import com.github.tomakehurst.wiremock.client.WireMock.equalTo
 import com.github.tomakehurst.wiremock.client.{MappingBuilder, WireMock}
@@ -26,6 +27,7 @@ import eu.timepit.refined.api.Refined
 import eu.timepit.refined.numeric.Positive
 import io.renku.http.client.AccessToken
 import io.renku.http.client.AccessToken._
+import org.http4s.Uri
 import org.scalatest.{BeforeAndAfterAll, BeforeAndAfterEach, Suite}
 
 trait ExternalServiceStubbing extends BeforeAndAfterEach with BeforeAndAfterAll {
@@ -46,6 +48,7 @@ trait ExternalServiceStubbing extends BeforeAndAfterEach with BeforeAndAfterAll 
   }
 
   lazy val externalServiceBaseUrl: String = s"http://localhost:${server.port()}"
+  lazy val externalServiceBaseUri: Uri    = Uri.unsafeFromString(externalServiceBaseUrl)
 
   override def beforeEach(): Unit =
     server.resetAll()
@@ -63,5 +66,31 @@ trait ExternalServiceStubbing extends BeforeAndAfterEach with BeforeAndAfterAll 
       case Some(PersonalAccessToken(token))  => mappingBuilder.withHeader("PRIVATE-TOKEN", equalTo(token))
       case None                              => mappingBuilder
     }
+  }
+
+  protected def otherWireMockResource =
+    Resource.make[IO, WireMockServer] {
+      IO {
+        val config = WireMockConfiguration.wireMockConfig().dynamicPort()
+        val server = new WireMockServer(config)
+
+        server.start()
+
+        server
+      }
+    }(server =>
+      IO {
+        server.shutdownServer()
+      }
+    )
+
+  protected implicit class WireMockOps(server: WireMockServer) {
+
+    lazy val baseUri: Uri = Uri.unsafeFromString(server.baseUrl())
+
+    def stubFor(mappingBuilder: MappingBuilder): Unit =
+      new WireMock(server.port()).register {
+        WireMock.stubFor(mappingBuilder)
+      }
   }
 }

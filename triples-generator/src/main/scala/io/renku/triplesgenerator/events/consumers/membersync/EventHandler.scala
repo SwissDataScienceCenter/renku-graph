@@ -21,16 +21,17 @@ package membersync
 
 import cats.effect.{Async, MonadCancelThrow}
 import cats.syntax.all._
-import io.renku.events.{CategoryName, consumers}
+import fs2.io.net.Network
 import io.renku.events.consumers.ProcessExecutor
 import io.renku.events.consumers.subscriptions.SubscriptionMechanism
+import io.renku.events.{CategoryName, consumers}
 import io.renku.graph.model.projects
 import io.renku.graph.tokenrepository.AccessTokenFinder
-import io.renku.lock.syntax._
 import io.renku.http.client.GitLabClient
 import io.renku.lock.Lock
-import io.renku.triplesgenerator.TgLockDB.TsWriteLock
-import io.renku.triplesstore.SparqlQueryTimeRecorder
+import io.renku.lock.syntax._
+import io.renku.triplesgenerator.TgDB.TsWriteLock
+import io.renku.triplesstore.{ProjectSparqlClient, SparqlQueryTimeRecorder}
 import org.typelevel.log4cats.Logger
 import tsmigrationrequest.migrations.reprovisioning.ReProvisioningStatus
 
@@ -47,12 +48,12 @@ private class EventHandler[F[_]: MonadCancelThrow: Logger](
   import membersSynchronizer._
   import tsReadinessChecker._
 
-  protected override type Event = projects.Path
+  protected override type Event = projects.Slug
 
   override def createHandlingDefinition(): EventHandlingDefinition =
     EventHandlingDefinition(
-      decode = _.event.getProjectPath,
-      process = (tsWriteLock: Lock[F, projects.Path]).surround[Unit](synchronizeMembers _),
+      decode = _.event.getProjectSlug,
+      process = (tsWriteLock: Lock[F, projects.Slug]).surround[Unit](synchronizeMembers(_)),
       precondition = verifyTSReady,
       onRelease = subscriptionMechanism.renewSubscription().some
     )
@@ -62,12 +63,15 @@ private object EventHandler {
 
   import eu.timepit.refined.auto._
 
-  def apply[F[_]: Async: ReProvisioningStatus: GitLabClient: AccessTokenFinder: SparqlQueryTimeRecorder: Logger](
+  def apply[F[
+      _
+  ]: Async: Network: ReProvisioningStatus: GitLabClient: AccessTokenFinder: SparqlQueryTimeRecorder: Logger](
       subscriptionMechanism: SubscriptionMechanism[F],
-      tsWriteLock:           TsWriteLock[F]
+      tsWriteLock:           TsWriteLock[F],
+      projectSparqlClient:   ProjectSparqlClient[F]
   ): F[consumers.EventHandler[F]] = for {
     tsReadinessChecker  <- TSReadinessForEventsChecker[F]
-    membersSynchronizer <- MembersSynchronizer[F]
+    membersSynchronizer <- MembersSynchronizer[F](projectSparqlClient)
     processExecutor     <- ProcessExecutor.concurrent(processesCount = 1)
   } yield new EventHandler[F](
     categoryName,

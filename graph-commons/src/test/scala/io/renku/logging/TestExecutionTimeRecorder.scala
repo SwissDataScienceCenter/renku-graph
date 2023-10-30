@@ -18,27 +18,28 @@
 
 package io.renku.logging
 
-import cats.{Monad, MonadThrow}
+import cats.MonadThrow
+import cats.effect.Clock
 import cats.syntax.all._
 import eu.timepit.refined.api.Refined
 import eu.timepit.refined.collection.NonEmpty
-import io.prometheus.client.Histogram
 import io.renku.generators.CommonGraphGenerators.elapsedTimes
 import io.renku.generators.Generators.Implicits._
 import io.renku.logging.ExecutionTimeRecorder.ElapsedTime
+import io.renku.metrics.Histogram
 import org.typelevel.log4cats.Logger
-
-import scala.util.Try
 
 object TestExecutionTimeRecorder {
 
-  def apply[F[_]: MonadThrow: Logger](maybeHistogram: Option[Histogram] = None): TestExecutionTimeRecorder[F] =
+  def apply[F[_]: MonadThrow: Logger: Clock](
+      maybeHistogram: Option[Histogram[F]] = None
+  ): TestExecutionTimeRecorder[F] =
     new TestExecutionTimeRecorder[F](threshold = elapsedTimes.generateOne, maybeHistogram)
 }
 
-class TestExecutionTimeRecorder[F[_]: Monad](
+class TestExecutionTimeRecorder[F[_]: MonadThrow: Clock: Logger](
     threshold:      ElapsedTime,
-    maybeHistogram: Option[Histogram]
+    maybeHistogram: Option[Histogram[F]]
 ) extends ExecutionTimeRecorder[F](threshold) {
 
   val elapsedTime:            ElapsedTime = threshold
@@ -47,16 +48,11 @@ class TestExecutionTimeRecorder[F[_]: Monad](
   override def measureExecutionTime[BlockOut](
       block:               F[BlockOut],
       maybeHistogramLabel: Option[String Refined NonEmpty] = None
-  ): F[(ElapsedTime, BlockOut)] = for {
-    _ <- Monad[F].unit // why?
-    maybeHistogramTimer = startTimer(maybeHistogramLabel)
-    result <- block
-    _ = maybeHistogramTimer map (_.observeDuration())
-  } yield threshold -> result
-
-  private def startTimer(maybeHistogramLabel: Option[String Refined NonEmpty]) = maybeHistogram flatMap { histogram =>
-    maybeHistogramLabel
-      .map(label => histogram.labels(label.value).startTimer())
-      .orElse(Try(histogram.startTimer()).toOption)
-  }
+  ): F[(ElapsedTime, BlockOut)] =
+    Clock[F]
+      .timed(block)
+      .flatTap { case (duration, _) =>
+        maybeHistogram.fold(ifEmpty = ().pure[F])(_.observe(maybeHistogramLabel.map(_.value), duration))
+      }
+      .map { case (_, result) => threshold -> result }
 }

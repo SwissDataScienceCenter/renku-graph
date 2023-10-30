@@ -28,9 +28,9 @@ class CleanUpEventSpec extends AnyWordSpec with should.Matchers {
 
   "show" should {
 
-    "print out the projectId and projectPath" in {
+    "print out the projectId and projectSlug" in {
       val event = cleanupEvents.generateOne
-      event.show shouldBe show"projectId = ${event.project.id}, projectPath = ${event.project.path}"
+      event.show shouldBe show"projectId = ${event.project.id}, projectSlug = ${event.project.slug}"
     }
   }
 }

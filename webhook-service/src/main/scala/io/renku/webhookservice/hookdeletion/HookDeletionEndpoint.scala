@@ -21,13 +21,12 @@ package io.renku.webhookservice.hookdeletion
 import cats.MonadThrow
 import cats.effect._
 import cats.syntax.all._
+import eu.timepit.refined.auto._
+import io.renku.data.Message
 import io.renku.graph.model.projects.GitLabId
-import io.renku.http.ErrorMessage._
-import io.renku.http.InfoMessage._
 import io.renku.http.client.GitLabClient
 import io.renku.http.client.RestClientError.UnauthorizedException
 import io.renku.http.server.security.model.AuthUser
-import io.renku.http.{ErrorMessage, InfoMessage}
 import io.renku.webhookservice.hookdeletion.HookRemover.DeletionResult
 import io.renku.webhookservice.hookdeletion.HookRemover.DeletionResult.HookDeleted
 import io.renku.webhookservice.model.{HookIdentifier, ProjectHookUrl}
@@ -48,20 +47,30 @@ class HookDeletionEndpointImpl[F[_]: MonadThrow: Logger](
     with HookDeletionEndpoint[F] {
 
   def deleteHook(projectId: GitLabId, authUser: AuthUser): F[Response[F]] = {
-    hookDeletor.deleteHook(HookIdentifier(projectId, projectHookUrl), authUser.accessToken).flatMap(toHttpResponse(_))
-  } recoverWith httpResponse
+    hookDeletor
+      .deleteHook(HookIdentifier(projectId, projectHookUrl), authUser.accessToken)
+      .flatTap(logInfo(projectId))
+      .flatMap(toHttpResponse(_))
+  } recoverWith errorHttpResponse
+
+  private def logInfo(projectId: GitLabId): Option[DeletionResult] => F[Unit] = {
+    case Some(HookDeleted) => Logger[F].info(show"Hook deleted for $projectId")
+    case _                 => Logger[F].info(show"Hook already deleted for $projectId")
+  }
 
   private lazy val toHttpResponse: Option[DeletionResult] => F[Response[F]] = {
-    case Some(HookDeleted) => Ok(InfoMessage("Hook deleted"))
-    case _                 => NotFound(InfoMessage("Hook not found"))
+    case Some(HookDeleted) => Ok(Message.Info("Hook deleted"))
+    case _                 => NotFound(Message.Info("Hook not found"))
   }
-  private lazy val httpResponse: PartialFunction[Throwable, F[Response[F]]] = {
+
+  private lazy val errorHttpResponse: PartialFunction[Throwable, F[Response[F]]] = {
     case ex @ UnauthorizedException =>
       Response[F](Status.Unauthorized)
-        .withEntity[ErrorMessage](ErrorMessage(ex))
+        .withEntity(Message.Error.fromExceptionMessage(ex))
         .pure[F]
     case NonFatal(exception) =>
-      Logger[F].error(exception)(exception.getMessage) >> InternalServerError(ErrorMessage(exception))
+      Logger[F].error(exception)(exception.getMessage) >>
+        InternalServerError(Message.Error.fromExceptionMessage(exception))
   }
 }
 

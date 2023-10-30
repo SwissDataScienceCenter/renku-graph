@@ -26,7 +26,7 @@ import io.renku.triplesstore.{MigrationsConnectionConfig, SparqlQueryTimeRecorde
 import org.typelevel.log4cats.Logger
 
 private trait ProjectDonePersister[F[_]] {
-  def noteDone(path: projects.Path): F[Unit]
+  def noteDone(slug: projects.Slug): F[Unit]
 }
 
 private object ProjectDonePersister {
@@ -45,11 +45,11 @@ private class ProjectDonePersisterImpl[F[_]](tsClient: TSClient[F])(implicit ru:
   import io.renku.triplesstore.client.syntax._
   import io.renku.triplesstore.SparqlQuery
 
-  override def noteDone(path: projects.Path): F[Unit] =
-    tsClient.updateWithNoResult(v10MigratedTriple(path))
+  override def noteDone(slug: projects.Slug): F[Unit] =
+    tsClient.updateWithNoResult(v10MigratedTriple(slug))
 
-  private def v10MigratedTriple(path: projects.Path) = {
-    val triple = Triple(MigrationToV10.name.asEntityId, renku / "toBeMigrated", path.asObject)
+  private def v10MigratedTriple(slug: projects.Slug) = {
+    val triple = Triple(MigrationToV10.name.asEntityId, renku / "toBeMigrated", slug.asObject)
     SparqlQuery.ofUnsafe(
       show"${MigrationToV10.name} - store migrated",
       s"DELETE DATA {${triple.asSparql.sparql}}"

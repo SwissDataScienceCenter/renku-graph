@@ -26,8 +26,8 @@ import io.circe.Json
 import io.renku.generators.Generators.Implicits._
 import io.renku.http.client.RestClient.ResponseMappingF
 import io.renku.http.client.{AccessToken, GitLabClient}
-import org.http4s.Method.{DELETE, GET, HEAD, POST, PUT}
-import org.http4s.{Method, Uri, UrlForm}
+import org.http4s.Uri
+import org.http4s.multipart.Multipart
 import org.scalacheck.Gen
 import org.scalamock.clazz.Mock
 import org.scalamock.function.MockFunctions
@@ -37,54 +37,73 @@ import org.scalamock.matchers.{Matchers, MockParameter}
 trait GitLabClientTools[F[_]] {
   self: Mock with MockFunctions with Matchers =>
 
+  sealed trait UnderlyingMethod
+  case object Get           extends UnderlyingMethod
+  case object Head          extends UnderlyingMethod
+  case object PostJson      extends UnderlyingMethod
+  case object PostMultipart extends UnderlyingMethod
+  case object Put           extends UnderlyingMethod
+  case object Delete        extends UnderlyingMethod
+
   def captureMapping[ResultType](gitLabClient: GitLabClient[F])(
       findingMethod:         => Any,
       resultGenerator:       Gen[ResultType],
-      method:                Method = GET,
+      underlyingMethod:      UnderlyingMethod,
       maybeEndpointName:     Option[String Refined NonEmpty] = None,
       expectedNumberOfCalls: Int = 1
   )(implicit applicative: Applicative[F]): ResponseMappingF[F, ResultType] = {
     val responseMapping = CaptureOne[ResponseMappingF[F, ResultType]]()
 
-    method match {
-      case GET =>
+    val endpointName: MockParameter[String Refined NonEmpty] =
+      maybeEndpointName.map(new MockParameter(_)).getOrElse(*)
+
+    underlyingMethod match {
+      case Get =>
         (gitLabClient
           .get(_: Uri, _: String Refined NonEmpty)(_: ResponseMappingF[F, ResultType])(
             _: Option[AccessToken]
           ))
-          .expects(*, maybeEndpointName.map(new MockParameter(_)).getOrElse(*), capture(responseMapping), *)
+          .expects(*, endpointName, capture(responseMapping), *)
           .returning(resultGenerator.generateOne.pure[F])
           .repeat(expectedNumberOfCalls)
-      case HEAD =>
+      case Head =>
         (gitLabClient
           .head(_: Uri, _: String Refined NonEmpty)(_: ResponseMappingF[F, ResultType])(
             _: Option[AccessToken]
           ))
-          .expects(*, maybeEndpointName.map(new MockParameter(_)).getOrElse(*), capture(responseMapping), *)
+          .expects(*, endpointName, capture(responseMapping), *)
           .returning(resultGenerator.generateOne.pure[F])
           .repeat(expectedNumberOfCalls)
-      case POST =>
+      case PostJson =>
         (gitLabClient
           .post(_: Uri, _: String Refined NonEmpty, _: Json)(_: ResponseMappingF[F, ResultType])(
             _: Option[AccessToken]
           ))
-          .expects(*, maybeEndpointName.map(new MockParameter(_)).getOrElse(*), *, capture(responseMapping), *)
+          .expects(*, endpointName, *, capture(responseMapping), *)
           .returning(resultGenerator.generateOne.pure[F])
           .repeat(expectedNumberOfCalls)
-      case PUT =>
+      case PostMultipart =>
         (gitLabClient
-          .put(_: Uri, _: String Refined NonEmpty, _: UrlForm)(_: ResponseMappingF[F, ResultType])(
+          .postMultipart(_: Uri, _: String Refined NonEmpty, _: Multipart[F])(_: ResponseMappingF[F, ResultType])(
+            _: AccessToken
+          ))
+          .expects(*, endpointName, *, capture(responseMapping), *)
+          .returning(resultGenerator.generateOne.pure[F])
+          .repeat(expectedNumberOfCalls)
+      case Put =>
+        (gitLabClient
+          .put(_: Uri, _: String Refined NonEmpty, _: Multipart[F])(_: ResponseMappingF[F, ResultType])(
             _: Option[AccessToken]
           ))
-          .expects(*, maybeEndpointName.map(new MockParameter(_)).getOrElse(*), *, capture(responseMapping), *)
+          .expects(*, endpointName, *, capture(responseMapping), *)
           .returning(resultGenerator.generateOne.pure[F])
           .repeat(expectedNumberOfCalls)
-      case DELETE =>
+      case Delete =>
         (gitLabClient
           .delete(_: Uri, _: String Refined NonEmpty)(_: ResponseMappingF[F, ResultType])(
             _: Option[AccessToken]
           ))
-          .expects(*, maybeEndpointName.map(new MockParameter(_)).getOrElse(*), capture(responseMapping), *)
+          .expects(*, endpointName, capture(responseMapping), *)
           .returning(resultGenerator.generateOne.pure[F])
           .repeat(expectedNumberOfCalls)
     }

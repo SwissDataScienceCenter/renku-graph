@@ -24,38 +24,44 @@ import eu.timepit.refined.api.Refined
 import eu.timepit.refined.numeric.NonNegative
 import io.renku.entities.searchgraphs.SearchGraphsCleaner
 import io.renku.graph.model.entities.ProjectIdentification
-import io.renku.graph.model.{GraphClass, projects}
+import io.renku.graph.model.{GraphClass, RenkuUrl, projects}
 import io.renku.http.client.RestClient.{MaxRetriesAfterConnectionTimeout, SleepAfterConnectionIssue}
+import io.renku.triplesgenerator.events.consumers.membersync.ProjectAuthSync
 import io.renku.triplesstore.client.syntax._
-import io.renku.triplesstore.{ProjectsConnectionConfig, SparqlQueryTimeRecorder, TSClientImpl}
+import io.renku.triplesstore.{ProjectSparqlClient, ProjectsConnectionConfig, SparqlQueryTimeRecorder, TSClientImpl}
 import org.typelevel.log4cats.Logger
 
 import scala.concurrent.duration._
 
 private[cleanup] trait TSCleaner[F[_]] {
-  def removeTriples(projectPath: projects.Path): F[Unit]
+  def removeTriples(projectSlug: projects.Slug): F[Unit]
 }
 
 private[cleanup] object TSCleaner {
   def apply[F[_]: Async: Logger: SparqlQueryTimeRecorder](
+      projectAuthSync:  ProjectAuthSync[F],
       connectionConfig: ProjectsConnectionConfig,
       retryInterval:    FiniteDuration = SleepAfterConnectionIssue,
       maxRetries:       Int Refined NonNegative = MaxRetriesAfterConnectionTimeout
   ): TSCleaner[F] =
     new TSCleanerImpl[F](ProjectIdFinder[F](connectionConfig),
                          SearchGraphsCleaner(connectionConfig),
+                         projectAuthSync,
                          connectionConfig,
                          retryInterval,
                          maxRetries
     )
 
-  def default[F[_]: Async: Logger: SparqlQueryTimeRecorder]: F[TSCleaner[F]] =
-    ProjectsConnectionConfig[F]().map(apply(_))
+  def default[F[_]: Async: Logger: SparqlQueryTimeRecorder](projectSparqlClient: ProjectSparqlClient[F])(implicit
+      renkuUrl: RenkuUrl
+  ): F[TSCleaner[F]] =
+    ProjectsConnectionConfig[F]().map(apply(ProjectAuthSync(projectSparqlClient), _))
 }
 
 private class TSCleanerImpl[F[_]: Async: Logger: SparqlQueryTimeRecorder](
     projectIdFinder:     ProjectIdFinder[F],
     searchGraphsCleaner: SearchGraphsCleaner[F],
+    projectAuthSync:     ProjectAuthSync[F],
     connectionConfig:    ProjectsConnectionConfig,
     retryInterval:       FiniteDuration = SleepAfterConnectionIssue,
     maxRetries:          Int Refined NonNegative = MaxRetriesAfterConnectionTimeout
@@ -70,13 +76,14 @@ private class TSCleanerImpl[F[_]: Async: Logger: SparqlQueryTimeRecorder](
   import searchGraphsCleaner._
   private implicit val tsConnection: ProjectsConnectionConfig = connectionConfig
 
-  override def removeTriples(projectPath: projects.Path): F[Unit] =
-    findProjectId(projectPath) >>= {
+  override def removeTriples(projectSlug: projects.Slug): F[Unit] =
+    findProjectId(projectSlug) >>= {
       case Some(project) =>
-        relinkSameAsHierarchy(project.path) >>
-          relinkProjectHierarchy(project.path) >>
+        relinkSameAsHierarchy(project.slug) >>
+          relinkProjectHierarchy(project.slug) >>
           removeProjectGraph(project) >>
-          cleanSearchGraphs(project)
+          cleanSearchGraphs(project) >>
+          projectAuthSync.removeAuthData(project.slug)
       case None => ().pure[F]
     }
 

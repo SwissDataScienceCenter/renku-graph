@@ -19,10 +19,11 @@
 package io.renku.http.rest
 
 import cats.Show
+import cats.data.ValidatedNel
 import cats.syntax.all._
 import io.renku.triplesstore.client.model.OrderBy
 import org.http4s.dsl.impl.OptionalMultiQueryParamDecoderMatcher
-import org.http4s.{ParseFailure, QueryParamDecoder}
+import org.http4s.{ParseFailure, Query, QueryParamDecoder}
 
 trait SortBy {
 
@@ -66,6 +67,7 @@ trait SortBy {
     val parameterName: String = "sort"
     def errorMessage(propertyName: String): String =
       s"'$propertyName' is not a valid $parameterName property. Allowed properties: ${properties.mkString(", ")}"
+    def find(query: Query): Option[ValidatedNel[ParseFailure, List[By]]] = sort.unapply(query.multiParams)
   }
 }
 

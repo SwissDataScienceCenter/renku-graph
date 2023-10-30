@@ -18,10 +18,10 @@
 
 package io.renku.triplesgenerator.events.consumers.membersync
 
-import io.renku.graph.model.testentities.Person
+import io.renku.graph.model.testentities.Project
 
 private object PersonOps {
 
-  implicit lazy val toKGProjectMember: Person => Option[KGProjectMember] =
-    person => person.maybeGitLabId.map(gitLabId => KGProjectMember(person.resourceId, gitLabId))
+  implicit lazy val toKGProjectMember: Project.Member => Option[KGProjectMember] =
+    member => member.person.maybeGitLabId.map(gitLabId => KGProjectMember(member.person.resourceId, gitLabId))
 }

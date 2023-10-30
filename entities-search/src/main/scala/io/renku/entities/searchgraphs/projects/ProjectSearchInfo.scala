@@ -20,17 +20,16 @@ package io.renku.entities.searchgraphs.projects
 
 import cats.Show
 import cats.syntax.all._
-import io.renku.entities.searchgraphs.PersonInfo
 import io.renku.graph.model.images.Image
-import io.renku.graph.model.projects
+import io.renku.graph.model.{persons, projects}
 
 private final case class ProjectSearchInfo(id:               projects.ResourceId,
                                            name:             projects.Name,
-                                           path:             projects.Path,
+                                           slug:             projects.Slug,
                                            visibility:       projects.Visibility,
                                            dateCreated:      projects.DateCreated,
                                            dateModified:     projects.DateModified,
-                                           maybeCreator:     Option[PersonInfo],
+                                           maybeCreator:     Option[persons.ResourceId],
                                            keywords:         List[projects.Keyword],
                                            maybeDescription: Option[projects.Description],
                                            images:           List[Image]
@@ -41,7 +40,7 @@ private object ProjectSearchInfo {
   implicit val show: Show[ProjectSearchInfo] = Show.show {
     case ProjectSearchInfo(id,
                            name,
-                           path,
+                           slug,
                            visibility,
                            dateCreated,
                            dateModified,
@@ -53,7 +52,7 @@ private object ProjectSearchInfo {
       List(
         show"id = $id".some,
         show"name = $name".some,
-        show"path = $path".some,
+        show"slug = $slug".some,
         show"visibility = $visibility".some,
         show"dateCreated = $dateCreated".some,
         show"dateModified = $dateModified".some,

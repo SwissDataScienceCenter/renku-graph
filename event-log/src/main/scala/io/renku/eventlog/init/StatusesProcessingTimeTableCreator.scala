@@ -23,7 +23,6 @@ import cats.effect.MonadCancelThrow
 import io.renku.eventlog.EventLogDB.SessionResource
 import org.typelevel.log4cats.Logger
 import skunk._
-import skunk.codec.all._
 import skunk.implicits._
 
 private trait StatusesProcessingTimeTableCreator[F[_]] extends DbMigrator[F]
@@ -40,18 +39,9 @@ private class StatusesProcessingTimeTableCreatorImpl[F[_]: MonadCancelThrow: Log
   import cats.syntax.all._
 
   override def run: F[Unit] = SessionResource[F].useK {
-    checkTableExists >>= {
+    checkTableExists("status_processing_time") >>= {
       case true  => Kleisli.liftF(Logger[F] info "'status_processing_time' table exists")
       case false => createTable()
-    }
-  }
-
-  private lazy val checkTableExists: Kleisli[F, Session[F], Boolean] = {
-    val query: Query[Void, Boolean] =
-      sql"SELECT EXISTS (SELECT 1 FROM pg_tables WHERE tablename = 'status_processing_time')".query(bool)
-    Kleisli[F, Session[F], Boolean] {
-      _.unique(query)
-        .recover { case _ => false }
     }
   }
 

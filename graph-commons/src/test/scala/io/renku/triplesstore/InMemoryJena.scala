@@ -21,10 +21,8 @@ package io.renku.triplesstore
 import cats.effect.IO
 import cats.effect.unsafe.IORuntime
 import cats.syntax.all._
-import com.dimafeng.testcontainers.{FixedHostPortGenericContainer, GenericContainer, SingleContainer}
-import eu.timepit.refined.api.Refined
+import com.dimafeng.testcontainers.SingleContainer
 import eu.timepit.refined.auto._
-import eu.timepit.refined.numeric.Positive
 import io.circe.{Decoder, HCursor, Json}
 import io.renku.graph.model._
 import io.renku.graph.model.entities.{EntityFunctions, Person}
@@ -36,8 +34,7 @@ import io.renku.jsonld._
 import io.renku.logging.TestSparqlQueryTimeRecorder
 import io.renku.triplesstore.client.model.{Quad, Triple}
 import io.renku.triplesstore.client.syntax._
-import org.testcontainers.containers
-import org.testcontainers.containers.wait.strategy.Wait
+import io.renku.triplesstore.client.util.{JenaContainer, JenaRunMode}
 
 import scala.collection.mutable
 import scala.language.reflectiveCalls
@@ -48,35 +45,9 @@ trait InMemoryJena {
 
   private val adminCredentials = BasicAuthCredentials(BasicAuthUsername("admin"), BasicAuthPassword("admin"))
 
-  lazy val container: SingleContainer[_] = jenaRunMode match {
-    case JenaRunMode.GenericContainer =>
-      GenericContainer(
-        dockerImage = "renku/renku-jena:0.0.21",
-        exposedPorts = Seq(3030),
-        waitStrategy = Wait forHttp "/$/ping"
-      )
-    case JenaRunMode.FixedPortContainer(fixedPort) =>
-      FixedHostPortGenericContainer(
-        imageName = "renku/renku-jena:0.0.21",
-        exposedPorts = Seq(3030),
-        exposedHostPort = fixedPort,
-        exposedContainerPort = fixedPort,
-        waitStrategy = Wait forHttp "/$/ping"
-      )
-    case JenaRunMode.Local(_) =>
-      new GenericContainer(new containers.GenericContainer("") {
-        override def start(): Unit = ()
-        override def stop():  Unit = ()
-      })
-  }
+  lazy val container: SingleContainer[_] = JenaContainer.create(jenaRunMode)
 
-  private lazy val fusekiServerPort: Int Refined Positive = jenaRunMode match {
-    case JenaRunMode.GenericContainer         => Refined.unsafeApply(container.mappedPort(container.exposedPorts.head))
-    case JenaRunMode.FixedPortContainer(port) => port
-    case JenaRunMode.Local(port)              => port
-  }
-
-  lazy val fusekiUrl: FusekiUrl = FusekiUrl(s"http://localhost:$fusekiServerPort")
+  lazy val fusekiUrl: FusekiUrl = FusekiUrl(JenaContainer.fusekiUrl(jenaRunMode, container))
 
   private val datasets: mutable.Map[FusekiUrl => DatasetConnectionConfig, DatasetConfigFile] = mutable.Map.empty
 
@@ -115,6 +86,9 @@ trait InMemoryJena {
       .map(g => queryRunnerFor(to).flatMap(_.uploadPayload(g)))
       .sequence
       .void
+
+  def uploadIO[T](to: DatasetName, objects: T*)(implicit ef: EntityFunctions[T], gp: GraphsProducer[T]): IO[Unit] =
+    uploadIO(to, objects >>= gp.apply: _*)
 
   def upload(to: DatasetName, graphs: Graph*)(implicit ioRuntime: IORuntime): Unit =
     uploadIO(to, graphs: _*).unsafeRunSync()
@@ -172,7 +146,7 @@ trait InMemoryJena {
 
         import io.circe.Decoder._
 
-        def uploadPayload(jsonLD: JsonLD) = upload(jsonLD)
+        def uploadPayload(jsonLD: JsonLD) = this.upload(jsonLD)
 
         def runQuery(query: SparqlQuery): IO[List[Map[String, String]]] =
           queryExpecting[List[Map[String, String]]](query)
@@ -238,6 +212,9 @@ sealed trait NamedGraphDataset {
       })
       .unsafeRunSync()
 
+  def insertIO(to: DatasetName, quads: List[Quad]): IO[Unit] =
+    quads.map(insertIO(to, _)).sequence.void
+
   def insertIO(to: DatasetName, quad: Quad): IO[Unit] =
     queryRunnerFor(to) >>= (_.runUpdate {
       SparqlQuery.of("insert quad", show"INSERT DATA { ${quad.asSparql.sparql} }")
@@ -271,10 +248,10 @@ trait ProjectsDataset extends JenaDataset with NamedGraphDataset {
   registerDataset(connectionInfoFactory, configFile)
 
   import io.renku.generators.Generators.Implicits._
-  import io.renku.graph.model.GraphModelGenerators.projectPaths
-  import io.renku.graph.model.projects.Path
+  import io.renku.graph.model.GraphModelGenerators.projectSlugs
+  import io.renku.graph.model.projects.Slug
 
-  private lazy val defaultProjectForGraph: Path = projectPaths.generateOne
+  private lazy val defaultProjectForGraph: Slug = projectSlugs.generateOne
 
   def defaultProjectGraphId(implicit renkuUrl: RenkuUrl): EntityId =
     io.renku.graph.model.testentities.Project.toEntityId(defaultProjectForGraph)

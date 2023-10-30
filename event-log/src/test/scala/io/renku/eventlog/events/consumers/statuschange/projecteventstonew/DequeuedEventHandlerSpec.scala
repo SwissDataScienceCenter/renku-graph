@@ -47,8 +47,9 @@ import io.renku.testtools.IOSpec
 import org.scalacheck.Gen
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.matchers.should
+import org.scalatest.prop.TableDrivenPropertyChecks
 import org.scalatest.wordspec.AnyWordSpec
-import skunk.SqlState
+import skunk.SqlState.{DeadlockDetected, ForeignKeyViolation}
 
 import java.time.Instant
 import scala.util.Random
@@ -60,7 +61,8 @@ class DequeuedEventHandlerSpec
     with SubscriptionDataProvisioning
     with TypeSerializers
     with should.Matchers
-    with MockFactory {
+    with MockFactory
+    with TableDrivenPropertyChecks {
 
   "updateDB" should {
 
@@ -102,15 +104,13 @@ class DequeuedEventHandlerSpec
         val counts: Map[EventStatus, Int] = eventsStatuses
           .groupBy(identity)
           .map { case (eventStatus, statuses) => (eventStatus, -1 * statuses.length) }
-          .updatedWith(EventStatus.New) { maybeNewEvents =>
-            maybeNewEvents.map(_ + events.size).orElse(Some(events.size))
-          }
+          .updatedWith(EventStatus.New)(_.map(_ + events.size).orElse(Some(events.size)))
           .updated(AwaitingDeletion, -1)
           .updated(Deleting, -1)
 
         sessionResource
           .useK(dbUpdater updateDB ProjectEventsToNew(project))
-          .unsafeRunSync() shouldBe DBUpdateResults.ForProjects(project.path, counts)
+          .unsafeRunSync() shouldBe DBUpdateResults.ForProjects(project.slug, counts)
 
         events.flatMap(findFullEvent) shouldBe events.map { eventId =>
           (eventId.id, EventStatus.New, None, None, Nil)
@@ -146,7 +146,7 @@ class DequeuedEventHandlerSpec
 
         sessionResource
           .useK(dbUpdater.updateDB(ProjectEventsToNew(project)))
-          .unsafeRunSync() shouldBe DBUpdateResults.ForProjects(project.path,
+          .unsafeRunSync() shouldBe DBUpdateResults.ForProjects(project.slug,
                                                                 Map(AwaitingDeletion -> 0, Deleting -> -2)
         )
 
@@ -154,50 +154,52 @@ class DequeuedEventHandlerSpec
         findEvent(event2) shouldBe None
       }
 
-    "change the status of all events of a specific project to NEW except SKIPPED events " +
-      "- case when there are no events left in the project and cleaning the project fails" in new TestCase {
+    "fail if the cleaning the project fails" in new TestCase {
 
-        val exception = exceptions.generateOne
-        val project   = consumerProjects.generateOne
+      val project = consumerProjects.generateOne
 
-        val event1 = addEvent(Deleting, project)
-        val event2 = addEvent(Deleting, project)
+      addEvent(Deleting, project)
+      addEvent(Deleting, project)
 
-        (projectCleaner.cleanUp _)
-          .expects(project)
-          .returning(Kleisli.liftF(exception.raiseError[IO, Unit]))
+      val exception = exceptions.generateOne
+      (projectCleaner.cleanUp _)
+        .expects(project)
+        .returning(Kleisli.liftF(exception.raiseError[IO, Unit]))
 
+      intercept[Exception](
         sessionResource
           .useK(dbUpdater.updateDB(ProjectEventsToNew(project)))
-          .unsafeRunSync() shouldBe DBUpdateResults.ForProjects(project.path,
-                                                                Map(AwaitingDeletion -> 0, Deleting -> -2)
-        )
+          .unsafeRunSync()
+      ) shouldBe exception
 
-        findEvent(event1) shouldBe None
-        findEvent(event2) shouldBe None
-
-        logger.loggedOnly(Error(show"$categoryName: project clean up failed: ${project.show}", exception))
-      }
+      logger.loggedOnly(Error(show"$categoryName: project clean up failed: ${project.show}; will retry", exception))
+    }
   }
 
   "onRollback" should {
 
-    "run the updateDB on DeadlockDetected" in new TestCase {
+    forAll(
+      Table(
+        "failure name"        -> "failure",
+        "Deadlock"            -> postgresErrors(DeadlockDetected).generateOne,
+        "ForeignKeyViolation" -> postgresErrors(ForeignKeyViolation).generateOne
+      )
+    ) { (failureName, failure) =>
+      s"run the updateDB on $failureName" in new TestCase {
 
-      val project = consumerProjects.generateOne
+        val project = consumerProjects.generateOne
 
-      val event = addEvent(Deleting, project)
+        val event = addEvent(Deleting, project)
 
-      upsertCategorySyncTime(project.id, categoryNames.generateOne, lastSyncedDates.generateOne)
+        upsertCategorySyncTime(project.id, categoryNames.generateOne, lastSyncedDates.generateOne)
 
-      (projectCleaner.cleanUp _).expects(project).returns(Kleisli.pure(()))
+        (projectCleaner.cleanUp _).expects(project).returns(Kleisli.pure(()))
 
-      val deadlockException = postgresErrors(SqlState.DeadlockDetected).generateOne
-      sessionResource
-        .useK((dbUpdater onRollback ProjectEventsToNew(project))(deadlockException))
-        .unsafeRunSync() shouldBe DBUpdateResults.ForProjects(project.path, Map(AwaitingDeletion -> 0, Deleting -> -1))
+        (dbUpdater onRollback ProjectEventsToNew(project)).apply(failure).unsafeRunSync() shouldBe
+          DBUpdateResults.ForProjects(project.slug, Map(AwaitingDeletion -> 0, Deleting -> -1))
 
-      findEvent(event) shouldBe None
+        findEvent(event) shouldBe None
+      }
     }
   }
 
@@ -221,7 +223,7 @@ class DequeuedEventHandlerSpec
         case AwaitingDeletion                => zippedEventPayloads.generateOption
         case _                               => zippedEventPayloads.generateNone
       },
-      projectPath = project.path
+      projectSlug = project.slug
     )
 
     status match {
@@ -252,9 +254,9 @@ class DequeuedEventHandlerSpec
     private val now         = Instant.now()
     currentTime.expects().returning(now).anyNumberOfTimes()
 
-    val subscriberId  = subscriberIds.generateOne
-    val sourceUrl     = microserviceBaseUrls.generateOne
-    val subscriberUrl = subscriberUrls.generateOne
+    val subscriberId          = subscriberIds.generateOne
+    private val sourceUrl     = microserviceBaseUrls.generateOne
+    private val subscriberUrl = subscriberUrls.generateOne
     upsertSubscriber(subscriberId, subscriberUrl, sourceUrl)
 
     implicit val logger:                   TestLogger[IO]            = TestLogger[IO]()

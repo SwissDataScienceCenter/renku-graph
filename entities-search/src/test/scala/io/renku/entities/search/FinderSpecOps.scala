@@ -28,16 +28,15 @@ import io.renku.http.rest.paging.PagingResponse
 import io.renku.http.server.security.model.AuthUser
 import io.renku.interpreters.TestLogger
 import io.renku.logging.TestSparqlQueryTimeRecorder
-import io.renku.testtools.IOSpec
 import io.renku.tinytypes.StringTinyType
 import io.renku.triplesstore.{InMemoryJenaForSpec, ProjectsDataset, SparqlQueryTimeRecorder}
-import org.scalatest.TestSuite
+import org.scalatest.Suite
 import org.typelevel.log4cats.Logger
 
 import java.time.Instant
 
 trait FinderSpecOps {
-  self: TestSuite with InMemoryJenaForSpec with ProjectsDataset with IOSpec =>
+  self: Suite with InMemoryJenaForSpec with ProjectsDataset =>
 
   protected implicit val logger: TestLogger[IO] = TestLogger[IO]()
   implicit val ioLogger:         Logger[IO]     = logger
@@ -67,8 +66,8 @@ trait FinderSpecOps {
 
   protected[search] implicit class EntityOps(entity: model.Entity) {
     lazy val dateAsInstant: Instant = entity match {
-      case proj:     model.Entity.Project  => proj.date.value
-      case ds:       model.Entity.Dataset  => ds.date.instant
+      case proj:     model.Entity.Project  => proj.dateModified.value
+      case ds:       model.Entity.Dataset  => ds.dateModified.map(_.value).getOrElse(ds.date.instant)
       case workflow: model.Entity.Workflow => workflow.date.value
       case person:   model.Entity.Person   => person.date.value
     }
@@ -95,7 +94,7 @@ trait FinderSpecOps {
     }.distinct
 
     def addAllPersonsFrom(project: RenkuProject): List[model.Entity] =
-      addPersons((project.members ++ project.maybeCreator).toList)
+      addPersons((project.members.map(_.person) ++ project.maybeCreator).toList)
         .addPersons(project.datasets.flatMap(_.provenance.creators.toList))
         .addPersons(project.activities.map(_.author))
         .addPersons(project.plans.flatMap(_.creators))

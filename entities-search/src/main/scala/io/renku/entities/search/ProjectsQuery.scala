@@ -21,9 +21,10 @@ package io.renku.entities.search
 import io.circe.Decoder
 import io.renku.entities.search.Criteria.Filters.EntityType
 import io.renku.entities.search.model.{Entity, MatchingScore}
-import io.renku.graph.model.entities.Person
+import io.renku.entities.searchgraphs.concatSeparator
 import io.renku.graph.model.{GraphClass, persons, projects}
 import io.renku.http.server.security.model.AuthUser
+import io.renku.projectauth.util.SparqlSnippets
 import io.renku.triplesstore.client.sparql.{Fragment, LuceneQuery, VarName}
 import io.renku.triplesstore.client.syntax._
 
@@ -33,46 +34,44 @@ private case object ProjectsQuery extends EntityQuery[model.Entity.Project] {
 
   private val matchingScoreVar    = VarName("matchingScore")
   private val nameVar             = VarName("name")
-  private val pathVar             = VarName("path")
+  private val slugVar             = VarName("slug")
   private val visibilityVar       = VarName("visibility")
   private val dateVar             = VarName("date")
   private val dateModifiedVar     = VarName("dateModified")
+  private val maybeDateCreatedVar = VarName("maybeDateCreated")
   private val maybeCreatorNameVar = VarName("maybeCreatorName")
   private val maybeDescriptionVar = VarName("maybeDescription")
   private val keywordsVar         = VarName("keywords")
   private val imagesVar           = VarName("images")
 
   // local vars
-  private val projectIdVar        = VarName("projectId")
-  private val someDateVar         = VarName("someDate")
-  private val someDateModifiedVar = VarName("someDateModified")
-  private val someCreatorNameVar  = VarName("someCreatorName")
-  private val keywordVar          = VarName("keyword")
-  private val encodedImageUrlVar  = VarName("encodedImageUrl")
+  private val projectIdVar = VarName("projectId")
+  private val authSnippets = SparqlSnippets(projectIdVar)
 
-  override val selectVariables: Set[String] = Set(entityTypeVar,
-                                                  matchingScoreVar,
-                                                  nameVar,
-                                                  pathVar,
-                                                  visibilityVar,
-                                                  dateVar,
-                                                  dateModifiedVar,
-                                                  maybeCreatorNameVar,
-                                                  maybeDescriptionVar,
-                                                  keywordsVar,
-                                                  imagesVar
-  ).map(_.name)
+  override val selectVariables: Set[String] =
+    Set(
+      entityTypeVar,
+      matchingScoreVar,
+      nameVar,
+      slugVar,
+      visibilityVar,
+      dateVar,
+      dateModifiedVar,
+      maybeCreatorNameVar,
+      maybeDescriptionVar,
+      keywordsVar,
+      imagesVar
+    ).map(_.name)
 
   override def query(criteria: Criteria): Option[String] = (criteria.filters whenRequesting entityType) {
     import criteria._
     sparql"""|{
-             |  SELECT $entityTypeVar $matchingScoreVar $nameVar $pathVar $visibilityVar
-             |    (MIN($someDateVar) AS $dateVar)
-             |    (MAX($someDateModifiedVar) AS $dateModifiedVar)
-             |    (SAMPLE($someCreatorNameVar) AS $maybeCreatorNameVar)
+             |  SELECT DISTINCT $entityTypeVar $matchingScoreVar $nameVar $slugVar $visibilityVar
+             |    $maybeDateCreatedVar $dateModifiedVar ($dateModifiedVar AS $dateVar)
+             |    $maybeCreatorNameVar
              |    $maybeDescriptionVar
-             |    (GROUP_CONCAT(DISTINCT $keywordVar; separator=',') AS $keywordsVar)
-             |    (GROUP_CONCAT($encodedImageUrlVar; separator=',') AS $imagesVar)
+             |    $keywordsVar
+             |    $imagesVar
              |  WHERE {
              |    BIND (${entityType.value.asTripleObject} AS $entityTypeVar)
              |
@@ -82,26 +81,31 @@ private case object ProjectsQuery extends EntityQuery[model.Entity.Project] {
              |    GRAPH ${GraphClass.Projects.id} {
              |      $projectIdVar a renku:DiscoverableProject;
              |                    schema:name $nameVar;
-             |                    renku:projectPath $pathVar;
-             |                    schema:dateModified $someDateModifiedVar;
-             |                    schema:dateCreated $someDateVar.
+             |                    renku:slug $slugVar;
+             |                    schema:dateModified $dateModifiedVar;
+             |                    schema:dateCreated $maybeDateCreatedVar.
              |
-             |      ${filters.maybeOnDateCreated(someDateVar)}
+             |      ${filters.maybeOnDateCreated(maybeDateCreatedVar)}
+             |
+             |      ${accessRightsAndVisibility(criteria.maybeUser, criteria.filters.visibilities)}
              |
              |      GRAPH $projectIdVar {
-             |        ${accessRightsAndVisibility(criteria.maybeUser, criteria.filters.visibilities)}
              |        ${namespacesPart(criteria.filters.namespaces)}
              |      }
              |
-             |      OPTIONAL { $projectIdVar schema:creator/schema:name $someCreatorNameVar }
-             |      ${filters.maybeOnCreatorName(someCreatorNameVar)}
+             |      OPTIONAL {
+             |        $projectIdVar schema:creator ?creatorId.
+             |        GRAPH ${GraphClass.Persons.id} {
+             |          ?creatorId schema:name $maybeCreatorNameVar
+             |        }
+             |      }
+             |      ${filters.maybeOnCreatorName(maybeCreatorNameVar)}
              |
              |      OPTIONAL { $projectIdVar schema:description $maybeDescriptionVar }
-             |      OPTIONAL { $projectIdVar schema:keywords $keywordVar }
-             |      $imagesPart
+             |      OPTIONAL { $projectIdVar renku:keywordsConcat $keywordsVar }
+             |      OPTIONAL { $projectIdVar renku:imagesConcat $imagesVar }
              |    }
              |  }
-             |  GROUP BY $entityTypeVar $matchingScoreVar $nameVar $pathVar $visibilityVar $maybeDescriptionVar
              |}
              |""".stripMargin.sparql
   }
@@ -113,7 +117,7 @@ private case object ProjectsQuery extends EntityQuery[model.Entity.Project] {
            |  SELECT $projectIdVar (MAX(?score) AS $matchingScoreVar)
            |  WHERE {
            |    {
-           |      (?id ?score) text:query (schema:name schema:keywords schema:description renku:projectNamespaces $luceneQuery)
+           |      (?id ?score) text:query (schema:name renku:keywordsConcat schema:description renku:projectNamespaces $luceneQuery)
            |    } {
            |      GRAPH ${GraphClass.Projects.id} {
            |        ?id a renku:DiscoverableProject
@@ -135,46 +139,10 @@ private case object ProjectsQuery extends EntityQuery[model.Entity.Project] {
   }
 
   private def accessRightsAndVisibility(maybeUser: Option[AuthUser], visibilities: Set[projects.Visibility]): Fragment =
-    maybeUser match {
-      case Some(user) =>
-        val nonPrivateVisibilities =
-          if (visibilities.isEmpty)
-            projects.Visibility.all - projects.Visibility.Private
-          else (projects.Visibility.all - projects.Visibility.Private) intersect visibilities
-
-        val selectPrivateValue =
-          if (visibilities.isEmpty || visibilities.contains(projects.Visibility.Private))
-            projects.Visibility.Private.asObject
-          else "".asTripleObject
-        fr"""|{
-             |  $projectIdVar renku:projectVisibility $visibilityVar.
-             |  {
-             |    VALUES ($visibilityVar) {
-             |      ${nonPrivateVisibilities.map(_.asObject)}
-             |    }
-             |  } UNION {
-             |    VALUES ($visibilityVar) {
-             |      ($selectPrivateValue)
-             |    }
-             |    $projectIdVar schema:member ?memberId.
-             |    GRAPH ${GraphClass.Persons.id} {
-             |      ?memberId schema:sameAs ?memberSameAs.
-             |      ?memberSameAs schema:additionalType ${Person.gitLabSameAsAdditionalType.asTripleObject};
-             |                    schema:identifier ${user.id.asObject}
-             |    }
-             |  }
-             |}
-             |""".stripMargin
-      case None =>
-        visibilities match {
-          case v if v.isEmpty || v.contains(projects.Visibility.Public) =>
-            fr"""|$projectIdVar renku:projectVisibility $visibilityVar.
-                 |VALUES ($visibilityVar) { (${projects.Visibility.Public.asObject}) }""".stripMargin
-          case _ =>
-            fr"""|$projectIdVar renku:projectVisibility $visibilityVar.
-                 |VALUES ($visibilityVar) { ('') }""".stripMargin
-        }
-    }
+    sparql"""
+            |$projectIdVar renku:projectVisibility $visibilityVar .
+            |${authSnippets.visibleProjects(maybeUser.map(_.id), visibilities)}
+              """.stripMargin
 
   private def namespacesPart(ns: Set[projects.Namespace]): Fragment = {
     val matchFrag =
@@ -186,15 +154,6 @@ private case object ProjectsQuery extends EntityQuery[model.Entity.Project] {
     """.stripMargin
   }
 
-  private lazy val imagesPart =
-    fr"""|OPTIONAL {
-         |  $projectIdVar schema:image ?imageId.
-         |  ?imageId schema:position ?imagePosition;
-         |           schema:contentUrl ?imageUrl.
-         |  BIND (CONCAT(STR(?imagePosition), STR(':'), STR(?imageUrl)) AS $encodedImageUrlVar)
-         |}
-         |""".stripMargin
-
   override def decoder[EE >: Entity.Project]: Decoder[EE] = { implicit cursor =>
     import DecodingTools._
     import cats.syntax.all._
@@ -202,18 +161,18 @@ private case object ProjectsQuery extends EntityQuery[model.Entity.Project] {
 
     for {
       matchingScore    <- read[MatchingScore](matchingScoreVar)
-      path             <- read[projects.Path](pathVar)
+      slug             <- read[projects.Slug](slugVar)
       name             <- read[projects.Name](nameVar)
       visibility       <- read[projects.Visibility](visibilityVar)
-      dateCreated      <- read[projects.DateCreated](dateVar)
+      dateCreated      <- read[projects.DateCreated](maybeDateCreatedVar)
       dateModified     <- read[projects.DateModified](dateModifiedVar)
       maybeCreatorName <- read[Option[persons.Name]](maybeCreatorNameVar)
       maybeDescription <- read[Option[projects.Description]](maybeDescriptionVar)
-      images           <- read[Option[String]](imagesVar) >>= toListOfImageUris
+      images           <- read[Option[String]](imagesVar) >>= toListOfImageUris(concatSeparator)
       keywords <-
-        read[Option[String]](keywordsVar) >>= toListOf[projects.Keyword, projects.Keyword.type](projects.Keyword)
+        read[Option[String]](keywordsVar) >>= toListOf[projects.Keyword, projects.Keyword.type](concatSeparator)
     } yield Entity.Project(matchingScore,
-                           path,
+                           slug,
                            name,
                            visibility,
                            dateCreated,

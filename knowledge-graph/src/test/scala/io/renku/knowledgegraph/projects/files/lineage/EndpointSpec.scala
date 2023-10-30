@@ -21,15 +21,13 @@ package io.renku.knowledgegraph.projects.files.lineage
 import LineageGenerators._
 import cats.effect.IO
 import cats.syntax.all._
+import eu.timepit.refined.auto._
 import io.circe.{Decoder, Json}
+import io.renku.data.Message
 import io.renku.generators.CommonGraphGenerators._
 import io.renku.generators.Generators.Implicits._
 import io.renku.generators.Generators.exceptions
 import io.renku.graph.model.GraphModelGenerators._
-import io.renku.http.ErrorMessage.ErrorMessage
-import io.renku.http.InfoMessage._
-import io.renku.http.server.EndpointTester.{errorMessageEntityDecoder, infoMessageEntityDecoder}
-import io.renku.http.{ErrorMessage, InfoMessage}
 import io.renku.interpreters.TestLogger
 import io.renku.testtools.IOSpec
 import model.Node.{Label, Location, Type}
@@ -50,10 +48,10 @@ class EndpointSpec extends AnyWordSpec with should.Matchers with MockFactory wit
       val lineage = lineages.generateOne
 
       (lineageFinder.find _)
-        .expects(projectPath, location, maybeUser)
+        .expects(projectSlug, location, maybeUser)
         .returning(lineage.some.pure[IO])
 
-      val response      = endpoint.`GET /lineage`(projectPath, location, maybeUser).unsafeRunSync()
+      val response      = endpoint.`GET /lineage`(projectSlug, location, maybeUser).unsafeRunSync()
       val Right(result) = response.as[Json].unsafeRunSync().as[Lineage]
 
       response.status      shouldBe Ok
@@ -64,34 +62,34 @@ class EndpointSpec extends AnyWordSpec with should.Matchers with MockFactory wit
     "respond with NotFound if the lineage isn't returned from the finder" in new TestCase {
 
       (lineageFinder.find _)
-        .expects(projectPath, location, maybeUser)
+        .expects(projectSlug, location, maybeUser)
         .returning(Option.empty[Lineage].pure[IO])
 
-      val response = endpoint.`GET /lineage`(projectPath, location, maybeUser).unsafeRunSync()
-      val result   = response.as[InfoMessage].unsafeRunSync()
+      val response = endpoint.`GET /lineage`(projectSlug, location, maybeUser).unsafeRunSync()
 
       response.status      shouldBe NotFound
       response.contentType shouldBe Some(`Content-Type`(application.json))
-      result               shouldBe InfoMessage(show"No lineage for project: $projectPath file: $location")
+      response.as[Message].unsafeRunSync() shouldBe
+        Message.Info.unsafeApply(show"No lineage for project: $projectSlug file: $location")
     }
 
     "respond with InternalServerError if the lineage is returned from the finder but the encoder fails" in new TestCase {
 
       val exception = exceptions.generateOne
       (lineageFinder.find _)
-        .expects(projectPath, location, maybeUser)
+        .expects(projectSlug, location, maybeUser)
         .returning(exception.raiseError[IO, Option[Lineage]])
 
-      val response = endpoint.`GET /lineage`(projectPath, location, maybeUser).unsafeRunSync()
+      val response = endpoint.`GET /lineage`(projectSlug, location, maybeUser).unsafeRunSync()
 
-      response.status                           shouldBe InternalServerError
-      response.contentType                      shouldBe Some(`Content-Type`(application.json))
-      response.as[ErrorMessage].unsafeRunSync() shouldBe ErrorMessage("Lineage generation failed")
+      response.status                      shouldBe InternalServerError
+      response.contentType                 shouldBe Some(`Content-Type`(application.json))
+      response.as[Message].unsafeRunSync() shouldBe Message.Error("Lineage generation failed")
     }
   }
 
   private trait TestCase {
-    val projectPath = projectPaths.generateOne
+    val projectSlug = projectSlugs.generateOne
     val location    = nodeLocations.generateOne
     val maybeUser   = authUsers.generateOption
 

@@ -40,9 +40,13 @@ private class ProjectPathAdder[F[_]: Spawn: Logger: SessionResource]
   import MigrationTools._
 
   def run: F[Unit] = SessionResource[F].useK {
-    checkColumnExists("projects_tokens", "project_path") >>= {
-      case true  => Kleisli.liftF(Logger[F].info("'project_path' column existed"))
-      case false => addColumn()
+    checkColumnExists("projects_tokens", "project_slug") >>= {
+      case true => Kleisli.liftF(Logger[F].info("no need to create 'project_path' as 'project_slug' already exists"))
+      case false =>
+        checkColumnExists("projects_tokens", "project_path") >>= {
+          case true  => Kleisli.liftF(Logger[F].info("'project_path' column existed"))
+          case false => addColumn()
+        }
     }
   }
 
@@ -58,7 +62,7 @@ private class ProjectPathAdder[F[_]: Spawn: Logger: SessionResource]
   }
 
   private lazy val logging: PartialFunction[Throwable, F[Unit]] = { case NonFatal(exception) =>
-    Logger[F].error(exception)("'project_path' column adding failure")
-    exception.raiseError[F, Unit]
+    Logger[F].error(exception)("'project_path' column adding failure") >>
+      exception.raiseError[F, Unit]
   }
 }

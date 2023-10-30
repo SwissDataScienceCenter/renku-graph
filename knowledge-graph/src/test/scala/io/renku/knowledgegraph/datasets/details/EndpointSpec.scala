@@ -24,9 +24,9 @@ import cats.data.NonEmptyList
 import cats.effect.IO
 import cats.syntax.all._
 import io.circe.Decoder._
-import io.circe.syntax._
 import io.circe.{Decoder, DecodingFailure, HCursor, Json}
 import io.renku.config.renku
+import io.renku.data.Message
 import io.renku.generators.CommonGraphGenerators.{authContexts, renkuApiUrls}
 import io.renku.generators.Generators.Implicits._
 import io.renku.generators.Generators._
@@ -36,15 +36,12 @@ import io.renku.graph.model._
 import io.renku.graph.model.datasets._
 import io.renku.graph.model.images.ImageUri
 import io.renku.graph.model.persons.{Affiliation, Email, Name => UserName}
-import io.renku.graph.model.projects.Path
+import io.renku.graph.model.projects.Slug
 import io.renku.graph.model.testentities.generators.EntitiesGenerators
-import io.renku.http.ErrorMessage._
-import io.renku.http.InfoMessage._
 import io.renku.http.rest.Links
 import io.renku.http.rest.Links.Rel.Self
 import io.renku.http.rest.Links.{Href, Rel}
 import io.renku.http.server.EndpointTester._
-import io.renku.http.{ErrorMessage, InfoMessage}
 import io.renku.interpreters.TestLogger
 import io.renku.interpreters.TestLogger.Level.{Error, Warn}
 import io.renku.logging.TestExecutionTimeRecorder
@@ -153,7 +150,7 @@ class EndpointSpec
       response.status      shouldBe NotFound
       response.contentType shouldBe `Content-Type`(MediaType.application.json).some
 
-      response.as[Json].unsafeRunSync() shouldBe InfoMessage(show"No '$requestedDataset' dataset found").asJson
+      response.as[Message].unsafeRunSync() shouldBe Message.Info.unsafeApply(show"No '$requestedDataset' dataset found")
 
       logger.loggedOnly(
         Warn(show"Finding '$requestedDataset' dataset finished${executionTimeRecorder.executionTimeInfo}")
@@ -173,7 +170,9 @@ class EndpointSpec
       response.status      shouldBe InternalServerError
       response.contentType shouldBe `Content-Type`(MediaType.application.json).some
 
-      response.as[ErrorMessage].unsafeRunSync() shouldBe ErrorMessage(show"Finding dataset '$requestedDataset' failed")
+      response.as[Message].unsafeRunSync() shouldBe Message.Error.unsafeApply(
+        show"Finding dataset '$requestedDataset' failed"
+      )
 
       logger.loggedOnly(Error(show"Finding dataset '$requestedDataset' failed", exception))
     }
@@ -236,16 +235,16 @@ class EndpointSpec
         .of(
           Self                   -> Href(Uri.unsafeFromString(renkuApiUrl.show) / "datasets" / requestedDataset),
           Rel("initial-version") -> Href(renkuApiUrl / "datasets" / dataset.versions.initial),
-          Rel("tags") -> Href(renkuApiUrl / "projects" / dataset.project.path / "datasets" / dataset.name / "tags")
+          Rel("tags") -> Href(renkuApiUrl / "projects" / dataset.project.slug / "datasets" / dataset.name / "tags")
         )
 
     def verifyProject(cursor: HCursor) = {
       val mainProject = cursor.downField("project").as[Json].value
-      (mainProject.hcursor.downField("path").as[Path], mainProject._links)
-        .mapN { case (path, links) =>
-          links shouldBe Links.of(Rel("project-details") -> Href(renkuApiUrl / "projects" / path))
+      (mainProject.hcursor.downField("path").as[projects.Slug], mainProject._links)
+        .mapN { case (slug, links) =>
+          links shouldBe Links.of(Rel("project-details") -> Href(renkuApiUrl / "projects" / slug))
         }
-        .getOrElse(fail("No 'path' or 'project-details' links on the 'project' element"))
+        .getOrElse(fail("No 'slug' or 'project-details' links on the 'project' element"))
     }
 
     def verifyUsedIn(cursor: HCursor, dataset: Dataset): Unit = {
@@ -254,11 +253,11 @@ class EndpointSpec
 
       usedInJsons should have size dataset.usedIn.size
       usedInJsons foreach { json =>
-        (json.hcursor.downField("path").as[Path], json._links)
-          .mapN { case (path, links) =>
-            links shouldBe Links.of(Rel("project-details") -> Href(renkuApiUrl / "projects" / path))
+        (json.hcursor.downField("path").as[projects.Slug], json._links)
+          .mapN { case (slug, links) =>
+            links shouldBe Links.of(Rel("project-details") -> Href(renkuApiUrl / "projects" / slug))
           }
-          .getOrElse(fail("No 'path' or 'project-details' links on the 'usedIn' elements"))
+          .getOrElse(fail("No 'slug' or 'project-details' links on the 'usedIn' elements"))
       }
     }
 
@@ -271,7 +270,7 @@ class EndpointSpec
         (json.hcursor.downField("location").as[ImageUri], json._links)
           .mapN {
             case (uri: ImageUri.Relative, links) =>
-              links shouldBe Links.of(Rel("view") -> Href(gitLabUrl / dataset.project.path / "raw" / "master" / uri))
+              links shouldBe Links.of(Rel("view") -> Href(gitLabUrl / dataset.project.slug / "raw" / "master" / uri))
             case (uri: ImageUri.Absolute, links) =>
               links shouldBe Links.of(Rel("view") -> Href(uri.show))
             case (uri, links) => fail(s"$uri 'location' or $links 'view' links of unknown shape")
@@ -373,11 +372,13 @@ class EndpointSpec
 
   private implicit lazy val projectDecoder: Decoder[DatasetProject] = cursor =>
     for {
-      path         <- cursor.downField("path").as[projects.Path]
+      path         <- cursor.downField("path").as[projects.Slug]
+      slug         <- cursor.downField("slug").as[projects.Slug]
+      _            <- Either.cond(path == slug, (), DecodingFailure("path != slug", Nil))
       name         <- cursor.downField("name").as[projects.Name]
       visibility   <- cursor.downField("visibility").as[projects.Visibility]
       dsIdentifier <- cursor.downField("dataset").downField("identifier").as[datasets.Identifier]
-    } yield DatasetProject(projects.ResourceId(path), path, name, visibility, dsIdentifier)
+    } yield DatasetProject(projects.ResourceId(slug), slug, name, visibility, dsIdentifier)
 
   private implicit lazy val versionsDecoder: Decoder[DatasetVersions] = cursor =>
     for {

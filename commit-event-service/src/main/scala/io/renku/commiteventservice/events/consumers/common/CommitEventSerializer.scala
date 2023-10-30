@@ -31,25 +31,25 @@ private object CommitEventSerializer extends CommitEventSerializer {
     toJson(commitEvent).noSpaces
 
   private def toJson(commitEvent: CommitEvent): Json = json"""{
-    "id":            ${commitEvent.id.value},
-    "message":       ${commitEvent.message.value},
-    "committedDate": ${commitEvent.committedDate.toString},
+    "id":            ${commitEvent.id},
+    "message":       ${commitEvent.message},
+    "committedDate": ${commitEvent.committedDate},
     "author":        ${commitEvent.author},
     "committer":     ${commitEvent.committer}, 
     "parents":       ${commitEvent.parents.map(_.value)},
     "project": {
-      "id":          ${commitEvent.project.id.value},
-      "path":        ${commitEvent.project.path.value}
+      "id":   ${commitEvent.project.id},
+      "slug": ${commitEvent.project.slug}
     }
   }"""
 
   private implicit def personEncoder[E <: Person]: Encoder[E] = Encoder.instance[E] {
     case person: Person with Person.WithEmail => json"""{
-      "username": ${person.name.value},
-      "email"   : ${person.email.value}
+      "username": ${person.name},
+      "email"   : ${person.email}
     }"""
     case person: Person => json"""{
-      "username": ${person.name.value}
+      "username": ${person.name}
     }"""
   }
 }

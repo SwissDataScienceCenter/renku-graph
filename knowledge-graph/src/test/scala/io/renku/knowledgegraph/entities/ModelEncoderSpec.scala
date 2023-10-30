@@ -48,9 +48,9 @@ class ModelEncoderSpec extends AnyFlatSpec with should.Matchers with DiffInstanc
     val absoluteUri = ImageUri("http://absolu.te/uri.png")
     val relativeUri = ImageUri("relative/uri.png")
     val images      = List(absoluteUri, relativeUri)
-    val path        = projects.Path("namespace/project")
-    val result      = ModelEncoders.imagesEncoder.apply(images -> path)
-    val expected    = images.map(makeImageLink(path))
+    val slug        = projects.Slug("namespace/project")
+    val result      = ModelEncoders.imagesEncoder.apply(images -> slug)
+    val expected    = images.map(makeImageLink(slug))
 
     result shouldBe expected.asJson
   }
@@ -58,7 +58,7 @@ class ModelEncoderSpec extends AnyFlatSpec with should.Matchers with DiffInstanc
   it should "encode projects" in {
     val project = Entity.Project(
       matchingScore = MatchingScore(0.55f),
-      path = projects.Path("some/great/ns/my-project"),
+      slug = projects.Slug("some/great/ns/my-project"),
       name = projects.Name("my-project"),
       visibility = Visibility.Public,
       date = projects.DateCreated(Instant.parse("2013-03-31T13:03:45Z")),
@@ -70,20 +70,21 @@ class ModelEncoderSpec extends AnyFlatSpec with should.Matchers with DiffInstanc
     )
     val result = ModelEncoders.projectEncoder.apply(project)
     val expected = JsonProject(
-      List(Href("details", s"${renkuApiUrl}/projects/${project.path.value}")),
+      List(Href("details", s"${renkuApiUrl}/projects/${project.slug.value}")),
       project.maybeDescription,
       project.maybeCreator,
       project.matchingScore,
-      project.path,
+      project.slug,
+      project.slug,
       project.name,
-      project.path.toNamespace,
-      makeNamespaces(project.path),
+      project.slug.toNamespace,
+      makeNamespaces(project.slug),
       project.visibility,
       project.date,
       project.date,
       project.dateModified,
       project.keywords,
-      project.images.map(makeImageLink(project.path))
+      project.images.map(makeImageLink(project.slug))
     )
     result shouldBe expected.asJson
   }
@@ -91,7 +92,7 @@ class ModelEncoderSpec extends AnyFlatSpec with should.Matchers with DiffInstanc
   it should "encode datasets with topmost-sameas" in {
     val dataset = Entity.Dataset(
       MatchingScore(0.65f),
-      datasets.TopmostSameAs(s"${renkuApiUrl}/datasets/123"),
+      datasets.TopmostSameAs(s"$renkuApiUrl/datasets/123"),
       datasets.Name("my-dataset"),
       Visibility.Public,
       datasets.DateCreated(Instant.parse("2013-03-31T13:03:45Z")),
@@ -100,7 +101,7 @@ class ModelEncoderSpec extends AnyFlatSpec with should.Matchers with DiffInstanc
       List("ds-word", "word two").map(datasets.Keyword),
       Some(datasets.Description("hello description")),
       List(ImageUri("http://absolu.te/uri.png")),
-      projects.Path("projx/my-project")
+      projects.Slug("projx/my-project")
     )
     val result     = ModelEncoders.datasetEncoder.apply(dataset)
     val sameAs     = datasets.SameAs(dataset.sameAs.value)
@@ -118,7 +119,7 @@ class ModelEncoderSpec extends AnyFlatSpec with should.Matchers with DiffInstanc
       dataset.creators,
       dataset.keywords,
       dataset.maybeDescription,
-      dataset.images.map(makeImageLink(dataset.exemplarProjectPath))
+      dataset.images.map(makeImageLink(dataset.exemplarProjectSlug))
     )
     result shouldBe expected.asJson
   }
@@ -153,14 +154,14 @@ class ModelEncoderSpec extends AnyFlatSpec with should.Matchers with DiffInstanc
     result shouldBe expected.asJson
   }
 
-  def makeImageLink(path: projects.Path)(uri: ImageUri): ImageLink =
+  def makeImageLink(slug: projects.Slug)(uri: ImageUri): ImageLink =
     uri match {
-      case ImageUri.Relative(v) => ImageLink(List(Href("view", s"${gitlabUrl.value}/${path.value}/raw/master/$v")), v)
+      case ImageUri.Relative(v) => ImageLink(List(Href("view", s"${gitlabUrl.value}/${slug.value}/raw/master/$v")), v)
       case ImageUri.Absolute(v) => ImageLink(List(Href("view", v)), v)
     }
 
-  def makeNamespaces(path: projects.Path): List[Ns] = {
-    val parts = path.toNamespaces
+  def makeNamespaces(slug: projects.Slug): List[Ns] = {
+    val parts = slug.toNamespaces
     val first = Ns(parts.head.value, parts.head.value)
     parts.tail
       .foldLeft(List(first)) { (result, element) =>
@@ -179,7 +180,8 @@ object ModelEncoderSpec {
       description:   Option[projects.Description],
       creator:       Option[persons.Name],
       matchingScore: MatchingScore,
-      path:          projects.Path,
+      path:          projects.Slug,
+      slug:          projects.Slug,
       name:          projects.Name,
       namespace:     projects.Namespace,
       namespaces:    List[Ns],

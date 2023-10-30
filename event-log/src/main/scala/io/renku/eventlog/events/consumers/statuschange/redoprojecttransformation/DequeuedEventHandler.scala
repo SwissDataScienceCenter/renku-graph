@@ -22,6 +22,7 @@ package redoprojecttransformation
 import cats.effect.Async
 import cats.syntax.all._
 import io.renku.db.DbClient
+import io.renku.eventlog.EventLogDB.SessionResource
 import io.renku.eventlog.TypeSerializers
 import io.renku.eventlog.api.events.StatusChangeEvent.RedoProjectTransformation
 import io.renku.eventlog.events.consumers.statuschange.DBUpdater.{RollbackOp, UpdateOp}
@@ -30,9 +31,9 @@ import io.renku.eventlog.metrics.QueriesExecutionTimes
 
 import java.time.Instant
 
-trait DequeuedEventHandler[F[_]] extends DBUpdater[F, RedoProjectTransformation]
+private[statuschange] trait DequeuedEventHandler[F[_]] extends DBUpdater[F, RedoProjectTransformation]
 
-object DequeuedEventHandler {
+private[statuschange] object DequeuedEventHandler {
   def apply[F[_]: Async: QueriesExecutionTimes]: F[DequeuedEventHandler[F]] =
     new DequeuedEventHandlerImpl[F]().pure.widen
 }
@@ -53,20 +54,20 @@ private class DequeuedEventHandlerImpl[F[_]: Async: QueriesExecutionTimes](
   import skunk.implicits._
 
   override def updateDB(event: RedoProjectTransformation): UpdateOp[F] =
-    findLatestSuccessfulEvent(event.project.path) >>= {
-      case Some(eventId) => toTriplesGenerated(eventId) flatMapF toDBUpdateResults(eventId, event.project.path)
-      case None          => triggerMinProjectInfoEvent(event.project.path) map (_ => DBUpdateResults.ForProjects.empty)
+    findLatestSuccessfulEvent(event.project.slug) >>= {
+      case Some(eventId) => toTriplesGenerated(eventId) flatMapF toDBUpdateResults(eventId, event.project.slug)
+      case None          => triggerMinProjectInfoEvent(event.project.slug).as(DBUpdateResults.ForProjects.empty)
     }
 
-  private def findLatestSuccessfulEvent(path: projects.Path) = measureExecutionTime {
+  private def findLatestSuccessfulEvent(slug: projects.Slug) = measureExecutionTime {
     SqlStatement
       .named("redo_transformation - find successful")
-      .select[projects.Path, CompoundEventId](sql"""
+      .select[projects.Slug, CompoundEventId](sql"""
         SELECT candidate.event_id, candidate.project_id
         FROM (
           SELECT e.event_id, e.project_id
           FROM event e
-          JOIN project p ON e.project_id = p.project_id AND p.project_path = $projectPathEncoder
+          JOIN project p ON e.project_id = p.project_id AND p.project_slug = $projectSlugEncoder
           WHERE e.status = '#${TriplesStore.value}'
           ORDER BY event_date DESC
           LIMIT 1
@@ -79,7 +80,7 @@ private class DequeuedEventHandlerImpl[F[_]: Async: QueriesExecutionTimes](
         ) triples_generated ON 1 = 1
         WHERE triples_generated.count = 0
         """.query(compoundEventIdDecoder))
-      .arguments(path)
+      .arguments(slug)
       .build(_.option)
   }
 
@@ -98,10 +99,10 @@ private class DequeuedEventHandlerImpl[F[_]: Async: QueriesExecutionTimes](
       .build
   }
 
-  private def toDBUpdateResults(eventId: CompoundEventId, path: projects.Path): Completion => F[DBUpdateResults] = {
+  private def toDBUpdateResults(eventId: CompoundEventId, slug: projects.Slug): Completion => F[DBUpdateResults] = {
     case Completion.Update(1) =>
       DBUpdateResults
-        .ForProjects(path, Map(TriplesStore -> -1, TriplesGenerated -> 1))
+        .ForProjects(slug, Map(TriplesStore -> -1, TriplesGenerated -> 1))
         .pure[F]
         .widen[DBUpdateResults]
     case Completion.Update(0) =>
@@ -110,23 +111,24 @@ private class DequeuedEventHandlerImpl[F[_]: Async: QueriesExecutionTimes](
       new Exception(show"Could not change event $eventId to status $TriplesGenerated").raiseError[F, DBUpdateResults]
   }
 
-  private def triggerMinProjectInfoEvent(path: projects.Path) = measureExecutionTime {
+  private def triggerMinProjectInfoEvent(slug: projects.Slug) = measureExecutionTime {
     SqlStatement
       .named[F]("redo_transformation - trigger ADD_MIN_PROJECT_INFO")
-      .command[projects.Path](
+      .command[projects.Slug](
         sql"""DELETE FROM subscription_category_sync_time
-              WHERE category_name = '#${minprojectinfo.categoryName.show}' 
+              WHERE category_name = '#${minprojectinfo.categoryName.show}'
                 AND project_id = (
                   SELECT project_id
                   FROM project
-                  WHERE project_path = $projectPathEncoder
+                  WHERE project_slug = $projectSlugEncoder
                 )
                """.command
       )
-      .arguments(path)
+      .arguments(slug)
       .build
       .void
   }
 
-  override def onRollback(event: RedoProjectTransformation): RollbackOp[F] = RollbackOp.empty
+  override def onRollback(event: RedoProjectTransformation)(implicit sr: SessionResource[F]): RollbackOp[F] =
+    RollbackOp.empty
 }

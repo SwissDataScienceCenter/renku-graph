@@ -22,15 +22,13 @@ import cats.effect._
 import cats.syntax.all._
 import cats.{MonadThrow, Parallel}
 import io.renku.config.renku
+import io.renku.data.Message
 import io.renku.graph.config.GitLabUrlLoader
 import io.renku.graph.model.{GitLabUrl, projects}
 import io.renku.graph.tokenrepository.AccessTokenFinder
-import io.renku.http.ErrorMessage._
-import io.renku.http.InfoMessage._
 import io.renku.http.client.GitLabClient
 import io.renku.http.rest.Links.Href
 import io.renku.http.server.security.model.AuthUser
-import io.renku.http.{ErrorMessage, InfoMessage}
 import io.renku.jsonld.syntax._
 import io.renku.logging.ExecutionTimeRecorder
 import io.renku.metrics.MetricsRegistry
@@ -47,7 +45,7 @@ import java.time.Instant
 import scala.util.control.NonFatal
 
 trait Endpoint[F[_]] {
-  def `GET /projects/:path`(path: projects.Path, maybeAuthUser: Option[AuthUser])(implicit
+  def `GET /projects/:slug`(slug: projects.Slug, maybeAuthUser: Option[AuthUser])(implicit
       request: Request[F]
   ): F[Response[F]]
 }
@@ -71,27 +69,27 @@ class EndpointImpl[F[_]: MonadThrow: Logger](
 
   private implicit lazy val glUrl: GitLabUrl = gitLabUrl
 
-  def `GET /projects/:path`(path: projects.Path, maybeAuthUser: Option[AuthUser])(implicit
+  def `GET /projects/:slug`(slug: projects.Slug, maybeAuthUser: Option[AuthUser])(implicit
       request: Request[F]
-  ): F[Response[F]] = measureAndLogTime(finishedSuccessfully(path)) {
+  ): F[Response[F]] = measureAndLogTime(finishedSuccessfully(slug)) {
     projectFinder
-      .findProject(path, maybeAuthUser)
+      .findProject(slug, maybeAuthUser)
       .flatTap(sendProjectViewedEvent(maybeAuthUser))
-      .flatMap(toHttpResult(path))
-      .recoverWith(httpResult(path))
+      .flatMap(toHttpResult(slug))
+      .recoverWith(httpResult(slug))
   }
 
   private def sendProjectViewedEvent(maybeAuthUser: Option[AuthUser]): Option[Project] => F[Unit] = {
     case None => ().pure[F]
     case Some(proj) =>
       tgClient
-        .send(ProjectViewedEvent.forProjectAndUserId(proj.path, maybeAuthUser.map(_.id), now))
+        .send(ProjectViewedEvent.forProjectAndUserId(proj.slug, maybeAuthUser.map(_.id), now))
         .handleErrorWith(err => Logger[F].error(err)(show"sending ${ProjectViewedEvent.categoryName} event failed"))
   }
 
-  private def toHttpResult(path: projects.Path)(implicit request: Request[F]): Option[Project] => F[Response[F]] = {
+  private def toHttpResult(slug: projects.Slug)(implicit request: Request[F]): Option[Project] => F[Response[F]] = {
     case None =>
-      val message = InfoMessage(s"No '$path' project found")
+      val message = Message.Info.unsafeApply(s"No '$slug' project found")
       whenAccept(
         application.`ld+json` --> NotFound(message.asJsonLD),
         application.json      --> NotFound(message.asJson)
@@ -103,19 +101,19 @@ class EndpointImpl[F[_]: MonadThrow: Logger](
       )(default = Ok(projectJsonEncoder encode project))
   }
 
-  private def httpResult(path: projects.Path)(implicit
+  private def httpResult(slug: projects.Slug)(implicit
       request: Request[F]
   ): PartialFunction[Throwable, F[Response[F]]] = { case NonFatal(exception) =>
-    val message = ErrorMessage(s"Finding '$path' project failed")
+    val message = Message.Error.unsafeApply(s"Finding '$slug' project failed")
     Logger[F].error(exception)(message.show) >> whenAccept(
       application.`ld+json` --> InternalServerError(message.asJsonLD),
       application.json      --> InternalServerError(message.asJson)
     )(default = InternalServerError(message.asJson))
   }
 
-  private def finishedSuccessfully(projectPath: projects.Path): PartialFunction[Response[F], String] = {
+  private def finishedSuccessfully(projectSlug: projects.Slug): PartialFunction[Response[F], String] = {
     case response if response.status == Ok || response.status == NotFound =>
-      s"Finding '$projectPath' details finished"
+      s"Finding '$projectSlug' details finished"
   }
 }
 
@@ -137,6 +135,6 @@ object Endpoint {
                                 gitLabUrl
     )
 
-  def href(renkuApiUrl: renku.ApiUrl, projectPath: projects.Path): Href =
-    Href(renkuApiUrl / "projects" / projectPath)
+  def href(renkuApiUrl: renku.ApiUrl, projectSlug: projects.Slug): Href =
+    Href(renkuApiUrl / "projects" / projectSlug)
 }

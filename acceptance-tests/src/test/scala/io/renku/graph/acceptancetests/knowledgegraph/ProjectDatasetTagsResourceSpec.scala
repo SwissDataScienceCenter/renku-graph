@@ -28,6 +28,7 @@ import io.renku.graph.acceptancetests.flows.TSProvisioning
 import io.renku.graph.acceptancetests.tooling.{AcceptanceSpec, ApplicationServices}
 import io.renku.graph.model.EventsGenerators.commitIds
 import io.renku.graph.model.RenkuTinyTypeGenerators.{personEmails, personGitLabIds}
+import io.renku.graph.model.projects.Role
 import io.renku.graph.model.publicationEvents
 import io.renku.graph.model.testentities._
 import io.renku.tinytypes.json.TinyTypeDecoders._
@@ -63,7 +64,7 @@ class ProjectDatasetTagsResourceSpec
 
         val project = dataProjects(testProject)
           .map(replaceCreatorFrom(creator, creatorGitLabId))
-          .map(addMemberFrom(creator, creatorGitLabId) >>> addMemberWithId(user.id))
+          .map(addMemberFrom(creator, creatorGitLabId, Role.Owner) >>> addMemberWithId(user.id, Role.Maintainer))
           .generateOne
 
         ds -> project
@@ -77,7 +78,7 @@ class ProjectDatasetTagsResourceSpec
 
       When("the user fetches the tags with GET knowledge-graph/projects/:namespace/:name/datasets/:dsName/tags")
       val response = knowledgeGraphClient.GET(
-        s"knowledge-graph/projects/${project.path}/datasets/${dataset.identification.name}/tags",
+        s"knowledge-graph/projects/${project.slug}/datasets/${dataset.identification.name}/tags",
         accessToken
       )
 

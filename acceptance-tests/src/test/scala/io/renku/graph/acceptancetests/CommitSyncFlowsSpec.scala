@@ -30,6 +30,7 @@ import io.renku.generators.Generators.Implicits._
 import io.renku.graph.model.EventsGenerators.commitIds
 import io.renku.graph.model.events.EventId
 import io.renku.graph.model.events.EventStatus.TriplesStore
+import io.renku.graph.model.projects.Role
 import io.renku.graph.model.testentities.cliShapedPersons
 import io.renku.graph.model.testentities.generators.EntitiesGenerators._
 import io.renku.webhookservice.model.HookToken
@@ -46,7 +47,7 @@ class CommitSyncFlowsSpec extends AcceptanceSpec with ApplicationServices with T
       val project =
         dataProjects(renkuProjectEntities(visibilityPublic, creatorGen = cliShapedPersons).modify(removeMembers()),
                      CommitsCount(2)
-        ).map(addMemberWithId(user.id)).generateOne
+        ).map(addMemberWithId(user.id, Role.Owner)).generateOne
 
       Given("commit with the commit id matching Push Event's 'after' exists on the project in GitLab")
       And("fetch latest commit endpoint returns the non missed commit")

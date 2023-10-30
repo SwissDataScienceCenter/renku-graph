@@ -20,9 +20,10 @@ package io.renku.webhookservice.webhookevents
 
 import cats.effect.IO
 import cats.syntax.all._
+import eu.timepit.refined.auto._
 import io.circe.Json
 import io.circe.literal._
-import io.circe.syntax._
+import io.renku.data.Message
 import io.renku.eventlog
 import io.renku.eventlog.api.events.CommitSyncRequest
 import io.renku.eventlog.api.events.Generators.commitSyncRequests
@@ -31,11 +32,8 @@ import io.renku.generators.Generators._
 import io.renku.graph.model.EventsGenerators.commitIds
 import io.renku.graph.model.GraphModelGenerators.projectIds
 import io.renku.graph.model.events.CommitId
-import io.renku.http.ErrorMessage._
-import io.renku.http.InfoMessage.InfoMessage
 import io.renku.http.client.RestClientError.UnauthorizedException
 import io.renku.http.server.EndpointTester._
-import io.renku.http.{ErrorMessage, InfoMessage}
 import io.renku.interpreters.TestLogger
 import io.renku.interpreters.TestLogger.Level.Info
 import io.renku.testtools.IOSpec
@@ -69,13 +67,13 @@ class EndpointSpec extends AnyWordSpec with MockFactory with should.Matchers wit
 
       val response = endpoint.processPushEvent(request).unsafeRunSync()
 
-      response.status                          shouldBe Accepted
-      response.contentType                     shouldBe Some(`Content-Type`(MediaType.application.json))
-      response.as[InfoMessage].unsafeRunSync() shouldBe InfoMessage("Event accepted")
+      response.status                      shouldBe Accepted
+      response.contentType                 shouldBe Some(`Content-Type`(MediaType.application.json))
+      response.as[Message].unsafeRunSync() shouldBe Message.Info("Event accepted")
 
       logger.loggedOnly(
         Info(
-          s"Push event for eventId = $commitId, projectId = ${syncRequest.project.id}, projectPath = ${syncRequest.project.path} -> accepted"
+          s"Push event for eventId = $commitId, projectId = ${syncRequest.project.id}, projectSlug = ${syncRequest.project.slug} -> accepted"
         )
       )
     }
@@ -90,9 +88,9 @@ class EndpointSpec extends AnyWordSpec with MockFactory with should.Matchers wit
 
       response.status      shouldBe BadRequest
       response.contentType shouldBe Some(`Content-Type`(MediaType.application.json))
-      response.as[Json].unsafeRunSync() shouldBe ErrorMessage(
+      response.as[Message].unsafeRunSync() shouldBe Message.Error.unsafeApply(
         s"Invalid message body: Could not decode JSON: ${Json.obj()}"
-      ).asJson
+      )
     }
 
     "return UNAUTHORIZED if X-Gitlab-Token token is not present in the header" in new TestCase {
@@ -102,9 +100,9 @@ class EndpointSpec extends AnyWordSpec with MockFactory with should.Matchers wit
 
       val response = endpoint.processPushEvent(request).unsafeRunSync()
 
-      response.status                   shouldBe Unauthorized
-      response.contentType              shouldBe Some(`Content-Type`(MediaType.application.json))
-      response.as[Json].unsafeRunSync() shouldBe ErrorMessage(UnauthorizedException).asJson
+      response.status                      shouldBe Unauthorized
+      response.contentType                 shouldBe Some(`Content-Type`(MediaType.application.json))
+      response.as[Message].unsafeRunSync() shouldBe Message.Error.fromExceptionMessage(UnauthorizedException)
     }
 
     "return UNAUTHORIZED when user X-Gitlab-Token is invalid" in new TestCase {
@@ -120,9 +118,9 @@ class EndpointSpec extends AnyWordSpec with MockFactory with should.Matchers wit
 
       val response = endpoint.processPushEvent(request).unsafeRunSync()
 
-      response.status                   shouldBe Unauthorized
-      response.contentType              shouldBe Some(`Content-Type`(MediaType.application.json))
-      response.as[Json].unsafeRunSync() shouldBe ErrorMessage(UnauthorizedException).asJson
+      response.status                      shouldBe Unauthorized
+      response.contentType                 shouldBe Some(`Content-Type`(MediaType.application.json))
+      response.as[Message].unsafeRunSync() shouldBe Message.Error.fromExceptionMessage(UnauthorizedException)
     }
 
     "return UNAUTHORIZED when X-Gitlab-Token decryption fails" in new TestCase {
@@ -139,9 +137,9 @@ class EndpointSpec extends AnyWordSpec with MockFactory with should.Matchers wit
 
       val response = endpoint.processPushEvent(request).unsafeRunSync()
 
-      response.status                   shouldBe Unauthorized
-      response.contentType              shouldBe Some(`Content-Type`(MediaType.application.json))
-      response.as[Json].unsafeRunSync() shouldBe ErrorMessage(UnauthorizedException).asJson
+      response.status                      shouldBe Unauthorized
+      response.contentType                 shouldBe Some(`Content-Type`(MediaType.application.json))
+      response.as[Message].unsafeRunSync() shouldBe Message.Error.fromExceptionMessage(UnauthorizedException)
     }
   }
 
@@ -172,7 +170,7 @@ class EndpointSpec extends AnyWordSpec with MockFactory with should.Matchers wit
       "after": $commitId,
       "project": {
         "id":                  ${syncRequest.project.id},
-        "path_with_namespace": ${syncRequest.project.path}
+        "path_with_namespace": ${syncRequest.project.slug}
       }
     }"""
 }

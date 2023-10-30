@@ -18,14 +18,18 @@
 
 package io.renku.graph.model
 
+import cats.data.{NonEmptyList, Validated}
+import cats.kernel.Order
 import cats.syntax.all._
 import eu.timepit.refined.api.Refined
 import eu.timepit.refined.numeric.Positive
+import io.circe.{Decoder, Encoder}
 import io.renku.graph.model.views.{EntityIdJsonLDOps, NonBlankTTJsonLDOps, TinyTypeJsonLDOps, UrlResourceRenderer}
 import io.renku.jsonld.{EntityId, JsonLDDecoder, JsonLDEncoder}
-import io.renku.tinytypes.constraints._
 import io.renku.tinytypes._
+import io.renku.tinytypes.constraints._
 
+import java.net.{MalformedURLException, URL}
 import java.time.Instant
 import java.time.temporal.ChronoUnit
 
@@ -39,8 +43,16 @@ object projects {
       with NonNegativeInt[GitLabId]
       with TinyTypeJsonLDOps[GitLabId]
 
-  final class Path private (val value: String) extends AnyVal with RelativePathTinyType with Identifier
-  implicit object Path extends TinyTypeFactory[Path](new Path(_)) with RelativePath[Path] with TinyTypeJsonLDOps[Path] {
+  final class GitLabPath private (val value: String) extends AnyVal with StringTinyType {
+    def asName: Name = Name(value)
+  }
+  implicit object GitLabPath
+      extends TinyTypeFactory[GitLabPath](new GitLabPath(_))
+      with NonBlank[GitLabPath]
+      with TinyTypeJsonLDOps[GitLabPath]
+
+  final class Slug private (val value: String) extends AnyVal with RelativePathTinyType with Identifier
+  implicit object Slug extends TinyTypeFactory[Slug](new Slug(_)) with RelativePath[Slug] with TinyTypeJsonLDOps[Slug] {
     private val allowedFirstChar         = ('a' to 'z') ++ ('A' to 'Z') ++ ('0' to '9') :+ '_'
     private[projects] val regexValidator = "^([\\w.-]+)(\\/([\\w.-]+))+$"
 
@@ -49,9 +61,9 @@ object projects {
       message = (value: String) => s"'$value' is not a valid $typeName"
     )
 
-    implicit class PathOps(path: Path) {
-      private lazy val nameString :: namespacesStringReversed = path.show.split('/').toList.reverse
-      lazy val toName:       Name            = Name(nameString)
+    implicit class SlugOps(slug: Slug) {
+      private lazy val path :: namespacesStringReversed = slug.show.split('/').toList.reverse
+      lazy val toPath:       GitLabPath      = GitLabPath(path)
       lazy val toNamespaces: List[Namespace] = namespacesStringReversed.reverseIterator.map(Namespace(_)).toList
       lazy val toNamespace:  Namespace       = toNamespaces.mkString("/")
     }
@@ -71,22 +83,22 @@ object projects {
       with UrlOps[ResourceId]
       with EntityIdJsonLDOps[ResourceId] {
 
-    private val regexValidator = s"^http[s]?:\\/\\/.*\\/projects\\/${Path.regexValidator.drop(1)}"
+    private val regexValidator = s"^http[s]?:\\/\\/.*\\/projects\\/${Slug.regexValidator.drop(1)}"
 
     addConstraint(
       _ matches regexValidator,
       message = (value: String) => s"'$value' is not a valid $typeName"
     )
 
-    def apply(projectPath: Path)(implicit renkuUrl: RenkuUrl): ResourceId =
-      ResourceId((renkuUrl / "projects" / projectPath).value)
+    def apply(projectSlug: Slug)(implicit renkuUrl: RenkuUrl): ResourceId =
+      ResourceId((renkuUrl / "projects" / projectSlug).value)
 
     def apply(id: EntityId): ResourceId = ResourceId(id.value.toString)
 
-    private val pathExtractor = "^.*\\/projects\\/(.*)$".r
-    implicit lazy val projectPathConverter: TinyTypeConverter[ResourceId, Path] = {
-      case ResourceId(pathExtractor(path)) => Path.from(path)
-      case illegalValue => Left(new IllegalArgumentException(s"'$illegalValue' cannot be converted to a ProjectPath"))
+    private val slugExtractor = "^.*\\/projects\\/(.*)$".r
+    implicit lazy val projectSlugConverter: TinyTypeConverter[ResourceId, Slug] = {
+      case ResourceId(slugExtractor(slug)) => Slug.from(slug)
+      case illegalValue => Left(new IllegalArgumentException(s"'$illegalValue' cannot be converted to a ProjectSlug"))
     }
   }
 
@@ -135,6 +147,8 @@ object projects {
       Visibility.allOrdered.indexOf(other) - Visibility.allOrdered.indexOf(this)
   }
   object Visibility extends TinyTypeFactory[Visibility](VisibilityInstantiator) {
+
+    implicit val factory: From[Visibility] = this
 
     val allOrdered: List[Visibility] = List(Public, Internal, Private)
     val all:        Set[Visibility]  = allOrdered.toSet
@@ -206,4 +220,81 @@ object projects {
       extends TinyTypeFactory[Keyword](new Keyword(_))
       with NonBlank[Keyword]
       with NonBlankTTJsonLDOps[Keyword]
+
+  final class GitHttpUrl private (val value: String) extends AnyVal with StringTinyType
+  implicit object GitHttpUrl extends TinyTypeFactory[GitHttpUrl](new GitHttpUrl(_)) with NonBlank[GitHttpUrl] {
+    addConstraint(
+      check = url =>
+        (url endsWith ".git") && Validated
+          .catchOnly[MalformedURLException](new URL(url))
+          .isValid,
+      message = url => s"$url is not a valid repository http url"
+    )
+  }
+
+  sealed trait Role extends Ordered[Role] {
+    def asString: String
+  }
+
+  object Role {
+    case object Owner extends Role {
+      val asString = "owner"
+
+      override def compare(that: Role): Int =
+        if (that == this) 0 else 1
+    }
+
+    case object Maintainer extends Role {
+      val asString = "maintainer"
+
+      override def compare(that: Role): Int =
+        if (that == this) 0
+        else if (that == Owner) -1
+        else 1
+    }
+
+    case object Reader extends Role {
+      val asString = "reader"
+
+      override def compare(that: Role): Int =
+        if (that == this) 0
+        else -1
+    }
+
+    val all: NonEmptyList[Role] =
+      NonEmptyList.of(Owner, Maintainer, Reader)
+
+    def fromString(str: String): Either[String, Role] =
+      all.find(_.asString.equalsIgnoreCase(str)).toRight(s"Invalid role name: $str")
+
+    def unsafeFromString(str: String): Role =
+      fromString(str).fold(sys.error, identity)
+
+    /** Translated from here: https://docs.gitlab.com/ee/api/members.html#roles */
+    def fromGitLabAccessLevel(accessLevel: Int) =
+      accessLevel match {
+        case n if n >= 50 => Owner
+        case n if n >= 40 => Maintainer
+        case _            => Reader
+      }
+
+    def toGitLabAccessLevel(role: Role): Int =
+      role match {
+        case Role.Owner      => 50
+        case Role.Maintainer => 40
+        case Role.Reader     => 20
+      }
+
+    implicit val ordering: Ordering[Role] =
+      Ordering.by(r => -all.toList.indexOf(r))
+
+    implicit val order: Order[Role] =
+      Order.fromOrdering
+
+    implicit val jsonDecoder: Decoder[Role] =
+      Decoder.decodeString.emap(fromString)
+
+    implicit val jsonEncoder: Encoder[Role] =
+      Encoder.encodeString.contramap(_.asString)
+  }
 }

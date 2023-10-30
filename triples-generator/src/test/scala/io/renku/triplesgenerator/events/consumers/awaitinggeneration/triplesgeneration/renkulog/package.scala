@@ -25,7 +25,6 @@ import java.nio.file.Paths
 
 package object renkulog {
 
-  val paths: Gen[os.Path] = for {
-    path <- relativePaths()
-  } yield os.Path(Paths.get(s"/$path"))
+  val paths: Gen[os.Path] =
+    relativePaths().map(path => os.Path(Paths.get(s"/$path")))
 }

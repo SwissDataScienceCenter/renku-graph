@@ -18,10 +18,11 @@
 
 package io.renku.eventlog.events.consumers.statuschange.rollbacktotriplesgenerated
 
-import cats.effect.MonadCancelThrow
+import cats.effect.Async
 import cats.syntax.all._
 import eu.timepit.refined.auto._
 import io.renku.db.{DbClient, SqlStatement}
+import io.renku.eventlog.EventLogDB.SessionResource
 import io.renku.eventlog.TypeSerializers._
 import io.renku.eventlog.api.events.StatusChangeEvent.RollbackToTriplesGenerated
 import io.renku.eventlog.events.consumers.statuschange
@@ -37,7 +38,7 @@ import skunk.implicits._
 
 import java.time.Instant
 
-private[statuschange] class DbUpdater[F[_]: MonadCancelThrow: QueriesExecutionTimes](
+private[statuschange] class DbUpdater[F[_]: Async: QueriesExecutionTimes](
     now: () => Instant = () => Instant.now
 ) extends DbClient(Some(QueriesExecutionTimes[F]))
     with statuschange.DBUpdater[F, RollbackToTriplesGenerated] {
@@ -57,7 +58,7 @@ private[statuschange] class DbUpdater[F[_]: MonadCancelThrow: QueriesExecutionTi
       .flatMapResult {
         case Completion.Update(1) =>
           DBUpdateResults
-            .ForProjects(event.project.path, Map(TransformingTriples -> -1, TriplesGenerated -> 1))
+            .ForProjects(event.project.slug, Map(TransformingTriples -> -1, TriplesGenerated -> 1))
             .pure[F]
             .widen[DBUpdateResults]
         case Completion.Update(0) => DBUpdateResults.ForProjects.empty.pure[F].widen[DBUpdateResults]
@@ -67,5 +68,6 @@ private[statuschange] class DbUpdater[F[_]: MonadCancelThrow: QueriesExecutionTi
       }
   }
 
-  override def onRollback(event: RollbackToTriplesGenerated): RollbackOp[F] = RollbackOp.empty
+  override def onRollback(event: RollbackToTriplesGenerated)(implicit sr: SessionResource[F]): RollbackOp[F] =
+    RollbackOp.empty
 }

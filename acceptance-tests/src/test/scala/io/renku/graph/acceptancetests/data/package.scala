@@ -28,8 +28,8 @@ import io.renku.graph.acceptancetests.data.Project.Urls._
 import io.renku.graph.acceptancetests.data.Project._
 import io.renku.graph.model.GraphModelGenerators._
 import io.renku.graph.model._
-import io.renku.graph.model.entities.Project.ProjectMember
-import io.renku.graph.model.testentities.projectMembers
+import io.renku.graph.model.gitlab.GitLabUser
+import io.renku.graph.model.testentities.generators.EntitiesGenerators
 import io.renku.graph.model.versions.CliVersion
 import org.scalacheck.Gen
 
@@ -44,7 +44,7 @@ package object data extends TSData with ProjectFunctions {
   ): Gen[Project] = for {
     project     <- projectGen
     id          <- projectIds
-    members     <- projectMembers.toGeneratorOfNonEmptyList(max = 3)
+    members     <- EntitiesGenerators.gitLabProjectMembers.toGeneratorOfNonEmptyList(max = 3)
     urls        <- urlsObjects
     starsCount  <- starsCounts
     permissions <- permissionsObjects
@@ -55,7 +55,7 @@ package object data extends TSData with ProjectFunctions {
           throw new Exception(show"Test project creator with GitLab id")
   } yield Project(project,
                   id,
-                  maybeCreator = project.maybeCreator.map(_.to[ProjectMember]),
+                  maybeCreator = project.maybeCreator.map(_.to[GitLabUser]),
                   members,
                   urls,
                   starsCount,
@@ -63,9 +63,8 @@ package object data extends TSData with ProjectFunctions {
                   statistics
   )
 
-  private implicit lazy val testPersonToProjectMember: testentities.Person => ProjectMember = { p =>
-    val m = ProjectMember(p.name, persons.Username(p.name.value), personGitLabIds.generateOne)
-    p.maybeEmail.map(m.add).getOrElse(m)
+  private implicit lazy val testPersonToGitLabUser: testentities.Person => GitLabUser = { p =>
+    GitLabUser(p.name, persons.Username(p.name.value), personGitLabIds.generateOne, p.maybeEmail)
   }
 
   def dataProjects(project: testentities.RenkuProject): Gen[Project] = dataProjects(fixed(project))
@@ -80,18 +79,18 @@ package object data extends TSData with ProjectFunctions {
   private lazy val starsCounts: Gen[StarsCount] = nonNegativeInts() map (v => StarsCount(v.value))
   private lazy val sshUrls: Gen[SshUrl] = for {
     hostParts   <- nonEmptyList(nonBlankStrings())
-    projectPath <- projectPaths
-  } yield SshUrl(s"git@${hostParts.toList.mkString(".")}:$projectPath.git")
+    projectSlug <- projectSlugs
+  } yield SshUrl(s"git@${hostParts.toList.mkString(".")}:$projectSlug.git")
 
   private lazy val httpUrls: Gen[HttpUrl] = for {
     url         <- urls()
-    projectPath <- projectPaths
-  } yield HttpUrl(s"$url/$projectPath.git")
+    projectSlug <- projectSlugs
+  } yield HttpUrl(s"$url/$projectSlug.git")
 
   private lazy val readmeUrls: Gen[ReadmeUrl] = for {
     url         <- urls()
-    projectPath <- projectPaths
-  } yield ReadmeUrl(s"$url/$projectPath/blob/master/README.md")
+    projectSlug <- projectSlugs
+  } yield ReadmeUrl(s"$url/$projectSlug/blob/master/README.md")
 
   private lazy val webUrls: Gen[WebUrl] = urls() map WebUrl.apply
 

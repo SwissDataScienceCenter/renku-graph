@@ -22,6 +22,7 @@ import cats.effect.Async
 import cats.syntax.all._
 import cats.{MonadThrow, NonEmptyParallel, Show}
 import io.circe.{Encoder, Json}
+import io.renku.data.Message
 import io.renku.eventlog.EventLogDB.SessionResource
 import io.renku.eventlog.events.EventsEndpoint.Criteria._
 import io.renku.eventlog.events.EventsEndpoint.JsonEncoders
@@ -29,7 +30,6 @@ import io.renku.eventlog.metrics.QueriesExecutionTimes
 import io.renku.graph.config.EventLogUrl
 import io.renku.graph.model.events.{EventDate, EventInfo, EventStatus, StatusProcessingTime}
 import io.renku.graph.model.projects
-import io.renku.http.ErrorMessage
 import io.renku.http.rest.Sorting
 import io.renku.http.rest.paging.PagingRequest
 import org.http4s.dsl.Http4sDsl
@@ -46,8 +46,6 @@ class EventsEndpointImpl[F[_]: MonadThrow: Logger](eventsFinder: EventsFinder[F]
     extends Http4sDsl[F]
     with EventsEndpoint[F] {
 
-  import io.renku.http.ErrorMessage._
-
   override def findEvents(criteria: EventsEndpoint.Criteria, request: Request[F]): F[Response[F]] =
     eventsFinder
       .findEvents(criteria)
@@ -58,9 +56,8 @@ class EventsEndpointImpl[F[_]: MonadThrow: Logger](eventsFinder: EventsFinder[F]
 
   private def httpResponse(request: Request[F]): PartialFunction[Throwable, F[Response[F]]] = {
     case NonFatal(exception) =>
-      Logger[F].error(exception)(show"Finding events for '${request.uri}' failed") *> InternalServerError(
-        ErrorMessage(exception)
-      )
+      Logger[F].error(exception)(show"Finding events for '${request.uri}' failed") *>
+        InternalServerError(Message.Error.fromExceptionMessage(exception))
   }
 }
 
@@ -110,7 +107,7 @@ object EventsEndpoint {
 
   implicit val show: Show[Criteria] = Show.show {
     implicit def idParamShow[I <: projects.Identifier]: Show[I] = Show.show {
-      case path: projects.Path     => s"project-path: $path"
+      case slug: projects.Slug     => s"project-slug: $slug"
       case id:   projects.GitLabId => s"project-id: $id"
     }
     _.filters match {
@@ -141,7 +138,7 @@ object EventsEndpoint {
     }
 
     implicit val projectIdsEncoder: Encoder[EventInfo.ProjectIds] = ids =>
-      json"""{ "id": ${ids.id}, "path": ${ids.path} }"""
+      json"""{ "id": ${ids.id}, "slug": ${ids.slug} }"""
 
     implicit val eventInfoEncoder: Encoder[EventInfo] = eventInfo =>
       json"""{

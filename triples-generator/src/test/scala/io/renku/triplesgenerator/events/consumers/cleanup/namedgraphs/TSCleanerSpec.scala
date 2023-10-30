@@ -32,6 +32,7 @@ import io.renku.interpreters.TestLogger
 import io.renku.jsonld.EntityId
 import io.renku.logging.TestSparqlQueryTimeRecorder
 import io.renku.testtools.IOSpec
+import io.renku.triplesgenerator.events.consumers.membersync.ProjectAuthSync
 import io.renku.triplesstore.SparqlQuery.Prefixes
 import io.renku.triplesstore._
 import org.scalamock.scalatest.MockFactory
@@ -57,8 +58,9 @@ class TSCleanerSpec
 
         givenProjectIdFindingSucceeds(project)
         givenSearchGraphsCleaningSucceeds(project)
+        givenProjectAuthSync(project)
 
-        (cleaner removeTriples project.path).unsafeRunSync()
+        (cleaner removeTriples project.slug).unsafeRunSync()
 
         findAllData(project.resourceId).unsafeRunSync() shouldBe List.empty
       }
@@ -75,8 +77,9 @@ class TSCleanerSpec
 
         givenProjectIdFindingSucceeds(parent)
         givenSearchGraphsCleaningSucceeds(parent)
+        givenProjectAuthSync(parent)
 
-        (cleaner removeTriples parent.path).unsafeRunSync()
+        (cleaner removeTriples parent.slug).unsafeRunSync()
 
         findProject(parent.resourceId).unsafeRunSync()        shouldBe Nil
         findProject(child.resourceId).unsafeRunSync().isEmpty shouldBe false
@@ -97,8 +100,9 @@ class TSCleanerSpec
 
         givenProjectIdFindingSucceeds(parent)
         givenSearchGraphsCleaningSucceeds(parent)
+        givenProjectAuthSync(parent)
 
-        (cleaner removeTriples parent.path).unsafeRunSync()
+        (cleaner removeTriples parent.slug).unsafeRunSync()
 
         findProject(parent.resourceId).unsafeRunSync()        shouldBe Nil
         findProject(child.resourceId).unsafeRunSync().isEmpty shouldBe false
@@ -123,8 +127,9 @@ class TSCleanerSpec
 
         givenProjectIdFindingSucceeds(topProject)
         givenSearchGraphsCleaningSucceeds(topProject)
+        givenProjectAuthSync(topProject)
 
-        (cleaner removeTriples topProject.path).unsafeRunSync()
+        (cleaner removeTriples topProject.slug).unsafeRunSync()
 
         findProject(topProject.resourceId).unsafeRunSync() shouldBe List.empty
         findDataset(topProjectDS.entityId).unsafeRunSync() shouldBe Nil
@@ -156,8 +161,9 @@ class TSCleanerSpec
 
         givenProjectIdFindingSucceeds(topProject)
         givenSearchGraphsCleaningSucceeds(topProject)
+        givenProjectAuthSync(topProject)
 
-        (cleaner removeTriples topProject.path).unsafeRunSync()
+        (cleaner removeTriples topProject.slug).unsafeRunSync()
 
         findProject(topProject.resourceId).unsafeRunSync() shouldBe List.empty
         findDataset(topProjectDS.entityId).unsafeRunSync() shouldBe Nil
@@ -188,8 +194,9 @@ class TSCleanerSpec
 
         givenProjectIdFindingSucceeds(middleProject)
         givenSearchGraphsCleaningSucceeds(middleProject)
+        givenProjectAuthSync(middleProject)
 
-        (cleaner removeTriples middleProject.path).unsafeRunSync()
+        (cleaner removeTriples middleProject.slug).unsafeRunSync()
 
         findProject(middleProject.resourceId).unsafeRunSync() shouldBe List.empty
 
@@ -221,8 +228,9 @@ class TSCleanerSpec
 
         givenProjectIdFindingSucceeds(bottomProject)
         givenSearchGraphsCleaningSucceeds(bottomProject)
+        givenProjectAuthSync(bottomProject)
 
-        (cleaner removeTriples bottomProject.path).unsafeRunSync()
+        (cleaner removeTriples bottomProject.slug).unsafeRunSync()
 
         findProject(bottomProject.resourceId).unsafeRunSync() shouldBe List.empty
 
@@ -257,8 +265,9 @@ class TSCleanerSpec
 
         givenProjectIdFindingSucceeds(topProject)
         givenSearchGraphsCleaningSucceeds(topProject)
+        givenProjectAuthSync(topProject)
 
-        (cleaner removeTriples topProject.path).unsafeRunSync()
+        (cleaner removeTriples topProject.slug).unsafeRunSync()
 
         findProject(topProject.resourceId).unsafeRunSync() shouldBe List.empty
         findDataset(topProjectDS.entityId).unsafeRunSync() shouldBe Nil
@@ -317,8 +326,9 @@ class TSCleanerSpec
 
         givenProjectIdFindingSucceeds(topProject)
         givenSearchGraphsCleaningSucceeds(topProject)
+        givenProjectAuthSync(topProject)
 
-        (cleaner removeTriples topProject.path).unsafeRunSync()
+        (cleaner removeTriples topProject.slug).unsafeRunSync()
 
         findProject(topProject.resourceId).unsafeRunSync() shouldBe List.empty
         findDataset(topProjectDS.entityId).unsafeRunSync() shouldBe Nil
@@ -360,8 +370,9 @@ class TSCleanerSpec
 
         givenProjectIdFindingSucceeds(topProject)
         givenSearchGraphsCleaningSucceeds(topProject)
+        givenProjectAuthSync(topProject)
 
-        (cleaner removeTriples topProject.path).unsafeRunSync()
+        (cleaner removeTriples topProject.slug).unsafeRunSync()
 
         findProject(topProject.resourceId).unsafeRunSync()        shouldBe List.empty
         findProject(topProjectFork.resourceId).unsafeRunSync().size should be > 0
@@ -394,8 +405,9 @@ class TSCleanerSpec
 
         givenProjectIdFindingSucceeds(middleProject)
         givenSearchGraphsCleaningSucceeds(middleProject)
+        givenProjectAuthSync(middleProject)
 
-        cleaner.removeTriples(middleProject.path).unsafeRunSync()
+        cleaner.removeTriples(middleProject.slug).unsafeRunSync()
 
         val Some((topSameAs, topTopmostSameAs)) = findSameAs(topProjectDS.entityId).unsafeRunSync()
         topSameAs              shouldBe None
@@ -432,11 +444,13 @@ class TSCleanerSpec
 
         givenProjectIdFindingSucceeds(middleProject)
         givenProjectIdFindingSucceeds(middleProjectFork)
+        givenProjectAuthSync(middleProject)
         givenSearchGraphsCleaningSucceeds(middleProject)
         givenSearchGraphsCleaningSucceeds(middleProjectFork)
+        givenProjectAuthSync(middleProjectFork)
 
-        cleaner.removeTriples(middleProject.path).unsafeRunSync()
-        cleaner.removeTriples(middleProjectFork.path).unsafeRunSync()
+        cleaner.removeTriples(middleProject.slug).unsafeRunSync()
+        cleaner.removeTriples(middleProjectFork.slug).unsafeRunSync()
 
         val Some((topSameAs, topTopmostSameAs)) = findSameAs(topProjectDS.entityId).unsafeRunSync()
         topSameAs              shouldBe None
@@ -473,8 +487,9 @@ class TSCleanerSpec
 
         givenProjectIdFindingSucceeds(middleProject)
         givenSearchGraphsCleaningSucceeds(middleProject)
+        givenProjectAuthSync(middleProject)
 
-        cleaner.removeTriples(middleProject.path).unsafeRunSync()
+        cleaner.removeTriples(middleProject.slug).unsafeRunSync()
 
         val Some((topSameAs, topTopmostSameAs)) = findSameAs(topProjectDS.entityId).unsafeRunSync()
         topSameAs              shouldBe None
@@ -575,17 +590,23 @@ class TSCleanerSpec
     private implicit val timeRecorder: SparqlQueryTimeRecorder[IO] = TestSparqlQueryTimeRecorder[IO].unsafeRunSync()
     private val projectIdFinder     = mock[ProjectIdFinder[IO]]
     private val searchGraphsCleaner = mock[SearchGraphsCleaner[IO]]
-    val cleaner = new TSCleanerImpl[IO](projectIdFinder, searchGraphsCleaner, projectsDSConnectionInfo)
+    val projectAuthSync             = mock[ProjectAuthSync[IO]]
+    val cleaner = new TSCleanerImpl[IO](projectIdFinder, searchGraphsCleaner, projectAuthSync, projectsDSConnectionInfo)
 
     def givenProjectIdFindingSucceeds(project: Project) =
       (projectIdFinder.findProjectId _)
-        .expects(project.path)
+        .expects(project.slug)
         .returning(project.identification.some.pure[IO])
 
     def givenSearchGraphsCleaningSucceeds(project: Project) =
       (searchGraphsCleaner.cleanSearchGraphs _)
         .expects(project.identification)
         .returning(().pure[IO])
+
+    def givenProjectAuthSync(project: Project) =
+      (projectAuthSync.removeAuthData _)
+        .expects(project.slug)
+        .returning(IO.unit)
   }
 
   private def findOutNewlyNominatedTopDS(ds1: Dataset[Dataset.Provenance], ds2: Dataset[Dataset.Provenance]): EntityId =

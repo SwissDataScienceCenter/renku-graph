@@ -19,7 +19,6 @@
 package io.renku.knowledgegraph.datasets
 package details
 
-import Dataset.Tag
 import cats.MonadThrow
 import cats.effect.Async
 import cats.syntax.all._
@@ -28,14 +27,15 @@ import io.circe.{Decoder, DecodingFailure}
 import io.renku.graph.http.server.security.Authorizer.AuthContext
 import io.renku.graph.model._
 import io.renku.graph.model.datasets.{Identifier, Keyword, SameAs}
-import io.renku.graph.model.entities.Person
 import io.renku.graph.model.images.ImageUri
-import io.renku.graph.model.projects.Path
+import io.renku.graph.model.projects.{Slug, Visibility}
 import io.renku.http.server.security.model.AuthUser
 import io.renku.jsonld.syntax._
+import io.renku.knowledgegraph.datasets.details.Dataset.Tag
+import io.renku.projectauth.util.SparqlSnippets
 import io.renku.triplesstore.SparqlQuery.Prefixes
 import io.renku.triplesstore._
-import io.renku.triplesstore.client.sparql.Fragment
+import io.renku.triplesstore.client.sparql.{Fragment, VarName}
 import io.renku.triplesstore.client.syntax._
 import org.typelevel.log4cats.Logger
 
@@ -69,10 +69,10 @@ private class BaseDetailsFinderImpl[F[_]: Async: Logger: SparqlQueryTimeRecorder
       Prefixes of (prov -> "prov", renku -> "renku", schema -> "schema"),
       sparql"""|SELECT DISTINCT ?datasetId ?name ?maybeDateCreated ?slug
                |  ?topmostSameAs ?maybeDerivedFrom ?initialVersion ?description ?maybeDatePublished 
-               |  ?maybeDateModified ?projectId ?projectPath ?projectName ?projectVisibility ?projectDSId
+               |  ?maybeDateModified ?projectId ?projectSlug ?projectName ?projectVisibility ?projectDSId
                |WHERE {        
                |  {
-               |    SELECT ?projectId ?projectPath ?projectName ?projectVisibility
+               |    SELECT ?projectId ?projectSlug ?projectName ?projectVisibility
                |    WHERE {
                |      GRAPH ?projectId {
                |        ?datasetId a schema:Dataset;
@@ -81,8 +81,8 @@ private class BaseDetailsFinderImpl[F[_]: Async: Logger: SparqlQueryTimeRecorder
                |        ?projectId schema:dateCreated ?dateCreated ;
                |                   schema:name ?projectName;
                |                   renku:projectVisibility ?projectVisibility;
-               |                   renku:projectPath ?projectPath.
-               |        VALUES (?projectPath) { ${authContext.allowedProjects.map(_.asObject)} }
+               |                   renku:projectPath ?projectSlug.
+               |        VALUES (?projectSlug) { ${authContext.allowedProjects.map(_.asObject)} }
                |        FILTER NOT EXISTS {
                |          ?datasetId prov:invalidatedAtTime ?invalidationTime.
                |        }
@@ -124,10 +124,10 @@ private class BaseDetailsFinderImpl[F[_]: Async: Logger: SparqlQueryTimeRecorder
       Prefixes of (prov -> "prov", renku -> "renku", schema -> "schema"),
       sparql"""|SELECT DISTINCT ?datasetId ?name ?maybeDateCreated ?slug
                |  ?topmostSameAs ?maybeDerivedFrom ?initialVersion ?description ?maybeDatePublished
-               |  ?maybeDateModified ?projectId ?projectPath ?projectName ?projectVisibility ?projectDSId
+               |  ?maybeDateModified ?projectId ?projectSlug ?projectName ?projectVisibility ?projectDSId
                |WHERE {
                |  {
-               |    SELECT ?datasetId ?projectId ?projectPath ?projectName ?projectVisibility
+               |    SELECT ?datasetId ?projectId ?projectSlug ?projectName ?projectVisibility
                |    WHERE {
                |      GRAPH ${GraphClass.Datasets.id} {
                |        BIND (${datasets.TopmostSameAs(sameAs).asEntityId} AS ?topmostSameAs)
@@ -140,8 +140,8 @@ private class BaseDetailsFinderImpl[F[_]: Async: Logger: SparqlQueryTimeRecorder
                |        ?projectId schema:dateCreated ?dateCreated ;
                |                   schema:name ?projectName;
                |                   renku:projectVisibility ?projectVisibility;
-               |                   renku:projectPath ?projectPath.
-               |        VALUES (?projectPath) { ${authContext.allowedProjects.map(_.asObject)} }
+               |                   renku:projectPath ?projectSlug.
+               |        VALUES (?projectSlug) { ${authContext.allowedProjects.map(_.asObject)} }
                |      }
                |    }
                |    ORDER BY ?dateCreated ?projectName
@@ -180,10 +180,10 @@ private class BaseDetailsFinderImpl[F[_]: Async: Logger: SparqlQueryTimeRecorder
              |               schema:version ?version;
              |               schema:sameAs/schema:url ?originalDsId
              |  }
+             |  ${allowedProjectFilterQuery(authContext.maybeAuthUser)}
              |  GRAPH ?originalDsProjId {
              |    ?originalDsProjId renku:hasDataset ?originalDsId;
-             |                      renku:projectPath ?projectPath.
-             |    ${allowedProjectFilterQuery(authContext.maybeAuthUser)}
+             |                      renku:projectPath ?projectSlug.
              |    ?originalDsTagId schema:about/schema:url ?originalDsId;
              |                     schema:name ?version
              |  }
@@ -198,29 +198,8 @@ private class BaseDetailsFinderImpl[F[_]: Async: Logger: SparqlQueryTimeRecorder
              |""".stripMargin
   )
 
-  private lazy val allowedProjectFilterQuery: Option[AuthUser] => Fragment = {
-    case Some(user) =>
-      fr"""|?originalDsProjId renku:projectVisibility ?visibility.
-           |{
-           |  VALUES (?visibility) {
-           |    (${projects.Visibility.Public.asObject}) (${projects.Visibility.Internal.asObject})
-           |  }
-           |} UNION {
-           |  VALUES (?visibility) {
-           |    (${projects.Visibility.Private.asObject})
-           |  }
-           |  ?originalDsProjId schema:member ?memberId
-           |  GRAPH ${GraphClass.Persons.id} {
-           |    ?memberId schema:sameAs ?sameAsId.
-           |    ?sameAsId schema:additionalType ${Person.gitLabSameAsAdditionalType.asTripleObject};
-           |              schema:identifier ${user.id.asObject}
-           |  }
-           |}
-           |""".stripMargin
-    case _ =>
-      fr"""|?originalDsProjId renku:projectVisibility ?visibility .
-           |VALUES (?visibility) { (${projects.Visibility.Public.asObject})}
-           |""".stripMargin
+  private lazy val allowedProjectFilterQuery: Option[AuthUser] => Fragment = { user =>
+    SparqlSnippets(VarName("originalDsProjId")).visibleProjects(user.map(_.id), Visibility.all)
   }
 
   def findKeywords(dataset: Dataset): F[List[Keyword]] =
@@ -352,7 +331,7 @@ private object BaseDetailsFinderImpl {
         maybeDescription <- extract[Option[Description]]("description")
 
         project <- (extract[projects.ResourceId]("projectId"),
-                    extract[projects.Path]("projectPath"),
+                    extract[projects.Slug]("projectSlug"),
                     extract[projects.Name]("projectName"),
                     extract[projects.Visibility]("projectVisibility"),
                     extract[datasets.Identifier]("projectDSId")

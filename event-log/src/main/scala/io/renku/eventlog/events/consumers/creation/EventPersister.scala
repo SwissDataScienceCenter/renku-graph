@@ -19,7 +19,7 @@
 package io.renku.eventlog.events.consumers.creation
 
 import cats.data.{Kleisli, NonEmptyList}
-import cats.effect.MonadCancelThrow
+import cats.effect.Async
 import cats.syntax.all._
 import cats.{Applicative, MonadThrow}
 import eu.timepit.refined.auto._
@@ -41,7 +41,7 @@ private trait EventPersister[F[_]] {
   def storeNewEvent(event: Event): F[Result]
 }
 
-private class EventPersisterImpl[F[_]: MonadCancelThrow: SessionResource: QueriesExecutionTimes: EventStatusGauges](
+private class EventPersisterImpl[F[_]: Async: SessionResource: QueriesExecutionTimes: EventStatusGauges](
     now: () => Instant = () => Instant.now
 ) extends DbClient(Some(QueriesExecutionTimes[F]))
     with EventPersister[F] {
@@ -57,7 +57,7 @@ private class EventPersisterImpl[F[_]: MonadCancelThrow: SessionResource: Querie
         result <- insertIfNotDuplicate(event)(session)
                     .flatTap(_ => transaction.commit)
                     .recoverWith { case error => transaction.rollback(sp) >> error.raiseError[F, Result] }
-        _ <- whenA(aNewEventIsCreated(result))(EventStatusGauges[F].awaitingGeneration.increment(event.project.path))
+        _ <- whenA(aNewEventIsCreated(result))(EventStatusGauges[F].awaitingGeneration.increment(event.project.slug))
       } yield result
     }
   }
@@ -176,17 +176,17 @@ private class EventPersisterImpl[F[_]: MonadCancelThrow: SessionResource: Querie
 
   private def upsertProject(event: Event) = measureExecutionTime(
     SqlStatement(name = "new - upsert project")
-      .command[projects.GitLabId *: projects.Path *: EventDate *: EmptyTuple](
+      .command[projects.GitLabId *: projects.Slug *: EventDate *: EmptyTuple](
         sql"""
-            INSERT INTO project (project_id, project_path, latest_event_date)
-            VALUES ($projectIdEncoder, $projectPathEncoder, $eventDateEncoder)
+            INSERT INTO project (project_id, project_slug, latest_event_date)
+            VALUES ($projectIdEncoder, $projectSlugEncoder, $eventDateEncoder)
             ON CONFLICT (project_id)
             DO 
-              UPDATE SET latest_event_date = EXCLUDED.latest_event_date, project_path = EXCLUDED.project_path 
+              UPDATE SET latest_event_date = EXCLUDED.latest_event_date, project_slug = EXCLUDED.project_slug
               WHERE EXCLUDED.latest_event_date > project.latest_event_date
           """.command
       )
-      .arguments(event.project.id *: event.project.path *: event.date *: EmptyTuple)
+      .arguments(event.project.id *: event.project.slug *: event.date *: EmptyTuple)
       .build
       .void
   )
@@ -196,10 +196,8 @@ private class EventPersisterImpl[F[_]: MonadCancelThrow: SessionResource: Querie
 }
 
 private object EventPersister {
-  def apply[F[_]: MonadCancelThrow: SessionResource: QueriesExecutionTimes: EventStatusGauges]
-      : F[EventPersisterImpl[F]] = MonadThrow[F].catchNonFatal {
-    new EventPersisterImpl[F]()
-  }
+  def apply[F[_]: Async: SessionResource: QueriesExecutionTimes: EventStatusGauges]: F[EventPersisterImpl[F]] =
+    MonadThrow[F].catchNonFatal(new EventPersisterImpl[F]())
 
   sealed trait Result extends Product with Serializable
   object Result {

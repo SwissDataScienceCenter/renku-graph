@@ -54,14 +54,14 @@ private class UpdateCommandsCalculatorImpl[F[_]: Monad: Logger](newValuesCalcula
   ): F[List[UpdateCommand]] = {
     val newValues = newValuesCalculator.findNewValues(tsData, glData, maybePayloadData)
 
-    logUpdateStatus(tsData.path)(newValues)
+    logUpdateStatus(tsData.slug)(newValues)
       .map(_ => calculateCommandsList(tsData, newValues))
   }
 
   private def calculateCommandsList(tsData: DataExtract.TS, newValues: NewValues) =
     (
       newValues.maybeName.map(nameUpdates(tsData.id, _)) combine
-        newValues.maybeVisibility.as(List(eventUpdate(tsData.path))) combine
+        newValues.maybeVisibility.as(List(eventUpdate(tsData.slug))) combine
         newValues.maybeDateModified.map(dateModifiedUpdates(tsData.id, _)) combine
         newValues.maybeDesc.map(descUpdates(tsData.id, _)) combine
         newValues.maybeKeywords.map(keywordsUpdates(tsData.id, _)) combine
@@ -101,8 +101,8 @@ private class UpdateCommandsCalculatorImpl[F[_]: Monad: Logger](newValuesCalcula
                |}""".stripMargin
     )
 
-  private def eventUpdate(projectPath: projects.Path): UpdateCommand =
-    UpdateCommand.Event(StatusChangeEvent.RedoProjectTransformation(projectPath))
+  private def eventUpdate(projectSlug: projects.Slug): UpdateCommand =
+    UpdateCommand.Event(StatusChangeEvent.RedoProjectTransformation(projectSlug))
 
   private def dateModifiedUpdates(id: projects.ResourceId, newValue: projects.DateModified): List[UpdateCommand] = List(
     dateModifiedInProjectUpdate(id, newValue),
@@ -295,7 +295,7 @@ private class UpdateCommandsCalculatorImpl[F[_]: Monad: Logger](newValuesCalcula
     )
   }
 
-  private def logUpdateStatus(path: projects.Path): NewValues => F[Unit] = {
+  private def logUpdateStatus(slug: projects.Slug): NewValues => F[Unit] = {
     case NewValues(maybeName, maybeVisibility, maybeDateModified, maybeDesc, maybeKeywords, maybeImages) =>
       List(
         maybeName.map(v => show"name to '$v'"),
@@ -306,7 +306,7 @@ private class UpdateCommandsCalculatorImpl[F[_]: Monad: Logger](newValuesCalcula
         maybeImages.map(v => show"images to '${v.map(_.uri).mkString(", ")}'")
       ).flatten match {
         case Nil     => ().pure[F]
-        case updates => Logger[F].info(show"$categoryName: updating ${updates.mkString(", ")} for project $path")
+        case updates => Logger[F].info(show"$categoryName: updating ${updates.mkString(", ")} for project $slug")
       }
   }
 }

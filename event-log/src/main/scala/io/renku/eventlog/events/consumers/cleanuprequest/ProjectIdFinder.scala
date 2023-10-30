@@ -18,7 +18,7 @@
 
 package io.renku.eventlog.events.consumers.cleanuprequest
 
-import cats.effect.MonadCancelThrow
+import cats.effect.Async
 import cats.syntax.all._
 import io.renku.db.{DbClient, SqlStatement}
 import io.renku.eventlog.EventLogDB.SessionResource
@@ -27,30 +27,30 @@ import io.renku.eventlog.metrics.QueriesExecutionTimes
 import io.renku.graph.model.projects
 
 private trait ProjectIdFinder[F[_]] {
-  def findProjectId(projectPath: projects.Path): F[Option[projects.GitLabId]]
+  def findProjectId(projectSlug: projects.Slug): F[Option[projects.GitLabId]]
 }
 
 private object ProjectIdFinder {
-  def apply[F[_]: MonadCancelThrow: SessionResource: QueriesExecutionTimes]: F[ProjectIdFinder[F]] =
+  def apply[F[_]: Async: SessionResource: QueriesExecutionTimes]: F[ProjectIdFinder[F]] =
     new ProjectIdFinderImpl[F].pure[F].widen
 }
 
-private class ProjectIdFinderImpl[F[_]: MonadCancelThrow: SessionResource: QueriesExecutionTimes]
+private class ProjectIdFinderImpl[F[_]: Async: SessionResource: QueriesExecutionTimes]
     extends DbClient(Some(QueriesExecutionTimes[F]))
     with ProjectIdFinder[F]
     with TypeSerializers {
   import skunk.implicits._
 
-  override def findProjectId(projectPath: projects.Path): F[Option[projects.GitLabId]] = SessionResource[F].useK {
+  override def findProjectId(projectSlug: projects.Slug): F[Option[projects.GitLabId]] = SessionResource[F].useK {
     measureExecutionTime {
       SqlStatement
         .named(s"${categoryName.show.toLowerCase} - find project_id")
-        .select[projects.Path, projects.GitLabId](sql"""
+        .select[projects.Slug, projects.GitLabId](sql"""
           SELECT project_id
           FROM project
-          WHERE project_path = $projectPathEncoder 
+          WHERE project_slug = $projectSlugEncoder
         """.query(projectIdDecoder))
-        .arguments(projectPath)
+        .arguments(projectSlug)
         .build(_.option)
     }
   }

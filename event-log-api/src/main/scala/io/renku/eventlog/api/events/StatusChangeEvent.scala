@@ -44,11 +44,11 @@ object StatusChangeEvent {
 
   val categoryName: CategoryName = CategoryName("EVENTS_STATUS_CHANGE")
 
-  final case class ProjectPath(path: projects.Path)
-  object ProjectPath {
-    implicit val jsonDecoder: Decoder[ProjectPath] = deriveDecoder[ProjectPath]
-    implicit val jsonEncoder: Encoder[ProjectPath] = deriveEncoder[ProjectPath]
-    implicit val show:        Show[ProjectPath]    = Show.show(_.path.show)
+  final case class ProjectSlug(slug: projects.Slug)
+  object ProjectSlug {
+    implicit val jsonDecoder: Decoder[ProjectSlug] = deriveDecoder[ProjectSlug]
+    implicit val jsonEncoder: Encoder[ProjectSlug] = deriveEncoder[ProjectSlug]
+    implicit val show:        Show[ProjectSlug]    = Show.show(_.slug.show)
   }
 
   case object AllEventsToNew extends StatusChangeEvent {
@@ -70,14 +70,14 @@ object StatusChangeEvent {
     implicit val jsonEncoder: Encoder[ProjectEventsToNew] = specificEncoder[ProjectEventsToNew]
   }
 
-  final case class RedoProjectTransformation(project: ProjectPath) extends StatusChangeEvent
+  final case class RedoProjectTransformation(project: ProjectSlug) extends StatusChangeEvent
   object RedoProjectTransformation {
 
-    def apply(path: projects.Path): RedoProjectTransformation =
-      RedoProjectTransformation(ProjectPath(path))
+    def apply(slug: projects.Slug): RedoProjectTransformation =
+      RedoProjectTransformation(ProjectSlug(slug))
 
     implicit lazy val show: Show[RedoProjectTransformation] = Show.show { event =>
-      show"${event.subCategoryName} projectPath = ${event.project.path}, status = ${EventStatus.TriplesGenerated}"
+      show"${event.subCategoryName} projectSlug = ${event.project.slug}, status = ${EventStatus.TriplesGenerated}"
     }
 
     implicit val jsonDecoder: Decoder[RedoProjectTransformation] = specificDecoder[RedoProjectTransformation]

@@ -24,13 +24,12 @@ import finder.ProjectsFinder
 import io.circe.{Decoder, DecodingFailure}
 import io.renku.config.renku
 import io.renku.config.renku.ResourceUrl
+import io.renku.data.Message
 import io.renku.generators.CommonGraphGenerators.{pagingRequests, pagingResponses}
 import io.renku.generators.Generators.Implicits._
 import io.renku.generators.Generators.{exceptions, relativePaths}
 import io.renku.graph.model.GraphModelGenerators.renkuUrls
 import io.renku.graph.model.{persons, projects}
-import io.renku.http.ErrorMessage
-import io.renku.http.ErrorMessage._
 import io.renku.http.rest.Links
 import io.renku.http.rest.paging.{PagingHeaders, PagingResponse}
 import io.renku.http.server.EndpointTester._
@@ -89,7 +88,7 @@ class EndpointSpec extends AnyWordSpec with should.Matchers with IOSpec with Moc
       response.contentType shouldBe Some(`Content-Type`(application.json))
 
       val errorMessage = "Finding user's projects failed"
-      response.as[ErrorMessage].unsafeRunSync() shouldBe ErrorMessage(errorMessage)
+      response.as[Message].unsafeRunSync() shouldBe Message.Error.unsafeApply(errorMessage)
 
       logger.loggedOnly(Error(errorMessage, exception))
     }
@@ -119,7 +118,9 @@ class EndpointSpec extends AnyWordSpec with should.Matchers with IOSpec with Moc
     cursor._links >>= {
       case links if links.get(Links.Rel("details")).isDefined =>
         for {
-          path         <- cursor.downField("path").as[projects.Path]
+          path         <- cursor.downField("path").as[projects.Slug]
+          slug         <- cursor.downField("slug").as[projects.Slug]
+          _            <- Either.cond(path == slug, (), DecodingFailure("path != slug", Nil))
           name         <- cursor.downField("name").as[projects.Name]
           visibility   <- cursor.downField("visibility").as[projects.Visibility]
           date         <- cursor.downField("date").as[projects.DateCreated]
@@ -131,14 +132,16 @@ class EndpointSpec extends AnyWordSpec with should.Matchers with IOSpec with Moc
                  .toRight(DecodingFailure("No 'details' link", Nil))
                  .flatMap { link =>
                    import io.renku.knowledgegraph.projects.details.{Endpoint => ProjectDetailsEndpoint}
-                   val expected = ProjectDetailsEndpoint.href(renkuApiUrl, path)
+                   val expected = ProjectDetailsEndpoint.href(renkuApiUrl, slug)
                    Either.cond(link.href.value == expected.show, (), DecodingFailure(s"$link not equal $expected", Nil))
                  }
-        } yield model.Project.Activated(name, path, visibility, date, maybeCreator, keywords, maybeDesc)
+        } yield model.Project.Activated(name, slug, visibility, date, maybeCreator, keywords, maybeDesc)
       case links if links.get(Links.Rel("activation")).isDefined =>
         for {
           id           <- cursor.downField("id").as[projects.GitLabId]
-          path         <- cursor.downField("path").as[projects.Path]
+          path         <- cursor.downField("path").as[projects.Slug]
+          slug         <- cursor.downField("path").as[projects.Slug]
+          _            <- Either.cond(path == slug, (), DecodingFailure("path != slug", Nil))
           name         <- cursor.downField("name").as[projects.Name]
           visibility   <- cursor.downField("visibility").as[projects.Visibility]
           date         <- cursor.downField("date").as[projects.DateCreated]
@@ -160,7 +163,7 @@ class EndpointSpec extends AnyWordSpec with should.Matchers with IOSpec with Moc
                  }
         } yield model.Project.NotActivated(id,
                                            name,
-                                           path,
+                                           slug,
                                            visibility,
                                            date,
                                            maybeCreatorId = None,

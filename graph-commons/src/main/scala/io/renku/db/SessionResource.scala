@@ -26,19 +26,34 @@ import io.renku.db.DBConfigProvider.DBConfig
 import natchez.Trace
 import skunk.{Session, Transaction}
 
-class SessionResource[F[_]: MonadCancelThrow, TargetDB](resource: Resource[F, Session[F]]) {
+trait SessionResource[F[_], TargetDB] {
 
-  def useK[ResultType](
+  def useK[ResultType](query: Kleisli[F, Session[F], ResultType]): F[ResultType]
+
+  def useWithTransactionK[ResultType](query: Kleisli[F, (Transaction[F], Session[F]), ResultType]): F[ResultType]
+
+  def session: Resource[F, Session[F]]
+}
+
+object SessionResource {
+  def apply[F[_]: MonadCancelThrow, TargetDB](resource: Resource[F, Session[F]]) =
+    new SessionResourceImpl[F, TargetDB](resource: Resource[F, Session[F]])
+}
+
+class SessionResourceImpl[F[_]: MonadCancelThrow, TargetDB](resource: Resource[F, Session[F]])
+    extends SessionResource[F, TargetDB] {
+
+  override def useK[ResultType](
       query: Kleisli[F, Session[F], ResultType]
   ): F[ResultType] = resource.use(query.run)
 
-  def useWithTransactionK[ResultType](
+  override def useWithTransactionK[ResultType](
       query: Kleisli[F, (Transaction[F], Session[F]), ResultType]
   ): F[ResultType] = resource.use { session =>
     session.transaction.use(transaction => query.run((transaction, session)))
   }
 
-  val session: Resource[F, Session[F]] = resource
+  override val session: Resource[F, Session[F]] = resource
 }
 
 object SessionPoolResource {
@@ -55,5 +70,5 @@ object SessionPoolResource {
         password = Some(dbConfig.pass.value),
         max = dbConfig.connectionPool.value
       )
-      .map(new SessionResource(_))
+      .map(new SessionResourceImpl(_))
 }

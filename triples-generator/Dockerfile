@@ -10,7 +10,7 @@ COPY . .
 RUN export PATH="/usr/local/sbt/bin:$PATH" && \
     apk update && apk add --no-cache --virtual .build-dependencies bash wget tar git && \
     mkdir -p "/usr/local/sbt" && \
-    wget -qO - "https://github.com/sbt/sbt/releases/download/v1.9.3/sbt-1.9.3.tgz" | tar xz -C /usr/local/sbt --strip-components=1 && \
+    wget -qO - "https://github.com/sbt/sbt/releases/download/v1.9.7/sbt-1.9.7.tgz" | tar xz -C /usr/local/sbt --strip-components=1 && \
     sbt writeVersionToVersionSbt && \
     sbt writeVersionToVersionConf && \
     sbt "project triples-generator" stage && \
@@ -45,7 +45,7 @@ USER tguser
 ENV PATH=$PATH:/home/tguser/.local/bin
 
 # Installing Renku
-RUN python3 -m pip install 'renku==2.6.1' 'sentry-sdk==1.5.11'
+RUN python3 -m pip install 'renku==2.7.0' 'sentry-sdk==1.5.11'
 
 RUN git config --global user.name 'renku'  && \
     git config --global user.email 'renku@renkulab.io'  && \

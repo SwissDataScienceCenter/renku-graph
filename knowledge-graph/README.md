@@ -13,17 +13,19 @@ The following routes may be slightly different when accessed via the main Renku 
 | GET    | ```/knowledge-graph/entities```                                          | Returns entities filtered by the given predicates`                                   |
 | GET    | ```/knowledge-graph/entities/current-user/recently-viewed```             | Returns entities recently viewed by the user introducing himself with the token.     |
 | GET    | ```/knowledge-graph/ontology```                                          | Returns ontology used in the Knowledge Graph                                         |
+| POST   | ```/knowledge-graph/projects```                                          | Creates a project from the given payload in GitLab and in the Knowledge Graph        |
 | DELETE | ```/knowledge-graph/projects/:namespace/:name```                         | Deletes the project with the given `namespace/name` from knowledge-graph and GitLab  |
 | GET    | ```/knowledge-graph/projects/:namespace/:name```                         | Returns details of the project with the given `namespace/name`                       |
-| PUT    | ```/knowledge-graph/projects/:namespace/:name```                         | Updates selected properties of the project with the given `namespace/name`           |
-| GET    | ```/knowledge-graph/projects/:namespace/:name/datasets```                | Returns datasets of the project with the given `path`                                |
-| GET    | ```/knowledge-graph/projects/:namespace/:name/datasets/:dsName/tags```   | Returns tags of the dataset with the given `dsName` on project with the given `path` |
+| PATCH  | ```/knowledge-graph/projects/:namespace/:name```                         | Updates selected properties of the project with the given `namespace/name`           |
+| GET    | ```/knowledge-graph/projects/:namespace/:name/datasets```                | Returns datasets of the project with the given `slug`                                |
+| GET    | ```/knowledge-graph/projects/:namespace/:name/datasets/:dsName/tags```   | Returns tags of the dataset with the given `dsName` on project with the given `slug` |
 | GET    | ```/knowledge-graph/projects/:namespace/:name/files/:location/lineage``` | Returns the lineage for a the path (location) of a file on a project                 |
 | GET    | ```/knowledge-graph/spec.json```                                         | Returns OpenAPI specification of the service's resources                             |
 | GET    | ```/knowledge-graph/users/:id/projects```                                | Returns all user's projects                                                          |
+| GET    | ```/knowledge-graph/version```                                           | Returns info about service version                                                   |
 | GET    | ```/metrics```                                                           | Serves Prometheus metrics                                                            |
 | GET    | ```/ping```                                                              | To check if service is healthy                                                       |
-| GET    | ```/version```                                                           | Returns info about service version                                                   |
+| GET    | ```/version```                                                           | Returns info about service version; same as `GET /knowledge-graph/version`           |
 
 #### GET /knowledge-graph/datasets
 
@@ -102,7 +104,7 @@ Response body example:
           "_links":[  
              {  
                 "rel":  "view",
-                "href": "https://renkulab.io/gitlab/project_path/raw/master/data/mniouUnmal/image.png"
+                "href": "https://renkulab.io/gitlab/project_slug/raw/master/data/mniouUnmal/image.png"
              }
           ]
         }
@@ -230,6 +232,7 @@ Response body example:
       "identifier": "22222222-2222-2222-2222-222222222222"
     },
     "path":       "namespace1/project1-name",
+    "slug":       "namespace1/project1-name",
     "name":       "project1 name",
     "visibility": "public"
   },
@@ -245,6 +248,7 @@ Response body example:
         "identifier": "33333333333"
       },
       "path":       "namespace1/project1-name",
+      "slug":       "namespace1/project1-name",
       "name":       "project1 name",
       "visibility": "public"
     },
@@ -259,6 +263,7 @@ Response body example:
         "identifier": "4444444444"
       },
       "path":       "namespace2/project2-name",
+      "slug":       "namespace2/project2-name",
       "name":       "project2 name",
       "visibility": "public"
     }
@@ -312,6 +317,7 @@ When the `query` parameter is given, the match is done on the following fields:
 **Sorting:**
 * `matchingScore` - to sort by match score
 * `name` - to sort by entity name - **default when no `query` parameter is given**
+* `dateModified` - to sort by entity modification date
 * `date` - to sort by entity creation date
 
 **NOTE:** the sorting has to be requested by giving the `sort` query parameter with the property name and sorting order (`asc` or `desc`). The default order is ascending so `sort`=`name` means the same as `sort`=`name:asc`.
@@ -358,6 +364,7 @@ Response body example:
     "type":          "project",
     "matchingScore": 1.0055376,
     "name":          "name",
+    "slug":          "group/subgroup/name",
     "path":          "group/subgroup/name",
     "namespace":     "group/subgroup",
     "namespaces": [
@@ -487,6 +494,7 @@ Response body example:
     "creator":       "Jan Kowalski",
     "matchingScore": 1,
     "name":          "name",
+    "slug":          "group/subgroup/name",
     "path":          "group/subgroup/name",
     "namespace":     "group/subgroup",
     "namespaces": [
@@ -616,6 +624,83 @@ Response body example for `Accept: application/ld+json`:
 ]
 ```
 
+#### POST /knowledge-graph/projects
+
+API to create a new project from the given payload in both the Triples Store and GitLab
+
+The endpoint requires an authorization token to be passed. Supported headers are:
+
+- `Authorization: Bearer <token>` with OAuth Token obtained from GitLab
+- `PRIVATE-TOKEN: <token>` with user's Personal Access Token in GitLab
+
+**Request**
+
+```
+POST /knowledge-graph/projects HTTP/1.1
+Host: dev.renku.ch
+Authorization: Bearer <XXX>
+Content-Length: 575
+Content-Type: multipart/form-data; boundary=----WebKitFormBoundary7MA4YWxkTrZu0gW
+
+------WebKitFormBoundary7MA4YWxkTrZu0gW
+Content-Disposition: form-data; name="name"
+
+project name
+------WebKitFormBoundary7MA4YWxkTrZu0gW
+Content-Disposition: form-data; name="namespaceId"
+
+15
+------WebKitFormBoundary7MA4YWxkTrZu0gW
+Content-Disposition: form-data; name="description"
+
+project description
+------WebKitFormBoundary7MA4YWxkTrZu0gW
+Content-Disposition: form-data; name="keywords[]"
+
+key1
+------WebKitFormBoundary7MA4YWxkTrZu0gW
+Content-Disposition: form-data; name="keywords[]"
+
+key2
+------WebKitFormBoundary7MA4YWxkTrZu0gW
+Content-Disposition: form-data; name="visibility"
+
+public
+------WebKitFormBoundary7MA4YWxkTrZu0gW
+Content-Disposition: form-data; name="templateRepositoryUrl"
+
+https://github.com/SwissDataScienceCenter/renku-project-template
+------WebKitFormBoundary7MA4YWxkTrZu0gW
+Content-Disposition: form-data; name="templateId"
+
+python-minimal
+------WebKitFormBoundary7MA4YWxkTrZu0gW
+Content-Disposition: form-data; name="image"; filename="image.png"
+Content-Type: image/png
+
+(data)
+------WebKitFormBoundary7MA4YWxkTrZu0gW--
+```
+
+**Response**
+
+| Status                      | Description                                            |
+|-----------------------------|--------------------------------------------------------|
+| CREATED (201)               | If the project is created                              |
+| BAD REQUEST (400)           | If the given payload is invalid                        |
+| UNAUTHORIZED (401)          | If the given auth header cannot be authenticated       |
+| FORBIDDEN (403)             | If the user cannot create the project in the namespace |
+| INTERNAL SERVER ERROR (500) | Otherwise                                              |
+
+Response body example for `CREATED (201)`:
+
+```json
+{
+  "message": "Project created",
+  "slug":    "namespace/project-path"
+}
+```
+
 #### DELETE /knowledge-graph/projects/:namespace/:name
 
 API to remove the project with the given `namespace/name` from both knowledge-graph and GitLab
@@ -660,6 +745,7 @@ Response body example for `Accept: application/json`:
 {
   "identifier":  123,
   "path":        "namespace/project-name", 
+  "slug":        "namespace/project-name", 
   "name":        "Some project name",
   "description": "This is a longer text describing the project", // optional
   "visibility":  "public|private|internal",
@@ -682,6 +768,7 @@ Response body example for `Accept: application/json`:
     "forksCount": 1,
     "parent": { // optional
       "path":       "namespace/parent-project",
+      "slug":       "namespace/parent-project",
       "name":       "Parent project name",
       "created": {
         "dateCreated": "2001-09-04T10:48:29.457Z",
@@ -747,6 +834,9 @@ Response body example for `Accept: application/ld+json`:
   "https://swissdatasciencecenter.github.io/renku-ontology#projectPath": {
     "@value": "d_llli5Zo/2nTaozqw/llosas_/__-6h3a"
   },
+  "https://swissdatasciencecenter.github.io/renku-ontology#slug": {
+    "@value": "d_llli5Zo/2nTaozqw/llosas_/__-6h3a"
+  },
   "http://schema.org/description": {
     "@value": "Zs oJtagvqvIn diw cywpaj ordCPacr vnnkjj cgtzizxkb clfPe xuhrqT vK"
   },
@@ -800,10 +890,24 @@ Response body example for `Accept: application/ld+json`:
 }
 ```
 
-#### PUT /knowledge-graph/projects/:namespace/:name
+#### PATCH /knowledge-graph/projects/:namespace/:name
 
-API to update selected properies of the project with the given `namespace/name` in both the Triples Store and GitLab
+API to update project data.
 
+Each of the properties can be either set to a new value or omitted in case there's no new value for it.
+The new values should be sent as a `multipart/form-data` in case there's new image or as JSON in case no update for an image is needed.
+
+The properties that can be updated are:
+* description - possible values are:
+  * `null` for removing the current description
+  * any non-blank String value
+* image - possible values are:
+  * `null` for removing the current image
+  * any image file; at the moment GitLab accepts images of size 200kB max and media type of: `image/png`, `image/jpeg`, `image/gif`, `image/bmp`, `image/tiff`, `image/vnd.microsoft.icon` 
+* keywords - an array of String values; an empty array removes all the keywords
+* visibility - possible values are: `public`, `internal`, `private`
+
+In case no properties are set, no data will be changed.
 The endpoint requires an authorization token to be passed. Supported headers are:
 
 - `Authorization: Bearer <token>` with OAuth Token obtained from GitLab
@@ -811,9 +915,45 @@ The endpoint requires an authorization token to be passed. Supported headers are
 
 **Request**
 
+* Multipart request (preferred) 
+```
+PATCH /knowledge-graph/projects/namespace/path HTTP/1.1
+Host: dev.renku.ch
+Authorization: Bearer <XXX>
+Content-Length: 575
+Content-Type: multipart/form-data; boundary=----WebKitFormBoundary7MA4YWxkTrZu0gW
+
+------WebKitFormBoundary7MA4YWxkTrZu0gW
+Content-Disposition: form-data; name="visibility"
+
+public
+------WebKitFormBoundary7MA4YWxkTrZu0gW
+Content-Disposition: form-data; name="description"
+
+desc test 1
+------WebKitFormBoundary7MA4YWxkTrZu0gW
+Content-Disposition: form-data; name="keywords[]"
+
+key1
+------WebKitFormBoundary7MA4YWxkTrZu0gW
+Content-Disposition: form-data; name="keywords[]"
+
+key2
+------WebKitFormBoundary7MA4YWxkTrZu0gW
+Content-Disposition: form-data; name="image"; filename="image.png"
+Content-Type: image/png
+
+(data)
+------WebKitFormBoundary7MA4YWxkTrZu0gW--
+```
+
+* JSON request (updating image not possible) 
+
 ```json
 {
-  "visibility": "public|internal|private"
+  "description": "a new project description",
+  "keywords":    ["keyword1", "keyword2"],
+  "visibility":  "public|internal|private"
 }
 ```
 
@@ -824,21 +964,49 @@ The endpoint requires an authorization token to be passed. Supported headers are
 | ACCEPTED (202)              | If the update process was successfully scheduled                                                           |
 | BAD_REQUEST (400)           | If the given payload is empty or malformed                                                                 |
 | UNAUTHORIZED (401)          | If given auth header cannot be authenticated                                                               |
+| FORBIDDEN (403)             | If the user is not authorised to update the project                                                        |
 | NOT_FOUND (404)             | If there is no project with the given `namespace/name` or the user is not authorised to access the project |
+| CONFLICT (409)              | If updating the data is not possible, e.g. the user cannot push to the default branch                      |
 | INTERNAL SERVER ERROR (500) | Otherwise                                                                                                  |
+
 
 #### GET /knowledge-graph/projects/:namespace/:name/datasets
 
 Finds list of datasets of the project with the given `namespace/name`.
 
+**Sorting:**
+* `name` - to sort by Dataset name - **default when no `query` parameter is given**
+* `dateModified` - to sort by modification date; in case a dataset hasn't been modified yet its creation date is considered.
+
+**NOTE:** the sorting has to be requested by giving the `sort` query parameter with the property name and sorting order (`asc` or `desc`). The default order is ascending so `sort`=`name` means the same as `sort`=`name:asc`.
+
+Multiple `sort` parameters are allowed.
+
+**Paging:**
+* the `page` query parameter is optional and defaults to `1`.
+* the `per_page` query parameter is optional and defaults to `20`; max value is `100`.
+
 **Response**
 
-| Status                       | Description                                                                                             |
-|------------------------------|---------------------------------------------------------------------------------------------------------|
-| OK (200)                     | If there are datasets for the project or `[]` if nothing is found                                       |
-| UNAUTHORIZED (401)           | If given auth header cannot be authenticated                                                            |
-| NOT_FOUND (404)              | If there is no project with the given `namespace/name` or user is not authorised to access this project |
-| INTERNAL SERVER ERROR (500)  | Otherwise                                                                                               |
+| Status                      | Description                                                                                             |
+|-----------------------------|---------------------------------------------------------------------------------------------------------|
+| OK (200)                    | If there are datasets for the project or `[]` if nothing is found                                       |
+| BAD_REQUEST (400)           | In case of invalid query parameters                                                                     |
+| UNAUTHORIZED (401)          | If given auth header cannot be authenticated                                                            |
+| NOT_FOUND (404)             | If there is no project with the given `namespace/name` or user is not authorised to access this project |
+| INTERNAL SERVER ERROR (500) | Otherwise                                                                                               |
+
+Response headers:
+
+| Header        | Description                                                                           |
+|---------------|---------------------------------------------------------------------------------------|
+| `Total`       | The total number of items                                                             |
+| `Total-Pages` | The total number of pages                                                             |
+| `Per-Page`    | The number of items per page                                                          |
+| `Page`        | The index of the current page (starting at 1)                                         |
+| `Next-Page`   | The index of the next page (optional)                                                 |
+| `Prev-Page`   | The index of the previous page (optional)                                             |
+| `Link`        | The set of `prev`/`next`/`first`/`last` link headers (`prev` and `next` are optional) |
 
 Response body example:
 
@@ -849,11 +1017,13 @@ Response body example:
       "versions": {
         "initial": "11111111-1111-1111-1111-111111111111"
       },
-      "title":       "rmDaYfpehl",
-      "name":        "mniouUnmal",
-      "slug":        "mniouUnmal",
-      "sameAs":      "http://host/url1",
-      "derivedFrom": "http://host/url1",
+      "title":         "rmDaYfpehl",
+      "name":          "mniouUnmal",
+      "slug":          "mniouUnmal",
+      "datePublished": "1990-07-16",              // optional, if not exists dateCreated is present
+      "dateCreated":   "1990-07-16T21:51:12.949Z, // optional, if not exists datePublished is present
+      "dateModified":  "1990-07-16T21:51:12.949Z, // only if derivedFrom exists
+      "sameAs":        "http://host/url1",
       "images": [],
       "_links": [  
         {  
@@ -875,17 +1045,19 @@ Response body example:
       "versions": {
         "initial": "22222222-2222-2222-2222-222222222222"
       },
-      "name":        "a",
-      "slug":        "a",
-      "sameAs":      "http://host/url2",   // optional property when no "derivedFrom" exists
-      "derivedFrom": "http://host/url2",   // optional property when no "sameAs" exists
+      "name":          "a",
+      "slug":          "a",
+      "datePublished": "1990-07-16",              // optional, if not exists dateCreated is present
+      "dateCreated":   "1990-07-16T21:51:12.949Z, // optional, if not exists datePublished is present
+      "dateModified":  "1990-07-16T21:51:12.949Z, // only if derivedFrom exists
+      "derivedFrom":   "http://host/url2",   // optional property when no "sameAs" exists
       "images": [
         {
           "location": "image.png",
           "_links":[  
              {  
                 "rel":  "view",
-                "href": "https://renkulab.io/gitlab/project_path/raw/master/data/mniouUnmal/image.png"
+                "href": "https://renkulab.io/gitlab/project_slug/raw/master/data/mniouUnmal/image.png"
              }
           ]
         },
@@ -921,14 +1093,31 @@ Response body example:
 
 Finds list of tags existing on the Dataset with the given `dsName` on the project with the given `namespace/name`.
 
+**Paging:**
+* the `page` query parameter is optional and defaults to `1`.
+* the `per_page` query parameter is optional and defaults to `20`; max value is `100`.
+
 **Response**
 
-| Status                       | Description                                                                                   |
-|------------------------------|-----------------------------------------------------------------------------------------------|
-| OK (200)                     | If tags are found or `[]` if nothing is found                                                 |
-| UNAUTHORIZED (401)           | If given auth header cannot be authenticated                                                  |
-| NOT_FOUND (404)              | If there is no project with the given `namespace/name` or user is not authorised to access it |
-| INTERNAL SERVER ERROR (500)  | Otherwise                                                                                     |
+| Status                      | Description                                                                                   |
+|-----------------------------|-----------------------------------------------------------------------------------------------|
+| OK (200)                    | If tags are found or `[]` if nothing is found                                                 |
+| BAD_REQUEST (400)           | In case of invalid query parameters                                                           |
+| UNAUTHORIZED (401)          | If given auth header cannot be authenticated                                                  |
+| NOT_FOUND (404)             | If there is no project with the given `namespace/name` or user is not authorised to access it |
+| INTERNAL SERVER ERROR (500) | Otherwise                                                                                     |
+
+Response headers:
+
+| Header        | Description                                                                           |
+|---------------|---------------------------------------------------------------------------------------|
+| `Total`       | The total number of items                                                             |
+| `Total-Pages` | The total number of pages                                                             |
+| `Per-Page`    | The number of items per page                                                          |
+| `Page`        | The index of the current page (starting at 1)                                         |
+| `Next-Page`   | The index of the next page (optional)                                                 |
+| `Prev-Page`   | The index of the previous page (optional)                                             |
+| `Link`        | The set of `prev`/`next`/`first`/`last` link headers (`prev` and `next` are optional) |
 
 Response body example:
 
@@ -1046,6 +1235,7 @@ Response body example:
 [
   {
     "name":        "name",
+    "slug":        "group/subgroup/name",
     "path":        "group/subgroup/name",
     "visibility":  "public",
     "date":        "2012-11-15T10:00:00.000Z",
@@ -1065,6 +1255,7 @@ Response body example:
   {
     "id":          123,
     "name":        "name",
+    "slug":        "group/subgroup/name",
     "path":        "group/subgroup/name",
     "visibility":  "public",
     "date":        "2012-11-15T10:00:00.000Z",
@@ -1083,6 +1274,30 @@ Response body example:
     ]
   }
 ]
+```
+
+#### GET /knowledge-graph/version
+
+Returns info about service version. It's the same as `GET /version` but it's exposed to the Internet.
+
+**Response**
+
+| Status                       | Description            |
+|------------------------------|------------------------|
+| OK (200)                     | If version is returned |
+| INTERNAL SERVER ERROR (500)  | Otherwise              |
+
+Response body example:
+
+```json
+{
+  "name": "commit-event-service",
+  "versions": [
+    {
+      "version": "2.3.0"
+    }
+  ]
+}
 ```
 
 #### GET /metrics  (Internal use only)
@@ -1107,7 +1322,7 @@ Verifies service health.
 | OK (200)                     | If service is healthy |
 | INTERNAL SERVER ERROR (500)  | Otherwise             |
 
-#### GET /version  (Internal use only)
+#### GET /version (Internal use only)
 
 Returns info about service version
 

@@ -115,7 +115,8 @@ class ProjectHookFetcherSpec
     val fetcher = new ProjectHookFetcherImpl[IO]
 
     val mapResponse = captureMapping(gitLabClient)(fetcher.fetchProjectHooks(projectId, accessToken).unsafeRunSync(),
-                                                   Gen.const(Option.empty[List[HookIdAndUrl]])
+                                                   Gen.const(Option.empty[List[HookIdAndUrl]]),
+                                                   underlyingMethod = Get
     )
   }
 }

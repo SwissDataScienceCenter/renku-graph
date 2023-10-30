@@ -34,7 +34,7 @@ object QueriesExecutionTimes {
       name = "token_repository_queries_execution_times",
       help = "Token Repository queries execution times",
       labelName = "query_id",
-      buckets = Seq(.05, .075, .1, .5, 1, 2.5, 5),
+      maybeBuckets = Seq(.05, .075, .1, .5, 1, 2.5, 5).some,
       maybeThreshold = (750 millis).some
     ) with QueriesExecutionTimes[F]
   }.widen

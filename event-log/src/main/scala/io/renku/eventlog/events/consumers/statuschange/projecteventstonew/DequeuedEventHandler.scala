@@ -26,6 +26,7 @@ import cleaning.ProjectCleaner
 import eu.timepit.refined.auto._
 import io.renku.db.implicits.PreparedQueryOps
 import io.renku.db.{DbClient, SqlStatement}
+import io.renku.eventlog.EventLogDB.SessionResource
 import io.renku.eventlog.TypeSerializers._
 import io.renku.eventlog.api.events.StatusChangeEvent.ProjectEventsToNew
 import io.renku.eventlog.events.consumers.statuschange.DBUpdater.{RollbackOp, UpdateOp}
@@ -46,9 +47,9 @@ import skunk.implicits._
 import java.time.Instant
 import scala.util.control.NonFatal
 
-trait DequeuedEventHandler[F[_]] extends DBUpdater[F, ProjectEventsToNew]
+private[statuschange] trait DequeuedEventHandler[F[_]] extends DBUpdater[F, ProjectEventsToNew]
 
-object DequeuedEventHandler {
+private[statuschange] object DequeuedEventHandler {
 
   def apply[F[_]: Async: AccessTokenFinder: Logger: QueriesExecutionTimes: MetricsRegistry]
       : F[DBUpdater[F, ProjectEventsToNew]] =
@@ -73,7 +74,7 @@ object DequeuedEventHandler {
         _                        <- updateLatestEventDate(event.project)(maybeLatestEventDate)
         _                        <- cleanUpProjectIfGone(event.project)(maybeLatestEventDate)
       } yield DBUpdateResults
-        .ForProjects(event.project.path, eventCountsByStatus(statuses, removedAwaitingDeletions, removedDeletingEvents))
+        .ForProjects(event.project.slug, eventCountsByStatus(statuses, removedAwaitingDeletions, removedDeletingEvents))
         .widen
 
     private def eventCountsByStatus(statuses:                 List[EventStatus],
@@ -92,7 +93,7 @@ object DequeuedEventHandler {
 
     private def updateStatuses(project: Project) = measureExecutionTime {
       SqlStatement(name = "project_to_new - status update")
-        .select[ExecutionDate *: projects.GitLabId *: projects.Path *: EmptyTuple, EventStatus](sql"""
+        .select[ExecutionDate *: projects.GitLabId *: projects.Slug *: EmptyTuple, EventStatus](sql"""
           UPDATE event evt
           SET status = '#${New.value}',
               execution_date = $executionDateEncoder,
@@ -102,14 +103,14 @@ object DequeuedEventHandler {
             FROM event e
             JOIN project p ON e.project_id = p.project_id
               AND p.project_id = $projectIdEncoder
-              AND p.project_path = $projectPathEncoder
+              AND p.project_slug = $projectSlugEncoder
             WHERE #${`status IN`(EventStatus.all diff Set(Skipped, GeneratingTriples, AwaitingDeletion, Deleting))}
             FOR UPDATE
           ) old_evt
           WHERE evt.event_id = old_evt.event_id AND evt.project_id = old_evt.project_id
           RETURNING old_evt.status
           """.query(eventStatusDecoder))
-        .arguments(ExecutionDate(now()) *: project.id *: project.path *: EmptyTuple)
+        .arguments(ExecutionDate(now()) *: project.id *: project.slug *: EmptyTuple)
         .build(_.toList)
     }
 
@@ -118,32 +119,32 @@ object DequeuedEventHandler {
 
     private def removeProcessingTimes(project: Project) = measureExecutionTime {
       SqlStatement(name = "project_to_new - processing_times removal")
-        .command[projects.GitLabId *: projects.Path *: EmptyTuple](sql"""
+        .command[projects.GitLabId *: projects.Slug *: EmptyTuple](sql"""
           DELETE FROM status_processing_time
           WHERE project_id IN (
             SELECT t.project_id
             FROM status_processing_time t
             JOIN project p ON t.project_id = p.project_id
               AND p.project_id = $projectIdEncoder
-              AND p.project_path = $projectPathEncoder
+              AND p.project_slug = $projectSlugEncoder
           )""".command)
-        .arguments(project.id *: project.path *: EmptyTuple)
+        .arguments(project.id *: project.slug *: EmptyTuple)
         .build
         .void
     }
 
     private def removePayloads(project: Project) = measureExecutionTime {
       SqlStatement(name = "project_to_new - payloads removal")
-        .command[projects.GitLabId *: projects.Path *: EmptyTuple](sql"""
+        .command[projects.GitLabId *: projects.Slug *: EmptyTuple](sql"""
           DELETE FROM event_payload
           WHERE project_id IN (
             SELECT ep.project_id
             FROM event_payload ep
             JOIN project p ON ep.project_id = p.project_id
               AND p.project_id = $projectIdEncoder
-              AND p.project_path = $projectPathEncoder
+              AND p.project_slug = $projectSlugEncoder
           )""".command)
-        .arguments(project.id *: project.path *: EmptyTuple)
+        .arguments(project.id *: project.slug *: EmptyTuple)
         .build
         .void
     }
@@ -151,17 +152,17 @@ object DequeuedEventHandler {
     private def removeEvents(project: Project, status: EventStatus) = measureExecutionTime {
       SqlStatement
         .named(show"project_to_new - $status removal")
-        .command[EventStatus *: projects.GitLabId *: projects.Path *: EmptyTuple](sql"""
+        .command[EventStatus *: projects.GitLabId *: projects.Slug *: EmptyTuple](sql"""
           DELETE FROM event
           WHERE status = $eventStatusEncoder AND project_id IN (
             SELECT e.project_id
             FROM event e
             JOIN project p ON e.project_id = p.project_id
               AND p.project_id = $projectIdEncoder
-              AND p.project_path = $projectPathEncoder
+              AND p.project_slug = $projectSlugEncoder
           )
           """.command)
-        .arguments(status *: project.id *: project.path *: EmptyTuple)
+        .arguments(status *: project.id *: project.slug *: EmptyTuple)
         .build
         .mapResult {
           case Completion.Delete(count) => count
@@ -171,7 +172,7 @@ object DequeuedEventHandler {
 
     private def removeDeliveryInfo(project: Project) = measureExecutionTime {
       SqlStatement(name = "project_to_new - delivery removal")
-        .command[projects.GitLabId *: projects.GitLabId *: projects.Path *: EmptyTuple](sql"""
+        .command[projects.GitLabId *: projects.GitLabId *: projects.Slug *: EmptyTuple](sql"""
           DELETE FROM event_delivery
           WHERE project_id = $projectIdEncoder
             AND event_id NOT IN (
@@ -179,10 +180,10 @@ object DequeuedEventHandler {
               FROM event e
               JOIN project p ON e.project_id = p.project_id
                 AND p.project_id = $projectIdEncoder
-                AND p.project_path = $projectPathEncoder
+                AND p.project_slug = $projectSlugEncoder
               WHERE e.status = '#${GeneratingTriples.value}'
             )""".command)
-        .arguments(project.id *: project.id *: project.path *: EmptyTuple)
+        .arguments(project.id *: project.id *: project.slug *: EmptyTuple)
         .build
         .void
     }
@@ -190,32 +191,32 @@ object DequeuedEventHandler {
     private def removeCategorySyncTimes(project: Project) = measureExecutionTime {
       SqlStatement
         .named("project_to_new - delivery removal")
-        .command[projects.GitLabId *: projects.Path *: EmptyTuple](sql"""
+        .command[projects.GitLabId *: projects.Slug *: EmptyTuple](sql"""
           DELETE FROM subscription_category_sync_time
           WHERE category_name = '#${minprojectinfo.categoryName.show}' AND project_id IN (
             SELECT st.project_id
             FROM subscription_category_sync_time st
             JOIN project p ON st.project_id = p.project_id
               AND p.project_id = $projectIdEncoder
-              AND p.project_path = $projectPathEncoder
+              AND p.project_slug = $projectSlugEncoder
           )
           """.command)
-        .arguments(project.id *: project.path *: EmptyTuple)
+        .arguments(project.id *: project.slug *: EmptyTuple)
         .build
         .void
     }
 
     private def findLatestEventDate(project: Project) = measureExecutionTime {
       SqlStatement(name = "project_to_new - get latest event date")
-        .select[projects.GitLabId *: projects.Path *: EmptyTuple, EventDate](sql"""
+        .select[projects.GitLabId *: projects.Slug *: EmptyTuple, EventDate](sql"""
           SELECT event_date
           FROM event e
           JOIN project p ON e.project_id = p.project_id
             AND p.project_id = $projectIdEncoder
-            AND p.project_path = $projectPathEncoder
+            AND p.project_slug = $projectSlugEncoder
           ORDER BY event_date DESC
           LIMIT 1""".query(eventDateDecoder))
-        .arguments(project.id *: project.path *: EmptyTuple)
+        .arguments(project.id *: project.slug *: EmptyTuple)
         .build(_.option)
     }
 
@@ -237,18 +238,22 @@ object DequeuedEventHandler {
 
     private def cleanUpProjectIfGone(project: Project): Option[EventDate] => Kleisli[F, Session[F], Unit] = {
       case Some(_) => Kleisli.pure(())
-      case None    => projectCleaner.cleanUp(project) recoverWith logError(project)
+      case None    => projectCleaner.cleanUp(project) onError logError(project)
     }
 
     private def logError(project: Project): PartialFunction[Throwable, Kleisli[F, Session[F], Unit]] = {
       case NonFatal(error) =>
-        Kleisli.liftF(Logger[F].error(error)(s"$categoryName: project clean up failed: ${project.show}"))
+        Kleisli.liftF(Logger[F].error(error)(s"$categoryName: project clean up failed: ${project.show}; will retry"))
     }
 
-    override def onRollback(event: ProjectEventsToNew): RollbackOp[F] = { case SqlState.DeadlockDetected(_) =>
-      Kleisli.liftF[F, Session[F], Unit](
-        Logger[F].info(show"$categoryName: deadlock happened while processing $event; retrying")
-      ) >> updateDB(event)
+    override def onRollback(event: ProjectEventsToNew)(implicit sr: SessionResource[F]): RollbackOp[F] = {
+      case SqlState.DeadlockDetected(_)    => logAndRetry(event, "Deadlock")
+      case SqlState.ForeignKeyViolation(_) => logAndRetry(event, "ForeignKeyViolation")
     }
+
+    private def logAndRetry(event: ProjectEventsToNew, message: String)(implicit sr: SessionResource[F]) =
+      Logger[F].info(show"$categoryName: $message happened while processing $event; retrying") >>
+        sr.useK(updateDB(event))
+          .handleErrorWith(onRollback(event))
   }
 }

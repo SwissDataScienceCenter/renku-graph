@@ -21,7 +21,7 @@ package io.renku.tokenrepository
 import cats.MonadThrow
 import cats.effect._
 import cats.syntax.all._
-import io.renku.graph.http.server.binders.{ProjectId, ProjectPath}
+import io.renku.graph.http.server.binders.{ProjectId, ProjectSlug}
 import io.renku.http.client.{AccessToken, GitLabClient}
 import io.renku.http.server.security.RequestTokenFinder.getAccessToken
 import io.renku.http.server.version
@@ -52,9 +52,9 @@ private class MicroserviceRoutesImpl[F[_]: MonadThrow](
 
   import associateTokenEndpoint._
   import deleteTokenEndpoint._
+  import eu.timepit.refined.auto._
   import fetchTokenEndpoint._
-  import io.renku.http.InfoMessage
-  import io.renku.http.InfoMessage._
+  import io.renku.data.Message
   import org.http4s.HttpRoutes
   import routesMetrics._
 
@@ -64,7 +64,7 @@ private class MicroserviceRoutesImpl[F[_]: MonadThrow](
   override lazy val routes: Resource[F, HttpRoutes[F]] = HttpRoutes.of[F] {
     case       GET    -> Root / "ping"                                           => Ok("pong")
     case       GET    -> Root / "projects" / ProjectId(projectId) / "tokens"     => whenDBReady(fetchToken(projectId))
-    case       GET    -> Root / "projects" / ProjectPath(projectPath) / "tokens" => whenDBReady(fetchToken(projectPath))
+    case       GET    -> Root / "projects" / ProjectSlug(projectSlug) / "tokens" => whenDBReady(fetchToken(projectSlug))
     case req @ POST   -> Root / "projects" / ProjectId(projectId) / "tokens"     => whenDBReady(createToken(projectId, req))
     case req @ DELETE -> Root / "projects" / ProjectId(projectId) / "tokens"     => whenDBReady(withAccessToken(req)(deleteToken(projectId, _)))
   }.withMetrics.map(_ <+> versionRoutes())
@@ -72,7 +72,7 @@ private class MicroserviceRoutesImpl[F[_]: MonadThrow](
 
   private def whenDBReady(thunk: => F[Response[F]]): F[Response[F]] = dbReady.get >>= {
     case true  => thunk
-    case false => ServiceUnavailable(InfoMessage("DB migration running"))
+    case false => ServiceUnavailable(Message.Info("DB migration running"))
   }
 
   private def withAccessToken(request: Request[F])(f: Option[AccessToken] => F[Response[F]]): F[Response[F]] =

@@ -33,12 +33,12 @@ object CleanUpEvent {
 
   val categoryName: CategoryName = CategoryName("CLEAN_UP")
 
-  implicit val encoder: Encoder[CleanUpEvent] = Encoder.instance { case CleanUpEvent(Project(id, path)) =>
+  implicit val encoder: Encoder[CleanUpEvent] = Encoder.instance { case CleanUpEvent(Project(id, slug)) =>
     json"""{
       "categoryName": $categoryName,
       "project": {
         "id":   $id,
-        "path": $path
+        "slug": $slug
       }
     }"""
   }
@@ -54,8 +54,8 @@ object CleanUpEvent {
     for {
       _    <- validateCategory
       id   <- cursor.downField("project").downField("id").as[projects.GitLabId]
-      path <- cursor.downField("project").downField("path").as[projects.Path]
-    } yield CleanUpEvent(Project(id, path))
+      slug <- cursor.downField("project").downField("slug").as[projects.Slug]
+    } yield CleanUpEvent(Project(id, slug))
   }
 
   implicit val show: Show[CleanUpEvent] = Show[Project].contramap(_.project)

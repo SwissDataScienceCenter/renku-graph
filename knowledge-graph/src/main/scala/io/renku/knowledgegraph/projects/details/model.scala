@@ -18,7 +18,6 @@
 
 package io.renku.knowledgegraph.projects.details
 
-import cats.data.Validated
 import cats.syntax.all._
 import eu.timepit.refined.api.Refined
 import eu.timepit.refined.auto._
@@ -27,13 +26,11 @@ import eu.timepit.refined.numeric.Positive
 import io.circe.Decoder
 import io.renku.graph.model.images.ImageUri
 import io.renku.graph.model.persons
-import io.renku.graph.model.projects.{DateCreated, DateModified, Description, GitLabId, Keyword, Name, Path, ResourceId, Visibility}
+import io.renku.graph.model.projects.{DateCreated, DateModified, Description, GitLabId, GitHttpUrl, Keyword, Name, ResourceId, Slug, Visibility}
 import io.renku.graph.model.versions.SchemaVersion
 import io.renku.tinytypes._
 import io.renku.tinytypes.constraints._
 import model.Statistics._
-
-import java.net.{MalformedURLException, URL}
 
 private object model {
   import Forking.ForksCount
@@ -42,7 +39,7 @@ private object model {
 
   final case class Project(resourceId:       ResourceId,
                            id:               GitLabId,
-                           path:             Path,
+                           slug:             Slug,
                            name:             Name,
                            maybeDescription: Option[Description],
                            visibility:       Visibility,
@@ -84,7 +81,7 @@ private object model {
     implicit object ForksCount extends TinyTypeFactory[ForksCount](new ForksCount(_)) with NonNegativeInt[ForksCount]
   }
 
-  final case class ParentProject(resourceId: ResourceId, path: Path, name: Name, created: Creation)
+  final case class ParentProject(resourceId: ResourceId, slug: Slug, name: Name, created: Creation)
 
   sealed trait Permissions extends Product with Serializable
 
@@ -170,7 +167,7 @@ private object model {
         with NonNegativeLong[JobArtifactsSize]
   }
 
-  final case class Urls(ssh: SshUrl, http: HttpUrl, web: WebUrl, maybeReadme: Option[ReadmeUrl])
+  final case class Urls(ssh: SshUrl, http: GitHttpUrl, web: WebUrl, maybeReadme: Option[ReadmeUrl])
 
   object Urls {
 
@@ -179,17 +176,6 @@ private object model {
       addConstraint(
         check = _ matches "^git@.*\\.git$",
         message = url => s"$url is not a valid repository ssh url"
-      )
-    }
-
-    final class HttpUrl private (val value: String) extends AnyVal with StringTinyType
-    implicit object HttpUrl extends TinyTypeFactory[HttpUrl](new HttpUrl(_)) with NonBlank[HttpUrl] {
-      addConstraint(
-        check = url =>
-          (url endsWith ".git") && Validated
-            .catchOnly[MalformedURLException](new URL(url))
-            .isValid,
-        message = url => s"$url is not a valid repository http url"
       )
     }
 

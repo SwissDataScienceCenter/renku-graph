@@ -50,13 +50,12 @@ private[statuschange] class StatusChangerImpl[F[_]: MonadCancelThrow: SessionRes
         {
           for {
             savepoint <- Kleisli.liftF(transaction.savepoint)
-            updateResults <-
+            results <-
               dbUpdater
                 .updateDB(event)
-                .flatMapF(res => transaction.commit.as(res))
+                .flatMapF(transaction.commit.as(_))
                 .handleErrorWith(rollback(transaction)(savepoint)(event)(dbUpdater))
-            _ <-
-              Kleisli.liftF(updateGauges(updateResults).handleErrorWith(Logger[F].error(_)("Updating gauges failed")))
+            _ <- Kleisli.liftF(updateGauges(results).handleErrorWith(Logger[F].error(_)("Updating gauges failed")))
           } yield ()
         } run session
       }
@@ -65,13 +64,12 @@ private[statuschange] class StatusChangerImpl[F[_]: MonadCancelThrow: SessionRes
   private def rollback[E <: StatusChangeEvent](transaction: Transaction[F])(savepoint: transaction.Savepoint)(event: E)(
       dbUpdater: DBUpdater[F, E]
   ): Throwable => UpdateOp[F] = { err =>
-    val throwAll: PartialFunction[Throwable, UpdateOp[F]] = { e => Kleisli.liftF(e.raiseError[F, DBUpdateResults]) }
+    val throwAll: PartialFunction[Throwable, F[DBUpdateResults]] =
+      _.raiseError[F, DBUpdateResults]
 
     Kleisli.liftF {
       transaction.rollback(savepoint) >>
-        SessionResource[F].useK(
-          (dbUpdater onRollback event).applyOrElse(err, throwAll)
-        )
+        (dbUpdater onRollback event).applyOrElse(err, throwAll)
     }
   }
 }

@@ -43,18 +43,18 @@ class PersistedTokensFinderSpec
 
       val encryptedToken = encryptedAccessTokens.generateOne
 
-      insert(projectId, projectPath, encryptedToken)
+      insert(projectId, projectSlug, encryptedToken)
 
       finder.findStoredToken(projectId).value.unsafeRunSync() shouldBe Some(encryptedToken)
     }
 
-    "return token associated with the projectPath" in new TestCase {
+    "return token associated with the projectSlug" in new TestCase {
 
       val encryptedToken = encryptedAccessTokens.generateOne
 
-      insert(projectId, projectPath, encryptedToken)
+      insert(projectId, projectSlug, encryptedToken)
 
-      finder.findStoredToken(projectPath).value.unsafeRunSync() shouldBe Some(encryptedToken)
+      finder.findStoredToken(projectSlug).value.unsafeRunSync() shouldBe Some(encryptedToken)
     }
 
     "return None if there's no token associated with the projectId" in new TestCase {
@@ -64,7 +64,7 @@ class PersistedTokensFinderSpec
 
   private trait TestCase {
     val projectId   = projectIds.generateOne
-    val projectPath = projectPaths.generateOne
+    val projectSlug = projectSlugs.generateOne
 
     private implicit val metricsRegistry:  TestMetricsRegistry[IO]   = TestMetricsRegistry[IO]
     private implicit val queriesExecTimes: QueriesExecutionTimes[IO] = QueriesExecutionTimes[IO]().unsafeRunSync()

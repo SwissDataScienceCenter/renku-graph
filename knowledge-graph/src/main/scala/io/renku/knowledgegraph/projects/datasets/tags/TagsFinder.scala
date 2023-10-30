@@ -64,7 +64,7 @@ private class TagsFinderImpl[F[_]: Async: NonEmptyParallel: Logger: SparqlQueryT
     Prefixes of (renku -> "renku", schema -> "schema"),
     s"""|SELECT DISTINCT ?name ?startDate ?maybeDesc ?dsIdentifier
         |WHERE {
-        |  BIND (${ResourceId(criteria.projectPath).showAs[RdfResource]} AS ?projId)
+        |  BIND (${ResourceId(criteria.projectSlug).showAs[RdfResource]} AS ?projId)
         |  Graph ?projId {
         |    ?projId renku:hasDataset ?dsId.
         |    ?dsId renku:slug '${criteria.datasetName}';

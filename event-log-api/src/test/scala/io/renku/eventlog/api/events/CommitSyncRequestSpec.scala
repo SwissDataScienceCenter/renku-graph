@@ -24,7 +24,7 @@ import io.circe.syntax._
 import io.renku.events.consumers.Project
 import io.renku.generators.Generators.Implicits._
 import io.renku.generators.Generators.nonEmptyStrings
-import io.renku.graph.model.RenkuTinyTypeGenerators.{projectIds, projectPaths}
+import io.renku.graph.model.RenkuTinyTypeGenerators.{projectIds, projectSlugs}
 import io.renku.graph.model.projects
 import org.scalatest.EitherValues
 import org.scalatest.matchers.should
@@ -46,13 +46,13 @@ class CommitSyncRequestSpec extends AnyWordSpec with should.Matchers with Either
       json"""{
         "categoryName": "COMMIT_SYNC_REQUEST",
         "project": {
-          "id":   "1",
-          "path": "project/path"
+          "id":   1,
+          "slug": "project/path"
         }
       }""".hcursor.as[CommitSyncRequest].value shouldBe CommitSyncRequest(
         Project(
           projects.GitLabId(1),
-          projects.Path("project/path")
+          projects.Slug("project/path")
         )
       )
     }
@@ -64,7 +64,7 @@ class CommitSyncRequestSpec extends AnyWordSpec with should.Matchers with Either
         "categoryName": $otherCategory,
         "project": {
           "id":   ${projectIds.generateOne},
-          "path": ${projectPaths.generateOne}
+          "slug": ${projectSlugs.generateOne}
         }
       }""".hcursor.as[CommitSyncRequest]
 

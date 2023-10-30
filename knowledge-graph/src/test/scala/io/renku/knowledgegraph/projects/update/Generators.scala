@@ -18,9 +18,29 @@
 
 package io.renku.knowledgegraph.projects.update
 
-import io.renku.graph.model.RenkuTinyTypeGenerators.projectVisibilities
+import io.renku.core.client.Generators.branches
+import io.renku.generators.Generators.Implicits._
+import io.renku.graph.model.RenkuTinyTypeGenerators.{imageUris, projectDescriptions, projectKeywords, projectVisibilities}
+import io.renku.knowledgegraph.projects.images.ImageGenerators.images
 import org.scalacheck.Gen
 
 private object Generators {
-  val newValuesGen: Gen[NewValues] = projectVisibilities.map(NewValues(_))
+
+  val projectUpdatesGen: Gen[ProjectUpdates] =
+    for {
+      maybeNewDesc       <- projectDescriptions.toGeneratorOfOptions.toGeneratorOfOptions
+      maybeNewImage      <- images.toGeneratorOfOptions.toGeneratorOfOptions
+      maybeNewKeywords   <- projectKeywords.toGeneratorOfSet().toGeneratorOfOptions
+      maybeNewVisibility <- projectVisibilities.toGeneratorOfOptions
+    } yield ProjectUpdates(maybeNewDesc, maybeNewImage, maybeNewKeywords, maybeNewVisibility)
+
+  val glUpdatedProjectsGen: Gen[GLUpdatedProject] =
+    for {
+      maybeNewImage      <- imageUris.toGeneratorOfOptions
+      maybeNewVisibility <- projectVisibilities
+    } yield GLUpdatedProject(maybeNewImage, maybeNewVisibility)
+
+  val defaultBranchInfos: Gen[DefaultBranch] =
+    branches
+      .flatMap(branch => Gen.oneOf(DefaultBranch.PushProtected(branch), DefaultBranch.Unprotected(branch)))
 }

@@ -28,123 +28,104 @@ import io.renku.generators.CommonGraphGenerators._
 import io.renku.generators.Generators.Implicits._
 import io.renku.generators.Generators._
 import io.renku.interpreters.TestLogger
-import io.renku.interpreters.TestLogger.Level.{Error, Warn}
+import io.renku.interpreters.TestLogger.Level.Warn
 import io.renku.logging.ExecutionTimeRecorder.ElapsedTime
-import io.renku.metrics.{Histogram, LabeledHistogram, SingleValueHistogram}
-import io.renku.testtools.IOSpec
+import io.renku.metrics.Histogram
+import io.renku.testtools.CustomAsyncIOSpec
 import org.scalacheck.Gen.finiteDuration
-import org.scalamock.scalatest.MockFactory
+import org.scalamock.scalatest.AsyncMockFactory
+import org.scalatest.BeforeAndAfterEach
 import org.scalatest.matchers.should
-import org.scalatest.wordspec.AnyWordSpec
-import org.scalatestplus.scalacheck.ScalaCheckPropertyChecks
+import org.scalatest.wordspec.AsyncWordSpec
 
 import scala.concurrent.duration._
 import scala.jdk.CollectionConverters._
 
 class ExecutionTimeRecorderSpec
-    extends AnyWordSpec
-    with IOSpec
-    with MockFactory
-    with ScalaCheckPropertyChecks
-    with should.Matchers {
+    extends AsyncWordSpec
+    with CustomAsyncIOSpec
+    with AsyncMockFactory
+    with should.Matchers
+    with BeforeAndAfterEach {
 
   "measureExecutionTime" should {
 
-    "measure execution time of the given block and provide it to the output" in new TestCase {
+    "measure execution time of the given block and provide it to the output" in {
 
       val elapsedTime = durations(min = 100 millis, max = 500 millis).map(ElapsedTime(_)).generateOne
       val blockOut    = nonEmptyStrings().generateOne
       block.expects().returning(Temporal[IO].delayBy(blockOut.pure[IO], elapsedTime.value millis))
 
-      val actualElapsedTime -> actualOut = executionTimeRecorder.measureExecutionTime[String](block()).unsafeRunSync()
-
-      actualElapsedTime should be >= elapsedTime
-      actualOut       shouldBe blockOut
+      executionTimeRecorder.measureExecutionTime[String](block()).asserting { case actualElapsedTime -> actualOut =>
+        actualElapsedTime should be >= elapsedTime
+        actualOut       shouldBe blockOut
+      }
     }
 
-    "let the block failure propagate" in new TestCase {
+    "let the block failure propagate" in {
 
       val exception = exceptions.generateOne
       block.expects().returning(exception.raiseError[IO, String])
 
-      intercept[Exception] {
-        executionTimeRecorder
-          .measureExecutionTime[String](block())
-          .unsafeRunSync()
-      } shouldBe exception
+      executionTimeRecorder
+        .measureExecutionTime[String](block())
+        .assertThrowsError[Exception](_ shouldBe exception)
     }
 
-    "made the given histogram to collect process' execution time - case without a label" in new TestCase {
-      val histogram      = mock[SingleValueHistogram[IO]]
-      val histogramTimer = mock[Histogram.Timer[IO]]
-      (histogram.startTimer _).expects().returning(histogramTimer.pure[IO])
-      (() => histogramTimer.observeDuration).expects().returning(nonNegativeDoubles().generateOne.value.pure[IO])
+    "observe the process execution time and update the histogram - case with no label" in {
 
-      override val executionTimeRecorder = new ExecutionTimeRecorderImpl(loggingThreshold, Some(histogram))
+      val histogram             = mock[Histogram[IO]]
+      val executionTimeRecorder = new ExecutionTimeRecorderImpl(loggingThreshold, Some(histogram))
 
       val blockOut = nonEmptyStrings().generateOne
       block.expects().returning(blockOut.pure[IO])
 
       val blockExecutionTime = positiveInts(max = 100).generateOne.value
+      (histogram
+        .observe(_: Option[String], _: FiniteDuration))
+        .expects(where((l: Option[String], amt: FiniteDuration) => l.isEmpty && amt.toMillis >= blockExecutionTime))
+        .returning(().pure[IO])
+
       executionTimeRecorder
         .measureExecutionTime[String] {
           Temporal[IO].delayBy(block(), blockExecutionTime millis)
         }
-        .unsafeRunSync()
+        .assertNoException
     }
 
-    "made the given histogram to collect process' execution time - case with a label" in new TestCase {
-      val label: String Refined NonEmpty = "label"
-      val histogram      = mock[LabeledHistogram[IO]]
-      val histogramTimer = mock[Histogram.Timer[IO]]
-      (histogram.startTimer _).expects(label.value).returning(histogramTimer.pure[IO])
-      (() => histogramTimer.observeDuration).expects().returning(nonNegativeDoubles().generateOne.value.pure[IO])
+    "observe the process execution time and update the histogram - case with a label" in {
 
-      override val executionTimeRecorder = new ExecutionTimeRecorderImpl(loggingThreshold, Some(histogram))
+      val label: String Refined NonEmpty = "label"
+      val histogram             = mock[Histogram[IO]]
+      val executionTimeRecorder = new ExecutionTimeRecorderImpl(loggingThreshold, Some(histogram))
 
       val blockOut = nonEmptyStrings().generateOne
       block.expects().returning(blockOut.pure[IO])
 
       val blockExecutionTime = positiveInts(max = 100).generateOne.value
+      (histogram
+        .observe(_: Option[String], _: FiniteDuration))
+        .expects(
+          where((l: Option[String], amt: FiniteDuration) =>
+            l == Option(label.value) && amt.toMillis >= blockExecutionTime
+          )
+        )
+        .returning(().pure[IO])
+
       executionTimeRecorder
         .measureExecutionTime[String](
           Temporal[IO].delayBy(block(), blockExecutionTime millis),
           Some(label)
         )
-        .unsafeRunSync()
-    }
-
-    "log an error when collecting process' execution time fails due to histogram misconfiguration" in new TestCase {
-      val histogram = new LabeledHistogram[IO] {
-        override val name = "metric"
-        override val help = "help"
-        override def startTimer(labelValue: String) = {
-          labelValue shouldBe "label"
-          mock[Histogram.Timer[IO]].pure[IO]
-        }
-        override def observe(labelValue: String, amt: Double): IO[Unit] = ???
-      }
-
-      override val executionTimeRecorder = new ExecutionTimeRecorderImpl(loggingThreshold, Some(histogram))
-
-      val blockOut = nonEmptyStrings().generateOne
-      block.expects().returning(blockOut.pure[IO])
-
-      val blockExecutionTime = positiveInts(max = 100).generateOne.value
-      executionTimeRecorder
-        .measureExecutionTime[String] {
-          Temporal[IO].delayBy(block(), blockExecutionTime millis)
-        }
-        .unsafeRunSync()
-
-      logger.loggedOnly(Error(s"No label sent for a Labeled Histogram ${histogram.name}"))
+        .assertNoException >>
+        IO(logger.expectNoLogs())
     }
   }
 
   "logExecutionTimeWhen" should {
 
     "log warning with the phrase returned from the given partial function if it gets applied " +
-      "and the elapsed time is >= threshold" in new TestCase {
+      "and the elapsed time is >= threshold" in {
         import executionTimeRecorder._
 
         val elapsedTime           = elapsedTimes.retryUntil(_.value >= loggingThreshold.value).generateOne
@@ -156,13 +137,12 @@ class ExecutionTimeRecorderSpec
           .flatMap(logExecutionTimeWhen { case _ =>
             blockExecutionMessage
           })
-          .unsafeRunSync() shouldBe blockOut
-
-        logger.loggedOnly(Warn(s"$blockExecutionMessage in ${elapsedTime}ms"))
+          .asserting(_ shouldBe blockOut) >>
+          logger.loggedOnlyF(Warn(s"$blockExecutionMessage in ${elapsedTime}ms"))
       }
 
     "not log a message if the given partial function does get applied " +
-      "but the elapsed time is < threshold" in new TestCase {
+      "but the elapsed time is < threshold" in {
         import executionTimeRecorder._
 
         val elapsedTime           = ElapsedTime(loggingThreshold.value - 1)
@@ -174,12 +154,11 @@ class ExecutionTimeRecorderSpec
           .flatMap(logExecutionTimeWhen { case _ =>
             blockExecutionMessage
           })
-          .unsafeRunSync() shouldBe blockOut
-
-        logger.expectNoLogs()
+          .asserting(_ shouldBe blockOut) >>
+          logger.expectNoLogsF()
       }
 
-    "not log a message if the given partial function does not get applied" in new TestCase {
+    "not log a message if the given partial function does not get applied" in {
       import executionTimeRecorder._
 
       val elapsedTime           = elapsedTimes.generateOne
@@ -191,15 +170,14 @@ class ExecutionTimeRecorderSpec
         .flatMap(logExecutionTimeWhen { case "" =>
           blockExecutionMessage
         })
-        .unsafeRunSync() shouldBe blockOut
-
-      logger.expectNoLogs()
+        .asserting(_ shouldBe blockOut) >>
+        logger.expectNoLogsF()
     }
   }
 
   "logExecutionTime" should {
 
-    "log warning with the given phrase when elapsed time is >= threshold" in new TestCase {
+    "log warning with the given phrase when elapsed time is >= threshold" in {
       import executionTimeRecorder._
 
       val elapsedTime           = elapsedTimes.retryUntil(_.value >= loggingThreshold.value).generateOne
@@ -209,12 +187,11 @@ class ExecutionTimeRecorderSpec
       (elapsedTime -> blockOut)
         .pure[IO]
         .flatMap(logExecutionTime(blockExecutionMessage))
-        .unsafeRunSync() shouldBe blockOut
-
-      logger.loggedOnly(Warn(s"$blockExecutionMessage in ${elapsedTime}ms"))
+        .asserting(_ shouldBe blockOut) >>
+        logger.loggedOnlyF(Warn(s"$blockExecutionMessage in ${elapsedTime}ms"))
     }
 
-    "not log a message if the elapsed time is < threshold" in new TestCase {
+    "not log a message if the elapsed time is < threshold" in {
       import executionTimeRecorder._
 
       val elapsedTime           = ElapsedTime(loggingThreshold.value - 1)
@@ -224,47 +201,47 @@ class ExecutionTimeRecorderSpec
       (elapsedTime -> blockOut)
         .pure[IO]
         .flatMap(logExecutionTime(blockExecutionMessage))
-        .unsafeRunSync() shouldBe blockOut
-
-      logger.expectNoLogs()
+        .asserting(_ shouldBe blockOut) >>
+        logger.expectNoLogsF()
     }
   }
 
   "apply" should {
 
     "read the logging threshold from 'logging.elapsed-time-threshold' and instantiate the recorder with it" in {
-      forAll(finiteDuration retryUntil (_.toMillis > 0)) { threshold =>
-        val config = ConfigFactory.parseMap(
-          Map(
-            "logging" -> Map(
-              "elapsed-time-threshold" -> threshold.toString()
-            ).asJava
+
+      val threshold = finiteDuration.retryUntil(_.toMillis > 0).generateOne
+      val config = ConfigFactory.parseMap(
+        Map(
+          "logging" -> Map(
+            "elapsed-time-threshold" -> threshold.toString
           ).asJava
-        )
+        ).asJava
+      )
 
-        implicit val logger: TestLogger[IO] = TestLogger[IO]()
-        val executionTimeRecorder = ExecutionTimeRecorder[IO](config).unsafeRunSync()
+      implicit val logger: TestLogger[IO] = TestLogger[IO]()
+      val executionTimeRecorder = ExecutionTimeRecorder[IO](config).unsafeRunSync()
 
-        val elapsedTime           = ElapsedTime(threshold.toMillis)
-        val blockOut              = nonEmptyStrings().generateOne
-        val blockExecutionMessage = "block executed"
+      val elapsedTime           = ElapsedTime(threshold.toMillis)
+      val blockOut              = nonEmptyStrings().generateOne
+      val blockExecutionMessage = "block executed"
 
-        (elapsedTime -> blockOut)
-          .pure[IO]
-          .flatMap(executionTimeRecorder.logExecutionTimeWhen { case _ => blockExecutionMessage })
-          .unsafeRunSync() shouldBe blockOut
-
-        logger.loggedOnly(Warn(s"$blockExecutionMessage in ${elapsedTime}ms"))
-      }
+      (elapsedTime -> blockOut)
+        .pure[IO]
+        .flatMap(executionTimeRecorder.logExecutionTimeWhen { case _ => blockExecutionMessage })
+        .asserting(_ shouldBe blockOut) >>
+        logger.loggedOnlyF(Warn(s"$blockExecutionMessage in ${elapsedTime}ms"))
     }
   }
 
-  private trait TestCase {
+  private lazy val block = mockFunction[IO[String]]
 
-    val block = mockFunction[IO[String]]
+  private lazy val loggingThreshold = ElapsedTime(1000 millis)
+  private implicit lazy val logger: TestLogger[IO] = TestLogger[IO]()
+  private lazy val executionTimeRecorder = new ExecutionTimeRecorderImpl[IO](loggingThreshold, maybeHistogram = None)
 
-    val loggingThreshold = ElapsedTime(1000 millis)
-    implicit val logger: TestLogger[IO] = TestLogger[IO]()
-    val executionTimeRecorder = new ExecutionTimeRecorderImpl[IO](loggingThreshold, maybeHistogram = None)
+  protected override def beforeEach() = {
+    super.beforeEach()
+    logger.reset()
   }
 }

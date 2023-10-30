@@ -30,12 +30,12 @@ import io.renku.events.consumers.ProcessExecutor
 import io.renku.events.consumers.subscriptions.SubscriptionMechanism
 import io.renku.generators.Generators.Implicits._
 import io.renku.generators.Generators.jsons
-import io.renku.graph.model.GraphModelGenerators.projectPaths
+import io.renku.graph.model.GraphModelGenerators.projectSlugs
 import io.renku.graph.model.projects
 import io.renku.interpreters.TestLogger
 import io.renku.lock.Lock
 import io.renku.testtools.IOSpec
-import io.renku.triplesgenerator.TgLockDB.TsWriteLock
+import io.renku.triplesgenerator.TgDB.TsWriteLock
 import io.renku.triplesgenerator.events.consumers.TSReadinessForEventsChecker
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.EitherValues
@@ -46,7 +46,7 @@ class EventHandlerSpec extends AnyWordSpec with IOSpec with MockFactory with sho
 
   "handlingDefinition.decode" should {
 
-    "decode the Project path from the event" in new TestCase {
+    "decode the Project slug from the event" in new TestCase {
       handler
         .createHandlingDefinition()
         .decode(EventRequestContent.NoPayload(event))
@@ -74,7 +74,7 @@ class EventHandlerSpec extends AnyWordSpec with IOSpec with MockFactory with sho
     "lock while executing" in new TestCase {
       val test = Ref.unsafe[IO, Int](0)
       override val tsWriteLock: TsWriteLock[IO] =
-        Lock.from[IO, projects.Path](Kleisli(_ => test.update(_ + 1)))(Kleisli(_ => test.update(_ + 1)))
+        Lock.from[IO, projects.Slug](Kleisli(_ => test.update(_ + 1)))(Kleisli(_ => test.update(_ + 1)))
 
       (membersSynchronizer.synchronizeMembers _).expects(eventProject).returns(().pure[IO])
 
@@ -102,7 +102,7 @@ class EventHandlerSpec extends AnyWordSpec with IOSpec with MockFactory with sho
 
   private trait TestCase {
 
-    val eventProject = projectPaths.generateOne
+    val eventProject = projectSlugs.generateOne
     val event        = eventProject.asJson(eventEncoder)
 
     implicit val logger: TestLogger[IO] = TestLogger[IO]()
@@ -116,7 +116,7 @@ class EventHandlerSpec extends AnyWordSpec with IOSpec with MockFactory with sho
     val renewSubscriptionCalled       = Ref.unsafe[IO, Boolean](false)
     (subscriptionMechanism.renewSubscription _).expects().returns(renewSubscriptionCalled.set(true))
 
-    def tsWriteLock: TsWriteLock[IO] = Lock.none[IO, projects.Path]
+    def tsWriteLock: TsWriteLock[IO] = Lock.none[IO, projects.Slug]
     lazy val handler = new EventHandler[IO](
       categoryName,
       tsReadinessChecker,
@@ -127,11 +127,11 @@ class EventHandlerSpec extends AnyWordSpec with IOSpec with MockFactory with sho
     )
   }
 
-  private lazy val eventEncoder: Encoder[projects.Path] = Encoder.instance { projectPath =>
+  private lazy val eventEncoder: Encoder[projects.Slug] = Encoder.instance { projectSlug =>
     json"""{
       "categoryName": "MEMBER_SYNC",
       "project": {
-        "path": $projectPath
+        "slug": $projectSlug
       }
     }"""
   }

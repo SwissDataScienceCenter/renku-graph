@@ -20,12 +20,14 @@ package io.renku.entities.search
 
 import cats.data.NonEmptyList
 import cats.syntax.all._
+import eu.timepit.refined.auto._
 import io.renku.entities.search
 import io.renku.entities.search.Criteria.Filters._
 import io.renku.entities.search.Criteria.{Filters, Sort}
 import io.renku.entities.search.EntityConverters._
 import io.renku.entities.search.Generators._
 import io.renku.entities.search.diff.SearchDiffInstances
+import io.renku.entities.search.model.Entity
 import io.renku.entities.searchgraphs.SearchInfoDatasets
 import io.renku.generators.CommonGraphGenerators.sortingDirections
 import io.renku.generators.Generators.Implicits._
@@ -133,8 +135,19 @@ class EntitiesFinderSpec
             .map(_.resultsWithSkippedMatchingScore)
       }
 
+      // expected date ordering is to use dateModified when available
       implicit val entityOrdering: Ordering[model.Entity] =
-        Ordering.by(e => s"${e.date}, ${e.name}".toLowerCase)
+        Ordering.by {
+          case d: Entity.Dataset =>
+            val date = d.dateModified.getOrElse(d.date).toString
+            s"$date, ${d.name}"
+          case p: Entity.Project =>
+            val date = p.dateModified.toString
+            s"$date, ${p.name}"
+          case e =>
+            val date = e.date.toString
+            s"$date, ${e.name}"
+        }
 
       val expected = allEntitiesFrom(project).filter(_.name.value.contains("hello")).sorted
 
@@ -284,7 +297,7 @@ class EntitiesFinderSpec
       val query = nonBlankStrings(minLength = 6).generateOne
 
       val soleProject = renkuProjectEntities(visibilityPublic)
-        .modify(_.copy(path = projects.Path(s"$query/${relativePaths(maxSegments = 2).generateOne}")))
+        .modify(_.copy(slug = projects.Slug(s"$query/${relativePaths(maxSegments = 2).generateOne}")))
         .generateOne
 
       val results = IOBody {
@@ -545,7 +558,7 @@ class EntitiesFinderSpec
         .withDatasets(datasetEntities(provenanceNonModified))
         .generateOne
 
-      val member = personEntities(personGitLabIds.toGeneratorOfSomes).generateOne
+      val member = projectMemberEntities(personGitLabIds.toGeneratorOfSomes).generateOne
       val privateProject = renkuProjectEntities(fixed(projects.Visibility.Private))
         .modify(replaceMembers(to = Set(member)))
         .withActivities(activityEntities(stepPlanEntities()))
@@ -558,7 +571,7 @@ class EntitiesFinderSpec
             .findEntities(
               Criteria(
                 Filters(visibilities = Set(projects.Visibility.Public, projects.Visibility.Private)),
-                maybeUser = member.toAuthUser.some,
+                maybeUser = member.person.toAuthUser.some,
                 paging = PagingRequest(Page.first, PerPage(50))
               )
             )
@@ -605,7 +618,7 @@ class EntitiesFinderSpec
           finder
             .findEntities(
               Criteria(
-                Filters(namespaces = Set(matchingProject.path.toNamespace)),
+                Filters(namespaces = Set(matchingProject.slug.toNamespace)),
                 paging = PagingRequest(Page.first, PerPage(50))
               )
             )
@@ -1027,7 +1040,7 @@ class EntitiesFinderSpec
 
     "be sorting by Matching Score if requested" in new TestCase {
 
-      val query = nonBlankStrings(minLength = 6).generateOne
+      val query: NonBlank = "project score"
 
       val ds -> project = renkuProjectEntities(visibilityPublic)
         .modify(replaceProjectName(to = projects.Name(query.value)))
@@ -1134,7 +1147,7 @@ class EntitiesFinderSpec
 
   "findEntities - security" should {
 
-    val member = personEntities(personGitLabIds.toGeneratorOfSomes).generateOne
+    val member = projectMemberEntities(personGitLabIds.toGeneratorOfSomes).generateOne
 
     val privateProject = renkuProjectEntities(fixed(Visibility.Private))
       .modify(replaceMembers(to = Set(member)))
@@ -1193,7 +1206,9 @@ class EntitiesFinderSpec
         List(privateProject, internalProject, publicProject).traverse_(provisionTestProject) *>
           finder
             .findEntities(
-              Criteria(maybeUser = member.toAuthUser.some, paging = PagingRequest.default.copy(perPage = PerPage(50)))
+              Criteria(maybeUser = member.person.toAuthUser.some,
+                       paging = PagingRequest.default.copy(perPage = PerPage(50))
+              )
             )
       }
 
@@ -1203,6 +1218,28 @@ class EntitiesFinderSpec
         .addAllEntitiesFrom(internalProject)
         .addAllEntitiesFrom(privateProject)
         .sortBy(_.name)(nameOrdering)
+    }
+
+    "not return private projects/datasets of different user" in new TestCase {
+      val otherMember = personEntities(
+        personGitLabIds.suchThat(id => !member.person.maybeGitLabId.contains(id)).toGeneratorOfSomes
+      ).generateOne
+      val results = IOBody {
+        provisionTestProjects(privateProject, internalProject, publicProject) >>
+          finder
+            .findEntities(
+              Criteria(maybeUser = otherMember.toAuthUser.some,
+                       paging = PagingRequest.default.copy(perPage = PerPage(50))
+              )
+            )
+      }
+      val expected = List
+        .empty[model.Entity]
+        .addAllEntitiesFrom(publicProject)
+        .addAllEntitiesFrom(internalProject)
+        .addAllPersonsFrom(privateProject)
+        .sortBy(_.name)(nameOrdering)
+      results.results shouldBe expected
     }
   }
 }

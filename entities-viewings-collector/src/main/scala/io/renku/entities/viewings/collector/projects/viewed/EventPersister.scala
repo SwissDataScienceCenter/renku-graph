@@ -77,7 +77,7 @@ private[viewings] class EventPersisterImpl[F[_]: MonadThrow](
   import tsClient.{queryExpecting, updateWithNoResult, upload}
 
   override def persist(event: ProjectViewedEvent): F[Unit] =
-    findProjectId(event.path) >>= {
+    findProjectId(event.slug) >>= {
       case None            => ().pure[F]
       case Some(projectId) => persistIfOlderOrNone(event, projectId) >> persistPersonViewedProject(event, projectId)
     }
@@ -90,7 +90,7 @@ private[viewings] class EventPersisterImpl[F[_]: MonadThrow](
       case _ => ().pure[F]
     }
 
-  private def findProjectId(path: projects.Path) = queryExpecting {
+  private def findProjectId(slug: projects.Slug) = queryExpecting {
     SparqlQuery.ofUnsafe(
       show"${categoryName.show.toLowerCase}: find id",
       Prefixes of (renku -> "renku", schema -> "schema"),
@@ -98,7 +98,7 @@ private[viewings] class EventPersisterImpl[F[_]: MonadThrow](
                |WHERE {
                |  GRAPH ?id {
                |    ?id a schema:Project;
-               |        renku:projectPath ${path.asObject}
+               |        renku:projectPath ${slug.asObject}
                |  }
                |}
                |""".stripMargin
@@ -158,7 +158,7 @@ private[viewings] class EventPersisterImpl[F[_]: MonadThrow](
 
   private def persistPersonViewedProject(event: ProjectViewedEvent, projectId: projects.ResourceId) =
     event.maybeUserId
-      .map(GLUserViewedProject(_, Project(projectId, event.path), event.dateViewed))
+      .map(GLUserViewedProject(_, Project(projectId, event.slug), event.dateViewed))
       .map(personViewedProjectPersister.persist)
       .getOrElse(().pure[F])
 }

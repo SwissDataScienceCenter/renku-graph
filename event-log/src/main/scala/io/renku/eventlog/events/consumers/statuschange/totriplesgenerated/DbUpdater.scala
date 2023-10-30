@@ -25,6 +25,7 @@ import cats.syntax.all._
 import eu.timepit.refined.auto._
 import io.renku.db.implicits._
 import io.renku.db.{DbClient, SqlStatement}
+import io.renku.eventlog.EventLogDB.SessionResource
 import io.renku.eventlog.TypeSerializers._
 import io.renku.eventlog.api.events.StatusChangeEvent.ToTriplesGenerated
 import io.renku.eventlog.events.consumers.statuschange
@@ -34,13 +35,16 @@ import io.renku.eventlog.metrics.QueriesExecutionTimes
 import io.renku.graph.model.events.EventStatus._
 import io.renku.graph.model.events.{EventId, EventProcessingTime, EventStatus, ExecutionDate}
 import io.renku.graph.model.projects
+import org.typelevel.log4cats.Logger
+import skunk.SqlState.DeadlockDetected
 import skunk._
 import skunk.data.Completion
 import skunk.implicits._
 
 import java.time.Instant
+import scala.concurrent.duration._
 
-private[statuschange] class DbUpdater[F[_]: Async: QueriesExecutionTimes](
+private[statuschange] class DbUpdater[F[_]: Async: Logger: QueriesExecutionTimes](
     deliveryInfoRemover: DeliveryInfoRemover[F],
     now:                 () => Instant = () => Instant.now
 ) extends DbClient(Some(QueriesExecutionTimes[F]))
@@ -50,8 +54,13 @@ private[statuschange] class DbUpdater[F[_]: Async: QueriesExecutionTimes](
 
   import deliveryInfoRemover._
 
-  override def onRollback(event: ToTriplesGenerated): RollbackOp[F] = { _ =>
-    deleteDelivery(event.eventId).as(DBUpdateResults.ForProjects.empty)
+  override def onRollback(event: ToTriplesGenerated)(implicit sr: SessionResource[F]): RollbackOp[F] = {
+    case DeadlockDetected(_) =>
+      Logger[F].warn(show"Deadlock while updating event ${event.eventId} to $TriplesGenerated") >>
+        Async[F].sleep(1 second) >>
+        sr.useK(updateDB(event).map(_.widen)).handleErrorWith(onRollback(event))
+    case ex =>
+      sr.useK(deleteDelivery(event.eventId)) >> ex.raiseError[F, DBUpdateResults]
   }
 
   override def updateDB(event: ToTriplesGenerated): UpdateOp[F] =
@@ -83,7 +92,7 @@ private[statuschange] class DbUpdater[F[_]: Async: QueriesExecutionTimes](
       .flatMapResult {
         case Completion.Update(1) =>
           DBUpdateResults
-            .ForProjects(event.project.path, Map(GeneratingTriples -> -1, TriplesGenerated -> 1))
+            .ForProjects(event.project.slug, Map(GeneratingTriples -> -1, TriplesGenerated -> 1))
             .pure[F]
         case Completion.Update(0) =>
           Monoid[DBUpdateResults.ForProjects].empty.pure[F]
@@ -161,7 +170,7 @@ private[statuschange] class DbUpdater[F[_]: Async: QueriesExecutionTimes](
         val incrementedStatuses =
           TriplesGenerated -> (idsAndStatuses.size - idsAndStatuses.count(_._2 == EventStatus.AwaitingDeletion))
         idsAndStatuses -> DBUpdateResults.ForProjects(
-          event.project.path,
+          event.project.slug,
           decrementedStatuses + incrementedStatuses
         )
       }
@@ -224,7 +233,7 @@ private[statuschange] class DbUpdater[F[_]: Async: QueriesExecutionTimes](
 
   private def removeAwaitingDeletionEvents(eventsWindow: List[(EventId, EventStatus)], event: ToTriplesGenerated) =
     eventsWindow.collect { case (id, AwaitingDeletion) => id } match {
-      case Nil => Kleisli.pure(DBUpdateResults.ForProjects(event.project.path, Map()))
+      case Nil => Kleisli.pure(DBUpdateResults.ForProjects(event.project.slug, Map()))
       case eventIdsToRemove =>
         measureExecutionTime {
           SqlStatement(name = "to_triples_generated - awaiting_deletions removal")

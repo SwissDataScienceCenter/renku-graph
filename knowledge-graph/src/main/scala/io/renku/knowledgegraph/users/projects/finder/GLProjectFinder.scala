@@ -93,7 +93,7 @@ private class GLProjectFinderImpl[F[_]: Async: Parallel: GitLabClient: Logger] e
       for {
         id              <- cursor.downField("id").as[projects.GitLabId]
         name            <- cursor.downField("name").as[projects.Name]
-        path            <- cursor.downField("path_with_namespace").as[projects.Path]
+        slug            <- cursor.downField("path_with_namespace").as[projects.Slug]
         maybeVisibility <- cursor.downField("visibility").as[Option[projects.Visibility]]
         dateCreated     <- cursor.downField("created_at").as[projects.DateCreated]
         maybeCreatorId  <- cursor.downField("creator_id").as[Option[persons.GitLabId]]
@@ -101,7 +101,7 @@ private class GLProjectFinderImpl[F[_]: Async: Parallel: GitLabClient: Logger] e
         maybeDesc       <- cursor.downField("description").as[Option[projects.Description]]
       } yield model.Project.NotActivated(id,
                                          name,
-                                         path,
+                                         slug,
                                          maybeVisibility.getOrElse(projects.Visibility.Public),
                                          dateCreated,
                                          maybeCreatorId,

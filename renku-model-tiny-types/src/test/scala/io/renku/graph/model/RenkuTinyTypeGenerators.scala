@@ -23,15 +23,20 @@ import io.renku.generators.Generators
 import io.renku.generators.Generators.Implicits._
 import io.renku.generators.Generators._
 import io.renku.graph.model.images.{ImageResourceId, ImageUri}
+import io.renku.graph.model.projects.Role
 import io.renku.graph.model.versions.{CliVersion, SchemaVersion}
 import io.renku.tinytypes.InstantTinyType
 import org.scalacheck.Gen
+import org.scalacheck.Gen.{alphaChar, frequency, oneOf}
 
 import java.nio.charset.StandardCharsets
 import java.time.{Instant, LocalDate, ZoneOffset}
 import scala.util.Random
 
 trait RenkuTinyTypeGenerators {
+
+  val roleGen: Gen[Role] =
+    Gen.oneOf(Role.all.toList)
 
   def associationResourceIdGen: Gen[associations.ResourceId] =
     Generators.validatedUrls.map(_.value).map(associations.ResourceId)
@@ -104,12 +109,17 @@ trait RenkuTinyTypeGenerators {
     Gen.uuid.map(_ => persons.GitLabId(Random.nextInt(100000000) + 1))
   implicit lazy val personOrcidIds: Gen[persons.OrcidId] =
     Gen
-      .choose(1000, 9999)
+      .listOfN(4, Gen.frequency(8 -> Gen.numChar, 2 -> Gen.alphaChar))
+      .map(_.mkString(""))
       .toGeneratorOfList(min = 4, max = 4)
       .map(_.mkString("https://orcid.org/", "-", ""))
       .toGeneratorOf(persons.OrcidId)
 
   implicit val projectIds: Gen[projects.GitLabId] = Gen.uuid.map(_ => projects.GitLabId(Random.nextInt(1000000) + 1))
+  implicit val projectPaths: Gen[projects.GitLabPath] =
+    Generators
+      .nonEmptyStrings(minLength = 5, charsGenerator = frequency(9 -> alphaChar, 1 -> oneOf('-', '_')))
+      .map(projects.GitLabPath)
   implicit val projectNames: Gen[projects.Name] =
     Generators.nonBlankStrings(minLength = 5) map (n => projects.Name(n.value))
   implicit val projectDescriptions: Gen[projects.Description] =
@@ -132,16 +142,16 @@ trait RenkuTinyTypeGenerators {
     } yield projects.Namespace(s"$firstChar${otherChars.toList.mkString("")}")
   }
 
-  implicit val projectPaths: Gen[projects.Path] = Generators.relativePaths(
+  implicit val projectSlugs: Gen[projects.Slug] = Generators.relativePaths(
     minSegments = 2,
     maxSegments = 5,
     partsGenerator = projectNamespaces.map(_.show)
-  ) map projects.Path.apply
+  ) map projects.Slug.apply
 
   implicit val projectResourceIds: Gen[projects.ResourceId] = projectResourceIds()(renkuUrls.generateOne)
 
   def projectResourceIds()(implicit renkuUrl: RenkuUrl): Gen[projects.ResourceId] =
-    projectPaths map (path => projects.ResourceId.from(s"$renkuUrl/projects/$path").fold(throw _, identity))
+    projectSlugs.map(slug => projects.ResourceId.from(s"$renkuUrl/projects/$slug").fold(throw _, identity))
 
   def projectImageResourceIds(projectId: projects.ResourceId, max: Int = 5): Gen[List[ImageResourceId]] =
     Gen
@@ -150,6 +160,11 @@ trait RenkuTinyTypeGenerators {
 
   implicit val projectKeywords: Gen[projects.Keyword] =
     Generators.nonBlankStrings(minLength = 5).map(v => projects.Keyword(v.value))
+
+  implicit lazy val projectGitHttpUrls: Gen[projects.GitHttpUrl] = for {
+    url         <- httpUrls()
+    projectSlug <- projectSlugs
+  } yield projects.GitHttpUrl(s"$url/$projectSlug.git")
 
   implicit val filePaths: Gen[projects.FilePath] = Generators.relativePaths() map projects.FilePath.apply
 

@@ -19,7 +19,7 @@
 package io.renku.eventlog.eventdetails
 
 import cats.MonadThrow
-import cats.effect.MonadCancelThrow
+import cats.effect.Async
 import eu.timepit.refined.auto._
 import io.renku.db.{DbClient, SqlStatement}
 import io.renku.eventlog.EventLogDB.SessionResource
@@ -34,7 +34,7 @@ private trait EventDetailsFinder[F[_]] {
   def findDetails(eventId: CompoundEventId): F[Option[EventDetails]]
 }
 
-private class EventDetailsFinderImpl[F[_]: MonadCancelThrow: SessionResource: QueriesExecutionTimes]
+private class EventDetailsFinderImpl[F[_]: Async: SessionResource: QueriesExecutionTimes]
     extends DbClient[F](Some(QueriesExecutionTimes[F]))
     with EventDetailsFinder[F]
     with TypeSerializers {
@@ -56,6 +56,6 @@ private class EventDetailsFinderImpl[F[_]: MonadCancelThrow: SessionResource: Qu
 }
 
 private object EventDetailsFinder {
-  def apply[F[_]: MonadCancelThrow: SessionResource: QueriesExecutionTimes]: F[EventDetailsFinder[F]] =
+  def apply[F[_]: Async: SessionResource: QueriesExecutionTimes]: F[EventDetailsFinder[F]] =
     MonadThrow[F].catchNonFatal(new EventDetailsFinderImpl[F])
 }

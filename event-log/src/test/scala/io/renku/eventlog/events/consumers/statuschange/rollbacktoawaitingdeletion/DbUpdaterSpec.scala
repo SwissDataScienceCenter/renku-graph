@@ -16,82 +16,96 @@
  * limitations under the License.
  */
 
-package io.renku.eventlog.events.consumers.statuschange.rollbacktoawaitingdeletion
+package io.renku.eventlog.events.consumers.statuschange
+package rollbacktoawaitingdeletion
 
+import SkunkExceptionsGenerators.postgresErrors
 import cats.effect.IO
-import io.renku.eventlog.events.consumers.statuschange.DBUpdateResults
+import cats.effect.testing.scalatest.AsyncIOSpec
 import io.renku.eventlog.api.events.StatusChangeEvent.RollbackToAwaitingDeletion
 import io.renku.eventlog.metrics.QueriesExecutionTimes
 import io.renku.eventlog.{InMemoryEventLogDbSpec, TypeSerializers}
+import io.renku.events.consumers.ConsumersModelGenerators.consumerProjects
 import io.renku.events.consumers.Project
 import io.renku.generators.Generators.Implicits._
-import io.renku.generators.Generators.timestampsNotInTheFuture
+import io.renku.generators.Generators.{exceptions, timestampsNotInTheFuture}
 import io.renku.graph.model.EventsGenerators.{eventBodies, eventIds, eventStatuses}
-import io.renku.graph.model.GraphModelGenerators.{projectIds, projectPaths}
 import io.renku.graph.model.events.EventStatus._
 import io.renku.graph.model.events._
+import io.renku.interpreters.TestLogger
 import io.renku.metrics.TestMetricsRegistry
-import io.renku.testtools.IOSpec
-import org.scalamock.scalatest.MockFactory
+import org.scalatest.OptionValues
 import org.scalatest.matchers.should
-import org.scalatest.wordspec.AnyWordSpec
-
-import java.time.Instant
+import org.scalatest.wordspec.AsyncWordSpec
+import skunk.SqlState.DeadlockDetected
 
 class DbUpdaterSpec
-    extends AnyWordSpec
-    with IOSpec
+    extends AsyncWordSpec
+    with AsyncIOSpec
     with InMemoryEventLogDbSpec
     with TypeSerializers
     with should.Matchers
-    with MockFactory {
+    with OptionValues {
 
   "updateDB" should {
 
-    s"change status of all the event in the $Deleting status of a given project to $AwaitingDeletion" in new TestCase {
+    s"change status of all the event in the $Deleting status of a given project to $AwaitingDeletion" in {
+
+      val project = consumerProjects.generateOne
+
       val otherStatus = eventStatuses.filter(_ != Deleting).generateOne
-      val event1Id    = addEvent(Deleting)
-      val event2Id    = addEvent(otherStatus)
-      val event3Id    = addEvent(Deleting)
-      sessionResource
-        .useK(dbUpdater updateDB RollbackToAwaitingDeletion(Project(projectId, projectPath)))
-        .unsafeRunSync() shouldBe DBUpdateResults.ForProjects(
-        projectPath,
-        Map(Deleting -> -2, AwaitingDeletion -> 2)
-      )
+      for {
+        event1Id <- addEvent(Deleting, project)
+        event2Id <- addEvent(otherStatus, project)
+        event3Id <- addEvent(Deleting, project)
 
-      findEvent(CompoundEventId(event1Id, projectId)).map(_._2) shouldBe Some(AwaitingDeletion)
-      findEvent(CompoundEventId(event2Id, projectId)).map(_._2) shouldBe Some(otherStatus)
-      findEvent(CompoundEventId(event3Id, projectId)).map(_._2) shouldBe Some(AwaitingDeletion)
+        _ <- sessionResource
+               .useK(dbUpdater updateDB RollbackToAwaitingDeletion(project))
+               .asserting(
+                 _ shouldBe DBUpdateResults.ForProjects(project.slug, Map(Deleting -> -2, AwaitingDeletion -> 2))
+               )
+        _ <- findEventIO(CompoundEventId(event1Id, project.id)).asserting(_.value._2 shouldBe AwaitingDeletion)
+        _ <- findEventIO(CompoundEventId(event2Id, project.id)).asserting(_.value._2 shouldBe otherStatus)
+        _ <- findEventIO(CompoundEventId(event3Id, project.id)).asserting(_.value._2 shouldBe AwaitingDeletion)
+      } yield ()
     }
-
   }
 
-  private trait TestCase {
+  "onRollback" should {
 
-    val projectId   = projectIds.generateOne
-    val projectPath = projectPaths.generateOne
+    "retry on DeadlockDetected" in {
 
-    val currentTime = mockFunction[Instant]
-    private implicit val metricsRegistry:  TestMetricsRegistry[IO]   = TestMetricsRegistry[IO]
-    private implicit val queriesExecTimes: QueriesExecutionTimes[IO] = QueriesExecutionTimes[IO]().unsafeRunSync()
-    val dbUpdater = new DbUpdater[IO](currentTime)
+      val project = consumerProjects.generateOne
 
-    val now = Instant.now()
-    currentTime.expects().returning(now).anyNumberOfTimes()
-
-    def addEvent(status: EventStatus): EventId = {
-      val eventId = CompoundEventId(eventIds.generateOne, projectId)
-
-      storeEvent(
-        eventId,
-        status,
-        timestampsNotInTheFuture.generateAs(ExecutionDate),
-        timestampsNotInTheFuture.generateAs(EventDate),
-        eventBodies.generateOne,
-        projectPath = projectPath
-      )
-      eventId.id
+      addEvent(Deleting, project) >>
+        dbUpdater
+          .onRollback(RollbackToAwaitingDeletion(project))
+          .apply(postgresErrors(DeadlockDetected).generateOne)
+          .asserting(_ shouldBe DBUpdateResults.ForProjects(project.slug, Map(Deleting -> -1, AwaitingDeletion -> 1)))
     }
+
+    "not be defined for an exception different than DeadlockDetected" in {
+      dbUpdater
+        .onRollback(RollbackToAwaitingDeletion(consumerProjects.generateOne))
+        .isDefinedAt(exceptions.generateOne) shouldBe false
+    }
+  }
+
+  private implicit val logger:           TestLogger[IO]            = TestLogger[IO]()
+  private implicit val metricsRegistry:  TestMetricsRegistry[IO]   = TestMetricsRegistry[IO]
+  private implicit val queriesExecTimes: QueriesExecutionTimes[IO] = QueriesExecutionTimes[IO]().unsafeRunSync()
+  private lazy val dbUpdater = new DbUpdater[IO]()
+
+  private def addEvent(status: EventStatus, project: Project): IO[EventId] = {
+    val eventId = CompoundEventId(eventIds.generateOne, project.id)
+
+    storeEventIO(
+      eventId,
+      status,
+      timestampsNotInTheFuture.generateAs(ExecutionDate),
+      timestampsNotInTheFuture.generateAs(EventDate),
+      eventBodies.generateOne,
+      projectSlug = project.slug
+    ).as(eventId.id)
   }
 }

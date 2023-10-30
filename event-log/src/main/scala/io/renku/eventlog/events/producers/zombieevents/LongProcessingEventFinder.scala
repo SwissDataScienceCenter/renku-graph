@@ -90,7 +90,7 @@ private class LongProcessingEventFinder[F[_]: Async: SessionResource: QueriesExe
         projects.GitLabId *: EventStatus *: String *: ExecutionDate *: EventProcessingTime *: ExecutionDate *: EventProcessingTime *: EmptyTuple,
         ZombieEvent
       ](
-        sql"""SELECT evt.event_id, evt.project_id, proj.project_path, evt.status
+        sql"""SELECT evt.event_id, evt.project_id, proj.project_slug, evt.status
               FROM event evt
               JOIN project proj ON proj.project_id = evt.project_id
               LEFT JOIN event_delivery ed ON ed.project_id = evt.project_id AND ed.event_id = evt.event_id
@@ -103,8 +103,8 @@ private class LongProcessingEventFinder[F[_]: Async: SessionResource: QueriesExe
                 )
               LIMIT 1
               """
-          .query(compoundEventIdDecoder ~ projectPathDecoder ~ processingStatusDecoder)
-          .map { case id ~ path ~ status => ZombieEvent(processName, id, path, status) }
+          .query(compoundEventIdDecoder ~ projectSlugDecoder ~ processingStatusDecoder)
+          .map { case id ~ slug ~ status => ZombieEvent(processName, id, slug, status) }
       )
       .arguments(
         projectId *: status *: zombieMessage *:

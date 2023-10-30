@@ -26,23 +26,23 @@ import io.renku.metrics.{LabeledGauge, TestLabeledGauge}
 
 object TestEventStatusGauges {
   def apply[F[_]: Sync]: EventStatusGauges[F] = new EventStatusGaugesImpl[F](
-    new TestLabeledGauge[F, projects.Path]() with AwaitingGenerationGauge[F],
-    new TestLabeledGauge[F, projects.Path]() with UnderTriplesGenerationGauge[F],
-    new TestLabeledGauge[F, projects.Path]() with AwaitingTransformationGauge[F],
-    new TestLabeledGauge[F, projects.Path]() with UnderTransformationGauge[F],
-    new TestLabeledGauge[F, projects.Path]() with AwaitingDeletionGauge[F],
-    new TestLabeledGauge[F, projects.Path]() with UnderDeletionGauge[F]
+    new TestLabeledGauge[F, projects.Slug]() with AwaitingGenerationGauge[F],
+    new TestLabeledGauge[F, projects.Slug]() with UnderTriplesGenerationGauge[F],
+    new TestLabeledGauge[F, projects.Slug]() with AwaitingTransformationGauge[F],
+    new TestLabeledGauge[F, projects.Slug]() with UnderTransformationGauge[F],
+    new TestLabeledGauge[F, projects.Slug]() with AwaitingDeletionGauge[F],
+    new TestLabeledGauge[F, projects.Slug]() with UnderDeletionGauge[F]
   )
 
-  implicit class TestGaugeOps[F[_]: MonadThrow](gauge: LabeledGauge[F, projects.Path]) {
+  implicit class TestGaugeOps[F[_]: MonadThrow](gauge: LabeledGauge[F, projects.Slug]) {
 
-    def getValue(path: projects.Path): F[Double] = gauge match {
-      case g: TestLabeledGauge[F, projects.Path] => g.state.get.map(_.getOrElse(path, 0d))
+    def getValue(slug: projects.Slug): F[Double] = gauge match {
+      case g: TestLabeledGauge[F, projects.Slug] => g.state.get.map(_.getOrElse(slug, 0d))
       case g => throw new Exception(s"Expected TestLabeledGauge but got ${g.getClass.getName}")
     }
 
-    def getAllValues: F[Map[projects.Path, Double]] = gauge match {
-      case g: TestLabeledGauge[F, projects.Path] => g.state.get
+    def getAllValues: F[Map[projects.Slug, Double]] = gauge match {
+      case g: TestLabeledGauge[F, projects.Slug] => g.state.get
       case g => throw new Exception(s"Expected TestLabeledGauge but got ${g.getClass.getName}")
     }
   }

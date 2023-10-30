@@ -26,6 +26,7 @@ import io.renku.generators.CommonGraphGenerators.{authUsers, serviceVersions}
 import io.renku.generators.Generators.Implicits._
 import io.renku.generators.Generators.nonEmptyStrings
 import io.renku.graph.model.EventsGenerators.commitIds
+import io.renku.graph.model.projects.Role
 import io.renku.graph.model.testentities.cliShapedPersons
 import io.renku.graph.model.testentities.generators.EntitiesGenerators._
 import io.renku.graph.model.versions.SchemaVersion
@@ -49,7 +50,7 @@ class ReProvisioningSpec extends AcceptanceSpec with ApplicationServices with TS
 
       And("There is data from this version in Jena")
 
-      val project  = dataProjects(testProject).map(addMemberWithId(user.id)).generateOne
+      val project  = dataProjects(testProject).map(addMemberWithId(user.id, Role.Owner)).generateOne
       val commitId = commitIds.generateOne
 
       gitLabStub.addAuthenticated(user)
@@ -58,7 +59,7 @@ class ReProvisioningSpec extends AcceptanceSpec with ApplicationServices with TS
 
       `data in the Triples Store`(project, commitId, accessToken)
 
-      val projectDetailsResponse = knowledgeGraphClient.GET(s"knowledge-graph/projects/${project.path}", accessToken)
+      val projectDetailsResponse = knowledgeGraphClient.GET(s"knowledge-graph/projects/${project.slug}", accessToken)
 
       projectDetailsResponseIsValid(projectDetailsResponse, initialProjectSchemaVersion)
 
@@ -83,7 +84,7 @@ class ReProvisioningSpec extends AcceptanceSpec with ApplicationServices with TS
 
       eventually {
         val updatedProjectDetailsResponse =
-          knowledgeGraphClient.GET(s"knowledge-graph/projects/${project.path}", accessToken)
+          knowledgeGraphClient.GET(s"knowledge-graph/projects/${project.slug}", accessToken)
         projectDetailsResponseIsValid(updatedProjectDetailsResponse, newSchemaVersion)
       }(PatienceConfig(timeout = Span(20, Minutes), interval = Span(10, Seconds)),
         Retrying.retryingNatureOfT,

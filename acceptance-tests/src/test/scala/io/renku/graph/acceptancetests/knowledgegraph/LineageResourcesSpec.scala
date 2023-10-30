@@ -31,6 +31,7 @@ import io.renku.graph.model
 import io.renku.graph.model.EventsGenerators.commitIds
 import io.renku.graph.model.Schemas.prov
 import io.renku.graph.model.projects
+import io.renku.graph.model.projects.Role
 import io.renku.graph.model.testentities.LineageExemplarData.ExemplarData
 import io.renku.graph.model.testentities.generators.EntitiesGenerators.{renkuProjectEntities, visibilityPublic}
 import io.renku.graph.model.testentities.{LineageExemplarData, NodeDef, cliShapedPersons, removeMembers, replaceProjectCreator, visibilityPrivate}
@@ -51,14 +52,14 @@ class LineageResourcesSpec extends AcceptanceSpec with ApplicationServices with 
           .modify(removeMembers())
           .map(
             _.copy(
-              path = projects.Path("public/lineage-project-for-rest"),
+              slug = projects.Slug("public/lineage-project-for-rest"),
               agent = cliVersion
             )
           )
           .generateOne,
         personGen = cliShapedPersons
       )
-      (lineageData, dataProjects(lineageData.project).map(addMemberWithId(user.id)).generateOne)
+      (lineageData, dataProjects(lineageData.project).map(addMemberWithId(user.id, Role.Owner)).generateOne)
     }
 
     /** Expected data structure when looking for the grid_plot file
@@ -84,7 +85,7 @@ class LineageResourcesSpec extends AcceptanceSpec with ApplicationServices with 
 
       When("user calls the lineage endpoint")
       val response =
-        knowledgeGraphClient GET s"knowledge-graph/projects/${project.path}/files/${urlEncode(exemplarData.`grid_plot entity`.location)}/lineage"
+        knowledgeGraphClient GET s"knowledge-graph/projects/${project.slug}/files/${urlEncode(exemplarData.`grid_plot entity`.location)}/lineage"
 
       Then("they should get Ok response with project lineage in Json")
       response.status shouldBe Ok
@@ -104,13 +105,13 @@ class LineageResourcesSpec extends AcceptanceSpec with ApplicationServices with 
         renkuProjectEntities(visibilityPrivate, creatorGen = cliShapedPersons)
           .modify(removeMembers())
           .generateOne
-          .copy(path = model.projects.Path("accessible/member-project-for-rest")),
+          .copy(slug = model.projects.Slug("accessible/member-project-for-rest")),
         personGen = cliShapedPersons
       )
 
       Given("some data in the Triples Store with a project I am a member of")
       val commitId = commitIds.generateOne
-      val project  = dataProjects(accessibleExemplarData.project).map(addMemberWithId(user.id)).generateOne
+      val project  = dataProjects(accessibleExemplarData.project).map(addMemberWithId(user.id, Role.Owner)).generateOne
       mockCommitDataOnTripleGenerator(project, toPayloadJsonLD(project), commitId)
       gitLabStub.setupProject(project, commitId)
       gitLabStub.addAuthenticated(user)
@@ -119,7 +120,7 @@ class LineageResourcesSpec extends AcceptanceSpec with ApplicationServices with 
       When("user fetches the lineage of the project he is a member of")
 
       val response =
-        knowledgeGraphClient GET (s"knowledge-graph/projects/${project.path}/files/${urlEncode(accessibleExemplarData.`grid_plot entity`.location)}/lineage", user.accessToken)
+        knowledgeGraphClient GET (s"knowledge-graph/projects/${project.slug}/files/${urlEncode(accessibleExemplarData.`grid_plot entity`.location)}/lineage", user.accessToken)
 
       Then("he should get OK response with project lineage in Json")
       response.status shouldBe Ok
@@ -138,14 +139,14 @@ class LineageResourcesSpec extends AcceptanceSpec with ApplicationServices with 
           .modify(removeMembers())
           .modify(replaceProjectCreator(creatorPerson.some))
           .generateOne
-          .copy(path = model.projects.Path("private/secret-project-for-rest")),
+          .copy(slug = model.projects.Slug("private/secret-project-for-rest")),
         personGen = cliShapedPersons
       )
       val commitId = commitIds.generateOne
       val project =
         dataProjects(privateExemplarData.project)
           .map(replaceCreatorFrom(creatorPerson, creator.id))
-          .map(addMemberFrom(creatorPerson, creator.id))
+          .map(addMemberFrom(creatorPerson, creator.id, Role.Owner))
           .generateOne
 
       Given("I am authenticated")
@@ -157,7 +158,7 @@ class LineageResourcesSpec extends AcceptanceSpec with ApplicationServices with 
       When("user posts a graphql query to fetch lineage of the project he is not a member of")
       val response =
         knowledgeGraphClient.GET(
-          s"knowledge-graph/projects/${project.path}/files/${urlEncode(privateExemplarData.`grid_plot entity`.location)}/lineage"
+          s"knowledge-graph/projects/${project.slug}/files/${urlEncode(privateExemplarData.`grid_plot entity`.location)}/lineage"
         )
 
       Then("he should get a NotFound response without lineage")

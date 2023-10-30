@@ -49,12 +49,12 @@ private class MigrationNeedCheckerImpl[F[_]: MonadThrow](tsClient: TSClient[F]) 
   private lazy val query = SparqlQuery.ofUnsafe(
     show"${MigrationToV10.name} - check migration needed",
     Prefixes of (schema -> "schema", renku -> "renku", xsd -> "xsd"),
-    s"""|SELECT (COUNT(DISTINCT ?path) AS ?cnt)
+    s"""|SELECT (COUNT(DISTINCT ?slug) AS ?cnt)
         |WHERE {
         |  GRAPH ?id {
         |    ?id a schema:Project;
         |        schema:schemaVersion '9';
-        |        renku:projectPath ?path.
+        |        renku:projectPath ?slug.
         |  }
         |}
         |LIMIT 1

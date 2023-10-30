@@ -16,30 +16,22 @@
  * limitations under the License.
  */
 
-package io.renku.entities.searchgraphs.datasets.commands
+package io.renku.entities.searchgraphs.datasets
+package commands
 
+import DatasetSearchInfoOntology._
+import Link.{ImportedDataset, OriginalDataset}
 import cats.syntax.all._
-import io.renku.entities.searchgraphs.PersonInfo
-import io.renku.entities.searchgraphs.datasets.Link.{ImportedDataset, OriginalDataset}
-import io.renku.entities.searchgraphs.datasets.{DatasetSearchInfo, DatasetSearchInfoOntology, Link, LinkOntology}
+import io.renku.entities.searchgraphs.toConcatValue
 import io.renku.graph.model.Schemas.{rdf, renku}
-import io.renku.graph.model.datasets
-import io.renku.graph.model.entities.Person
 import io.renku.graph.model.images.Image
+import io.renku.graph.model.{datasets, persons}
 import io.renku.jsonld.Property
 import io.renku.jsonld.syntax._
 import io.renku.triplesstore.client.model.{Quad, QuadsEncoder, TripleObject}
 import io.renku.triplesstore.client.syntax._
 
 private object Encoders {
-
-  implicit val personInfoEncoder: QuadsEncoder[PersonInfo] = QuadsEncoder.instance {
-    case PersonInfo(resourceId, name) =>
-      Set(
-        DatasetsQuad(resourceId, rdf / "type", Person.Ontology.typeClass.id),
-        DatasetsQuad(resourceId, Person.Ontology.nameProperty.id, name.asObject)
-      )
-  }
 
   implicit val imageEncoder: QuadsEncoder[Image] = QuadsEncoder.instance { case Image(resourceId, uri, position) =>
     Set(
@@ -65,51 +57,78 @@ private object Encoders {
       )
   }
 
+  implicit val projectsVisibilitiesConcatEncoder: QuadsEncoder[(datasets.TopmostSameAs, List[Link])] =
+    QuadsEncoder.instance { case (topSameAs, links) =>
+      toConcatValue[Link](links, link => s"${link.projectSlug.value}:${link.visibility.value}")
+        .map(DatasetsQuad(topSameAs, projectsVisibilitiesConcatProperty.id, _))
+        .toSet
+    }
+
   implicit val searchInfoEncoder: QuadsEncoder[DatasetSearchInfo] = QuadsEncoder.instance { info =>
     def searchInfoQuad(predicate: Property, obj: TripleObject): Quad =
       DatasetsQuad(info.topmostSameAs, predicate, obj)
 
+    def maybeConcatQuad[A](property: Property, values: List[A], toValue: A => String): Option[Quad] =
+      toConcatValue(values, toValue).map(searchInfoQuad(property, _))
+
     val createdOrPublishedQuad = info.createdOrPublished match {
       case d: datasets.DateCreated =>
-        searchInfoQuad(DatasetSearchInfoOntology.dateCreatedProperty.id, d.asObject)
+        searchInfoQuad(dateCreatedProperty.id, d.asObject)
       case d: datasets.DatePublished =>
-        searchInfoQuad(DatasetSearchInfoOntology.datePublishedProperty.id, d.asObject)
+        searchInfoQuad(datePublishedProperty.id, d.asObject)
     }
 
     val maybeDateModifiedQuad = info.maybeDateModified.map { d =>
-      searchInfoQuad(DatasetSearchInfoOntology.dateModifiedProperty.id, d.asObject)
+      searchInfoQuad(dateModifiedProperty.id, d.asObject)
     }
 
     val maybeDescriptionQuad = info.maybeDescription.map { d =>
-      searchInfoQuad(DatasetSearchInfoOntology.descriptionProperty.id, d.asObject)
+      searchInfoQuad(descriptionProperty.id, d.asObject)
     }
 
-    val creatorsQuads = info.creators.toList.toSet.flatMap { (pi: PersonInfo) =>
-      pi.asQuads +
-        searchInfoQuad(DatasetSearchInfoOntology.creatorProperty, pi.resourceId.asEntityId)
+    val creatorsQuads = info.creators.toList.toSet.map { (creator: Creator) =>
+      searchInfoQuad(creatorProperty, creator.resourceId.asEntityId)
     }
+
+    val maybeCreatorsNamesConcatQuad =
+      maybeConcatQuad[persons.Name](creatorsNamesConcatProperty.id, info.creators.toList.map(_.name).distinct, _.value)
 
     val keywordsQuads = info.keywords.toSet.map { (k: datasets.Keyword) =>
-      searchInfoQuad(DatasetSearchInfoOntology.keywordsProperty.id, k.asObject)
+      searchInfoQuad(keywordsProperty.id, k.asObject)
     }
+
+    val maybeKeywordsConcatQuad =
+      maybeConcatQuad[datasets.Keyword](keywordsConcatProperty.id, info.keywords.distinct, _.value)
 
     val imagesQuads = info.images.toSet.flatMap { (i: Image) =>
       i.asQuads +
-        searchInfoQuad(DatasetSearchInfoOntology.imageProperty, i.resourceId.asEntityId)
+        searchInfoQuad(imageProperty, i.resourceId.asEntityId)
     }
+
+    val maybeImagesConcatQuad =
+      maybeConcatQuad[Image](imagesConcatProperty.id,
+                             info.images,
+                             image => s"${image.position.value}:${image.uri.value}"
+      )
 
     val linksQuads = info.links.toList.toSet.flatMap { (l: Link) =>
       l.asQuads +
-        searchInfoQuad(DatasetSearchInfoOntology.linkProperty, l.resourceId.asEntityId)
+        searchInfoQuad(linkProperty, l.resourceId.asEntityId)
     }
 
+    val projectsVisibilitiesConcatQuads =
+      (info.topmostSameAs -> info.links.toList).asQuads
+
     Set(
-      searchInfoQuad(rdf / "type", DatasetSearchInfoOntology.typeDef.clazz.id).some,
-      searchInfoQuad(DatasetSearchInfoOntology.slugProperty.id, info.name.asObject).some,
-      searchInfoQuad(DatasetSearchInfoOntology.visibilityProperty.id, info.visibility.asObject).some,
+      searchInfoQuad(rdf / "type", typeDef.clazz.id).some,
+      searchInfoQuad(slugProperty.id, info.name.asObject).some,
+      searchInfoQuad(visibilityProperty.id, info.visibility.asObject).some,
       createdOrPublishedQuad.some,
       maybeDateModifiedQuad,
-      maybeDescriptionQuad
-    ).flatten ++ creatorsQuads ++ keywordsQuads ++ imagesQuads ++ linksQuads
+      maybeDescriptionQuad,
+      maybeCreatorsNamesConcatQuad,
+      maybeKeywordsConcatQuad,
+      maybeImagesConcatQuad
+    ).flatten ++ projectsVisibilitiesConcatQuads ++ creatorsQuads ++ keywordsQuads ++ imagesQuads ++ linksQuads
   }
 }

@@ -27,12 +27,12 @@ package object creation {
 
   import io.renku.tokenrepository.repository.creation.TokenDates._
 
-  private[creation] val createdAtDecoder: Decoder[CreatedAt] =
+  private[repository] val createdAtDecoder: Decoder[CreatedAt] =
     timestamptz.map(timestamp => CreatedAt(timestamp.toInstant))
-  private[creation] val createdAtEncoder: Encoder[CreatedAt] = timestamptz.values.contramap((b: CreatedAt) =>
+  private[repository] val createdAtEncoder: Encoder[CreatedAt] = timestamptz.values.contramap((b: CreatedAt) =>
     OffsetDateTime.ofInstant(b.value, b.value.atOffset(ZoneOffset.UTC).toZonedDateTime.getZone)
   )
 
-  private[creation] val expiryDateDecoder: Decoder[ExpiryDate] = date.map(date => ExpiryDate(date))
-  private[creation] val expiryDateEncoder: Encoder[ExpiryDate] = date.values.contramap((b: ExpiryDate) => b.value)
+  private[repository] val expiryDateDecoder: Decoder[ExpiryDate] = date.map(date => ExpiryDate(date))
+  private[repository] val expiryDateEncoder: Encoder[ExpiryDate] = date.values.contramap((b: ExpiryDate) => b.value)
 }

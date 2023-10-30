@@ -1,42 +1,44 @@
-import sbt._
+import sbt.*
 
 //noinspection TypeAnnotation
 object Dependencies {
 
   object V {
     val ammonite               = "2.4.1"
-    val catsCore               = "2.9.0"
-    val catsEffect             = "3.5.1"
+    val catsCore               = "2.10.0"
+    val catsEffect             = "3.5.2"
     val catsEffectScalaTest    = "1.5.0"
-    val circeCore              = "0.14.5"
+    val catsEffectMunit        = "1.0.7"
+    val scalacheckEffectMunit  = "1.0.4"
+    val circeCore              = "0.14.6"
     val circeGenericExtras     = "0.14.3"
-    val circeOptics            = "0.14.1"
-    val diffx                  = "0.8.3"
+    val circeOptics            = "0.15.0"
+    val diffx                  = "0.9.0"
+    val fs2                    = "3.9.2"
     val http4s                 = "0.23.23"
     val http4sEmber            = "0.23.23"
-    val http4sPrometheus       = "0.24.4"
+    val http4sPrometheus       = "0.24.6"
     val ip4s                   = "3.3.0"
     val jsonld4s               = "0.12.0"
     val log4cats               = "2.6.0"
-    val log4jCore              = "2.20.0"
-    val logback                = "1.4.8"
-    val luceneQueryParser      = "9.7.0"
-    val monocle                = "2.1.0"
+    val log4jCore              = "2.21.1"
+    val logback                = "1.4.11"
+    val luceneQueryParser      = "9.8.0"
     val owlapi                 = "5.5.0"
     val pureconfig             = "0.17.4"
-    val rdf4jQueryParserSparql = "4.3.4"
+    val rdf4jQueryParserSparql = "4.3.7"
     val refined                = "0.11.0"
     val refinedPureconfig      = "0.11.0"
     val scalacheck             = "1.17.0"
     val scalamock              = "5.2.0"
-    val scalatest              = "3.2.16"
+    val scalatest              = "3.2.17"
     val scalatestScalacheck    = "3.2.14.0"
-    val sentryLogback          = "6.26.0"
-    val skunk                  = "0.6.0"
-    val swaggerParser          = "2.1.16"
-    val testContainersScala    = "0.40.17"
-    val widoco                 = "1.4.19"
-    val wiremock               = "2.35.0"
+    val sentryLogback          = "6.32.0"
+    val skunk                  = "0.6.1"
+    val swaggerParser          = "2.1.18"
+    val testContainersScala    = "0.41.0"
+    val widoco                 = "1.4.20"
+    val wiremock               = "3.2.0"
   }
 
   val ip4s = Seq(
@@ -57,11 +59,6 @@ object Dependencies {
 
   val rdf4jQueryParserSparql = Seq(
     "org.eclipse.rdf4j" % "rdf4j-queryparser-sparql" % V.rdf4jQueryParserSparql
-  )
-
-  val monocle = Seq(
-    // libraryDependencies += "dev.optics" %% "monocle-core" % 3.x.x // to be used when circe-optics starts to use is
-    "com.github.julien-truffaut" %% "monocle-core" % V.monocle
   )
 
   val diffx = Seq(
@@ -98,6 +95,10 @@ object Dependencies {
     "org.apache.lucene" % "lucene-queryparser" % V.luceneQueryParser
   )
 
+  val luceneAnalyzer = Seq(
+    "org.apache.lucene" % "lucene-analysis-common" % V.luceneQueryParser
+  )
+
   val http4sClient = Seq(
     "org.http4s" %% "http4s-ember-client" % V.http4sEmber
   )
@@ -127,17 +128,29 @@ object Dependencies {
     "org.typelevel" %% "cats-effect-testing-scalatest" % V.catsEffectScalaTest
   )
 
+  val catsEffectMunit = Seq(
+    "org.typelevel" %% "munit-cats-effect-3" % V.catsEffectMunit
+  )
+
+  val scalacheckEffectMunit = Seq(
+    "org.typelevel" %% "scalacheck-effect-munit" % V.scalacheckEffectMunit
+  )
+
   val log4Cats = Seq(
     "org.typelevel" %% "log4cats-core" % V.log4cats
   )
 
-  val testContainersPostgres = Seq(
-    "com.dimafeng" %% "testcontainers-scala-scalatest"  % V.testContainersScala,
-    "com.dimafeng" %% "testcontainers-scala-postgresql" % V.testContainersScala
+  val testContainersScalaTest = Seq(
+    "com.dimafeng" %% "testcontainers-scala-scalatest" % V.testContainersScala
   )
+  val testContainersPostgres =
+    testContainersScalaTest ++
+      Seq(
+        "com.dimafeng" %% "testcontainers-scala-postgresql" % V.testContainersScala
+      )
 
   val wiremock = Seq(
-    "com.github.tomakehurst" % "wiremock-jre8" % V.wiremock
+    "org.wiremock" % "wiremock" % V.wiremock
   )
 
   val scalamock = Seq(
@@ -176,6 +189,10 @@ object Dependencies {
     "io.renku" %% "jsonld4s" % V.jsonld4s
   )
 
+  val fs2Core = Seq(
+    "co.fs2" %% "fs2-core" % V.fs2
+  )
+
   val catsCore = Seq(
     "org.typelevel" %% "cats-core" % V.catsCore
   )
@@ -187,5 +204,4 @@ object Dependencies {
   val scalacheck = Seq(
     "org.scalacheck" %% "scalacheck" % V.scalacheck
   )
-
 }

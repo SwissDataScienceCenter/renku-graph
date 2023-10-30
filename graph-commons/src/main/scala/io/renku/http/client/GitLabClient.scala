@@ -35,7 +35,8 @@ import io.renku.http.rest.paging.model.{Page, Total}
 import io.renku.metrics.{GitLabApiCallRecorder, MetricsRegistry}
 import org.http4s.Method.{DELETE, GET, HEAD, POST, PUT}
 import org.http4s.circe.{jsonEncoder, jsonEncoderOf}
-import org.http4s.{EntityEncoder, Method, Response, Uri, UrlForm}
+import org.http4s.multipart.Multipart
+import org.http4s.{EntityEncoder, Method, Response, Uri}
 import org.typelevel.ci._
 import org.typelevel.log4cats.Logger
 
@@ -55,7 +56,11 @@ trait GitLabClient[F[_]] {
       mapResponse: ResponseMappingF[F, ResultType]
   )(implicit maybeAccessToken: Option[AccessToken]): F[ResultType]
 
-  def put[ResultType](path: Uri, endpointName: String Refined NonEmpty, payload: UrlForm)(
+  def postMultipart[ResultType](path: Uri, endpointName: String Refined NonEmpty, payload: Multipart[F])(
+      mapResponse: ResponseMappingF[F, ResultType]
+  )(implicit accessToken: AccessToken): F[ResultType]
+
+  def put[ResultType](path: Uri, endpointName: String Refined NonEmpty, payload: Multipart[F])(
       mapResponse: ResponseMappingF[F, ResultType]
   )(implicit maybeAccessToken: Option[AccessToken]): F[ResultType]
 
@@ -104,13 +109,19 @@ final class GitLabClientImpl[F[_]: Async: Logger](
     result  <- super.send(request)(mapResponse)
   } yield result
 
-  override def put[ResultType](path: Uri, endpointName: String Refined NonEmpty, payload: UrlForm)(
+  override def postMultipart[ResultType](path: Uri, endpointName: String Refined NonEmpty, payload: Multipart[F])(
       mapResponse: ResponseMappingF[F, ResultType]
-  )(implicit maybeAccessToken: Option[AccessToken]): F[ResultType] = for {
-    uri     <- validateUri(show"$gitLabApiUrl/$path")
-    request <- secureNamedRequest(PUT, uri, endpointName, payload)
-    result  <- super.send(request)(mapResponse)
-  } yield result
+  )(implicit accessToken: AccessToken): F[ResultType] =
+    validateUri(show"$gitLabApiUrl/$path")
+      .flatMap(secureNamedRequest(POST, _, endpointName, payload)(accessToken.some))
+      .flatMap(super.send(_: NamedRequest[F])(mapResponse))
+
+  override def put[ResultType](path: Uri, endpointName: String Refined NonEmpty, payload: Multipart[F])(
+      mapResponse: ResponseMappingF[F, ResultType]
+  )(implicit maybeAccessToken: Option[AccessToken]): F[ResultType] =
+    validateUri(show"$gitLabApiUrl/$path")
+      .flatMap(secureNamedRequest(PUT, _, endpointName, payload))
+      .flatMap(send(_: NamedRequest[F])(mapResponse))
 
   override def delete[ResultType](path: Uri, endpointName: Refined[String, NonEmpty])(
       mapResponse: ResponseMappingF[F, ResultType]
@@ -129,13 +140,23 @@ final class GitLabClientImpl[F[_]: Async: Logger](
     endpointName
   ).pure[F]
 
-  private def secureNamedRequest[T](method: Method, uri: Uri, endpointName: String Refined NonEmpty, payload: T)(
-      implicit
-      maybeAccessToken: Option[AccessToken],
-      eEnc:             EntityEncoder[F, T]
+  private def secureNamedRequest(method: Method, uri: Uri, endpointName: String Refined NonEmpty, payload: Json)(
+      implicit maybeAccessToken: Option[AccessToken]
   ): F[NamedRequest[F]] =
     secureNamedRequest(method, uri, endpointName)
       .map(originalRequest => originalRequest.copy(request = originalRequest.request.withEntity(payload)))
+
+  private def secureNamedRequest(method:       Method,
+                                 uri:          Uri,
+                                 endpointName: String Refined NonEmpty,
+                                 payload:      Multipart[F]
+  )(implicit
+      maybeAccessToken: Option[AccessToken]
+  ): F[NamedRequest[F]] =
+    secureNamedRequest(method, uri, endpointName)
+      .map(originalRequest =>
+        originalRequest.copy(request = originalRequest.request.withEntity(payload).putHeaders(payload.headers))
+      )
 }
 
 object GitLabClient {

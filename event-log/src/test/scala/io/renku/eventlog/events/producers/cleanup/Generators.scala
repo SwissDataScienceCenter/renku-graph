@@ -19,12 +19,12 @@
 package io.renku.eventlog.events.producers.cleanup
 
 import io.renku.events.consumers.Project
-import io.renku.graph.model.GraphModelGenerators.{projectIds, projectPaths}
+import io.renku.graph.model.GraphModelGenerators.{projectIds, projectSlugs}
 import org.scalacheck.Gen
 
 private object Generators {
   lazy val cleanupEvents: Gen[CleanUpEvent] = for {
     projectId   <- projectIds
-    projectPath <- projectPaths
-  } yield CleanUpEvent(Project(projectId, projectPath))
+    projectSlug <- projectSlugs
+  } yield CleanUpEvent(Project(projectId, projectSlug))
 }

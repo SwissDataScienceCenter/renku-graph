@@ -20,12 +20,12 @@ package io.renku.knowledgegraph.projects.details
 
 import cats.MonadThrow
 import cats.syntax.all._
+import eu.timepit.refined.auto._
+import io.renku.data.Message
 import io.renku.graph.config.GitLabUrlLoader
 import io.renku.graph.model.images.ImageUri
 import io.renku.graph.model.versions.SchemaVersion
 import io.renku.graph.model.{GitLabUrl, persons, projects}
-import io.renku.http.InfoMessage
-import io.renku.http.InfoMessage._
 import io.renku.knowledgegraph.docs
 import io.renku.knowledgegraph.docs.model.Operation.GET
 import io.renku.knowledgegraph.docs.model._
@@ -33,7 +33,7 @@ import model.Forking.ForksCount
 import model.Permissions.{AccessLevel, GroupAccessLevel}
 import model.Project.StarsCount
 import model.Statistics.{CommitsCount, JobArtifactsSize, LsfObjectsSize, RepositorySize, StorageSize}
-import model.Urls.{HttpUrl, ReadmeUrl, SshUrl, WebUrl}
+import model.Urls.{ReadmeUrl, SshUrl, WebUrl}
 import model._
 
 import java.time.Instant
@@ -63,16 +63,16 @@ private class EndpointDocsImpl(projectJsonEncoder: ProjectJsonEncoder, projectJs
       ),
       Status.Unauthorized -> Response(
         "Unauthorized",
-        Contents(MediaType.`application/json`("Invalid token", InfoMessage("Unauthorized")))
+        Contents(MediaType.`application/json`("Invalid token", Message.Info("Unauthorized")))
       ),
       Status.NotFound -> Response(
         "Details not found or no privileges",
         Contents(
-          MediaType.`application/json`("Reason", InfoMessage("No project namespace/project found"))
+          MediaType.`application/json`("Reason", Message.Info("No project namespace/project found"))
         )
       ),
       Status.InternalServerError -> Response("Error",
-                                             Contents(MediaType.`application/json`("Reason", InfoMessage("Message")))
+                                             Contents(MediaType.`application/json`("Reason", Message.Info("Message")))
       )
     )
   )
@@ -89,7 +89,7 @@ private class EndpointDocsImpl(projectJsonEncoder: ProjectJsonEncoder, projectJs
   private val example = Project(
     projects.ResourceId("http://renkulab.io/projects/namespace/name"),
     projects.GitLabId(123),
-    projects.Path("namespace/name"),
+    projects.Slug("namespace/name"),
     projects.Name("name"),
     projects.Description("description").some,
     projects.Visibility.Public,
@@ -104,7 +104,7 @@ private class EndpointDocsImpl(projectJsonEncoder: ProjectJsonEncoder, projectJs
     projects.DateModified(Instant.parse("2012-11-16T10:00:00.000Z")),
     Urls(
       SshUrl("git@github.com:namespace/name.git"),
-      HttpUrl("https://github.com/namespace/name.git"),
+      projects.GitHttpUrl("https://github.com/namespace/name.git"),
       WebUrl("https://github.com/namespace/name"),
       ReadmeUrl("https://github.com/namespace/name/README.md").some
     ),
@@ -112,7 +112,7 @@ private class EndpointDocsImpl(projectJsonEncoder: ProjectJsonEncoder, projectJs
       ForksCount(1),
       ParentProject(
         projects.ResourceId("http://renkulab.io/projects/namespace/fork"),
-        projects.Path("namespace/fork"),
+        projects.Slug("namespace/fork"),
         projects.Name("fork"),
         Creation(
           projects.DateCreated(Instant.parse("2012-11-17T10:00:00.000Z")),

@@ -49,6 +49,11 @@ trait ModelOps extends Dataset.ProvenanceOps {
     def toMaybe[T](implicit convert: Person => Option[T]): Option[T] = convert(person)
   }
 
+  implicit class MemberOps(m: Project.Member) {
+    def to[T](implicit convert:      Project.Member => T):         T         = convert(m)
+    def toMaybe[T](implicit convert: Project.Member => Option[T]): Option[T] = convert(m)
+  }
+
   implicit class ProjectOps(project: Project)(implicit
       renkuUrl: RenkuUrl
   ) extends AbstractProjectOps[Project](project)
@@ -109,7 +114,7 @@ trait ModelOps extends Dataset.ProvenanceOps {
         creatorGen = creatorsGen
       ).map(child =>
         RenkuProject.WithParent(
-          child.path,
+          child.slug,
           child.name,
           child.maybeDescription,
           parentProject.agent,
@@ -233,7 +238,7 @@ trait ModelOps extends Dataset.ProvenanceOps {
                               creatorGen = creatorGen
       ).map(child =>
         NonRenkuProject.WithParent(
-          child.path,
+          child.slug,
           child.name,
           child.maybeDescription,
           child.dateCreated,

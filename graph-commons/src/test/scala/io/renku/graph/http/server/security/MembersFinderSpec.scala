@@ -58,7 +58,7 @@ class MembersFinderSpec
       val members = personGitLabIds.generateSet()
       givenFindingMembers(maybePage = None, returning = (members -> Option.empty[Int]).pure[IO])
 
-      finder.findMembers(projectPath).unsafeRunSync() shouldBe members
+      finder.findMembers(projectSlug).unsafeRunSync() shouldBe members
     }
 
     "return project members from all pages" in new TestCase {
@@ -68,7 +68,7 @@ class MembersFinderSpec
       val membersPage2 = personGitLabIds.generateSet()
       givenFindingMembers(maybePage = 2.some, returning = (membersPage2 -> Option.empty[Int]).pure[IO])
 
-      finder.findMembers(projectPath).unsafeRunSync() shouldBe membersPage1 ++ membersPage2
+      finder.findMembers(projectSlug).unsafeRunSync() shouldBe membersPage1 ++ membersPage2
     }
 
     "return members if OK" in new TestCase {
@@ -102,7 +102,7 @@ class MembersFinderSpec
 
   private trait TestCase {
 
-    val projectPath = projectPaths.generateOne
+    val projectSlug = projectSlugs.generateOne
     implicit val maybeAccessToken: Option[AccessToken] = accessTokens.generateOption
 
     private implicit val logger: TestLogger[IO]   = TestLogger[IO]()
@@ -113,7 +113,7 @@ class MembersFinderSpec
       val endpointName: String Refined NonEmpty = "project-members"
 
       val uri = {
-        val uri = uri"projects" / projectPath / "members" / "all"
+        val uri = uri"projects" / projectSlug / "members" / "all"
         maybePage match {
           case Some(page) => uri withQueryParam ("page", page.toString)
           case None       => uri
@@ -130,8 +130,9 @@ class MembersFinderSpec
 
     val mapResponse =
       captureMapping(gitLabClient)(
-        finder.findMembers(projectPath)(maybeAccessToken).unsafeRunSync(),
-        fixed((Set.empty[persons.GitLabId], Option.empty[Int]))
+        finder.findMembers(projectSlug)(maybeAccessToken).unsafeRunSync(),
+        fixed((Set.empty[persons.GitLabId], Option.empty[Int])),
+        underlyingMethod = Get
       )
   }
 

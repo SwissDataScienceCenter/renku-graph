@@ -18,6 +18,7 @@
 
 package io.renku.triplesgenerator.events.consumers.membersync
 
+import Generators._
 import cats.effect.IO
 import cats.syntax.all._
 import io.renku.generators.CommonGraphGenerators.accessTokens
@@ -26,84 +27,104 @@ import io.renku.generators.Generators._
 import io.renku.graph.model.GraphModelGenerators._
 import io.renku.graph.model.projects
 import io.renku.graph.tokenrepository.AccessTokenFinder
-import io.renku.graph.tokenrepository.AccessTokenFinder.Implicits.projectPathToPath
+import io.renku.graph.tokenrepository.AccessTokenFinder.Implicits.projectSlugToPath
 import io.renku.http.client.AccessToken
 import io.renku.interpreters.TestLogger
 import io.renku.interpreters.TestLogger.Level.{Error, Info}
 import io.renku.logging.TestExecutionTimeRecorder
-import io.renku.testtools.IOSpec
-import io.renku.triplesgenerator.events.consumers.membersync.Generators._
-import org.scalamock.scalatest.MockFactory
+import io.renku.testtools.CustomAsyncIOSpec
+import org.scalamock.scalatest.AsyncMockFactory
+import org.scalatest.BeforeAndAfterEach
+import org.scalatest.flatspec.AsyncFlatSpec
 import org.scalatest.matchers.should
-import org.scalatest.wordspec.AnyWordSpec
 
-class MembersSynchronizerSpec extends AnyWordSpec with IOSpec with MockFactory with should.Matchers {
+class MembersSynchronizerSpec
+    extends AsyncFlatSpec
+    with CustomAsyncIOSpec
+    with AsyncMockFactory
+    with should.Matchers
+    with BeforeAndAfterEach {
 
-  "synchronizeMembers" should {
+  it should "pulls members and visibility from GitLab and sync the members in the TS" in {
 
-    "pulls members from GitLab and sync the members in the TS" in new TestCase {
+    val projectSlug = projectSlugs.generateOne
 
-      val membersInGitLab = gitLabProjectMembers.generateSet()
+    val maybeAccessToken = accessTokens.generateOption
+    givenAccessTokenFinding(projectSlug, returning = maybeAccessToken.pure[IO])
 
-      val maybeAccessToken = accessTokens.generateOption
-      (accessTokenFinder
-        .findAccessToken(_: projects.Path)(_: projects.Path => String))
-        .expects(projectPath, projectPathToPath)
-        .returning(maybeAccessToken.pure[IO])
+    val membersInGitLab = gitLabProjectMembers.generateSet()
+    givenProjectMembersFinding(projectSlug, maybeAccessToken, returning = membersInGitLab.pure[IO])
 
-      (gitLabProjectMembersFinder
-        .findProjectMembers(_: projects.Path)(_: Option[AccessToken]))
-        .expects(projectPath, maybeAccessToken)
-        .returning(membersInGitLab.pure[IO])
+    val maybeVisibility = projectVisibilities.generateOption
+    givenProjectVisibilityFinding(projectSlug, maybeAccessToken, returning = maybeVisibility.pure[IO])
 
-      val syncSummary = syncSummaries.generateOne
-      (kgSynchronizer.syncMembers _)
-        .expects(projectPath, membersInGitLab)
-        .returning(syncSummary.pure[IO])
+    val syncSummary = syncSummaries.generateOne
+    givenMemberSynchro(projectSlug, membersInGitLab, maybeVisibility, returning = syncSummary.pure[IO])
 
-      synchronizer.synchronizeMembers(projectPath).unsafeRunSync() shouldBe ()
-
-      logger.loggedOnly(
-        Info(show"$categoryName: $projectPath accepted"),
-        infoMessage(syncSummary)
-      )
-    }
-
-    "recover with log statement if collaborator fails" in new TestCase {
-
-      val maybeAccessToken = accessTokens.generateOption
-      (accessTokenFinder
-        .findAccessToken(_: projects.Path)(_: projects.Path => String))
-        .expects(projectPath, projectPathToPath)
-        .returning(maybeAccessToken.pure[IO])
-
-      val exception = exceptions.generateOne
-      (gitLabProjectMembersFinder
-        .findProjectMembers(_: projects.Path)(_: Option[AccessToken]))
-        .expects(projectPath, maybeAccessToken)
-        .returning(exception.raiseError[IO, Set[GitLabProjectMember]])
-
-      synchronizer.synchronizeMembers(projectPath).unsafeRunSync() shouldBe ()
-
-      logger.logged(Error(s"$categoryName: Members synchronized for project $projectPath failed", exception))
-    }
+    synchronizer.synchronizeMembers(projectSlug).assertNoException >>
+      IO(logger.loggedOnly(Info(show"$categoryName: $projectSlug accepted"), infoMessage(projectSlug, syncSummary)))
   }
 
-  private trait TestCase {
+  it should "recover with log statement if collaborator fails" in {
 
-    val projectPath = projectPaths.generateOne
+    val projectSlug = projectSlugs.generateOne
 
-    implicit val logger:            TestLogger[IO]        = TestLogger[IO]()
-    implicit val accessTokenFinder: AccessTokenFinder[IO] = mock[AccessTokenFinder[IO]]
-    val gitLabProjectMembersFinder = mock[GitLabProjectMembersFinder[IO]]
-    val kgSynchronizer             = mock[KGSynchronizer[IO]]
-    val executionTimeRecorder      = TestExecutionTimeRecorder[IO](maybeHistogram = None)
-    val synchronizer =
-      new MembersSynchronizerImpl[IO](gitLabProjectMembersFinder, kgSynchronizer, executionTimeRecorder)
+    val maybeAccessToken = accessTokens.generateOption
+    givenAccessTokenFinding(projectSlug, returning = maybeAccessToken.pure[IO])
 
-    def infoMessage(syncSummary: SyncSummary) = Info(
-      s"$categoryName: members for project: $projectPath synchronized in ${executionTimeRecorder.elapsedTime}ms: " +
-        s"${syncSummary.membersAdded} member(s) added, ${syncSummary.membersRemoved} member(s) removed"
-    )
+    val exception = exceptions.generateOne
+    givenProjectMembersFinding(projectSlug, maybeAccessToken, returning = exception.raiseError[IO, Nothing])
+
+    synchronizer.synchronizeMembers(projectSlug).assertNoException >>
+      IO(logger.logged(Error(s"$categoryName: Members synchronized for project $projectSlug failed", exception)))
   }
+
+  private implicit lazy val logger:       TestLogger[IO]        = TestLogger[IO]()
+  private implicit val accessTokenFinder: AccessTokenFinder[IO] = mock[AccessTokenFinder[IO]]
+  private val glProjectMembersFinder    = mock[GLProjectMembersFinder[IO]]
+  private val glProjectVisibilityFinder = mock[GLProjectVisibilityFinder[IO]]
+  private val kgSynchronizer            = mock[KGSynchronizer[IO]]
+  private val executionTimeRecorder     = TestExecutionTimeRecorder[IO](maybeHistogram = None)
+  private lazy val synchronizer = new MembersSynchronizerImpl[IO](glProjectMembersFinder,
+                                                                  glProjectVisibilityFinder,
+                                                                  kgSynchronizer,
+                                                                  executionTimeRecorder
+  )
+
+  private def infoMessage(projectSlug: projects.Slug, syncSummary: SyncSummary) = Info(
+    s"$categoryName: members for project: $projectSlug synchronized in ${executionTimeRecorder.elapsedTime}ms: " +
+      s"${syncSummary.membersAdded} member(s) added, ${syncSummary.membersRemoved} member(s) removed"
+  )
+
+  private def givenAccessTokenFinding(projectSlug: projects.Slug, returning: IO[Option[AccessToken]]) =
+    (accessTokenFinder
+      .findAccessToken(_: projects.Slug)(_: projects.Slug => String))
+      .expects(projectSlug, projectSlugToPath)
+      .returning(returning)
+
+  private def givenProjectMembersFinding(projectSlug: projects.Slug,
+                                         mat:         Option[AccessToken],
+                                         returning:   IO[Set[GitLabProjectMember]]
+  ) = (glProjectMembersFinder
+    .findProjectMembers(_: projects.Slug)(_: Option[AccessToken]))
+    .expects(projectSlug, mat)
+    .returning(returning)
+
+  private def givenProjectVisibilityFinding(projectSlug: projects.Slug,
+                                            mat:         Option[AccessToken],
+                                            returning:   IO[Option[projects.Visibility]]
+  ) = (glProjectVisibilityFinder
+    .findVisibility(_: projects.Slug)(_: Option[AccessToken]))
+    .expects(projectSlug, mat)
+    .returning(returning)
+
+  private def givenMemberSynchro(projectSlug:     projects.Slug,
+                                 membersInGL:     Set[GitLabProjectMember],
+                                 maybeVisibility: Option[projects.Visibility],
+                                 returning:       IO[SyncSummary]
+  ) = (kgSynchronizer.syncMembers _)
+    .expects(projectSlug, membersInGL, maybeVisibility)
+    .returning(returning)
+
+  protected override def beforeEach() = logger.reset()
 }

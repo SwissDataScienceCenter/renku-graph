@@ -43,7 +43,7 @@ private class EventHandler[F[_]: MonadCancelThrow: Logger](projectInfoSynchroniz
 
   override def createHandlingDefinition(): EventHandlingDefinition =
     EventHandlingDefinition(
-      decode = _.event.getProject.map(p => ProjectSyncEvent(p.id, p.path)),
+      decode = _.event.getProject.map(p => ProjectSyncEvent(p.id, p.slug)),
       process = ev => Logger[F].info(show"$categoryName: $ev accepted") >> syncProjectInfo(ev),
       onRelease = subscriptionMechanism.renewSubscription()
     )

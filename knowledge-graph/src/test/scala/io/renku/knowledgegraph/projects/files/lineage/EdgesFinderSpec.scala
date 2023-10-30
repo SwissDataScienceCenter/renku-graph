@@ -20,10 +20,11 @@ package io.renku.knowledgegraph.projects.files.lineage
 
 import cats.effect.IO
 import cats.syntax.all._
+import io.renku.entities.searchgraphs.SearchInfoDatasets
 import io.renku.generators.CommonGraphGenerators.authUsers
 import io.renku.generators.Generators.Implicits._
 import io.renku.generators.Generators.fixed
-import io.renku.graph.model.GraphModelGenerators.projectPaths
+import io.renku.graph.model.GraphModelGenerators.projectSlugs
 import io.renku.graph.model.projects.Visibility
 import io.renku.graph.model.testentities.StepPlanCommandParameter.{CommandInput, CommandOutput}
 import io.renku.graph.model.testentities._
@@ -38,14 +39,18 @@ import io.renku.triplesstore.{InMemoryJenaForSpec, ProjectsDataset, SparqlQueryT
 import model._
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
+import org.typelevel.log4cats.Logger
 
 class EdgesFinderSpec
     extends AnyWordSpec
     with should.Matchers
     with InMemoryJenaForSpec
     with ProjectsDataset
+    with SearchInfoDatasets
     with ExternalServiceStubbing
     with IOSpec {
+
+  implicit override val ioLogger: Logger[IO] = TestLogger[IO]()
 
   "findEdges" should {
 
@@ -56,10 +61,10 @@ class EdgesFinderSpec
 
         import exemplarData._
 
-        upload(to = projectsDataset, project)
+        provisionTestProject(project).unsafeRunSync()
 
         edgesFinder
-          .findEdges(project.path, maybeUser = None)
+          .findEdges(project.slug, maybeUser = None)
           .unsafeRunSync() shouldBe Map(
           ExecutionInfo(activity1.asEntityId.show, RunDate(activity1.startTime.value)) -> (
             Set(`zhbikes folder`.toNodeLocation, `clean_data entity`.toNodeLocation),
@@ -114,10 +119,10 @@ class EdgesFinderSpec
         .planOutputParameterOverrides(out1 -> out2)
         .buildProvenanceUnsafe()
 
-      upload(to = projectsDataset, project.addActivities(activity1, activity2))
+      provisionTestProject(project.addActivities(activity1, activity2)).unsafeRunSync()
 
       edgesFinder
-        .findEdges(project.path, maybeUser = None)
+        .findEdges(project.slug, maybeUser = None)
         .unsafeRunSync() shouldBe Map(
         ExecutionInfo(activity1.asEntityId.show, RunDate(activity1.startTime.value)) -> (
           Set(Node.Location(in1.value), Node.Location(in2.value)),
@@ -133,7 +138,7 @@ class EdgesFinderSpec
     "return None if there's no lineage for the project " +
       "case when the user is not authenticated and the project is public" in new TestCase {
         edgesFinder
-          .findEdges(projectPaths.generateOne, maybeUser = None)
+          .findEdges(projectSlugs.generateOne, maybeUser = None)
           .unsafeRunSync() shouldBe empty
       }
 
@@ -142,10 +147,10 @@ class EdgesFinderSpec
         "case when the user is not authenticated" in new TestCase {
           val exemplarData = LineageExemplarData(renkuProjectEntities(fixed(visibility)).generateOne)
 
-          upload(to = projectsDataset, exemplarData.project)
+          provisionTestProject(exemplarData.project).unsafeRunSync()
 
           edgesFinder
-            .findEdges(projectPaths.generateOne, authUsers.generateOption)
+            .findEdges(projectSlugs.generateOne, authUsers.generateOption)
             .unsafeRunSync() shouldBe empty
 
           logger.logged(Warn(s"lineage - edges finished${executionTimeRecorder.executionTimeInfo}"))
@@ -156,10 +161,10 @@ class EdgesFinderSpec
       "case when the user is authenticated but he's not the project member" in new TestCase {
         val exemplarData = LineageExemplarData(renkuProjectEntities(fixed(Visibility.Private)).generateOne)
 
-        upload(to = projectsDataset, exemplarData.project)
+        provisionTestProject(exemplarData.project).unsafeRunSync()
 
         edgesFinder
-          .findEdges(projectPaths.generateOne, authUsers.generateSome)
+          .findEdges(projectSlugs.generateOne, authUsers.generateSome)
           .unsafeRunSync() shouldBe empty
 
         logger.logged(Warn(s"lineage - edges finished${executionTimeRecorder.executionTimeInfo}"))
@@ -172,16 +177,16 @@ class EdgesFinderSpec
 
           val exemplarData = LineageExemplarData(
             renkuProjectEntities(fixed(visibility)).generateOne.copy(
-              members = Set(personEntities.generateOne.copy(maybeGitLabId = Some(authUser.id)))
+              members = Set(memberPersonGitLabIdLens.replace(Some(authUser.id))(projectMemberEntities().generateOne))
             )
           )
 
           import exemplarData._
 
-          upload(to = projectsDataset, project)
+          provisionTestProject(project).unsafeRunSync()
 
           edgesFinder
-            .findEdges(project.path, Some(authUser))
+            .findEdges(project.slug, Some(authUser))
             .unsafeRunSync() shouldBe Map(
             ExecutionInfo(activity1.asEntityId.show, RunDate(activity1.startTime.value)) -> (
               Set(`zhbikes folder`.toNodeLocation, `clean_data entity`.toNodeLocation),
@@ -211,10 +216,10 @@ class EdgesFinderSpec
 
         import exemplarData._
 
-        upload(to = projectsDataset, project)
+        provisionTestProject(project).unsafeRunSync()
 
         edgesFinder
-          .findEdges(project.path, Some(authUser))
+          .findEdges(project.slug, Some(authUser))
           .unsafeRunSync() shouldBe Map(
           ExecutionInfo(activity1.asEntityId.show, RunDate(activity1.startTime.value)) -> (
             Set(`zhbikes folder`.toNodeLocation, `clean_data entity`.toNodeLocation),
@@ -233,6 +238,21 @@ class EdgesFinderSpec
             Set(`grid_plot entity`.toNodeLocation, `cumulative entity`.toNodeLocation)
           )
         )
+      }
+
+    "return no the edges of the internal project " +
+      "case when the user is anonymous" in new TestCase {
+        val authUser = authUsers.generateOne
+
+        val exemplarData = LineageExemplarData(renkuProjectEntities(fixed(Visibility.Internal)).generateOne)
+
+        import exemplarData._
+
+        provisionTestProject(project).unsafeRunSync()
+
+        edgesFinder
+          .findEdges(project.slug, None)
+          .unsafeRunSync() shouldBe Map()
       }
   }
 

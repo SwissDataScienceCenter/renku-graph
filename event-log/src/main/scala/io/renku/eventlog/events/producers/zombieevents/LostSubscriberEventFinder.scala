@@ -21,7 +21,7 @@ package zombieevents
 
 import cats.MonadThrow
 import cats.data.Kleisli
-import cats.effect.MonadCancelThrow
+import cats.effect.Async
 import cats.syntax.all._
 import io.renku.db.{DbClient, SqlStatement}
 import io.renku.eventlog.EventLogDB.SessionResource
@@ -38,7 +38,7 @@ import skunk.implicits._
 
 import java.time.Instant.now
 
-private class LostSubscriberEventFinder[F[_]: MonadCancelThrow: SessionResource: QueriesExecutionTimes]
+private class LostSubscriberEventFinder[F[_]: Async: SessionResource: QueriesExecutionTimes]
     extends DbClient(Some(QueriesExecutionTimes[F]))
     with producers.EventFinder[F, ZombieEvent]
     with ZombieEventSubProcess
@@ -55,7 +55,7 @@ private class LostSubscriberEventFinder[F[_]: MonadCancelThrow: SessionResource:
       .named(s"${categoryName.value.toLowerCase} - lse - find events")
       .select[Void, ZombieEvent](
         sql"""
-        SELECT DISTINCT evt.event_id, evt.project_id, proj.project_path, evt.status
+        SELECT DISTINCT evt.event_id, evt.project_id, proj.project_slug, evt.status
         FROM event_delivery delivery
         JOIN event evt ON evt.event_id = delivery.event_id
           AND evt.project_id = delivery.project_id
@@ -69,9 +69,9 @@ private class LostSubscriberEventFinder[F[_]: MonadCancelThrow: SessionResource:
         )
         LIMIT 1
         """
-          .query(eventIdDecoder ~ projectIdDecoder ~ projectPathDecoder ~ processingStatusDecoder)
-          .map { case eventId ~ projectId ~ projectPath ~ status =>
-            ZombieEvent(processName, CompoundEventId(eventId, projectId), projectPath, status)
+          .query(eventIdDecoder ~ projectIdDecoder ~ projectSlugDecoder ~ processingStatusDecoder)
+          .map { case eventId ~ projectId ~ projectSlug ~ status =>
+            ZombieEvent(processName, CompoundEventId(eventId, projectId), projectSlug, status)
           }
       )
       .arguments(Void)
@@ -110,6 +110,6 @@ private class LostSubscriberEventFinder[F[_]: MonadCancelThrow: SessionResource:
 }
 
 private object LostSubscriberEventFinder {
-  def apply[F[_]: MonadCancelThrow: SessionResource: QueriesExecutionTimes]: F[producers.EventFinder[F, ZombieEvent]] =
+  def apply[F[_]: Async: SessionResource: QueriesExecutionTimes]: F[producers.EventFinder[F, ZombieEvent]] =
     MonadThrow[F].catchNonFatal(new LostSubscriberEventFinder[F])
 }

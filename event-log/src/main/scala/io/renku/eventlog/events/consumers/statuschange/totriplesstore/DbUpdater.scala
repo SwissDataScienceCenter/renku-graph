@@ -25,6 +25,7 @@ import cats.syntax.all._
 import eu.timepit.refined.auto._
 import io.renku.db.implicits._
 import io.renku.db.{DbClient, SqlStatement}
+import io.renku.eventlog.EventLogDB.SessionResource
 import io.renku.eventlog.TypeSerializers._
 import io.renku.eventlog.api.events.StatusChangeEvent.ToTriplesStore
 import io.renku.eventlog.events.consumers.statuschange
@@ -49,14 +50,17 @@ private[statuschange] class DbUpdater[F[_]: Async: QueriesExecutionTimes](
 
   import deliveryInfoRemover._
 
-  override def onRollback(event: ToTriplesStore): RollbackOp[F] = { _ =>
-    deleteDelivery(event.eventId).as(DBUpdateResults.ForProjects.empty)
+  override def onRollback(event: ToTriplesStore)(implicit sr: SessionResource[F]): RollbackOp[F] = {
+    case DeadlockDetected(_) =>
+      sr.useK(updateDB(event).map(_.widen)).handleErrorWith(onRollback(event))
+    case ex =>
+      sr.useK(deleteDelivery(event.eventId)) >> ex.raiseError[F, DBUpdateResults]
   }
 
   override def updateDB(event: ToTriplesStore): UpdateOp[F] = for {
     _                      <- deleteDelivery(event.eventId)
     updateResults          <- updateEvent(event)
-    ancestorsUpdateResults <- updateAncestors(event, updateResults) recoverWith retryOnDeadlock(event, updateResults)
+    ancestorsUpdateResults <- updateAncestors(event, updateResults)
   } yield updateResults combine ancestorsUpdateResults
 
   private def updateEvent(event: ToTriplesStore) = for {
@@ -80,7 +84,7 @@ private[statuschange] class DbUpdater[F[_]: Async: QueriesExecutionTimes](
       .flatMapResult {
         case Completion.Update(1) =>
           DBUpdateResults
-            .ForProjects(event.project.path, Map(TransformingTriples -> -1, TriplesStore -> 1))
+            .ForProjects(event.project.slug, Map(TransformingTriples -> -1, TriplesStore -> 1))
             .pure[F]
         case Completion.Update(0) => Monoid[DBUpdateResults.ForProjects].empty.pure[F]
         case completion =>
@@ -155,17 +159,10 @@ private[statuschange] class DbUpdater[F[_]: Async: QueriesExecutionTimes](
             .mapResult { oldStatuses =>
               val decrementedStatuses = oldStatuses.groupBy(identity).view.mapValues(-_.size).toMap
               val incrementedStatuses = TriplesStore -> oldStatuses.size
-              DBUpdateResults.ForProjects(event.project.path, decrementedStatuses + incrementedStatuses)
+              DBUpdateResults.ForProjects(event.project.slug, decrementedStatuses + incrementedStatuses)
             }
         }
     }
-
-  private def retryOnDeadlock(
-      event:         ToTriplesStore,
-      updateResults: DBUpdateResults.ForProjects
-  ): PartialFunction[Throwable, Kleisli[F, Session[F], DBUpdateResults.ForProjects]] = { case DeadlockDetected(_) =>
-    updateAncestors(event, updateResults)
-  }
 
   private def `status IN`(statuses: Set[EventStatus]) =
     s"status IN (${statuses.map(s => s"'$s'").toList.mkString(",")})"

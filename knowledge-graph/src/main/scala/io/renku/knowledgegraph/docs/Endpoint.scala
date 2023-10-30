@@ -41,6 +41,7 @@ object Endpoint {
                        datasets.details.EndpointDocs[F],
                        entities.EndpointDocs[F],
                        ontology.EndpointDocs[F],
+                       projects.create.EndpointDocs.pure[F].widen[docs.EndpointDocs],
                        projects.delete.EndpointDocs.pure[F].widen[docs.EndpointDocs],
                        projects.details.EndpointDocs[F],
                        projects.update.EndpointDocs.pure[F].widen[docs.EndpointDocs],
@@ -49,6 +50,7 @@ object Endpoint {
                        projects.datasets.tags.EndpointDocs[F],
                        users.projects.EndpointDocs[F],
                        entities.currentuser.recentlyviewed.EndpointDocs[F],
+                       version.EndpointDocs.pure[F].widen[docs.EndpointDocs],
                        EndpointDocs[F]
                      ).sequence
   } yield new EndpointImpl[F](serviceVersion, endpointsDocs)

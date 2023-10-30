@@ -20,14 +20,13 @@ package io.renku.knowledgegraph.projects.delete
 
 import cats.effect.{Async, Spawn, Temporal}
 import cats.syntax.all._
+import eu.timepit.refined.auto._
+import io.renku.data.Message
 import io.renku.eventlog.api.events.CommitSyncRequest
 import io.renku.events.consumers.Project
 import io.renku.graph.model.projects
-import io.renku.http.ErrorMessage._
-import io.renku.http.InfoMessage._
 import io.renku.http.client.{AccessToken, GitLabClient}
 import io.renku.http.server.security.model.AuthUser
-import io.renku.http.{ErrorMessage, InfoMessage}
 import io.renku.metrics.MetricsRegistry
 import io.renku.triplesgenerator.api.events.CleanUpEvent
 import io.renku.{eventlog, triplesgenerator}
@@ -38,7 +37,7 @@ import org.typelevel.log4cats.Logger
 import scala.concurrent.duration._
 
 trait Endpoint[F[_]] {
-  def `DELETE /projects/:path`(path: projects.Path, authUser: AuthUser): F[Response[F]]
+  def `DELETE /projects/:slug`(slug: projects.Slug, authUser: AuthUser): F[Response[F]]
 }
 
 object Endpoint {
@@ -59,36 +58,37 @@ private class EndpointImpl[F[_]: Async: Logger](glProjectFinder: GLProjectFinder
 
   import projectRemover.deleteProject
 
-  override def `DELETE /projects/:path`(path: projects.Path, authUser: AuthUser): F[Response[F]] = {
+  override def `DELETE /projects/:slug`(slug: projects.Slug, authUser: AuthUser): F[Response[F]] = {
     implicit val at: AccessToken = authUser.accessToken
 
-    findProject(path) >>= {
+    findProject(slug) >>= {
       case None =>
-        NotFound(InfoMessage("Project does not exist"))
+        NotFound(Message.Info("Project does not exist"))
       case Some(project) =>
         deleteProject(project.id) >>
-          Spawn[F].start(waitForDeletion(project.path) >> sendEvents(project)) >>
-          Accepted(InfoMessage("Project deleted"))
+          Spawn[F].start(waitForDeletion(project.slug) >> sendEvents(project)) >>
+          Logger[F].info(show"Project $slug deleted") >>
+          Accepted(Message.Info("Project deleted"))
     }
-  }.handleErrorWith(httpResult(path))
+  }.handleErrorWith(httpResult(slug))
 
-  private def waitForDeletion(path: projects.Path)(implicit ac: AccessToken): F[Unit] =
-    glProjectFinder.findProject(path) >>= {
+  private def waitForDeletion(slug: projects.Slug)(implicit ac: AccessToken): F[Unit] =
+    glProjectFinder.findProject(slug) >>= {
       case None    => ().pure[F]
-      case Some(_) => Temporal[F].delayBy(waitForDeletion(path), waitBeforeNextCheck)
+      case Some(_) => Temporal[F].delayBy(waitForDeletion(slug), waitBeforeNextCheck)
     }
 
-  private def findProject(path: projects.Path)(implicit ac: AccessToken): F[Option[Project]] =
-    glProjectFinder.findProject(path) >>= {
-      case None        => elProjectFinder.findProject(path)
+  private def findProject(slug: projects.Slug)(implicit ac: AccessToken): F[Option[Project]] =
+    glProjectFinder.findProject(slug) >>= {
+      case None        => elProjectFinder.findProject(slug)
       case someProject => someProject.pure[F]
     }
 
   private def sendEvents(project: Project): F[Unit] =
     elClient.send(CommitSyncRequest(project)) >> tgClient.send(CleanUpEvent(project))
 
-  private def httpResult(path: projects.Path): Throwable => F[Response[F]] = { exception =>
-    Logger[F].error(exception)(show"Deleting '$path' project failed") >>
-      InternalServerError(ErrorMessage(s"Project deletion failure: ${exception.getMessage}"))
+  private def httpResult(slug: projects.Slug): Throwable => F[Response[F]] = { exception =>
+    Logger[F].error(exception)(show"Deleting '$slug' project failed") >>
+      InternalServerError(Message.Error.unsafeApply(s"Project deletion failure: ${exception.getMessage}"))
   }
 }

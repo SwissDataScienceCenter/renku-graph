@@ -58,14 +58,14 @@ private class MigrationNeedCheckerImpl[F[_]: MonadThrow](tsClient: TSClient[F]) 
              |  }
              |  {
              |    GRAPH ${GraphClass.Projects.id} {
-             |      ?id renku:projectPath ?path
+             |      ?id renku:projectPath ?slug
              |      FILTER NOT EXISTS {
              |        ?id schema:dateModified ?dm
              |      }
              |    }
              |  } UNION {
              |    GRAPH ?id {
-             |      ?id renku:projectPath ?path
+             |      ?id renku:projectPath ?slug
              |      FILTER NOT EXISTS {
              |        ?id schema:dateModified ?dm
              |      }

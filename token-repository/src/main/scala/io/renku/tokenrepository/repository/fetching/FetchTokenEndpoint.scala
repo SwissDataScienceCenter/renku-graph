@@ -20,14 +20,12 @@ package io.renku.tokenrepository.repository.fetching
 
 import cats.MonadThrow
 import cats.data.OptionT
-import cats.effect.MonadCancelThrow
+import cats.effect.Async
 import cats.syntax.all._
 import io.circe.syntax._
+import io.renku.data.Message
 import io.renku.graph.model.projects
-import io.renku.http.ErrorMessage._
-import io.renku.http.InfoMessage._
 import io.renku.http.client.AccessToken
-import io.renku.http.{ErrorMessage, InfoMessage}
 import io.renku.tokenrepository.repository.ProjectsTokensDB.SessionResource
 import io.renku.tokenrepository.repository.metrics.QueriesExecutionTimes
 import org.http4s.Response
@@ -43,7 +41,7 @@ trait FetchTokenEndpoint[F[_]] {
   )(implicit findToken: ID => OptionT[F, AccessToken]): F[Response[F]]
 
   implicit val findById:   projects.GitLabId => OptionT[F, AccessToken]
-  implicit val findByPath: projects.Path => OptionT[F, AccessToken]
+  implicit val findBySlug: projects.Slug => OptionT[F, AccessToken]
 }
 
 class FetchTokenEndpointImpl[F[_]: MonadThrow: Logger](tokenFinder: TokenFinder[F])
@@ -61,21 +59,21 @@ class FetchTokenEndpointImpl[F[_]: MonadThrow: Logger](tokenFinder: TokenFinder[
       projectIdentifier: ID
   ): Option[AccessToken] => F[Response[F]] = {
     case Some(token) => Ok(token.asJson)
-    case None        => NotFound(InfoMessage(s"Token for project: $projectIdentifier not found"))
+    case None        => NotFound(Message.Info.unsafeApply(s"Token for project: $projectIdentifier not found"))
   }
 
   private def httpResult[ID](
       projectIdentifier: ID
   ): PartialFunction[Throwable, F[Response[F]]] = { case NonFatal(exception) =>
-    val errorMessage = ErrorMessage(s"Finding token for project: $projectIdentifier failed")
+    val errorMessage = Message.Error.unsafeApply(s"Finding token for project: $projectIdentifier failed")
     Logger[F].error(exception)(errorMessage.show) *> InternalServerError(errorMessage)
   }
 
   implicit val findById:   projects.GitLabId => OptionT[F, AccessToken] = tokenFinder.findToken
-  implicit val findByPath: projects.Path => OptionT[F, AccessToken]     = tokenFinder.findToken
+  implicit val findBySlug: projects.Slug => OptionT[F, AccessToken]     = tokenFinder.findToken
 }
 
 object FetchTokenEndpoint {
-  def apply[F[_]: MonadCancelThrow: Logger: SessionResource: QueriesExecutionTimes]: F[FetchTokenEndpoint[F]] =
+  def apply[F[_]: Async: Logger: SessionResource: QueriesExecutionTimes]: F[FetchTokenEndpoint[F]] =
     TokenFinder[F].map(new FetchTokenEndpointImpl[F](_))
 }

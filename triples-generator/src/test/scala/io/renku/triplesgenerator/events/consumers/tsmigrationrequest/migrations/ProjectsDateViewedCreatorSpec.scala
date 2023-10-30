@@ -35,7 +35,7 @@ import io.renku.logging.TestSparqlQueryTimeRecorder
 import io.renku.testtools.IOSpec
 import io.renku.triplesgenerator
 import io.renku.triplesgenerator.api.events.ProjectViewedEvent
-import io.renku.triplesgenerator.generators.ErrorGenerators.processingRecoverableErrors
+import io.renku.triplesgenerator.errors.ErrorGenerators.processingRecoverableErrors
 import io.renku.triplesstore._
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.EitherValues
@@ -68,7 +68,7 @@ class ProjectsDateViewedCreatorSpec
         }
 
         val events = projects.zip(eventDates) map { case (project, eventDate) =>
-          ProjectViewedEvent(project.path, DateViewed(eventDate.value), maybeUserId = None)
+          ProjectViewedEvent(project.slug, DateViewed(eventDate.value), maybeUserId = None)
         }
 
         events foreach (givenProjectViewedEventSent(_, returning = ().pure[IO]))
@@ -86,7 +86,7 @@ class ProjectsDateViewedCreatorSpec
         projects foreach (givenSuccessfulFindingLatestEventInfo(_, returning = Option.empty[EventDate]))
 
         val events = projects map { project =>
-          ProjectViewedEvent(project.path, DateViewed(project.dateCreated.value), maybeUserId = None)
+          ProjectViewedEvent(project.slug, DateViewed(project.dateCreated.value), maybeUserId = None)
         }
 
         events foreach (givenProjectViewedEventSent(_, returning = ().pure[IO]))
@@ -136,7 +136,7 @@ class ProjectsDateViewedCreatorSpec
       (elClient.getEvents _)
         .expects(
           EventLogClient.SearchCriteria
-            .forProject(project.path)
+            .forProject(project.slug)
             .sortBy(EventLogClient.SearchCriteria.Sort.EventDateDesc)
             .withPerPage(PerPage(1))
         )

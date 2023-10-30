@@ -27,7 +27,7 @@ import io.renku.graph.model.events.EventStatus._
 import io.renku.graph.model.projects
 import io.renku.metrics._
 
-trait UnderDeletionGauge[F[_]] extends LabeledGauge[F, projects.Path]
+trait UnderDeletionGauge[F[_]] extends LabeledGauge[F, projects.Slug]
 
 object UnderDeletionGauge {
 
@@ -36,7 +36,7 @@ object UnderDeletionGauge {
   def apply[F[_]: Async: MetricsRegistry](statsFinder: StatsFinder[F]): F[UnderDeletionGauge[F]] =
     MetricsRegistry[F]
       .register {
-        new PositiveValuesLabeledGauge[F, projects.Path](
+        new PositiveValuesLabeledGauge[F, projects.Slug](
           name = "events_deleting_count",
           help = "Number of Events being cleaned up",
           labelName = "project",

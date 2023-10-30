@@ -37,20 +37,26 @@ trait Authorizer[F[_], Key] {
 
 object Authorizer {
   final case class SecurityRecord(visibility:     Visibility,
-                                  projectPath:    projects.Path,
+                                  projectSlug:    projects.Slug,
                                   allowedPersons: Set[persons.GitLabId]
   )
-  trait SecurityRecordFinder[F[_], Key] extends ((Key, Option[AuthUser]) => F[List[SecurityRecord]])
+  trait SecurityRecordFinder[F[_], Key] extends ((Key, Option[AuthUser]) => F[List[SecurityRecord]]) {
+    def asAuthorizer(implicit F: MonadThrow[F]): Authorizer[F, Key] =
+      Authorizer.of(this)
+  }
 
-  final case class AuthContext[Key](maybeAuthUser: Option[AuthUser], key: Key, allowedProjects: Set[projects.Path]) {
-    def addAllowedProject(path: projects.Path): AuthContext[Key] = copy(allowedProjects = allowedProjects + path)
+  final case class AuthContext[Key](maybeAuthUser: Option[AuthUser], key: Key, allowedProjects: Set[projects.Slug]) {
+    def addAllowedProject(slug: projects.Slug): AuthContext[Key] = copy(allowedProjects = allowedProjects + slug)
     def replaceKey[K](key:      K):             AuthContext[K]   = AuthContext(maybeAuthUser, key, allowedProjects)
   }
 
   object AuthContext {
-    def forUnknownUser[Key](key: Key, allowedProjects: Set[projects.Path]): AuthContext[Key] =
+    def forUnknownUser[Key](key: Key, allowedProjects: Set[projects.Slug]): AuthContext[Key] =
       AuthContext(None, key, allowedProjects)
   }
+
+  def of[F[_]: MonadThrow, K](securityRecordFinder: SecurityRecordFinder[F, K]): Authorizer[F, K] =
+    new AuthorizerImpl[F, K](securityRecordFinder)
 
   def using[F[_]: Async: Logger, Key](
       securityRecordsFinderFactory: F[SecurityRecordFinder[F, Key]]
@@ -76,13 +82,13 @@ private class AuthorizerImpl[F[_]: MonadThrow, Key](securityRecordsFinder: Secur
     }
   }
 
-  private def findAllowedProjects(authContext: AuthContext[Key]): List[SecurityRecord] => Set[projects.Path] =
-    _.foldLeft(Set.empty[projects.Path]) {
-      case (allowed, SecurityRecord(Public, path, _))                                          => allowed + path
-      case (allowed, SecurityRecord(Internal, path, _)) if authContext.maybeAuthUser.isDefined => allowed + path
-      case (allowed, SecurityRecord(Private, path, members))
+  private def findAllowedProjects(authContext: AuthContext[Key]): List[SecurityRecord] => Set[projects.Slug] =
+    _.foldLeft(Set.empty[projects.Slug]) {
+      case (allowed, SecurityRecord(Public, slug, _))                                          => allowed + slug
+      case (allowed, SecurityRecord(Internal, slug, _)) if authContext.maybeAuthUser.isDefined => allowed + slug
+      case (allowed, SecurityRecord(Private, slug, members))
           if (members intersect authContext.maybeAuthUser.map(_.id).toSet).nonEmpty =>
-        allowed + path
+        allowed + slug
       case (allowed, _) => allowed
     }
 }

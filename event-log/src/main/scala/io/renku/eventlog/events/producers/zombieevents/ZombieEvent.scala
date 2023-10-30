@@ -30,16 +30,16 @@ private object ZombieEventProcess extends TinyTypeFactory[ZombieEventProcess](ne
 
 private case class ZombieEvent(generatedBy: ZombieEventProcess,
                                eventId:     CompoundEventId,
-                               projectPath: projects.Path,
+                               projectSlug: projects.Slug,
                                status:      ProcessingStatus
 ) {
   override lazy val toString: String =
-    s"$ZombieEvent $generatedBy $eventId, projectPath = $projectPath, status = $status"
+    s"$ZombieEvent $generatedBy $eventId, projectSlug = $projectSlug, status = $status"
 }
 
 private object ZombieEvent {
   implicit lazy val show: Show[ZombieEvent] = Show.show(event =>
-    show"${event.generatedBy} ${event.eventId}, projectPath = ${event.projectPath}, status = ${event.status}"
+    show"${event.generatedBy} ${event.eventId}, projectSlug = ${event.projectSlug}, status = ${event.status}"
   )
 }
 
@@ -49,12 +49,12 @@ private object ZombieEventEncoder {
   import io.circe.literal.JsonStringContext
 
   def encodeEvent(event: ZombieEvent): Json = json"""{
-    "categoryName": ${categoryName.value},
-    "id":           ${event.eventId.id.value},
+    "categoryName": $categoryName,
+    "id":           ${event.eventId.id},
     "project": {
-      "id":         ${event.eventId.projectId.value},
-      "path":       ${event.projectPath.value}
+      "id":   ${event.eventId.projectId},
+      "slug": ${event.projectSlug}
     },
-    "status":       ${event.status.value}
+    "status": ${event.status}
   }"""
 }

@@ -20,18 +20,19 @@ package io.renku.triplesgenerator.events.consumers
 package tsmigrationrequest
 
 import TSStateChecker.TSState
+import TSStateChecker.TSState.ReProvisioning
 import cats.data.EitherT.{leftT, liftF, rightT}
 import cats.effect.{IO, Ref}
 import cats.syntax.all._
 import io.circe.literal._
-import io.renku.data.ErrorMessage
-import io.renku.events.{CategoryName, EventRequestContent}
-import io.renku.events.consumers.ProcessExecutor
-import io.renku.events.consumers.subscriptions.SubscriptionMechanism
+import io.renku.data.Message
 import io.renku.events.Generators.{eventRequestContents, subscriberUrls}
 import io.renku.events.consumers.EventSchedulingResult.{SchedulingError, ServiceUnavailable}
+import io.renku.events.consumers.ProcessExecutor
+import io.renku.events.consumers.subscriptions.SubscriptionMechanism
 import io.renku.events.producers.EventSender
 import io.renku.events.producers.EventSender.EventContext
+import io.renku.events.{CategoryName, EventRequestContent}
 import io.renku.generators.CommonGraphGenerators.{microserviceIdentifiers, serviceVersions}
 import io.renku.generators.Generators.Implicits._
 import io.renku.generators.Generators.exceptions
@@ -39,14 +40,13 @@ import io.renku.interpreters.TestLogger
 import io.renku.interpreters.TestLogger.Level.Info
 import io.renku.json.JsonOps._
 import io.renku.testtools.IOSpec
-import TSStateChecker.TSState.ReProvisioning
-import io.renku.triplesgenerator.generators.ErrorGenerators.processingRecoverableErrors
+import io.renku.triplesgenerator.errors.ErrorGenerators.processingRecoverableErrors
 import org.scalacheck.Gen
 import org.scalamock.matchers.ArgCapture.CaptureOne
 import org.scalamock.scalatest.MockFactory
+import org.scalatest.EitherValues
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
-import org.scalatest.EitherValues
 
 class EventHandlerSpec extends AnyWordSpec with IOSpec with MockFactory with should.Matchers with EitherValues {
 
@@ -94,7 +94,7 @@ class EventHandlerSpec extends AnyWordSpec with IOSpec with MockFactory with sho
         .expects(
           statusChangePayload(
             status = "RECOVERABLE_FAILURE",
-            ErrorMessage.withMessageAndStackTrace(recoverableFailure.message, recoverableFailure.cause).show.some
+            Message.Error.fromMessageAndStackTraceUnsafe(recoverableFailure.message, recoverableFailure.cause).show.some
           ),
           expectedEventContext
         )
@@ -121,7 +121,7 @@ class EventHandlerSpec extends AnyWordSpec with IOSpec with MockFactory with sho
       val eventCursor = payloadCaptor.value.event.hcursor
       eventCursor.downField("newStatus").as[String] shouldBe "NON_RECOVERABLE_FAILURE".asRight
       eventCursor.downField("message").as[String].fold(throw _, identity) should
-        include(ErrorMessage.withStackTrace(exception).show)
+        include(Message.Error.fromStackTrace(exception).show)
     }
   }
 

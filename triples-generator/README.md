@@ -4,12 +4,14 @@ This microservice deals with all Triples Store administrative and provisioning e
 
 ## API
 
-| Method | Path             | Description                        |
-|--------|------------------|------------------------------------|
-| POST   | ```/events```    | To send an event for processing    |
-| GET    | ```/metrics```   | Serves Prometheus metrics          |
-| GET    | ```/ping```      | To check if service is healthy     |
-| GET    | ```/version```   | Returns info about service version |
+| Method | Path                  | Description                          |
+|--------|-----------------------|--------------------------------------|
+| POST   | ```/events```         | To send an event for processing      |
+| GET    | ```/metrics```        | Serves Prometheus metrics            |
+| GET    | ```/ping```           | To check if service is healthy       |
+| POST   | ```/projects```       | API to create a project in the TS    |
+| PATCH  | ```/projects/:slug``` | API to update project data in the TS |
+| GET    | ```/version```        | Returns info about service version   |
 
 #### POST /events
 
@@ -48,8 +50,8 @@ Accepts an event as multipart requests.
     "f307326be71b17b90db5caaf47bcd44710fe119f"
   ],
   "project": {
-    "id": 123,
-    "path": "namespace/project-name"
+    "id":   123,
+    "slug": "namespace/project-name"
   }
 }
 ```
@@ -65,8 +67,8 @@ Accepts an event as multipart requests.
   "categoryName": "TRIPLES_GENERATED",
   "id": "df654c3b1bd105a29d658f78f6380a842feac879",
   "project": {
-    "id": 12,
-    "path": "project/path"
+    "id":   12,
+    "slug": "project/path"
   }
 }
 ```
@@ -87,8 +89,8 @@ Upon arrival, triples-generator will
 {
   "categoryName": "ADD_MIN_PROJECT_INFO",
   "project": {
-    "id": 12,
-    "path": "project/path"
+    "id":   12,
+    "slug": "project/path"
   }
 }
 ```
@@ -109,7 +111,7 @@ Upon arrival, triples-generator will
 {
   "categoryName": "SYNC_REPO_METADATA",
   "project": {
-    "path": "project/path"
+    "slug": "project/path"
   }
 }
 ```
@@ -124,7 +126,7 @@ Upon arrival, triples-generator will
 {
   "categoryName": "MEMBER_SYNC",
   "project": {
-    "path": "namespace/project-name"
+    "slug": "namespace/project-name"
   }
 }
 ```
@@ -139,8 +141,8 @@ Upon arrival, triples-generator will
 {
   "categoryName": "CLEAN_UP",
   "project": {
-    "id": 12,
-    "path": "project/path"
+    "id":   12,
+    "slug": "project/path"
   }
 }
 ```
@@ -175,7 +177,7 @@ Once an event of the type is sent, triples-generator inserts project viewing inf
 {
   "categoryName": "PROJECT_ACTIVATED",
   "project": {
-    "path": "project/path"
+    "slug": "project/path"
   },
   "date": "2001-09-04T10:48:29.457Z"
 }
@@ -185,7 +187,7 @@ Once an event of the type is sent, triples-generator inserts project viewing inf
 
 Once an event of the type is sent, triples-generator upserts project viewing info in the TS with the data from the payload.
 The upsert happens only if the date from the event is newer than the date from the TS.
-In case there's no project with the given path in the TS, the event is discarded.
+In case there's no project with the given slug in the TS, the event is discarded.
 
 **Multipart Request**
 
@@ -195,7 +197,7 @@ In case there's no project with the given path in the TS, the event is discarded
 {
   "categoryName": "PROJECT_VIEWED",
   "project": {
-    "path": "project/path"
+    "slug": "project/path"
   },
   "date": "2001-09-04T10:48:29.457Z",
   "user": {
@@ -242,7 +244,7 @@ Once an event of the type is sent, triples-generator removes project viewing inf
 {
   "categoryName": "PROJECT_VIEWING_DELETION",
   "project": {
-    "path": "project/path"
+    "slug": "project/path"
   }
 }
 ```
@@ -277,6 +279,96 @@ Verifies service health.
 |----------------------------|-------------------------|
 | OK (200)                   | If service is healthy   |
 | INTERNAL SERVER ERROR (500)| Otherwise               |
+
+#### POST /knowledge-graph/projects
+
+API to create a project in the Triples Store.
+
+All of the properties except from `description` and `image` are mandatory.
+Notes:
+* images - an array of either relative or absolute links to the images 
+* visibility - possible values are: `public`, `internal`, `private`
+
+**Request**
+
+```json
+{
+  "name":        "yTAapRBG",
+  "slug":        "kukQDx2-52i/_D107Ch2IAD",
+  "description": "project description",
+  "dateCreated": "2004-09-08T07:53:49.451Z",
+  "keywords":    ["EEgWHeURD", "IJDvEo", "IluFdENW"],
+  "visibility":  "internal",
+  "images":      ["https://KUvxaz:9228/UnHoVd/uTSx"],
+  "creator": {
+    "name": "_JMILU`v cRYpkiJ",
+    "id":   61181175
+  }
+}
+```
+
+        
+**Response**
+
+| Status                      | Description                          |
+|-----------------------------|--------------------------------------|
+| CREATED (201)               | When project is created successfully |
+| BAD_REQUEST (400)           | When the given payload is malformed  |
+| INTERNAL SERVER ERROR (500) | In case of failures                  |
+
+#### PATCH /knowledge-graph/projects/:slug
+
+API to update project data in the Triples Store.
+
+Each of the properties can be either set to a new value or omitted in case there's no new value.
+
+The properties that can be updated are:
+* description - possible values are: 
+  * `null` for removing the current description
+  * any non-blank String value 
+* images - an array of either relative or absolute links to the images; an empty array removes all the images 
+* keywords - an array of String values; an empty array removes all the keywords
+* visibility - possible values are: `public`, `internal`, `private`
+
+In case no properties are set, no data will be changed in the TS. 
+
+**Request**
+
+* case when there are updates for all properties
+
+```json
+{
+  "description": "a new project description",
+  "images":      ["image.png", "http://image.com/image.png"],
+  "keywords":    ["some keyword"],
+  "visibility":  "public|internal|private"
+}
+```
+
+* case when there's an update only for the `description` that removes it
+
+```json
+{
+  "description": null
+}
+```
+
+* case with the `description` set to a blank String means the same as `"description": null`
+
+```json
+{
+  "description": ""
+}
+```
+
+**Response**
+
+| Status                      | Description                           |
+|-----------------------------|---------------------------------------|
+| OK (200)                    | When project is updated successfully  |
+| BAD_REQUEST (400)           | When the given payload is malformed   |
+| NOT_FOUND (404)             | When project does not exist in the TS |
+| INTERNAL SERVER ERROR (500) | In case of failures                   |
 
 #### GET /version
 

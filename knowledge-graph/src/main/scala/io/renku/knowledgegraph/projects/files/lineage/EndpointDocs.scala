@@ -19,8 +19,8 @@
 package io.renku.knowledgegraph.projects.files.lineage
 
 import cats.syntax.all._
-import io.renku.http.InfoMessage
-import io.renku.http.InfoMessage._
+import eu.timepit.refined.auto._
+import io.renku.data.Message
 import io.renku.knowledgegraph.docs
 import io.renku.knowledgegraph.docs.model.Operation.GET
 import io.renku.knowledgegraph.docs.model._
@@ -38,18 +38,18 @@ object EndpointDocs extends docs.EndpointDocs {
       Status.Ok -> Response("Lineage found", Contents(MediaType.`application/json`("Sample Lineage", example))),
       Status.Unauthorized -> Response(
         "Unauthorized",
-        Contents(MediaType.`application/json`("Invalid token", InfoMessage("Unauthorized")))
+        Contents(MediaType.`application/json`("Invalid token", Message.Info("Unauthorized")))
       ),
       Status.NotFound -> Response(
         "Lineage not found",
         Contents(
           MediaType.`application/json`("Reason",
-                                       InfoMessage("No lineage for project: namespace/project file: some/file")
+                                       Message.Info("No lineage for project: namespace/project file: some/file")
           )
         )
       ),
       Status.InternalServerError -> Response("Error",
-                                             Contents(MediaType.`application/json`("Reason", InfoMessage("Message")))
+                                             Contents(MediaType.`application/json`("Reason", Message.Info("Message")))
       )
     )
   )

@@ -24,13 +24,12 @@ import cats.syntax.all._
 import io.circe.{Decoder, DecodingFailure}
 import io.renku.config.renku
 import io.renku.config.renku.ResourceUrl
+import io.renku.data.Message
 import io.renku.generators.CommonGraphGenerators.{authUsers, pagingRequests, pagingResponses}
 import io.renku.generators.Generators.Implicits._
 import io.renku.generators.Generators._
-import io.renku.graph.model.GraphModelGenerators.{datasetNames, projectPaths, renkuUrls}
+import io.renku.graph.model.GraphModelGenerators.{datasetNames, projectSlugs, renkuUrls}
 import io.renku.graph.model.publicationEvents
-import io.renku.http.ErrorMessage
-import io.renku.http.ErrorMessage._
 import io.renku.http.rest.paging.{PagingHeaders, PagingRequest, PagingResponse}
 import io.renku.http.server.EndpointTester._
 import io.renku.interpreters.TestLogger
@@ -49,13 +48,13 @@ import org.scalatestplus.scalacheck.ScalaCheckPropertyChecks
 
 class EndpointSpec extends AnyWordSpec with should.Matchers with MockFactory with ScalaCheckPropertyChecks with IOSpec {
 
-  "GET /projects/:path/datasets/:name/tags" should {
+  "GET /projects/:slug/datasets/:name/tags" should {
 
     "respond with OK and the found tags" in new TestCase {
       forAll(pagingResponses(modelTags)) { results =>
         (finder.findTags _).expects(criteria).returning(results.pure[IO])
 
-        val response = endpoint.`GET /projects/:path/datasets/:name/tags`(criteria).unsafeRunSync()
+        val response = endpoint.`GET /projects/:slug/datasets/:name/tags`(criteria).unsafeRunSync()
 
         response.status        shouldBe Ok
         response.contentType   shouldBe Some(`Content-Type`(application.json))
@@ -70,7 +69,7 @@ class EndpointSpec extends AnyWordSpec with should.Matchers with MockFactory wit
       val results = PagingResponse.empty[model.Tag](pagingRequests.generateOne)
       (finder.findTags _).expects(criteria).returning(results.pure[IO])
 
-      val response = endpoint.`GET /projects/:path/datasets/:name/tags`(criteria).unsafeRunSync()
+      val response = endpoint.`GET /projects/:slug/datasets/:name/tags`(criteria).unsafeRunSync()
 
       response.status        shouldBe Ok
       response.contentType   shouldBe Some(`Content-Type`(application.json))
@@ -84,13 +83,13 @@ class EndpointSpec extends AnyWordSpec with should.Matchers with MockFactory wit
       val exception = exceptions.generateOne
       (finder.findTags _).expects(criteria).returning(exception.raiseError[IO, PagingResponse[model.Tag]])
 
-      val response = endpoint.`GET /projects/:path/datasets/:name/tags`(criteria).unsafeRunSync()
+      val response = endpoint.`GET /projects/:slug/datasets/:name/tags`(criteria).unsafeRunSync()
 
       response.status      shouldBe InternalServerError
       response.contentType shouldBe Some(`Content-Type`(application.json))
 
       val errorMessage = "Project Dataset Tags search failed"
-      response.as[ErrorMessage].unsafeRunSync() shouldBe ErrorMessage(errorMessage)
+      response.as[Message].unsafeRunSync() shouldBe Message.Error.unsafeApply(errorMessage)
 
       logger.loggedOnly(Error(errorMessage, exception))
     }
@@ -111,10 +110,10 @@ class EndpointSpec extends AnyWordSpec with should.Matchers with MockFactory wit
   }
 
   private lazy val criterias = for {
-    projectPath <- projectPaths
+    projectSlug <- projectSlugs
     datasetName <- datasetNames
     maybeUser   <- authUsers.toGeneratorOfOptions
-  } yield Criteria(projectPath, datasetName, PagingRequest.default, maybeUser)
+  } yield Criteria(projectSlug, datasetName, PagingRequest.default, maybeUser)
 
   private def tagsDecoder(possibleTags: List[model.Tag]): Decoder[model.Tag] = Decoder.instance { cursor =>
     import io.renku.tinytypes.json.TinyTypeDecoders._

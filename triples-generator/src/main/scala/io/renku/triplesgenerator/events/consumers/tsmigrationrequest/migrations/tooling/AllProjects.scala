@@ -24,7 +24,7 @@ import eu.timepit.refined.auto._
 import fs2.Stream
 import io.circe.Decoder
 import io.renku.graph.model.Schemas
-import io.renku.graph.model.projects.{Path => ProjectPath}
+import io.renku.graph.model.projects.{Slug => ProjectSlug}
 import io.renku.tinytypes.json.TinyTypeDecoders._
 import io.renku.triplesstore._
 import io.renku.triplesstore.ResultsDecoder._
@@ -39,7 +39,7 @@ object AllProjects {
   def create[F[_]: Async: Logger: SparqlQueryTimeRecorder]: F[AllProjects[F]] =
     ProjectsConnectionConfig[F]().map(apply[F])
 
-  final case class ProjectMetadata(path: ProjectPath)
+  final case class ProjectMetadata(slug: ProjectSlug)
 
   def apply[F[_]: Async: Logger: SparqlQueryTimeRecorder](
       tsConfig: DatasetConnectionConfig
@@ -62,11 +62,11 @@ object AllProjects {
           "TS migration: find projects",
           Prefixes.of(Schemas.schema -> "schema", Schemas.renku -> "renku"),
           s"""
-             |SELECT DISTINCT ?projectPath
+             |SELECT DISTINCT ?projectSlug
              |WHERE {
-             |  Graph ?g {
+             |  Graph ?projectId {
              |    ?projectId a schema:Project;
-             |      renku:projectPath ?projectPath.
+             |               renku:slug ?projectSlug.
              |  }
              |}
              |ORDER BY ?projectId
@@ -77,9 +77,7 @@ object AllProjects {
 
       implicit val decoder: Decoder[List[ProjectMetadata]] =
         ResultsDecoder[List, ProjectMetadata] { implicit cursor =>
-          for {
-            path <- extract[ProjectPath]("projectPath")
-          } yield ProjectMetadata(path)
+          extract[ProjectSlug]("projectSlug").map(ProjectMetadata)
         }
     }
 }

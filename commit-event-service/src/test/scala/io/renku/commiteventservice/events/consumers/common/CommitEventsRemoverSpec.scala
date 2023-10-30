@@ -28,7 +28,7 @@ import io.renku.events.{CategoryName, EventRequestContent}
 import io.renku.generators.Generators.Implicits._
 import io.renku.generators.Generators._
 import io.renku.graph.model.EventsGenerators.commitIds
-import io.renku.graph.model.GraphModelGenerators.{projectIds, projectPaths}
+import io.renku.graph.model.GraphModelGenerators.{projectIds, projectSlugs}
 import io.renku.graph.model.events.EventStatus.AwaitingDeletion
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.matchers.should
@@ -47,7 +47,7 @@ class CommitEventsRemoverSpec extends AnyWordSpec with should.Matchers with Mock
         "id":           $commitId,
         "project": {
           "id":   ${project.id},
-          "path": ${project.path}
+          "slug": ${project.slug}
         },
         "subCategory": "ToAwaitingDeletion"
       }""")
@@ -83,8 +83,8 @@ class CommitEventsRemoverSpec extends AnyWordSpec with should.Matchers with Mock
     val project = {
       for {
         projectId   <- projectIds
-        projectPath <- projectPaths
-      } yield Project(projectId, projectPath)
+        projectSlug <- projectSlugs
+      } yield Project(projectId, projectSlug)
     }.generateOne
     val commitId = commitIds.generateOne
 

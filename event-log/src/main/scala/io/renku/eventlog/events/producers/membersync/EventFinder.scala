@@ -20,7 +20,7 @@ package io.renku.eventlog.events.producers.membersync
 
 import cats.MonadThrow
 import cats.data.Kleisli
-import cats.effect.MonadCancelThrow
+import cats.effect.Async
 import cats.syntax.all._
 import io.renku.db.{DbClient, SqlStatement}
 import io.renku.eventlog.EventLogDB.SessionResource
@@ -29,13 +29,13 @@ import io.renku.eventlog.metrics.QueriesExecutionTimes
 import io.renku.events.CategoryName
 import io.renku.graph.model.events.{EventDate, LastSyncedDate}
 import io.renku.graph.model.projects
+import skunk._
 import skunk.data.Completion
 import skunk.implicits._
-import skunk._
 
 import java.time.Instant
 
-private class EventFinderImpl[F[_]: MonadCancelThrow: SessionResource: QueriesExecutionTimes](
+private class EventFinderImpl[F[_]: Async: SessionResource: QueriesExecutionTimes](
     now: () => Instant = () => Instant.now
 ) extends DbClient(Some(QueriesExecutionTimes[F]))
     with EventFinder[F, MemberSyncEvent]
@@ -60,7 +60,7 @@ private class EventFinderImpl[F[_]: MonadCancelThrow: SessionResource: QueriesEx
         CategoryName *: EventDate *: LastSyncedDate *: EventDate *: LastSyncedDate *: EventDate *: LastSyncedDate *: EmptyTuple,
         (projects.GitLabId, Option[LastSyncedDate], MemberSyncEvent)
       ](
-        sql"""SELECT proj.project_id, sync_time.last_synced, proj.project_path
+        sql"""SELECT proj.project_id, sync_time.last_synced, proj.project_slug
               FROM project proj
               LEFT JOIN subscription_category_sync_time sync_time
                 ON sync_time.project_id = proj.project_id AND sync_time.category_name = $categoryNameEncoder
@@ -73,9 +73,9 @@ private class EventFinderImpl[F[_]: MonadCancelThrow: SessionResource: QueriesEx
                 )
               ORDER BY proj.latest_event_date DESC
               LIMIT 1
-      """.query(projectIdDecoder ~ lastSyncedDateDecoder.opt ~ projectPathDecoder)
-          .map { case (id: projects.GitLabId) ~ (maybeDate: Option[LastSyncedDate]) ~ (path: projects.Path) =>
-            (id, maybeDate, MemberSyncEvent(path))
+      """.query(projectIdDecoder ~ lastSyncedDateDecoder.opt ~ projectSlugDecoder)
+          .map { case (id: projects.GitLabId) ~ (maybeDate: Option[LastSyncedDate]) ~ (slug: projects.Slug) =>
+            (id, maybeDate, MemberSyncEvent(slug))
           }
       )
       .arguments(
@@ -141,6 +141,6 @@ private class EventFinderImpl[F[_]: MonadCancelThrow: SessionResource: QueriesEx
 }
 
 private object EventFinder {
-  def apply[F[_]: MonadCancelThrow: SessionResource: QueriesExecutionTimes]: F[EventFinder[F, MemberSyncEvent]] =
+  def apply[F[_]: Async: SessionResource: QueriesExecutionTimes]: F[EventFinder[F, MemberSyncEvent]] =
     MonadThrow[F].catchNonFatal(new EventFinderImpl[F]())
 }

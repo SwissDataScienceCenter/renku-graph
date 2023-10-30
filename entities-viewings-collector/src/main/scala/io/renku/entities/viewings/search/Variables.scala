@@ -22,6 +22,7 @@ import cats.syntax.all._
 import io.circe.{Decoder, DecodingFailure}
 import io.renku.entities.search.DecodingTools.{toListOf, toListOfImageUris}
 import io.renku.entities.search.model.{MatchingScore, Entity => SearchEntity}
+import io.renku.entities.searchgraphs.concatSeparator
 import io.renku.graph.model.{datasets, persons, projects}
 import io.renku.tinytypes.json.TinyTypeDecoders._
 import io.renku.triplesstore.ResultsDecoder.read
@@ -46,7 +47,7 @@ object Variables {
     val description       = VarName("description")
     val keywords          = VarName("keywords")
     val images            = VarName("images")
-    val projectPath       = VarName("projectPath")
+    val projectSlug       = VarName("projectSlug")
     val projectVisibility = VarName("projectVisibility")
     lazy val viewedDate   = Variables.viewedDate
 
@@ -61,7 +62,7 @@ object Variables {
       date,
       creatorNames,
       description,
-      projectPath,
+      projectSlug,
       projectVisibility,
       keywords,
       images,
@@ -73,7 +74,7 @@ object Variables {
         matchingScore      <- read[MatchingScore](matchingScore)
         name               <- read[datasets.Name](datasetName)
         sameAs             <- read[datasets.TopmostSameAs](datasetSameAs)
-        path               <- read[projects.Path](projectPath)
+        slug               <- read[projects.Slug](projectSlug)
         visibility         <- read[projects.Visibility](projectVisibility)
         maybeDateCreated   <- read[Option[datasets.DateCreated]](dateCreated)
         maybeDatePublished <- read[Option[datasets.DatePublished]](datePublished)
@@ -82,11 +83,11 @@ object Variables {
           Either.fromOption(maybeDateModified.orElse(maybeDateCreated.orElse(maybeDatePublished)),
                             ifNone = DecodingFailure("No dataset date", Nil)
           )
-        creators <- read[Option[String]](creatorNames) >>= toListOf[persons.Name, persons.Name.type](persons.Name)
+        creators <- read[Option[String]](creatorNames) >>= toListOf[persons.Name, persons.Name.type](concatSeparator)
         keywords <-
-          read[Option[String]](keywords) >>= toListOf[datasets.Keyword, datasets.Keyword.type](datasets.Keyword)
+          read[Option[String]](keywords) >>= toListOf[datasets.Keyword, datasets.Keyword.type](concatSeparator)
         maybeDesc <- read[Option[datasets.Description]](description)
-        images    <- read[Option[String]](images) >>= toListOfImageUris
+        images    <- read[Option[String]](images) >>= toListOfImageUris(concatSeparator)
       } yield SearchEntity.Dataset(
         matchingScore,
         sameAs,
@@ -98,7 +99,7 @@ object Variables {
         keywords,
         maybeDesc,
         images,
-        path
+        slug
       )
     }
   }
@@ -108,7 +109,7 @@ object Variables {
     val matchingScore   = VarName("matchingScore")
     val entityType      = VarName("entityType")
     val projectName     = VarName("projectName")
-    val projectPath     = VarName("projectPath")
+    val projectSlug     = VarName("projectSlug")
     val visibility      = VarName("visibility")
     val creatorNames    = VarName("creatorNames")
     val dateCreated     = VarName("dateCreated")
@@ -122,7 +123,7 @@ object Variables {
       matchingScore,
       entityType,
       projectName,
-      projectPath,
+      projectSlug,
       visibility,
       creatorNames,
       dateCreated,
@@ -137,18 +138,18 @@ object Variables {
       for {
         matchingScore    <- read[MatchingScore](matchingScore)
         name             <- read[projects.Name](projectName)
-        path             <- read[projects.Path](projectPath)
+        slug             <- read[projects.Slug](projectSlug)
         visibility       <- read[projects.Visibility](visibility)
         dateCreated      <- read[projects.DateCreated](dateCreated)
         dateModified     <- read[projects.DateModified](dateModified)
         maybeCreatorName <- read[Option[persons.Name]](creatorNames)
         keywords <-
-          read[Option[String]](keywords) >>= toListOf[projects.Keyword, projects.Keyword.type](projects.Keyword)
+          read[Option[String]](keywords) >>= toListOf[projects.Keyword, projects.Keyword.type](concatSeparator)
         maybeDescription <- read[Option[projects.Description]](description)
-        images           <- read[Option[String]](images) >>= toListOfImageUris
+        images           <- read[Option[String]](images) >>= toListOfImageUris(concatSeparator)
       } yield SearchEntity.Project(
         matchingScore,
-        path,
+        slug,
         name,
         visibility,
         dateCreated,

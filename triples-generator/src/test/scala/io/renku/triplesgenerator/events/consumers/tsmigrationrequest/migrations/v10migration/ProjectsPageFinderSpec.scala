@@ -23,7 +23,7 @@ import cats.effect.IO
 import io.renku.generators.Generators.Implicits._
 import io.renku.graph.model._
 import io.renku.graph.model.GraphModelGenerators.renkuUrls
-import io.renku.graph.model.RenkuTinyTypeGenerators.projectPaths
+import io.renku.graph.model.RenkuTinyTypeGenerators.projectSlugs
 import io.renku.interpreters.TestLogger
 import io.renku.logging.TestSparqlQueryTimeRecorder
 import io.renku.testtools.IOSpec
@@ -50,13 +50,13 @@ class ProjectsPageFinderSpec
 
     "return next page of projects for migration each time the method is called" in new TestCase {
 
-      val paths = projectPaths
+      val slugs = projectSlugs
         .generateList(min = pageSize + 1, max = Gen.choose(pageSize + 1, (2 * pageSize) - 1).generateOne)
         .sorted
 
-      runUpdate(on = migrationsDataset, BacklogCreator.asToBeMigratedInserts.apply(paths).value).unsafeRunSync()
+      runUpdate(on = migrationsDataset, BacklogCreator.asToBeMigratedInserts.apply(slugs).value).unsafeRunSync()
 
-      val (page1, page2) = paths splitAt pageSize
+      val (page1, page2) = slugs splitAt pageSize
 
       finder.nextProjectsPage().unsafeRunSync() shouldBe page1
 

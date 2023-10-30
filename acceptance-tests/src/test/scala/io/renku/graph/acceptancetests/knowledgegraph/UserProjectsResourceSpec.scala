@@ -28,6 +28,7 @@ import io.renku.generators.CommonGraphGenerators.authUsers
 import io.renku.generators.Generators.Implicits._
 import io.renku.graph.model.EventsGenerators.commitIds
 import io.renku.graph.model.projects
+import io.renku.graph.model.projects.Role
 import io.renku.graph.model.testentities._
 import io.renku.tinytypes.json.TinyTypeDecoders._
 import org.http4s.Status.Ok
@@ -46,7 +47,7 @@ class UserProjectsResourceSpec extends AcceptanceSpec with ApplicationServices w
 
       val activatedProject = dataProjects(
         renkuProjectEntities(anyVisibility, creatorGen = cliShapedPersons).modify(removeMembers()).generateOne
-      ).map(addMemberWithId(user.id)).generateOne
+      ).map(addMemberWithId(user.id, Role.Owner)).generateOne
 
       val commitId = commitIds.generateOne
       mockCommitDataOnTripleGenerator(activatedProject, toPayloadJsonLD(activatedProject), commitId)
@@ -56,7 +57,7 @@ class UserProjectsResourceSpec extends AcceptanceSpec with ApplicationServices w
       And("he has a not activated project")
       val notActivatedProject = dataProjects(
         renkuProjectEntities(visibilityPublic, creatorGen = cliShapedPersons).modify(removeMembers()).generateOne
-      ).map(addMemberWithId(user.id)).generateOne
+      ).map(addMemberWithId(user.id, Role.Owner)).generateOne
 
       gitLabStub.addProject(notActivatedProject)
 

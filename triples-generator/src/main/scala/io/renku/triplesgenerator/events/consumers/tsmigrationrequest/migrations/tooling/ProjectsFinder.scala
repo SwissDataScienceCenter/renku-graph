@@ -27,7 +27,7 @@ import io.renku.triplesstore._
 import org.typelevel.log4cats.Logger
 
 private trait ProjectsFinder[F[_]] {
-  def findProjects: F[List[projects.Path]]
+  def findProjects: F[List[projects.Slug]]
 }
 
 private object ProjectsFinder {
@@ -41,11 +41,11 @@ private class ProjectsFinderImpl[F[_]: Async: Logger: SparqlQueryTimeRecorder](
 ) extends TSClientImpl[F](storeConfig)
     with ProjectsFinder[F] {
 
-  override def findProjects: F[List[projects.Path]] = queryExpecting[List[projects.Path]](query)
+  override def findProjects: F[List[projects.Slug]] = queryExpecting[List[projects.Slug]](query)
 
-  private implicit lazy val pathsDecoder: Decoder[List[projects.Path]] = ResultsDecoder[List, projects.Path] {
+  private implicit lazy val slugsDecoder: Decoder[List[projects.Slug]] = ResultsDecoder[List, projects.Slug] {
     implicit cursor =>
       import io.renku.tinytypes.json.TinyTypeDecoders._
-      extract[projects.Path]("path")
+      extract[projects.Slug]("slug")
   }
 }

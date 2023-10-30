@@ -27,7 +27,7 @@ import io.renku.graph.acceptancetests.data.Project.{Permissions, Statistics}
 import io.renku.graph.acceptancetests.stubs.gitlab.GitLabApiStub._
 import io.renku.graph.acceptancetests.stubs.gitlab.GitLabAuth.AuthedReq
 import io.renku.graph.acceptancetests.stubs.gitlab.GitLabAuth.AuthedReq.{AuthedProject, AuthedUser}
-import io.renku.graph.model.entities.Project.ProjectMember
+import io.renku.graph.model.gitlab.GitLabMember
 import io.renku.graph.model.testentities.{Parent, Person}
 import org.http4s.Uri
 
@@ -41,12 +41,13 @@ trait JsonEncoders {
     Map("id" -> person.maybeGitLabId.asJson, "username" -> person.name.asJson, "name" -> person.name.asJson).asJson
   }
 
-  implicit val projectMemberEncoder: Encoder[ProjectMember] = Encoder.instance { pm =>
-    Map("id"           -> pm.gitLabId.asJson,
-        "username"     -> pm.username.asJson,
-        "name"         -> pm.name.asJson,
-        "access_level" -> 40.asJson,
-        "state"        -> "active".asJson
+  implicit val projectMemberEncoder: Encoder[GitLabMember] = Encoder.instance { pm =>
+    Map(
+      "id"           -> pm.user.gitLabId.asJson,
+      "username"     -> pm.user.username.asJson,
+      "name"         -> pm.user.name.asJson,
+      "access_level" -> pm.accessLevel.asJson,
+      "state"        -> "active".asJson
     ).asJson
   }
 
@@ -141,7 +142,7 @@ trait JsonEncoders {
           "topics"              -> project.entitiesProject.keywords.map(_.value).asJson,
           "name"                -> project.name.value.asJson,
           "star_count"          -> project.starsCount.value.asJson,
-          "path_with_namespace" -> project.path.value.asJson,
+          "path_with_namespace" -> project.slug.value.asJson,
           "created_at"          -> project.entitiesProject.dateCreated.value.asJson,
           "updated_at"          -> project.entitiesProject.dateModified.value.asJson,
           "creator_id"          -> project.maybeCreator.map(_.gitLabId).asJson,
@@ -149,7 +150,7 @@ trait JsonEncoders {
           "statistics"          -> project.statistics.asJson,
           "forked_from_project" -> (project.entitiesProject match {
             case withParent: Parent =>
-              Json.obj("path_with_namespace" -> withParent.parent.path.value.asJson)
+              Json.obj("path_with_namespace" -> withParent.parent.slug.value.asJson)
             case _ => Json.Null
           })
         )

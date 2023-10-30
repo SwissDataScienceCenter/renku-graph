@@ -20,13 +20,13 @@ package io.renku.knowledgegraph.users.projects
 
 import cats.MonadThrow
 import cats.implicits._
+import eu.timepit.refined.auto._
 import io.circe.Json
 import io.circe.syntax._
 import io.renku.config.renku
+import io.renku.data.Message
 import io.renku.graph.config.RenkuUrlLoader
 import io.renku.graph.model._
-import io.renku.http.InfoMessage
-import io.renku.http.InfoMessage._
 import io.renku.knowledgegraph.docs
 import io.renku.knowledgegraph.docs.model.Operation.GET
 import io.renku.knowledgegraph.docs.model._
@@ -53,14 +53,14 @@ private class EndpointDocsImpl()(implicit renkuUrl: RenkuUrl, renkuApiUrl: renku
       ),
       Status.BadRequest -> Response(
         "In case of invalid query parameters",
-        Contents(MediaType.`application/json`("Reason", InfoMessage("Invalid parameters")))
+        Contents(MediaType.`application/json`("Reason", Message.Info("Invalid parameters")))
       ),
       Status.Unauthorized -> Response(
         "Unauthorized",
-        Contents(MediaType.`application/json`("Invalid token", InfoMessage("Unauthorized")))
+        Contents(MediaType.`application/json`("Invalid token", Message.Info("Unauthorized")))
       ),
       Status.InternalServerError -> Response("Error",
-                                             Contents(MediaType.`application/json`("Reason", InfoMessage("Message")))
+                                             Contents(MediaType.`application/json`("Reason", Message.Info("Message")))
       )
     )
   )
@@ -91,7 +91,7 @@ private class EndpointDocsImpl()(implicit renkuUrl: RenkuUrl, renkuApiUrl: renku
     model.Project
       .Activated(
         projects.Name("name"),
-        projects.Path("group/subgroup/name"),
+        projects.Slug("group/subgroup/name"),
         projects.Visibility.Public,
         projects.DateCreated(Instant.parse("2012-11-15T10:00:00.000Z")),
         persons.Name("Jan Kowalski").some,
@@ -103,7 +103,7 @@ private class EndpointDocsImpl()(implicit renkuUrl: RenkuUrl, renkuApiUrl: renku
       .NotActivated(
         projects.GitLabId(1),
         projects.Name("name"),
-        projects.Path("group/subgroup/name"),
+        projects.Slug("group/subgroup/name"),
         projects.Visibility.Public,
         projects.DateCreated(Instant.parse("2012-11-15T10:00:00.000Z")),
         persons.GitLabId(1).some,

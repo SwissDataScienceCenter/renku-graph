@@ -22,6 +22,7 @@ import cats.data.Kleisli
 import cats.effect.IO
 import cats.syntax.all._
 import io.renku.eventlog.api.events.StatusChangeEvent.ToFailure
+import io.renku.eventlog.events.consumers.statuschange.SkunkExceptionsGenerators.postgresErrors
 import io.renku.eventlog.events.consumers.statuschange.{DBUpdateResults, DeliveryInfoRemover}
 import io.renku.eventlog.metrics.QueriesExecutionTimes
 import io.renku.eventlog.{InMemoryEventLogDbSpec, TypeSerializers}
@@ -36,8 +37,10 @@ import io.renku.interpreters.TestLogger
 import io.renku.metrics.TestMetricsRegistry
 import io.renku.testtools.IOSpec
 import org.scalamock.scalatest.MockFactory
+import org.scalatest.OptionValues
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
+import skunk.SqlState
 
 import java.time.{Duration, Instant}
 
@@ -47,6 +50,7 @@ class DbUpdaterSpec
     with InMemoryEventLogDbSpec
     with TypeSerializers
     with should.Matchers
+    with OptionValues
     with MockFactory {
 
   "updateDB" should {
@@ -56,16 +60,16 @@ class DbUpdaterSpec
         createFailureEvent(GenerationNonRecoverableFailure, None),
         createFailureEvent(GenerationRecoverableFailure, Duration.ofHours(100).some)
       ) foreach { statusChangeEvent =>
-        (deliveryInfoRemover.deleteDelivery _).expects(statusChangeEvent.eventId).returning(Kleisli.pure(()))
+        givenDeliveryInfoRemoved(statusChangeEvent.eventId)
 
         sessionResource
           .useK(dbUpdater updateDB statusChangeEvent)
           .unsafeRunSync() shouldBe DBUpdateResults.ForProjects(
-          project.path,
+          project.slug,
           Map(statusChangeEvent.currentStatus -> -1, statusChangeEvent.newStatus -> 1)
         )
 
-        val Some((executionDate, executionStatus, Some(message))) = findEvent(statusChangeEvent.eventId)
+        val (executionDate, executionStatus, Some(message)) = findEvent(statusChangeEvent.eventId).value
 
         statusChangeEvent.newStatus match {
           case _: GenerationRecoverableFailure | _: TransformationRecoverableFailure =>
@@ -115,12 +119,12 @@ class DbUpdaterSpec
           ) -> TriplesGenerated
         }
 
-        (deliveryInfoRemover.deleteDelivery _).expects(statusChangeEvent.eventId).returning(Kleisli.pure(()))
+        givenDeliveryInfoRemoved(statusChangeEvent.eventId)
 
         sessionResource
           .useK(dbUpdater updateDB statusChangeEvent)
           .unsafeRunSync() shouldBe DBUpdateResults.ForProjects(
-          project.path,
+          project.slug,
           Map(TriplesGenerated -> -1, statusChangeEvent.currentStatus -> -1, statusChangeEvent.newStatus -> 2)
         )
 
@@ -137,6 +141,7 @@ class DbUpdaterSpec
 
     "change status of the given event from TRANSFORMING_TRIPLES to TRANSFORMATION_NON_RECOVERABLE_FAILURE " +
       "as well as all the older events which are TRIPLES_GENERATED status to NEW" in new TestCase {
+
         val latestEventDate = eventDates.generateOne
         val statusChangeEvent = ToFailure(
           addEvent(compoundEventIds.generateOne.copy(projectId = project.id), TransformingTriples, latestEventDate).id,
@@ -172,12 +177,12 @@ class DbUpdaterSpec
           ) -> TriplesGenerated
         }
 
-        (deliveryInfoRemover.deleteDelivery _).expects(statusChangeEvent.eventId).returning(Kleisli.pure(()))
+        givenDeliveryInfoRemoved(statusChangeEvent.eventId)
 
         sessionResource
           .useK(dbUpdater updateDB statusChangeEvent)
           .unsafeRunSync() shouldBe DBUpdateResults.ForProjects(
-          project.path,
+          project.slug,
           Map(statusChangeEvent.currentStatus -> -1, statusChangeEvent.newStatus -> 1, New -> 1, TriplesGenerated -> -1)
         )
 
@@ -206,7 +211,7 @@ class DbUpdaterSpec
           ToFailure(eventId.id, project, message, TransformationNonRecoverableFailure, None),
           ToFailure(eventId.id, project, message, TransformationRecoverableFailure, None)
         ) foreach { statusChangeEvent =>
-          (deliveryInfoRemover.deleteDelivery _).expects(statusChangeEvent.eventId).returning(Kleisli.pure(()))
+          givenDeliveryInfoRemoved(statusChangeEvent.eventId)
 
           val ancestorEventId = addEvent(
             compoundEventIds.generateOne.copy(projectId = project.id),
@@ -226,20 +231,47 @@ class DbUpdaterSpec
   }
 
   "onRollback" should {
-    "clean the delivery info for the event" in new TestCase {
-      val event = ToFailure(eventIds.generateOne,
-                            ConsumersModelGenerators.consumerProjects.generateOne,
-                            eventMessages.generateOne,
-                            GenerationNonRecoverableFailure,
-                            None
+
+    "retry the updateDB procedure on DeadlockDetected" in new TestCase {
+
+      val statusChangeEvent = createFailureEvent(GenerationNonRecoverableFailure, None)
+
+      givenDeliveryInfoRemoved(statusChangeEvent.eventId)
+
+      val deadlockException = postgresErrors(SqlState.DeadlockDetected).generateOne
+      (dbUpdater onRollback statusChangeEvent)
+        .apply(deadlockException)
+        .unsafeRunSync() shouldBe DBUpdateResults.ForProjects(
+        project.slug,
+        Map(statusChangeEvent.currentStatus -> -1, statusChangeEvent.newStatus -> 1)
       )
 
-      (deliveryInfoRemover.deleteDelivery _).expects(event.eventId).returning(Kleisli.pure(()))
+      val (executionDate, executionStatus, Some(message)) = findEvent(statusChangeEvent.eventId).value
 
-      sessionResource
-        .useK((dbUpdater onRollback event)(exceptions.generateOne))
-        .unsafeRunSync() shouldBe DBUpdateResults.ForProjects.empty
+      executionDate.value shouldBe <=(Instant.now())
+      executionStatus     shouldBe statusChangeEvent.newStatus
+      message             shouldBe statusChangeEvent.message
     }
+
+    "clean the delivery info for the event when Exception different than DeadlockDetected " +
+      "and rethrow the exception" in new TestCase {
+
+        val event = ToFailure(eventIds.generateOne,
+                              ConsumersModelGenerators.consumerProjects.generateOne,
+                              eventMessages.generateOne,
+                              GenerationNonRecoverableFailure,
+                              None
+        )
+
+        givenDeliveryInfoRemoved(event.eventId)
+
+        val exception = exceptions.generateOne
+        intercept[Exception] {
+          (dbUpdater onRollback event)
+            .apply(exception)
+            .unsafeRunSync() shouldBe DBUpdateResults.ForProjects.empty
+        } shouldBe exception
+      }
   }
 
   private trait TestCase {
@@ -247,14 +279,17 @@ class DbUpdaterSpec
     val project = ConsumersModelGenerators.consumerProjects.generateOne
 
     implicit val logger: TestLogger[IO] = TestLogger[IO]()
-    val currentTime         = mockFunction[Instant]
-    val deliveryInfoRemover = mock[DeliveryInfoRemover[IO]]
+    private val currentTime         = mockFunction[Instant]
+    private val deliveryInfoRemover = mock[DeliveryInfoRemover[IO]]
     private implicit val metricsRegistry:  TestMetricsRegistry[IO]   = TestMetricsRegistry[IO]
     private implicit val queriesExecTimes: QueriesExecutionTimes[IO] = QueriesExecutionTimes[IO]().unsafeRunSync()
     val dbUpdater = new DbUpdater[IO](deliveryInfoRemover, currentTime)
 
-    val now = Instant.now()
+    private val now = Instant.now()
     currentTime.expects().returning(now).anyNumberOfTimes()
+
+    def givenDeliveryInfoRemoved(eventId: CompoundEventId) =
+      (deliveryInfoRemover.deleteDelivery _).expects(eventId).returning(Kleisli.pure(()))
 
     def createFailureEvent(newStatus: FailureStatus, executionDelay: Option[Duration]): ToFailure = {
       val currentStatus = newStatus match {
@@ -270,7 +305,7 @@ class DbUpdaterSpec
       )
     }
 
-    def addEvent(status: ProcessingStatus): CompoundEventId = {
+    private def addEvent(status: ProcessingStatus): CompoundEventId = {
       val eventId = CompoundEventId(eventIds.generateOne, project.id)
       addEvent(eventId, status)
       eventId
@@ -286,7 +321,7 @@ class DbUpdaterSpec
         timestampsNotInTheFuture.generateAs(ExecutionDate),
         eventDate,
         eventBodies.generateOne,
-        projectPath = project.path
+        projectSlug = project.slug
       )
       eventId
     }

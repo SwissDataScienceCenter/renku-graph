@@ -16,8 +16,7 @@
  * limitations under the License.
  */
 
-package io.renku.triplesgenerator.events.consumers
-package tsmigrationrequest
+package io.renku.triplesgenerator.events.consumers.tsmigrationrequest
 
 import cats.MonadThrow
 import cats.data.EitherT
@@ -26,6 +25,7 @@ import cats.effect.Async
 import cats.syntax.all._
 import com.typesafe.config.Config
 import io.renku.metrics.MetricsRegistry
+import io.renku.triplesgenerator.errors.ProcessingRecoverableError
 import io.renku.triplesgenerator.events.consumers.tsmigrationrequest.migrations.Migrations
 import io.renku.triplesgenerator.events.consumers.tsmigrationrequest.migrations.reprovisioning.ReProvisioningStatus
 import io.renku.triplesstore.SparqlQueryTimeRecorder

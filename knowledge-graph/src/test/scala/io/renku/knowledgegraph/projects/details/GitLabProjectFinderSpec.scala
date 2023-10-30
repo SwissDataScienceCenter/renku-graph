@@ -29,7 +29,7 @@ import io.circe.Json
 import io.circe.literal._
 import io.renku.generators.CommonGraphGenerators.accessTokens
 import io.renku.generators.Generators.Implicits._
-import io.renku.graph.model.GraphModelGenerators.projectPaths
+import io.renku.graph.model.GraphModelGenerators.projectSlugs
 import io.renku.graph.model.projects
 import io.renku.http.client.RestClient.ResponseMappingF
 import io.renku.http.client.{AccessToken, GitLabClient}
@@ -58,17 +58,17 @@ class GitLabProjectFinderSpec
   "findProject" should {
 
     "return fetched project info if service responds with OK and a valid body" in new TestCase {
-      forAll { (path: projects.Path, accessToken: AccessToken, project: GitLabProject) =>
+      forAll { (slug: projects.Slug, accessToken: AccessToken, project: GitLabProject) =>
         val expectation = project.some
 
         (gitLabClient
           .get(_: Uri, _: String Refined NonEmpty)(_: ResponseMappingF[IO, Option[GitLabProject]])(
             _: Option[AccessToken]
           ))
-          .expects(uri(path), endpointName, *, accessToken.some)
+          .expects(uri(slug), endpointName, *, accessToken.some)
           .returning(expectation.pure[IO])
 
-        projectFinder.findProject(path)(accessToken).unsafeRunSync() shouldBe expectation
+        projectFinder.findProject(slug)(accessToken).unsafeRunSync() shouldBe expectation
       }
     }
 
@@ -104,14 +104,15 @@ class GitLabProjectFinderSpec
     implicit val gitLabClient: GitLabClient[IO] = mock[GitLabClient[IO]]
     val projectFinder = new GitLabProjectFinderImpl[IO]
 
-    def uri(path: projects.Path) = uri"projects" / path.show withQueryParam ("statistics", "true")
+    def uri(slug: projects.Slug) = uri"projects" / slug.show withQueryParam ("statistics", "true")
 
     val endpointName:         String Refined NonEmpty = "single-project"
     implicit val accessToken: AccessToken             = accessTokens.generateOne
 
     val mapResponse: ResponseMappingF[IO, Option[GitLabProject]] =
-      captureMapping(gitLabClient)(projectFinder.findProject(projectPaths.generateOne).unsafeRunSync(),
-                                   gitLabProjects.toGeneratorOfOptions
+      captureMapping(gitLabClient)(projectFinder.findProject(projectSlugs.generateOne).unsafeRunSync(),
+                                   gitLabProjects.toGeneratorOfOptions,
+                                   underlyingMethod = Get
       )
   }
 

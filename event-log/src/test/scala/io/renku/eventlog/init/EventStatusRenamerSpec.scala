@@ -44,7 +44,6 @@ class EventStatusRenamerSpec
     with IOSpec
     with DbInitSpec
     with should.Matchers
-    with EventLogDataProvisioning
     with EventDataFetching {
 
   protected[init] override lazy val migrationsToRun: List[DbMigrator[IO]] = allMigrations.takeWhile {
@@ -113,24 +112,24 @@ class EventStatusRenamerSpec
   }
 
   private def store(event: Event, withStatus: String): Unit = {
-    upsertProject(event.compoundEventId, event.project.path, event.date)
+    upsertProject(event.compoundEventId.projectId, event.project.slug, event.date)
     execute[Unit] {
       Kleisli { session =>
         val query: Command[
           EventId *: projects.GitLabId *: String *: CreatedDate *: ExecutionDate *: EventDate *: String *: BatchDate *: EmptyTuple
         ] =
-          sql"""INSERT INTO 
-              event (event_id, project_id, status, created_date, execution_date, event_date, event_body, batch_date) 
-              values (
-              $eventIdEncoder, 
-              $projectIdEncoder, 
-              $varchar, 
-              $createdDateEncoder,
-              $executionDateEncoder, 
-              $eventDateEncoder, 
-              $text,
-              $batchDateEncoder)
-      """.command
+          sql"""INSERT INTO event (event_id, project_id, status, created_date, execution_date, event_date, event_body, batch_date)
+                VALUES (
+                  $eventIdEncoder,
+                  $projectIdEncoder,
+                  $varchar,
+                  $createdDateEncoder,
+                  $executionDateEncoder,
+                  $eventDateEncoder,
+                  $text,
+                  $batchDateEncoder
+                )
+                """.command
         session
           .prepare(query)
           .flatMap(
@@ -151,11 +150,23 @@ class EventStatusRenamerSpec
     }
   }
 
-  private def toJsonBody(event: Event): String =
-    json"""{
+  private def upsertProject(projectId: projects.GitLabId, projectSlug: projects.Slug, eventDate: EventDate): Unit =
+    execute[Unit] {
+      Kleisli { session =>
+        val query: Command[projects.GitLabId *: projects.Slug *: EventDate *: EmptyTuple] =
+          sql"""INSERT INTO project (project_id, project_path, latest_event_date)
+                VALUES ($projectIdEncoder, $projectSlugEncoder, $eventDateEncoder)
+                ON CONFLICT (project_id)
+                DO UPDATE SET latest_event_date = excluded.latest_event_date WHERE excluded.latest_event_date > project.latest_event_date
+          """.command
+        session.prepare(query).flatMap(_.execute(projectId *: projectSlug *: eventDate *: EmptyTuple)).void
+      }
+    }
+
+  private def toJsonBody(event: Event): String = json"""{
     "project": {
-      "id": ${event.project.id.value},
-      "path": ${event.project.path.value}
+      "id":   ${event.project.id},
+      "slug": ${event.project.slug}
      }
   }""".noSpaces
 

@@ -18,82 +18,105 @@
 
 package io.renku.knowledgegraph.projects.datasets
 
-import ProjectDatasetsFinder.ProjectDataset
+import Endpoint.Criteria
+import cats.NonEmptyParallel
 import cats.effect._
 import cats.syntax.all._
 import io.circe.Encoder
 import io.circe.syntax._
 import io.renku.config.renku
+import io.renku.data.Message
 import io.renku.graph.config.{GitLabUrlLoader, RenkuUrlLoader}
 import io.renku.graph.model.{GitLabUrl, RenkuUrl, projects}
-import io.renku.http.ErrorMessage
-import io.renku.http.ErrorMessage._
 import io.renku.http.rest.Links._
+import io.renku.http.rest.SortBy.Direction
+import io.renku.http.rest.Sorting
+import io.renku.http.rest.paging.{PagingHeaders, PagingRequest, PagingResponse}
 import io.renku.logging.ExecutionTimeRecorder
 import io.renku.triplesstore.{ProjectsConnectionConfig, SparqlQueryTimeRecorder}
-import org.http4s.Response
 import org.http4s.dsl.Http4sDsl
+import org.http4s.{Header, Request, Response}
 import org.typelevel.log4cats.Logger
 
 import scala.util.control.NonFatal
 
 trait Endpoint[F[_]] {
-  def getProjectDatasets(projectPath: projects.Path): F[Response[F]]
+  def `GET /projects/:slug/datasets`(request: Request[F], criteria: Criteria): F[Response[F]]
 }
 
 class EndpointImpl[F[_]: MonadCancelThrow: Logger](
     projectDatasetsFinder: ProjectDatasetsFinder[F],
-    renkuApiUrl:           renku.ApiUrl,
-    gitLabUrl:             GitLabUrl,
     executionTimeRecorder: ExecutionTimeRecorder[F]
-) extends Http4sDsl[F]
+)(implicit renkuUrl: RenkuUrl, renkuApiUrl: renku.ApiUrl, gitLabUrl: GitLabUrl)
+    extends Http4sDsl[F]
     with Endpoint[F] {
 
   import executionTimeRecorder._
   import org.http4s.circe._
 
-  private implicit lazy val apiUrl: renku.ApiUrl = renkuApiUrl
-  private implicit lazy val glUrl:  GitLabUrl    = gitLabUrl
-
-  def getProjectDatasets(projectPath: projects.Path): F[Response[F]] =
-    measureAndLogTime(finishedSuccessfully(projectPath)) {
-      implicit val encoder: Encoder[ProjectDataset] = ProjectDatasetEncoder.encoder(projectPath)
-
+  def `GET /projects/:slug/datasets`(request: Request[F], criteria: Criteria): F[Response[F]] =
+    measureAndLogTime(finishedSuccessfully(criteria.projectSlug)) {
       projectDatasetsFinder
-        .findProjectDatasets(projectPath)
-        .flatMap(datasets => Ok(datasets.asJson))
-        .recoverWith(httpResult(projectPath))
+        .findProjectDatasets(criteria)
+        .map(toHttpResponse(request, criteria))
+        .recoverWith(errorHttpResponse(criteria.projectSlug))
     }
 
-  private def httpResult(
-      projectPath: projects.Path
-  ): PartialFunction[Throwable, F[Response[F]]] = { case NonFatal(exception) =>
-    val errorMessage = ErrorMessage(s"Finding $projectPath's datasets failed")
-    Logger[F].error(exception)(errorMessage.show) >>
-      InternalServerError(errorMessage)
+  private def toHttpResponse(request: Request[F], criteria: Criteria)(
+      response: PagingResponse[ProjectDataset]
+  ): Response[F] = {
+    implicit val encoder: Encoder[ProjectDataset] = ProjectDataset.encoder(criteria.projectSlug)
+    val resourceUrl = renku.ResourceUrl(show"$renkuUrl${request.uri}")
+    Response[F](Ok)
+      .withEntity(response.results.asJson)
+      .putHeaders(PagingHeaders.from(response)(resourceUrl, renku.ResourceUrl).toSeq.map(Header.ToRaw.rawToRaw): _*)
   }
 
-  private def finishedSuccessfully(projectPath: projects.Path): PartialFunction[Response[F], String] = {
-    case response if response.status == Ok => s"Finding '$projectPath' datasets finished"
+  private def errorHttpResponse(
+      projectSlug: projects.Slug
+  ): PartialFunction[Throwable, F[Response[F]]] = { case NonFatal(exception) =>
+    val errorMessage = Message.Error.unsafeApply(s"Finding $projectSlug's datasets failed")
+    Logger[F].error(exception)(errorMessage.show) >> InternalServerError(errorMessage)
+  }
+
+  private def finishedSuccessfully(projectSlug: projects.Slug): PartialFunction[Response[F], String] = {
+    case response if response.status == Ok => s"Finding '$projectSlug' datasets finished"
   }
 }
 
 object Endpoint {
 
-  def apply[F[_]: Async: Logger: SparqlQueryTimeRecorder]: F[Endpoint[F]] = for {
-    implicit0(renkuUrl: RenkuUrl) <- RenkuUrlLoader()
-    renkuConnectionConfig         <- ProjectsConnectionConfig[F]()
-    gitLabUrl                     <- GitLabUrlLoader[F]()
-    renkuResourceUrl              <- renku.ApiUrl[F]()
-    executionTimeRecorder         <- ExecutionTimeRecorder[F]()
-    projectDatasetFinder          <- ProjectDatasetsFinder(renkuConnectionConfig)
-  } yield new EndpointImpl[F](
-    projectDatasetFinder,
-    renkuResourceUrl,
-    gitLabUrl,
-    executionTimeRecorder
+  final case class Criteria(projectSlug: projects.Slug,
+                            sorting:     Sorting[Criteria.Sort.type] = Criteria.Sort.default,
+                            paging:      PagingRequest = PagingRequest.default
   )
 
-  def href(renkuApiUrl: renku.ApiUrl, projectPath: projects.Path): Href =
-    Href(renkuApiUrl / "projects" / projectPath / "datasets")
+  object Criteria {
+    object Sort extends io.renku.http.rest.SortBy {
+
+      type PropertyType = SortProperty
+
+      sealed trait SortProperty extends Property
+
+      final case object ByName         extends Property("name") with SortProperty
+      final case object ByDateModified extends Property("dateModified") with SortProperty
+
+      val byNameAsc: Sort.By = Sort.By(ByName, Direction.Asc)
+
+      val default: Sorting[Sort.type] = Sorting(byNameAsc)
+
+      override lazy val properties: Set[SortProperty] = Set(ByName, ByDateModified)
+    }
+  }
+
+  def apply[F[_]: Async: NonEmptyParallel: Logger: SparqlQueryTimeRecorder]: F[Endpoint[F]] = for {
+    implicit0(renkuUrl: RenkuUrl)        <- RenkuUrlLoader()
+    implicit0(gitLabUrl: GitLabUrl)      <- GitLabUrlLoader[F]()
+    implicit0(renkuApiUrl: renku.ApiUrl) <- renku.ApiUrl[F]()
+    renkuConnectionConfig                <- ProjectsConnectionConfig[F]()
+    executionTimeRecorder                <- ExecutionTimeRecorder[F]()
+  } yield new EndpointImpl[F](ProjectDatasetsFinder(renkuConnectionConfig), executionTimeRecorder)
+
+  def href(renkuApiUrl: renku.ApiUrl, projectSlug: projects.Slug): Href =
+    Href(renkuApiUrl / "projects" / projectSlug / "datasets")
 }

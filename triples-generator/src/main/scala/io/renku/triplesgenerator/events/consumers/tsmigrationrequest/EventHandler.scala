@@ -16,15 +16,13 @@
  * limitations under the License.
  */
 
-package io.renku.triplesgenerator.events.consumers
-package tsmigrationrequest
+package io.renku.triplesgenerator.events.consumers.tsmigrationrequest
 
-import TSStateChecker.TSState.{MissingDatasets, ReProvisioning, Ready}
 import cats.effect.{Async, MonadCancelThrow}
 import cats.syntax.all._
 import com.typesafe.config.Config
 import io.renku.config.ServiceVersion
-import io.renku.data.ErrorMessage
+import io.renku.data.Message
 import io.renku.events.Subscription.SubscriberUrl
 import io.renku.events.consumers.EventSchedulingResult.{SchedulingError, ServiceUnavailable}
 import io.renku.events.consumers.subscriptions.SubscriptionMechanism
@@ -34,9 +32,12 @@ import io.renku.events.{CategoryName, EventRequestContent, consumers}
 import io.renku.graph.config.EventLogUrl
 import io.renku.metrics.MetricsRegistry
 import io.renku.microservices.MicroserviceIdentifier
+import io.renku.triplesgenerator.events.consumers.TSStateChecker
+import io.renku.triplesgenerator.events.consumers.TSStateChecker.TSState.{MissingDatasets, ReProvisioning, Ready}
 import io.renku.triplesstore.SparqlQueryTimeRecorder
 import migrations.reprovisioning.ReProvisioningStatus
 import org.typelevel.log4cats.Logger
+import io.renku.triplesgenerator.errors.ProcessingRecoverableError
 
 import scala.util.control.NonFatal
 
@@ -97,11 +98,11 @@ private class EventHandler[F[_]: MonadCancelThrow: Logger](
   private def toRecoverableFailure(recoverableFailure: ProcessingRecoverableError) =
     changeMigrationStatus(
       "RECOVERABLE_FAILURE",
-      ErrorMessage.withMessageAndStackTrace(recoverableFailure.message, recoverableFailure.cause).show.some
+      Message.Error.fromMessageAndStackTraceUnsafe(recoverableFailure.message, recoverableFailure.cause).show.some
     )
 
   private def nonRecoverableFailure: PartialFunction[Throwable, F[Unit]] = { case NonFatal(e) =>
-    changeMigrationStatus("NON_RECOVERABLE_FAILURE", ErrorMessage.withStackTrace(e).show.some)
+    changeMigrationStatus("NON_RECOVERABLE_FAILURE", Message.Error.fromStackTrace(e).show.some)
   }
 
   private def verifyTSState: F[Option[EventSchedulingResult]] =

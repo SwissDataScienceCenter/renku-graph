@@ -23,17 +23,18 @@ import eu.timepit.refined.auto._
 import io.circe.Json
 import io.circe.literal._
 import io.renku.generators.CommonGraphGenerators.authUsers
-import io.renku.generators.Generators._
 import io.renku.generators.Generators.Implicits._
+import io.renku.generators.Generators._
 import io.renku.graph.acceptancetests.data
 import io.renku.graph.acceptancetests.data._
 import io.renku.graph.acceptancetests.flows.TSProvisioning
-import io.renku.graph.acceptancetests.tooling.{AcceptanceSpec, ApplicationServices}
 import io.renku.graph.acceptancetests.tooling.TestReadabilityTools._
-import io.renku.graph.model._
+import io.renku.graph.acceptancetests.tooling.{AcceptanceSpec, ApplicationServices}
 import io.renku.graph.model.EventsGenerators.commitIds
-import io.renku.graph.model.testentities.{::~, creatorUsernameUpdaterInternal}
+import io.renku.graph.model._
+import io.renku.graph.model.projects.Role
 import io.renku.graph.model.testentities.generators.EntitiesGenerators._
+import io.renku.graph.model.testentities.{::~, creatorUsernameUpdaterInternal}
 import io.renku.http.client.UrlEncoder.urlEncode
 import io.renku.http.rest.Links.Rel
 import io.renku.http.server.EndpointTester._
@@ -57,23 +58,22 @@ class DatasetsResourcesSpec
 
   Feature("GET knowledge-graph/projects/<namespace>/<name>/datasets to find project's datasets") {
 
-    val (dataset1 ::~ dataset2 ::~ dataset2Modified, testProject) =
-      renkuProjectEntities(visibilityPublic, creatorGen = cliShapedPersons)
-        .modify(removeMembers())
-        .addDataset(datasetEntities(provenanceInternal(cliShapedPersons)))
-        .addDatasetAndModification(
-          datasetEntities(provenanceInternal(cliShapedPersons)),
-          creatorGen = cliShapedPersons
-        )
-        .generateOne
-    val creatorPerson = cliShapedPersons.generateOne
-    val project =
-      dataProjects(testProject)
-        .map(replaceCreatorFrom(creatorPerson, creator.id))
-        .map(addMemberFrom(creatorPerson, creator.id) >>> addMemberWithId(user.id))
-        .generateOne
-
     Scenario("As a user I would like to find project's datasets by calling a REST endpoint") {
+      val (dataset1 -> dataset2 -> dataset2Modified, testProject) =
+        renkuProjectEntities(visibilityPublic, creatorGen = cliShapedPersons)
+          .modify(removeMembers())
+          .addDataset(datasetEntities(provenanceInternal(cliShapedPersons)))
+          .addDatasetAndModification(
+            datasetEntities(provenanceInternal(cliShapedPersons)),
+            creatorGen = cliShapedPersons
+          )
+          .generateOne
+      val creatorPerson = cliShapedPersons.generateOne
+      val project =
+        dataProjects(testProject)
+          .map(replaceCreatorFrom(creatorPerson, creator.id))
+          .map(addMemberFrom(creatorPerson, creator.id, Role.Owner) >>> addMemberWithId(user.id, Role.Maintainer))
+          .generateOne
 
       Given("some data in the Triples Store")
       gitLabStub.addAuthenticated(creator)
@@ -84,13 +84,13 @@ class DatasetsResourcesSpec
       `data in the Triples Store`(project, commitId, creator.accessToken)
 
       When("user fetches project's datasets with GET knowledge-graph/projects/<project-name>/datasets")
-      val projectDatasetsResponse = knowledgeGraphClient GET s"knowledge-graph/projects/${project.path}/datasets"
+      val projectDatasetsResponse = knowledgeGraphClient GET s"knowledge-graph/projects/${project.slug}/datasets"
 
       Then("he should get OK response with project's datasets")
       projectDatasetsResponse.status shouldBe Ok
       val foundDatasets = projectDatasetsResponse.jsonBody.as[List[Json]].value
-      foundDatasets should contain theSameElementsAs List(briefJson(dataset1, project.path),
-                                                          briefJson(dataset2Modified, project.path)
+      foundDatasets should contain theSameElementsAs List(briefJson(dataset1, project.slug),
+                                                          briefJson(dataset2Modified, dataset2, project.slug)
       )
 
       When("user then fetches details of the chosen dataset with the link from the response")
@@ -189,7 +189,7 @@ class DatasetsResourcesSpec
       val privateProject =
         dataProjects(testPrivateProject)
           .map(replaceCreatorFrom(creatorPerson, creator.id))
-          .map(addMemberFrom(creatorPerson, creator.id))
+          .map(addMemberFrom(creatorPerson, creator.id, Role.Owner))
           .generateOne
 
       Given("there's a private project in KG")
@@ -202,7 +202,7 @@ class DatasetsResourcesSpec
       When("there's an authenticated user who is not a member of the project")
       And("he fetches project's details")
       val response =
-        knowledgeGraphClient.GET(s"knowledge-graph/projects/${privateProject.path}/datasets", user.accessToken)
+        knowledgeGraphClient.GET(s"knowledge-graph/projects/${privateProject.slug}/datasets", user.accessToken)
 
       Then("he should get NOT_FOUND response")
       response.status shouldBe NotFound
@@ -221,13 +221,13 @@ class DatasetsResourcesSpec
         .modify(removeMembers())
         .addDataset(datasetEntities(provenanceInternal(cliShapedPersons)).modify(_.makeTitleContaining(text)))
         .generateOne
-      val project1 = dataProjects(testProject1).map(addMemberWithId(creator.id)).generateOne
+      val project1 = dataProjects(testProject1).map(addMemberWithId(creator.id, Role.Owner)).generateOne
 
       val (dataset2, testProject2) = renkuProjectEntities(visibilityPublic, creatorGen = cliShapedPersons)
         .modify(removeMembers())
         .addDataset(datasetEntities(provenanceInternal(cliShapedPersons)).modify(_.makeDescContaining(text)))
         .generateOne
-      val project2 = dataProjects(testProject2).map(addMemberWithId(creator.id)).generateOne
+      val project2 = dataProjects(testProject2).map(addMemberWithId(creator.id, Role.Owner)).generateOne
       val (dataset3, testProject3) = renkuProjectEntities(visibilityPublic, creatorGen = cliShapedPersons)
         .modify(removeMembers())
         .addDataset(
@@ -235,20 +235,20 @@ class DatasetsResourcesSpec
             .modify(_.makeCreatorNameContaining(text)(creatorUsernameUpdaterInternal(cliShapedPersons)))
         )
         .generateOne
-      val project3 = dataProjects(testProject3).map(addMemberWithId(creator.id)).generateOne
+      val project3 = dataProjects(testProject3).map(addMemberWithId(creator.id, Role.Owner)).generateOne
       val (dataset4, testProject4 ::~ testProject4Fork) =
         renkuProjectEntities(visibilityPublic, creatorGen = cliShapedPersons)
           .addDataset(datasetEntities(provenanceInternal(cliShapedPersons)).modify(_.makeKeywordsContaining(text)))
           .forkOnce(creatorGen = cliShapedPersons)
           .generateOne
           .bimap(identity, _.bimap(removeMembers(), removeMembers()))
-      val project4     = dataProjects(testProject4).map(addMemberWithId(creator.id)).generateOne
-      val project4Fork = dataProjects(testProject4Fork).map(addMemberWithId(creator.id)).generateOne
+      val project4     = dataProjects(testProject4).map(addMemberWithId(creator.id, Role.Owner)).generateOne
+      val project4Fork = dataProjects(testProject4Fork).map(addMemberWithId(creator.id, Role.Owner)).generateOne
       val (dataset5WithoutText, testProject5) = renkuProjectEntities(visibilityPublic, creatorGen = cliShapedPersons)
         .modify(removeMembers())
         .addDataset(datasetEntities(provenanceInternal(cliShapedPersons)))
         .generateOne
-      val project5 = dataProjects(testProject5).map(addMemberWithId(creator.id)).generateOne
+      val project5 = dataProjects(testProject5).map(addMemberWithId(creator.id, Role.Owner)).generateOne
       val (_, testProject6Private) = renkuProjectEntities(visibilityPrivate, creatorGen = cliShapedPersons)
         .modify(removeMembers())
         .addDataset(datasetEntities(provenanceInternal(cliShapedPersons)).modify(_.makeTitleContaining(text)))
@@ -256,7 +256,7 @@ class DatasetsResourcesSpec
       val project6CreatorPerson = cliShapedPersons.generateOne
       val project6Private = dataProjects(testProject6Private)
         .map(replaceCreatorFrom(project6CreatorPerson, creator.id))
-        .map(addMemberFrom(project6CreatorPerson, creator.id))
+        .map(addMemberFrom(project6CreatorPerson, creator.id, Role.Owner))
         .generateOne
 
       Given("some datasets with title, description, name and author containing some arbitrary chosen text")
@@ -278,15 +278,15 @@ class DatasetsResourcesSpec
       val foundDatasets = dsSearchResponse.jsonBody.as[List[Json]].value
       foundDatasets should {
         contain theSameElementsAs List(
-          searchResultJson(dataset1, 1, project1.path, foundDatasets),
-          searchResultJson(dataset2, 1, project2.path, foundDatasets),
-          searchResultJson(dataset3, 1, project3.path, foundDatasets),
-          searchResultJson(dataset4, 2, project4.path, foundDatasets)
+          searchResultJson(dataset1, 1, project1.slug, foundDatasets),
+          searchResultJson(dataset2, 1, project2.slug, foundDatasets),
+          searchResultJson(dataset3, 1, project3.slug, foundDatasets),
+          searchResultJson(dataset4, 2, project4.slug, foundDatasets)
         ) or contain theSameElementsAs List(
-          searchResultJson(dataset1, 1, project1.path, foundDatasets),
-          searchResultJson(dataset2, 1, project2.path, foundDatasets),
-          searchResultJson(dataset3, 1, project3.path, foundDatasets),
-          searchResultJson(dataset4, 2, project4Fork.path, foundDatasets)
+          searchResultJson(dataset1, 1, project1.slug, foundDatasets),
+          searchResultJson(dataset2, 1, project2.slug, foundDatasets),
+          searchResultJson(dataset3, 1, project3.slug, foundDatasets),
+          searchResultJson(dataset4, 2, project4Fork.slug, foundDatasets)
         )
       }
 
@@ -298,21 +298,21 @@ class DatasetsResourcesSpec
       searchSortedByName.status shouldBe Ok
 
       val foundDatasetsSortedByName = searchSortedByName.jsonBody.as[List[Json]].value
-      val datasetsSortedByNameProj4Path = List(
-        searchResultJson(dataset1, 1, project1.path, foundDatasetsSortedByName),
-        searchResultJson(dataset2, 1, project2.path, foundDatasetsSortedByName),
-        searchResultJson(dataset3, 1, project3.path, foundDatasetsSortedByName),
-        searchResultJson(dataset4, 2, project4.path, foundDatasetsSortedByName)
+      val datasetsSortedByNameProj4Slug = List(
+        searchResultJson(dataset1, 1, project1.slug, foundDatasetsSortedByName),
+        searchResultJson(dataset2, 1, project2.slug, foundDatasetsSortedByName),
+        searchResultJson(dataset3, 1, project3.slug, foundDatasetsSortedByName),
+        searchResultJson(dataset4, 2, project4.slug, foundDatasetsSortedByName)
       ).sortBy(_.hcursor.downField("title").as[String].getOrElse(fail("No 'title' property found")))
-      val datasetsSortedByNameProj4ForkPath = List(
-        searchResultJson(dataset1, 1, project1.path, foundDatasetsSortedByName),
-        searchResultJson(dataset2, 1, project2.path, foundDatasetsSortedByName),
-        searchResultJson(dataset3, 1, project3.path, foundDatasetsSortedByName),
-        searchResultJson(dataset4, 2, project4Fork.path, foundDatasetsSortedByName)
+      val datasetsSortedByNameProj4ForkSlug = List(
+        searchResultJson(dataset1, 1, project1.slug, foundDatasetsSortedByName),
+        searchResultJson(dataset2, 1, project2.slug, foundDatasetsSortedByName),
+        searchResultJson(dataset3, 1, project3.slug, foundDatasetsSortedByName),
+        searchResultJson(dataset4, 2, project4Fork.slug, foundDatasetsSortedByName)
       ).sortBy(_.hcursor.downField("title").as[String].getOrElse(fail("No 'title' property found")))
 
       foundDatasetsSortedByName should {
-        be(datasetsSortedByNameProj4Path) or be(datasetsSortedByNameProj4ForkPath)
+        be(datasetsSortedByNameProj4Slug) or be(datasetsSortedByNameProj4ForkSlug)
       }
 
       When("user calls the GET knowledge-graph/datasets?query=<text>&sort=title:asc&page=2&per_page=1")
@@ -322,8 +322,8 @@ class DatasetsResourcesSpec
       Then("he should get OK response with the dataset from the requested page")
       val foundDatasetsPage = searchForPage.jsonBody.as[List[Json]].value
       foundDatasetsPage should {
-        contain theSameElementsAs List(datasetsSortedByNameProj4Path(1)) or
-          contain theSameElementsAs List(datasetsSortedByNameProj4ForkPath(1))
+        contain theSameElementsAs List(datasetsSortedByNameProj4Slug(1)) or
+          contain theSameElementsAs List(datasetsSortedByNameProj4ForkSlug(1))
       }
 
       When("user calls the GET knowledge-graph/datasets?sort=name:asc")
@@ -333,18 +333,18 @@ class DatasetsResourcesSpec
       val foundDatasetsWithoutPhrase = searchWithoutPhrase.jsonBody.as[List[Json]].value
       foundDatasetsWithoutPhrase should {
         contain allElementsOf List(
-          searchResultJson(dataset1, 1, project1.path, foundDatasetsWithoutPhrase),
-          searchResultJson(dataset2, 1, project2.path, foundDatasetsWithoutPhrase),
-          searchResultJson(dataset3, 1, project3.path, foundDatasetsWithoutPhrase),
-          searchResultJson(dataset4, 2, project4.path, foundDatasetsWithoutPhrase),
-          searchResultJson(dataset5WithoutText, 1, project5.path, foundDatasetsWithoutPhrase)
+          searchResultJson(dataset1, 1, project1.slug, foundDatasetsWithoutPhrase),
+          searchResultJson(dataset2, 1, project2.slug, foundDatasetsWithoutPhrase),
+          searchResultJson(dataset3, 1, project3.slug, foundDatasetsWithoutPhrase),
+          searchResultJson(dataset4, 2, project4.slug, foundDatasetsWithoutPhrase),
+          searchResultJson(dataset5WithoutText, 1, project5.slug, foundDatasetsWithoutPhrase)
         ).sortBy(_.hcursor.downField("title").as[String].getOrElse(fail("No 'title' property found"))) or
           contain allElementsOf List(
-            searchResultJson(dataset1, 1, project1.path, foundDatasetsWithoutPhrase),
-            searchResultJson(dataset2, 1, project2.path, foundDatasetsWithoutPhrase),
-            searchResultJson(dataset3, 1, project3.path, foundDatasetsWithoutPhrase),
-            searchResultJson(dataset4, 2, project4Fork.path, foundDatasetsWithoutPhrase),
-            searchResultJson(dataset5WithoutText, 1, project5.path, foundDatasetsWithoutPhrase)
+            searchResultJson(dataset1, 1, project1.slug, foundDatasetsWithoutPhrase),
+            searchResultJson(dataset2, 1, project2.slug, foundDatasetsWithoutPhrase),
+            searchResultJson(dataset3, 1, project3.slug, foundDatasetsWithoutPhrase),
+            searchResultJson(dataset4, 2, project4Fork.slug, foundDatasetsWithoutPhrase),
+            searchResultJson(dataset5WithoutText, 1, project5.slug, foundDatasetsWithoutPhrase)
           ).sortBy(_.hcursor.downField("title").as[String].getOrElse(fail("No 'title' property found")))
       }
 
@@ -355,8 +355,8 @@ class DatasetsResourcesSpec
       Then("he should get OK response with the datasets from the first page")
       val foundFirstPage = firstPageResponse.flatMap(_.as[List[Json]]).unsafeRunSync()
       foundFirstPage should {
-        contain theSameElementsAs List(datasetsSortedByNameProj4Path.head) or
-          contain theSameElementsAs List(datasetsSortedByNameProj4ForkPath.head)
+        contain theSameElementsAs List(datasetsSortedByNameProj4Slug.head) or
+          contain theSameElementsAs List(datasetsSortedByNameProj4ForkSlug.head)
       }
 
       When("user uses 'details' link of one of the found datasets")
@@ -389,7 +389,7 @@ class DatasetsResourcesSpec
       val project1CreatorPerson = cliShapedPersons.generateOne
       val project1 = dataProjects(testProject1)
         .map(replaceCreatorFrom(project1CreatorPerson, creator.id))
-        .map(addMemberWithId(user.id) >>> addMemberFrom(project1CreatorPerson, creator.id))
+        .map(addMemberWithId(user.id, Role.Maintainer) >>> addMemberFrom(project1CreatorPerson, creator.id, Role.Owner))
         .generateOne
 
       val (_, testProject2Private) = renkuProjectEntities(visibilityPrivate, creatorGen = cliShapedPersons)
@@ -399,7 +399,7 @@ class DatasetsResourcesSpec
       val project2CreatorPerson = cliShapedPersons.generateOne
       val project2Private = dataProjects(testProject2Private)
         .map(replaceCreatorFrom(project2CreatorPerson, creator.id))
-        .map(addMemberFrom(project2CreatorPerson, creator.id))
+        .map(addMemberFrom(project2CreatorPerson, creator.id, Role.Owner))
         .generateOne
 
       val (dataset3PrivateWithAccess, testProject3PrivateWithAccess) =
@@ -410,7 +410,7 @@ class DatasetsResourcesSpec
       val project3CreatorPerson = cliShapedPersons.generateOne
       val project3PrivateWithAccess = dataProjects(testProject3PrivateWithAccess)
         .map(replaceCreatorFrom(project3CreatorPerson, creator.id))
-        .map(addMemberWithId(user.id) >>> addMemberFrom(project3CreatorPerson, creator.id))
+        .map(addMemberWithId(user.id, Role.Maintainer) >>> addMemberFrom(project3CreatorPerson, creator.id, Role.Owner))
         .generateOne
 
       Given("some datasets with title, description, name and author containing some arbitrary chosen text")
@@ -427,8 +427,8 @@ class DatasetsResourcesSpec
 
       val foundDatasets = datasetsSearchResponse.jsonBody.as[List[Json]].value
       foundDatasets should contain theSameElementsAs List(
-        searchResultJson(dataset1, 1, project1.path, foundDatasets),
-        searchResultJson(dataset3PrivateWithAccess, 1, project3PrivateWithAccess.path, foundDatasets)
+        searchResultJson(dataset1, 1, project1.slug, foundDatasets),
+        searchResultJson(dataset3PrivateWithAccess, 1, project3PrivateWithAccess.slug, foundDatasets)
       )
     }
 
@@ -453,7 +453,7 @@ class DatasetsResourcesSpec
         .addDataset(datasetEntities(provenanceInternal(cliShapedPersons)))
         .generateOne
 
-      val project = dataProjects(testProject).map(addMemberWithId(creator.id)).generateOne
+      val project = dataProjects(testProject).map(addMemberWithId(creator.id, Role.Owner)).generateOne
 
       Given("some data in the Triples Store")
       gitLabStub.addAuthenticated(creator)
@@ -482,7 +482,7 @@ class DatasetsResourcesSpec
       val projectCreatorPerson = cliShapedPersons.generateOne
       val project = dataProjects(testProject)
         .map(replaceCreatorFrom(projectCreatorPerson, creator.id))
-        .map(addMemberWithId(user.id) >>> addMemberFrom(projectCreatorPerson, creator.id))
+        .map(addMemberWithId(user.id, Role.Maintainer) >>> addMemberFrom(projectCreatorPerson, creator.id, Role.Owner))
         .generateOne
 
       Given("I am authenticated")

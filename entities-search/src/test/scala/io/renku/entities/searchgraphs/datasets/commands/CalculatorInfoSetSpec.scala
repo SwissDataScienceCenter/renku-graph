@@ -19,123 +19,203 @@
 package io.renku.entities.searchgraphs.datasets
 package commands
 
+import CalculatorInfoSetGenerators._
+import Generators._
+import cats.data.NonEmptyList
 import cats.syntax.all._
-import io.renku.entities.searchgraphs.datasets.Generators._
-import io.renku.entities.searchgraphs.datasets.DatasetSearchInfo
+import io.renku.entities.searchgraphs.datasets.ModelDatasetSearchInfo
 import io.renku.generators.Generators.Implicits._
 import io.renku.graph.model.GraphModelGenerators.projectResourceIds
+import io.renku.graph.model.entities
 import io.renku.graph.model.testentities._
-import io.renku.graph.model.{entities, projects}
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
+import org.scalatest.{EitherValues, OptionValues}
 import org.scalatestplus.scalacheck.ScalaCheckPropertyChecks
 
-class CalculatorInfoSetSpec extends AnyWordSpec with should.Matchers with ScalaCheckPropertyChecks {
+class CalculatorInfoSetSpec
+    extends AnyWordSpec
+    with should.Matchers
+    with ScalaCheckPropertyChecks
+    with EitherValues
+    with OptionValues {
 
   "from" should {
 
-    "create CalculatorInfoSet if there's no TS Search Info" in {
+    "create CalculatorInfoSet when there's no TS Search Info" in {
 
-      val project        = projectIdentifications.generateOne
-      val modelInfo      = datasetSearchInfoObjects(project.resourceId).generateOne
-      val tsVisibilities = Map.empty[projects.ResourceId, projects.Visibility]
+      val project   = anyRenkuProjectEntities.map(_.to[entities.Project]).generateOne
+      val modelInfo = modelDatasetSearchInfoObjects(project).generateOne
 
-      val Right(infoSet) = CalculatorInfoSet.from(project, modelInfo.some, None, tsVisibilities)
+      val infoSet = CalculatorInfoSet.from(project.identification, modelInfo.some, maybeTSInfo = None).value
 
-      infoSet shouldBe CalculatorInfoSet.ModelInfoOnly(project, modelInfo)
+      infoSet shouldBe CalculatorInfoSet.ModelInfoOnly(project.identification, modelInfo)
     }
 
-    "create CalculatorInfoSet if there's no model Search Info" in {
+    "create CalculatorInfoSet when there's no model Search Info" in {
 
-      val project        = anyRenkuProjectEntities(anyVisibility).map(_.to[entities.Project]).generateOne
-      val tsInfo         = datasetSearchInfoObjects(project.resourceId).generateOne
-      val tsVisibilities = Map(project.resourceId -> project.visibility)
+      val project = anyRenkuProjectEntities.map(_.to[entities.Project]).generateOne
+      val tsInfo  = tsDatasetSearchInfoObjects(project.resourceId).generateOne
 
-      val Right(infoSet) = CalculatorInfoSet.from(project.identification, None, tsInfo.some, tsVisibilities)
+      val infoSet = CalculatorInfoSet.from(project.identification, maybeModelInfo = None, tsInfo.some).value
 
-      infoSet shouldBe CalculatorInfoSet.TSInfoOnly(project.identification, tsInfo, tsVisibilities)
+      infoSet shouldBe CalculatorInfoSet.TSInfoOnly(project.identification, tsInfo)
     }
 
-    "create CalculatorInfoSet if there are both Search Infos" in {
+    "create CalculatorInfoSet when there are both Search Infos" in {
 
-      val project        = anyRenkuProjectEntities(anyVisibility).map(_.to[entities.Project]).generateOne
-      val modelInfo      = datasetSearchInfoObjects(project.resourceId).generateOne
-      val tsInfo         = datasetSearchInfoObjects(project.resourceId).generateOne
-      val tsVisibilities = Map(project.resourceId -> project.visibility)
+      val project   = anyRenkuProjectEntities.map(_.to[entities.Project]).generateOne
+      val modelInfo = modelDatasetSearchInfoObjects(project).generateOne
+      val tsInfo =
+        tsDatasetSearchInfoObjects(project.resourceId).generateOne.copy(topmostSameAs = modelInfo.topmostSameAs)
 
-      val Right(infoSet) = CalculatorInfoSet.from(project.identification, modelInfo.some, tsInfo.some, tsVisibilities)
+      val infoSet = CalculatorInfoSet.from(project.identification, modelInfo.some, tsInfo.some).value
 
-      infoSet shouldBe CalculatorInfoSet.AllInfos(project.identification, modelInfo, tsInfo, tsVisibilities)
+      infoSet shouldBe CalculatorInfoSet.BothInfos(project.identification, modelInfo, tsInfo)
     }
 
-    "fail if there's model Search Info with multiple Links" in {
+    "fail when there's a model Search Info pointing to another Project" in {
 
-      val project        = projectIdentifications.generateOne
-      val modelInfo      = datasetSearchInfoObjects(project.resourceId, projectResourceIds.generateOne).generateOne
-      val tsVisibilities = Map.empty[projects.ResourceId, projects.Visibility]
+      val project = projectIdentifications.generateOne
+      val modelInfo = modelDatasetSearchInfoObjects(
+        anyRenkuProjectEntities.map(_.to[entities.Project]).generateOne
+      ).generateOne
 
-      val result = CalculatorInfoSet.from(project, modelInfo.some, None, tsVisibilities)
+      val exception = CalculatorInfoSet.from(project, modelInfo.some, maybeTSInfo = None).left.value
 
-      result shouldBe a[Left[_, _]]
-      result.leftMap(_.getMessage) shouldBe
-        show"CalculatorInfoSet for ${project.resourceId} is linked to many projects".asLeft
+      exception.getMessage shouldBe show"CalculatorInfoSet for ${project.resourceId} has link to ${modelInfo.link.projectId}"
     }
 
-    "fail if there's model Search Info pointing to some other Project" in {
+    "fail when model and TS Search Infos point to another TopmostSameAs" in {
 
-      val project        = projectIdentifications.generateOne
-      val modelInfo      = datasetSearchInfoObjects(projectResourceIds.generateOne).generateOne
-      val tsVisibilities = Map.empty[projects.ResourceId, projects.Visibility]
+      val project   = anyRenkuProjectEntities.map(_.to[entities.Project]).generateOne
+      val modelInfo = modelDatasetSearchInfoObjects(project).generateOne
+      val tsInfo    = tsDatasetSearchInfoObjects(project.resourceId).generateOne
 
-      val result = CalculatorInfoSet.from(project, modelInfo.some, None, tsVisibilities)
+      val exception =
+        CalculatorInfoSet.from(project.identification, modelInfo.some, maybeTSInfo = tsInfo.some).left.value
 
-      result shouldBe a[Left[_, _]]
-      result.leftMap(_.getMessage) shouldBe
-        show"CalculatorInfoSet for ${project.resourceId} has model linked to ${modelInfo.links.head.projectId}".asLeft
+      exception.getMessage shouldBe show"CalculatorInfoSet for ${project.resourceId} has different TopmostSameAs"
     }
 
-    "fail if there is neither model nor ts info" in {
+    "fail when there's neither model nor TS info" in {
 
       val project = projectIdentifications.generateOne
 
-      val result = CalculatorInfoSet.from(project, None, None, Map.empty)
+      val exception = CalculatorInfoSet.from(project, maybeModelInfo = None, maybeTSInfo = None).left.value
 
-      result                       shouldBe a[Left[_, _]]
-      result.leftMap(_.getMessage) shouldBe show"CalculatorInfoSet for ${project.resourceId} has no infos".asLeft
+      exception.getMessage shouldBe show"CalculatorInfoSet for ${project.resourceId} has no infos"
+    }
+  }
+
+  "toDatasetSearchInfo" should {
+
+    "copy data from the ModelDatasetSearchInfo if there's no TSDatasetSearchInfo" in {
+
+      val project   = anyRenkuProjectEntities.map(_.to[entities.Project]).generateOne
+      val modelInfo = modelDatasetSearchInfoObjects(project).generateOne
+
+      CalculatorInfoSet
+        .from(project.identification, modelInfo.some, maybeTSInfo = None)
+        .value
+        .asDatasetSearchInfo
+        .value shouldBe DatasetSearchInfo(
+        modelInfo.topmostSameAs,
+        modelInfo.name,
+        modelInfo.createdOrPublished,
+        modelInfo.maybeDateModified,
+        modelInfo.creators,
+        modelInfo.keywords,
+        modelInfo.maybeDescription,
+        modelInfo.images,
+        NonEmptyList.one(modelInfo.link)
+      )
+    }
+
+    "return None if there's no ModelDatasetSearchInfo" in {
+
+      val project = anyRenkuProjectEntities.map(_.to[entities.Project]).generateOne
+      val tsInfo  = tsDatasetSearchInfoObjects(project).generateOne
+
+      CalculatorInfoSet
+        .from(project.identification, maybeModelInfo = None, tsInfo.some)
+        .value
+        .asDatasetSearchInfo shouldBe None
+    }
+
+    "merge data from the ModelDatasetSearchInfo and TSDatasetSearchInfo if both given" in {
+
+      val project   = anyRenkuProjectEntities.map(_.to[entities.Project]).generateOne
+      val modelInfo = modelDatasetSearchInfoObjects(project).generateOne
+      val tsInfo    = tsDatasetSearchInfoObjects.generateOne.copy(topmostSameAs = modelInfo.topmostSameAs)
+
+      val info =
+        CalculatorInfoSet.from(project.identification, modelInfo.some, tsInfo.some).value.asDatasetSearchInfo.value
+
+      info.topmostSameAs      shouldBe modelInfo.topmostSameAs
+      info.name               shouldBe modelInfo.name
+      info.createdOrPublished shouldBe modelInfo.createdOrPublished
+      info.maybeDateModified  shouldBe modelInfo.maybeDateModified
+      info.creators           shouldBe modelInfo.creators
+      info.keywords           shouldBe modelInfo.keywords
+      info.maybeDescription   shouldBe modelInfo.maybeDescription
+      info.images             shouldBe modelInfo.images
+      info.links.toList         should contain theSameElementsAs (modelInfo.link :: tsInfo.links)
+    }
+
+    "use the project link from the model if also exists in TS" in {
+
+      val project   = anyRenkuProjectEntities.map(_.to[entities.Project]).generateOne
+      val modelInfo = modelDatasetSearchInfoObjects(project).generateOne
+      val tsInfo = {
+        val info         = tsDatasetSearchInfoObjects(project.resourceId).generateOne
+        val otherTSLinks = linkObjectsGen(modelInfo.topmostSameAs).generateList(min = 1, max = 3)
+        info.copy(topmostSameAs = modelInfo.topmostSameAs, links = info.links ::: otherTSLinks)
+      }
+
+      val info =
+        CalculatorInfoSet.from(project.identification, modelInfo.some, tsInfo.some).value.asDatasetSearchInfo.value
+
+      info.topmostSameAs      shouldBe modelInfo.topmostSameAs
+      info.name               shouldBe modelInfo.name
+      info.createdOrPublished shouldBe modelInfo.createdOrPublished
+      info.maybeDateModified  shouldBe modelInfo.maybeDateModified
+      info.creators           shouldBe modelInfo.creators
+      info.keywords           shouldBe modelInfo.keywords
+      info.maybeDescription   shouldBe modelInfo.maybeDescription
+      info.images             shouldBe modelInfo.images
+      info.links.toList         should contain theSameElementsAs (
+        modelInfo.link :: tsInfo.links.filterNot(_.projectId == project.resourceId)
+      )
     }
   }
 
   "show" should {
 
-    "return String containing project id and path along with model and TS search info" in {
+    "return String containing project id and slug along with model and TS search info" in {
       forAll(anyProjectEntities.map(_.to[entities.Project])) { project =>
-        val maybeModelInfo = datasetSearchInfoObjects(withLinkTo = project.resourceId).generateSome
+        val modelInfo = modelDatasetSearchInfoObjects(withLinkTo = project).generateOne
 
-        val maybeTSInfo = datasetSearchInfoObjects(
+        val maybeTSInfo = tsDatasetSearchInfoObjects(
           withLinkTo = project.resourceId,
           and = projectResourceIds.generateList(): _*
-        ).generateSome
+        ).generateSome.map(_.copy(topmostSameAs = modelInfo.topmostSameAs))
 
-        val tsVisibilities = maybeTSInfo.map(_ => Map(project.resourceId -> project.visibility)).getOrElse(Map.empty)
-
-        val infoSet =
-          CalculatorInfoSet
-            .from(project.identification, maybeModelInfo, maybeTSInfo, tsVisibilities)
-            .fold(throw _, identity)
+        val infoSet = CalculatorInfoSet.from(project.identification, modelInfo.some, maybeTSInfo).value
 
         infoSet.show shouldBe List(
           project.identification.show.some,
-          maybeModelInfo.map(mi => show"modelInfo = [${searchIntoToString(mi)}]"),
-          maybeTSInfo.map(tsi => show"tsInfo = [${searchIntoToString(tsi)}]")
+          show"modelInfo = [${searchIntoToString(modelInfo)}]".some,
+          maybeTSInfo.map(tsi => show"tsInfo = [$tsi]")
         ).flatten.mkString(", ")
       }
     }
   }
 
-  private def searchIntoToString(info: DatasetSearchInfo) = List(
+  private def searchIntoToString(info: ModelDatasetSearchInfo) = List(
     show"topmostSameAs = ${info.topmostSameAs}",
     show"name = ${info.name}",
-    show"visibility = ${info.visibility}",
-    show"links = [${info.links.map(link => show"projectId = ${link.projectId}, datasetId = ${link.datasetId}").intercalate("; ")}}]"
+    show"visibility = ${info.link.visibility}",
+    show"link = ${info.link}"
   ).mkString(", ")
 }

@@ -18,7 +18,6 @@
 
 package io.renku.entities.searchgraphs.projects
 
-import io.renku.entities.searchgraphs.PersonInfo
 import io.renku.generators.Generators.Implicits._
 import io.renku.graph.model.entities
 import io.renku.graph.model.testentities._
@@ -34,11 +33,11 @@ class SearchInfoExtractorSpec extends AnyFlatSpec with should.Matchers {
     SearchInfoExtractor.extractSearchInfo(project) shouldBe ProjectSearchInfo(
       project.resourceId,
       project.name,
-      project.path,
+      project.slug,
       project.visibility,
       project.dateCreated,
       project.dateModified,
-      project.maybeCreator.map(PersonInfo.toPersonInfo),
+      project.maybeCreator.map(_.resourceId),
       project.keywords.toList,
       project.maybeDescription,
       project.images

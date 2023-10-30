@@ -31,7 +31,7 @@ import io.renku.generators.Generators.Implicits._
 import io.renku.generators.Generators._
 import io.renku.graph.config.EventLogUrl
 import io.renku.graph.model.EventsGenerators._
-import io.renku.graph.model.GraphModelGenerators.projectPaths
+import io.renku.graph.model.GraphModelGenerators.projectSlugs
 import io.renku.graph.model.events.CommitId
 import io.renku.http.client.UrlEncoder.urlEncode
 import io.renku.interpreters.TestLogger
@@ -56,7 +56,7 @@ class ELCommitFetcherSpec extends AnyWordSpec with IOSpec with ExternalServiceSt
       val maybeNextPage = pages.generateOption
       stubFor {
         get(
-          s"/events?project-path=$projectPath&page=${pageRequest.page}&per_page=${pageRequest.perPage}&$conditionQuery"
+          s"/events?project-slug=$projectSlug&page=${pageRequest.page}&per_page=${pageRequest.perPage}&$conditionQuery"
         ).willReturn(
           okJson(commitIdsList.asJson.noSpaces)
             .withHeader("Next-Page", maybeNextPage.map(_.show).getOrElse(""))
@@ -64,7 +64,7 @@ class ELCommitFetcherSpec extends AnyWordSpec with IOSpec with ExternalServiceSt
       }
 
       elCommitFetcher
-        .fetchELCommits(projectPath, condition, pageRequest)
+        .fetchELCommits(projectSlug, condition, pageRequest)
         .unsafeRunSync() shouldBe PageResult(commitIdsList, maybeNextPage)
     }
 
@@ -74,12 +74,12 @@ class ELCommitFetcherSpec extends AnyWordSpec with IOSpec with ExternalServiceSt
 
       stubFor {
         get(
-          s"/events?project-path=$projectPath&page=${pageRequest.page}&per_page=${pageRequest.perPage}&until=${urlEncode(dateCondition.date.toString)}"
+          s"/events?project-slug=$projectSlug&page=${pageRequest.page}&per_page=${pageRequest.perPage}&until=${urlEncode(dateCondition.date.toString)}"
         ).willReturn(okJson("[]"))
       }
 
       elCommitFetcher
-        .fetchELCommits(projectPath, dateCondition, pageRequest)
+        .fetchELCommits(projectSlug, dateCondition, pageRequest)
         .unsafeRunSync() shouldBe PageResult.empty
     }
 
@@ -89,12 +89,12 @@ class ELCommitFetcherSpec extends AnyWordSpec with IOSpec with ExternalServiceSt
 
       stubFor {
         get(
-          s"/events?project-path=$projectPath&page=${pageRequest.page}&per_page=${pageRequest.perPage}&until=${urlEncode(dateCondition.date.toString)}"
+          s"/events?project-slug=$projectSlug&page=${pageRequest.page}&per_page=${pageRequest.perPage}&until=${urlEncode(dateCondition.date.toString)}"
         ).willReturn(notFound())
       }
 
       elCommitFetcher
-        .fetchELCommits(projectPath, dateCondition, pageRequest)
+        .fetchELCommits(projectSlug, dateCondition, pageRequest)
         .unsafeRunSync() shouldBe PageResult.empty
     }
 
@@ -104,13 +104,13 @@ class ELCommitFetcherSpec extends AnyWordSpec with IOSpec with ExternalServiceSt
 
       stubFor {
         get(
-          s"/events?project-path=$projectPath&page=${pageRequest.page}&per_page=${pageRequest.perPage}&until=${urlEncode(dateCondition.date.toString)}"
+          s"/events?project-slug=$projectSlug&page=${pageRequest.page}&per_page=${pageRequest.perPage}&until=${urlEncode(dateCondition.date.toString)}"
         ).willReturn(badRequest().withBody("some error"))
       }
 
       intercept[Exception] {
-        elCommitFetcher.fetchELCommits(projectPath, dateCondition, pageRequest).unsafeRunSync()
-      }.getMessage shouldBe s"GET $eventLogUrl/events?project-path=$projectPath&page=${pageRequest.page}&per_page=${pageRequest.perPage}&until=${urlEncode(
+        elCommitFetcher.fetchELCommits(projectSlug, dateCondition, pageRequest).unsafeRunSync()
+      }.getMessage shouldBe s"GET $eventLogUrl/events?project-slug=$projectSlug&page=${pageRequest.page}&per_page=${pageRequest.perPage}&until=${urlEncode(
           dateCondition.date.toString
         )} returned ${Status.BadRequest}; body: some error"
     }
@@ -121,14 +121,14 @@ class ELCommitFetcherSpec extends AnyWordSpec with IOSpec with ExternalServiceSt
 
       stubFor {
         get(
-          s"/events?project-path=$projectPath&page=${pageRequest.page}&per_page=${pageRequest.perPage}&until=${urlEncode(dateCondition.date.toString)}"
+          s"/events?project-slug=$projectSlug&page=${pageRequest.page}&per_page=${pageRequest.perPage}&until=${urlEncode(dateCondition.date.toString)}"
         ).willReturn(okJson("{}"))
       }
 
       intercept[Exception] {
-        elCommitFetcher.fetchELCommits(projectPath, dateCondition, pageRequest).unsafeRunSync()
+        elCommitFetcher.fetchELCommits(projectSlug, dateCondition, pageRequest).unsafeRunSync()
       }.getMessage should startWith(
-        s"GET $eventLogUrl/events?project-path=$projectPath&page=${pageRequest.page}&per_page=${pageRequest.perPage}&until=${urlEncode(
+        s"GET $eventLogUrl/events?project-slug=$projectSlug&page=${pageRequest.page}&per_page=${pageRequest.perPage}&until=${urlEncode(
             dateCondition.date.toString
           )} returned ${Status.Ok}; error: Invalid message body: Could not decode JSON: {}"
       )
@@ -136,7 +136,7 @@ class ELCommitFetcherSpec extends AnyWordSpec with IOSpec with ExternalServiceSt
   }
 
   private trait TestCase {
-    val projectPath   = projectPaths.generateOne
+    val projectSlug   = projectSlugs.generateOne
     val pageRequest   = pagingRequests.generateOne
     val commitIdsList = commitIds.generateNonEmptyList().toList
 

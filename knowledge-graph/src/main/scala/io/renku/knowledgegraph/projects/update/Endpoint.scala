@@ -18,69 +18,87 @@
 
 package io.renku.knowledgegraph.projects.update
 
+import cats.NonEmptyParallel
 import cats.data.EitherT
 import cats.effect.Async
 import cats.syntax.all._
-import io.circe.Json
-import io.circe.syntax._
-import io.renku.data.ErrorMessage
+import eu.timepit.refined.auto._
+import io.renku.data.Message
 import io.renku.graph.model.projects
-import io.renku.http.ErrorMessage._
-import io.renku.http.InfoMessage
-import io.renku.http.InfoMessage._
 import io.renku.http.client.GitLabClient
 import io.renku.http.server.security.model.AuthUser
+import io.renku.knowledgegraph.Failure
 import io.renku.metrics.MetricsRegistry
-import io.renku.triplesgenerator
-import io.renku.triplesgenerator.api.events.SyncRepoMetadata
+import org.http4s.MediaType.{application, multipartType}
 import org.http4s.circe.CirceEntityDecoder._
-import org.http4s.circe.CirceEntityEncoder._
 import org.http4s.dsl.Http4sDsl
+import org.http4s.headers.`Content-Type`
+import org.http4s.multipart.Multipart
 import org.http4s.{Request, Response}
 import org.typelevel.log4cats.Logger
 
 trait Endpoint[F[_]] {
-  def `PUT /projects/:path`(path: projects.Path, request: Request[F], authUser: AuthUser): F[Response[F]]
+  def `PATCH /projects/:slug`(slug: projects.Slug, request: Request[F], authUser: AuthUser): F[Response[F]]
 }
 
 object Endpoint {
-  def apply[F[_]: Async: Logger: MetricsRegistry: GitLabClient]: F[Endpoint[F]] =
-    triplesgenerator.api.events.Client[F].map(new EndpointImpl(GLProjectUpdater[F], _))
+  def apply[F[_]: Async: NonEmptyParallel: Logger: MetricsRegistry: GitLabClient]: F[Endpoint[F]] =
+    ProjectUpdater[F].map(new EndpointImpl(_))
 }
 
-private class EndpointImpl[F[_]: Async: Logger](glProjectUpdater: GLProjectUpdater[F],
-                                                tgClient: triplesgenerator.api.events.Client[F]
-) extends Http4sDsl[F]
+private class EndpointImpl[F[_]: Async: Logger](projectUpdater: ProjectUpdater[F])
+    extends Http4sDsl[F]
     with Endpoint[F] {
 
-  override def `PUT /projects/:path`(path: projects.Path, request: Request[F], authUser: AuthUser): F[Response[F]] =
-    decodePayload(request)
-      .flatMap(updateGL(path, authUser))
-      .semiflatMap(_ => tgClient.send(SyncRepoMetadata(path)))
-      .as(Response[F](Accepted).withEntity(InfoMessage("Project update accepted")))
+  override def `PATCH /projects/:slug`(slug: projects.Slug, request: Request[F], authUser: AuthUser): F[Response[F]] =
+    EitherT(decodePayload(request))
+      .semiflatMap { updates =>
+        projectUpdater
+          .updateProject(slug, updates, authUser)
+          .as(Response[F](Accepted).withEntity(Message.Info("Project update accepted")))
+          .flatTap(_ => Logger[F].info(show"Project $slug updated with $updates"))
+      }
       .merge
-      .handleErrorWith(serverError(path)(_))
+      .handleErrorWith(relevantError(slug))
 
-  private lazy val decodePayload: Request[F] => EitherT[F, Response[F], NewValues] = req =>
-    EitherT {
+  private lazy val decodePayload: Request[F] => F[Either[Response[F], ProjectUpdates]] = {
+    case req if req.contentType contains `Content-Type`(application.json) =>
       req
-        .as[NewValues]
+        .as[ProjectUpdates]
         .map(_.asRight[Response[F]])
-        .handleError(badRequest(_).asLeft[NewValues])
-    }
-
-  private def badRequest: Throwable => Response[F] = { _ =>
-    Response[F](BadRequest).withEntity(ErrorMessage("Invalid payload").asJson)
+        .handleError(badRequest(_).asLeft[ProjectUpdates])
+    case req if req.contentType.map(_.mediaType).exists(_.satisfies(multipartType("form-data"))) =>
+      req
+        .as[Multipart[F]]
+        .flatMap(MultipartRequestDecoder[F].decode)
+        .map(_.asRight[Response[F]])
+        .handleError(badRequest(_).asLeft[ProjectUpdates])
+    case req =>
+      Response[F](InternalServerError)
+        .withEntity(Message.Error.unsafeApply(s"'${req.contentType}' not supported"))
+        .asLeft[ProjectUpdates]
+        .pure[F]
   }
 
-  private def badRequest(message: Json): Response[F] =
-    Response[F](BadRequest).withEntity(ErrorMessage(message))
+  private def badRequest: Throwable => Response[F] = { _ =>
+    Response[F](BadRequest).withEntity(Message.Error("Invalid payload"))
+  }
 
-  private def updateGL(path: projects.Path, authUser: AuthUser)(newValues: NewValues): EitherT[F, Response[F], Unit] =
-    glProjectUpdater.updateProject(path, newValues, authUser.accessToken).leftMap(badRequest)
+  private def relevantError(slug: projects.Slug): Throwable => F[Response[F]] = {
+    case f: Failure =>
+      logFailure(slug)(f).as(f.toResponse[F])
+    case ex: Exception =>
+      Logger[F]
+        .error(ex)(show"Updating project $slug failed")
+        .as(Response[F](InternalServerError).withEntity(Message.Error("Update failed")))
+  }
 
-  private def serverError(path: projects.Path): Throwable => F[Response[F]] =
-    Logger[F]
-      .error(_)(show"Updating project $path failed")
-      .as(Response[F](InternalServerError).withEntity(ErrorMessage("Update failed").asJson))
+  private def logFailure(slug: projects.Slug): Failure => F[Unit] = {
+    case f if f.status == BadRequest || f.status == Conflict =>
+      Logger[F].info(show"Updating project $slug failed: ${f.detailedMessage}")
+    case f if f.status == Forbidden =>
+      ().pure[F]
+    case f =>
+      Logger[F].error(f)(show"Updating project $slug failed: ${f.detailedMessage}")
+  }
 }

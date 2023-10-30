@@ -30,7 +30,7 @@ import io.renku.generators.Generators.Implicits._
 import io.renku.graph.model.projects
 import io.renku.interpreters.TestLogger
 import io.renku.lock.Lock
-import io.renku.triplesgenerator.TgLockDB.TsWriteLock
+import io.renku.triplesgenerator.TgDB.TsWriteLock
 import io.renku.triplesgenerator.api.events.Generators.syncRepoMetadataEvents
 import io.renku.triplesgenerator.events.consumers.TSReadinessForEventsChecker
 import io.renku.triplesgenerator.events.consumers.syncrepometadata.processor.EventProcessor
@@ -78,7 +78,7 @@ class EventHandlerSpec
 
       val test = Ref.unsafe[IO, Int](0)
       val tsWriteLock: TsWriteLock[IO] =
-        Lock.from[IO, projects.Path](Kleisli(_ => test.update(_ + 1)))(Kleisli(_ => test.update(_ + 1)))
+        Lock.from[IO, projects.Slug](Kleisli(_ => test.update(_ + 1)))(Kleisli(_ => test.update(_ + 1)))
 
       expectTSReadinessCheckerCall
 
@@ -121,7 +121,7 @@ class EventHandlerSpec
 
   private lazy val eventProcessor = mock[EventProcessor[IO]]
 
-  private lazy val noLock = Lock.none[IO, projects.Path]
+  private lazy val noLock = Lock.none[IO, projects.Slug]
 
   private def handler(tsWriteLock: TsWriteLock[IO]) =
     new EventHandler[IO](categoryName, tsReadinessChecker, eventProcessor, mock[ProcessExecutor[IO]], tsWriteLock)

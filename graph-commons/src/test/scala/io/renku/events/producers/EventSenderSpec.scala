@@ -28,7 +28,7 @@ import eu.timepit.refined.auto._
 import io.renku.events.CategoryName
 import io.renku.events.Generators._
 import io.renku.generators.Generators.Implicits._
-import io.renku.generators.Generators.nonEmptyStrings
+import io.renku.generators.Generators.{nonEmptyStrings, positiveInts}
 import io.renku.graph.config.EventConsumerUrl
 import io.renku.graph.metrics.SentEventsGauge
 import io.renku.interpreters.TestLogger
@@ -36,6 +36,7 @@ import io.renku.stubbing.ExternalServiceStubbing
 import io.renku.testtools.IOSpec
 import org.http4s.Status.{Accepted, BadGateway, GatewayTimeout, NotFound, ServiceUnavailable, TooManyRequests}
 import org.scalamock.scalatest.MockFactory
+import org.scalatest.OptionValues
 import org.scalatest.matchers.should
 import org.scalatest.prop.TableDrivenPropertyChecks
 import org.scalatest.wordspec.AnyWordSpec
@@ -48,6 +49,7 @@ class EventSenderSpec
     with ExternalServiceStubbing
     with MockFactory
     with should.Matchers
+    with OptionValues
     with TableDrivenPropertyChecks {
 
   forAll {
@@ -55,12 +57,12 @@ class EventSenderSpec
       "Request Content Type" -> "SendEvent generator",
       "No Payload" -> { (sender: EventSender[IO], categoryName: CategoryName) =>
         eventRequestContentNoPayloads.map(ev =>
-          sender.sendEvent(ev, EventContext(categoryName, nonEmptyStrings().generateOne))
+          sender.sendEvent(ev, EventContext(categoryName, nonEmptyStrings().generateOne, maxRetriesNumber = 3))
         )
       },
       "With Payload" -> { (sender: EventSender[IO], categoryName: CategoryName) =>
         eventRequestContentWithZippedPayloads.map(ev =>
-          sender.sendEvent(ev, EventContext(categoryName, nonEmptyStrings().generateOne))
+          sender.sendEvent(ev, EventContext(categoryName, nonEmptyStrings().generateOne, maxRetriesNumber = 3))
         )
       }
     )
@@ -84,6 +86,7 @@ class EventSenderSpec
 
       Set(TooManyRequests, BadGateway, ServiceUnavailable, GatewayTimeout) foreach { errorStatus =>
         s"retry if remote responds with status such as $errorStatus" in new TestCase {
+
           val eventRequest = post(urlEqualTo(s"/events")).inScenario("Retry")
 
           stubFor {
@@ -152,6 +155,62 @@ class EventSenderSpec
           reset()
         }
       }
+
+      "fail when the specified number of retries is exceeded" in new TestCase {
+
+        val eventRequest = post(urlEqualTo(s"/events"))
+        val response     = aResponse().withFault(CONNECTION_RESET_BY_PEER)
+
+        stubFor {
+          eventRequest.willReturn(response)
+        }
+
+        (sentEventsGauge.increment _).expects(categoryName).returning(().pure[IO]).anyNumberOfTimes()
+
+        intercept[Exception](
+          callGenerator(eventSender, categoryName).generateOne.unsafeRunSync()
+        ).getMessage should endWith("no more attempts left")
+      }
+    }
+  }
+
+  "EventContext.nextAttempt" should {
+
+    "return a copy of the context object with decremented number of retries" in {
+
+      val initialRetries = positiveInts().generateOne.value
+      val ctx            = generateEventContext(maxRetries = initialRetries.some)
+
+      ctx.retries.value.max  shouldBe initialRetries
+      ctx.retries.value.left shouldBe initialRetries
+
+      val nextAttempt = ctx.nextAttempt()
+      nextAttempt.retries.value.max  shouldBe initialRetries
+      nextAttempt.retries.value.left shouldBe initialRetries - 1
+    }
+
+    "return the same instance if no retries specified" in {
+
+      val ctx = generateEventContext(maxRetries = None)
+
+      ctx.retries shouldBe None
+
+      ctx.nextAttempt() shouldBe ctx
+    }
+  }
+
+  "EventContext.hasAttemptsLeft" should {
+
+    "return true when the number of retries is > 0" in {
+      generateEventContext(maxRetries = positiveInts().generateSome.map(_.value)).hasAttemptsLeft shouldBe true
+    }
+
+    "return false when the number of retries is <= 0" in {
+      generateEventContext(maxRetries = 0.some).hasAttemptsLeft shouldBe false
+    }
+
+    "return true when no retries specified" in {
+      generateEventContext(maxRetries = None).hasAttemptsLeft shouldBe true
     }
   }
 
@@ -175,4 +234,12 @@ class EventSenderSpec
       requestTimeoutOverride = Some(requestTimeout)
     )
   }
+
+  private def generateEventContext(maxRetries: Option[Int]) =
+    maxRetries match {
+      case None =>
+        EventContext(categoryNames.generateOne, nonEmptyStrings().generateOne)
+      case Some(retries) =>
+        EventContext(categoryNames.generateOne, nonEmptyStrings().generateOne, retries)
+    }
 }

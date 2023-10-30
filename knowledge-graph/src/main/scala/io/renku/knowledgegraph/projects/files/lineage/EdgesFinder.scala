@@ -22,21 +22,21 @@ import cats.effect._
 import cats.syntax.all._
 import eu.timepit.refined.auto._
 import io.renku.graph.config.RenkuUrlLoader
+import io.renku.graph.model.RenkuUrl
 import io.renku.graph.model.Schemas._
-import io.renku.graph.model.entities.Person
-import io.renku.graph.model.projects.{Path, ResourceId, Visibility}
+import io.renku.graph.model.projects.{ResourceId, Slug, Visibility}
 import io.renku.graph.model.views.RdfResource
-import io.renku.graph.model.{GraphClass, RenkuUrl}
 import io.renku.http.server.security.model.AuthUser
 import io.renku.jsonld.EntityId
+import io.renku.knowledgegraph.projects.files.lineage.model.Node.Location
+import io.renku.knowledgegraph.projects.files.lineage.model._
+import io.renku.projectauth.util.SparqlSnippets
 import io.renku.triplesstore.SparqlQuery.Prefixes
 import io.renku.triplesstore._
-import model.Node.Location
-import model._
 import org.typelevel.log4cats.Logger
 
 private trait EdgesFinder[F[_]] {
-  def findEdges(projectPath: Path, maybeUser: Option[AuthUser]): F[EdgeMap]
+  def findEdges(projectSlug: Slug, maybeUser: Option[AuthUser]): F[EdgeMap]
 }
 
 private class EdgesFinderImpl[F[_]: Async: Logger: SparqlQueryTimeRecorder](
@@ -47,8 +47,8 @@ private class EdgesFinderImpl[F[_]: Async: Logger: SparqlQueryTimeRecorder](
 
   private type EdgeData = (ExecutionInfo, Option[Location], Option[Node.Location])
 
-  override def findEdges(projectPath: Path, maybeUser: Option[AuthUser]): F[EdgeMap] =
-    queryEdges(query = query(projectPath, maybeUser)) map toNodesLocations
+  override def findEdges(projectSlug: Slug, maybeUser: Option[AuthUser]): F[EdgeMap] =
+    queryEdges(query = query(projectSlug, maybeUser)) map toNodesLocations
 
   private def queryEdges(query: SparqlQuery): F[Set[EdgeData]] = {
     val pageSize = 2000
@@ -67,14 +67,14 @@ private class EdgesFinderImpl[F[_]: Async: Logger: SparqlQueryTimeRecorder](
     fetchPaginatedResult(Set.empty[EdgeData], query, offset = 0)
   }
 
-  private def query(path: Path, maybeUser: Option[AuthUser]) = SparqlQuery.of(
+  private def query(slug: Slug, maybeUser: Option[AuthUser]) = SparqlQuery.of(
     name = "lineage - edges",
     Prefixes.of(prov -> "prov", renku -> "renku", schema -> "schema"),
     s"""|SELECT DISTINCT ?activity ?date ?sourceEntityLocation ?targetEntityLocation
         |WHERE {
-        |   BIND (${ResourceId(path)(renkuUrl).showAs[RdfResource]} AS ?projectId)
+        |   BIND (${ResourceId(slug)(renkuUrl).showAs[RdfResource]} AS ?projectId)
         |   GRAPH ?projectId {
-        |     ${projectMemberFilterQuery(ResourceId(path)(renkuUrl).showAs[RdfResource])(maybeUser)}
+        |     ${projectMemberFilterQuery(ResourceId(slug)(renkuUrl).showAs[RdfResource])(maybeUser)}
         |     ?activity a prov:Activity;
         |               ^renku:hasActivity ?projectId;
         |               prov:startedAtTime ?date;
@@ -143,23 +143,12 @@ private class EdgesFinderImpl[F[_]: Async: Logger: SparqlQueryTimeRecorder](
     case _                                       => false
   }
 
-  private def projectMemberFilterQuery(projectResourceId: String): Option[AuthUser] => String = {
-    case Some(user) =>
-      s"""|$projectResourceId renku:projectVisibility ?visibility .
-          |OPTIONAL {
-          |  $projectResourceId schema:member ?memberId
-          |  GRAPH <${GraphClass.Persons.id}> {
-          |    ?memberId schema:sameAs ?sameAsId.
-          |    ?sameAsId schema:additionalType '${Person.gitLabSameAsAdditionalType}';
-          |              schema:identifier ?userGitlabId .
-          |  }
-          |}
-          |FILTER ( ?visibility != '${Visibility.Private.value}' || ?userGitlabId = ${user.id.value} )
-          |""".stripMargin
-    case _ =>
-      s"""|$projectResourceId renku:projectVisibility ?visibility .
-          |FILTER(?visibility = '${Visibility.Public.value}')
-          |""".stripMargin
+  private def projectMemberFilterQuery(projectResourceId: String): Option[AuthUser] => String = { user =>
+    s"""
+       |BIND($projectResourceId as ${SparqlSnippets.default.projectId.name})
+       |${SparqlSnippets.default.visibleProjects(user.map(_.id), Visibility.all).sparql}
+       |""".stripMargin
+
   }
 }
 

@@ -20,16 +20,16 @@ package io.renku.knowledgegraph.entities
 
 import cats.MonadThrow
 import cats.implicits._
+import eu.timepit.refined.auto._
 import io.circe.Json
 import io.circe.syntax._
 import io.renku.config.renku
+import io.renku.data.Message
 import io.renku.entities.search.model.Entity._
 import io.renku.entities.search.model.MatchingScore
 import io.renku.graph.config.GitLabUrlLoader
 import io.renku.graph.model._
 import io.renku.graph.model.images.ImageUri
-import io.renku.http.InfoMessage
-import io.renku.http.InfoMessage._
 import io.renku.knowledgegraph.docs
 import io.renku.knowledgegraph.docs.model.Operation.GET
 import io.renku.knowledgegraph.docs.model._
@@ -57,14 +57,14 @@ private class EndpointDocsImpl()(implicit gitLabUrl: GitLabUrl, renkuApiUrl: ren
       ),
       Status.BadRequest -> Response(
         "In case of invalid query parameters",
-        Contents(MediaType.`application/json`("Reason", InfoMessage("Invalid parameters")))
+        Contents(MediaType.`application/json`("Reason", Message.Info("Invalid parameters")))
       ),
       Status.Unauthorized -> Response(
         "Unauthorized",
-        Contents(MediaType.`application/json`("Invalid token", InfoMessage("Unauthorized")))
+        Contents(MediaType.`application/json`("Invalid token", Message.Info("Unauthorized")))
       ),
       Status.InternalServerError -> Response("Error",
-                                             Contents(MediaType.`application/json`("Reason", InfoMessage("Message")))
+                                             Contents(MediaType.`application/json`("Reason", Message.Info("Message")))
       )
     )
   )
@@ -96,7 +96,7 @@ private class EndpointDocsImpl()(implicit gitLabUrl: GitLabUrl, renkuApiUrl: ren
   private lazy val namespace = Parameter.Query(
     "namespace",
     Schema.String,
-    "to filter by namespace(s); there might be multiple values given; for nested namespaces the whole path has be used, e.g. 'group/subgroup'".some,
+    "to filter by namespace(s); there might be multiple values given; for nested namespaces the whole path has to be used, e.g. 'group/subgroup'".some,
     required = false
   )
   private lazy val since = Parameter.Query(
@@ -114,7 +114,7 @@ private class EndpointDocsImpl()(implicit gitLabUrl: GitLabUrl, renkuApiUrl: ren
   private lazy val sort = Parameter.Query(
     "sort",
     Schema.String,
-    "the `sort` query parameter is optional and defaults to `name:asc`. Allowed property names are: `matchingScore`, `name` and `date`".some,
+    "the `sort` query parameter is optional and defaults to `name:asc`. Allowed property names are: `matchingScore`, `name`, `dateModified` and `date`".some,
     required = false
   )
   private lazy val page = Parameter.Query(
@@ -143,7 +143,7 @@ private class EndpointDocsImpl()(implicit gitLabUrl: GitLabUrl, renkuApiUrl: ren
   private lazy val example = Json.arr(
     Project(
       MatchingScore(1),
-      projects.Path("group/subgroup/name"),
+      projects.Slug("group/subgroup/name"),
       projects.Name("name"),
       projects.Visibility.Public,
       projects.DateCreated(Instant.parse("2012-11-15T10:00:00.000Z")),
@@ -164,7 +164,7 @@ private class EndpointDocsImpl()(implicit gitLabUrl: GitLabUrl, renkuApiUrl: ren
       List(datasets.Keyword("key")),
       datasets.Description("Some project").some,
       List(ImageUri("image.png")),
-      projects.Path("group/subgroup/name")
+      projects.Slug("group/subgroup/name")
     ).asJson,
     Workflow(
       MatchingScore(1),

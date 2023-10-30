@@ -18,17 +18,17 @@
 
 package io.renku.knowledgegraph.datasets.details
 
-import Dataset.DatasetProject
 import cats.MonadThrow
 import cats.effect.kernel.Async
 import eu.timepit.refined.auto._
 import io.renku.graph.http.server.security.Authorizer.AuthContext
 import io.renku.graph.model.Schemas._
-import io.renku.graph.model.entities.Person
-import io.renku.graph.model.projects.{Path, ResourceId, Visibility}
+import io.renku.graph.model.projects.{ResourceId, Slug, Visibility}
 import io.renku.graph.model.{GraphClass, datasets, projects}
 import io.renku.http.server.security.model.AuthUser
 import io.renku.jsonld.syntax._
+import io.renku.knowledgegraph.datasets.details.Dataset.DatasetProject
+import io.renku.projectauth.util.SparqlSnippets
 import io.renku.triplesstore.SparqlQuery.Prefixes
 import io.renku.triplesstore._
 import io.renku.triplesstore.client.sparql.Fragment
@@ -51,7 +51,7 @@ private class ProjectsFinderImpl[F[_]: Async: Logger: SparqlQueryTimeRecorder](s
   private def query(ds: Dataset, maybeAuthUser: Option[AuthUser]) = SparqlQuery.of(
     name = "ds by id - projects",
     Prefixes of (prov -> "prov", renku -> "renku", schema -> "schema"),
-    sparql"""|SELECT DISTINCT ?projectId ?projectPath ?projectName ?projectVisibility ?projectDSId
+    sparql"""|SELECT DISTINCT ?projectId ?projectSlug ?projectName ?projectVisibility ?projectDSId
              |WHERE {
              |  GRAPH ${GraphClass.Project.id(ds.project.id)} {
              |    ${ds.resourceId.asEntityId} a schema:Dataset;
@@ -64,11 +64,10 @@ private class ProjectsFinderImpl[F[_]: Async: Logger: SparqlQueryTimeRecorder](s
              |    ?linkId renku:dataset ?projectDS;
              |            renku:project ?projectId.
              |  }
-             |
+             |  ${allowedProjectFilterQuery(maybeAuthUser)}
              |  GRAPH ?projectId {
-             |    ${allowedProjectFilterQuery(maybeAuthUser)}
              |    ?projectId schema:name ?projectName;
-             |               renku:projectPath ?projectPath;
+             |               renku:projectPath ?projectSlug;
              |               renku:projectVisibility ?projectVisibility.
              |    ?projectDS schema:identifier ?projectDSId.
              |  }
@@ -77,23 +76,8 @@ private class ProjectsFinderImpl[F[_]: Async: Logger: SparqlQueryTimeRecorder](s
              |""".stripMargin
   )
 
-  private lazy val allowedProjectFilterQuery: Option[AuthUser] => Fragment = {
-    case Some(user) =>
-      fr"""|?projectId renku:projectVisibility ?parentVisibility.
-           |OPTIONAL {
-           |  ?projectId schema:member ?memberId
-           |  GRAPH ${GraphClass.Persons.id} {
-           |    ?memberId schema:sameAs ?sameAsId.
-           |    ?sameAsId schema:additionalType ${Person.gitLabSameAsAdditionalType.asTripleObject};
-           |              schema:identifier ?userGitlabId
-           |  }
-           |}
-           |FILTER (?parentVisibility = ${Visibility.Public.value.asTripleObject} || ?userGitlabId = ${user.id.asObject})
-           |""".stripMargin
-    case _ =>
-      fr"""|?projectId renku:projectVisibility ?parentVisibility .
-           |FILTER (?parentVisibility = ${Visibility.Public.value.asTripleObject})
-           |""".stripMargin
+  private lazy val allowedProjectFilterQuery: Option[AuthUser] => Fragment = { user =>
+    SparqlSnippets.default.visibleProjects(user.map(_.id), Visibility.all)
   }
 }
 
@@ -107,11 +91,11 @@ private object ProjectsFinderImpl {
       import io.renku.tinytypes.json.TinyTypeDecoders._
       for {
         id          <- extract[projects.ResourceId]("projectId")
-        path        <- extract[projects.Path]("projectPath")
+        slug        <- extract[projects.Slug]("projectSlug")
         name        <- extract[projects.Name]("projectName")
         visibility  <- extract[projects.Visibility]("projectVisibility")
         projectDSId <- extract[datasets.Identifier]("projectDSId")
-      } yield DatasetProject(id, path, name, visibility, projectDSId)
+      } yield DatasetProject(id, slug, name, visibility, projectDSId)
   }
 }
 

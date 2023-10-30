@@ -57,16 +57,16 @@ class GitLabProjectFetcherSpec
 
       givenFindAccessToken(by = projectId, returning = maybeAccessToken.pure[IO])
 
-      val projectPath = projectPaths.generateSome
+      val projectSlug = projectSlugs.generateSome
       val singleProjectEndpoint: String Refined NonEmpty = "single-project"
       (gitLabClient
         .get(_: Uri, _: String Refined NonEmpty)(
-          _: ResponseMappingF[IO, Either[UnauthorizedException, Option[projects.Path]]]
+          _: ResponseMappingF[IO, Either[UnauthorizedException, Option[projects.Slug]]]
         )(_: Option[AccessToken]))
         .expects(uri"projects" / projectId.show, singleProjectEndpoint, *, maybeAccessToken)
-        .returning(projectPath.asRight.pure[IO])
+        .returning(projectSlug.asRight.pure[IO])
 
-      fetcher.fetchGitLabProject(projectId).unsafeRunSync() shouldBe projectPath.asRight
+      fetcher.fetchGitLabProject(projectId).unsafeRunSync() shouldBe projectSlug.asRight
     }
 
     "fail if finding access token fails" in new TestCase {
@@ -79,11 +79,11 @@ class GitLabProjectFetcherSpec
     }
 
     "extract path_with_namespace from the OK response from GitLab" in new TestCase {
-      val projectPath = projectPaths.generateOne
+      val projectSlug = projectSlugs.generateOne
       mapResponse(Status.Ok,
                   Request[IO](),
-                  Response[IO](Status.Ok).withEntity(toResponseEntity(projectId, projectPath))
-      ).unsafeRunSync() shouldBe projectPath.some.asRight
+                  Response[IO](Status.Ok).withEntity(toResponseEntity(projectId, projectSlug))
+      ).unsafeRunSync() shouldBe projectSlug.some.asRight
     }
 
     NotFound :: InternalServerError :: Nil foreach { status =>
@@ -119,7 +119,8 @@ class GitLabProjectFetcherSpec
         givenFindAccessToken(by = projectId, returning = maybeAccessToken.pure[IO])
         fetcher.fetchGitLabProject(projectId).unsafeRunSync()
       },
-      projectPaths.generateOption.asRight[UnauthorizedException]
+      projectSlugs.generateOption.asRight[UnauthorizedException],
+      underlyingMethod = Get
     )
 
     def givenFindAccessToken(by: projects.GitLabId, returning: IO[Option[AccessToken]]) =
@@ -129,8 +130,8 @@ class GitLabProjectFetcherSpec
         .returning(returning)
   }
 
-  private def toResponseEntity(id: projects.GitLabId, path: projects.Path): Json = json"""{
-    "id": ${id.value},
-    "path_with_namespace": ${path.value}
+  private def toResponseEntity(id: projects.GitLabId, slug: projects.Slug): Json = json"""{
+    "id":                  $id,
+    "path_with_namespace": $slug
   }"""
 }

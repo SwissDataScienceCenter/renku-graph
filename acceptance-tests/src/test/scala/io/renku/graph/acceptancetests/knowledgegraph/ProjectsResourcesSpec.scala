@@ -26,8 +26,7 @@ import io.renku.graph.acceptancetests.data._
 import io.renku.graph.acceptancetests.flows.TSProvisioning
 import io.renku.graph.acceptancetests.tooling.{AcceptanceSpec, ApplicationServices}
 import io.renku.graph.model.EventsGenerators.commitIds
-import io.renku.graph.model.RenkuTinyTypeGenerators.{personEmails, personGitLabIds}
-import io.renku.graph.model.projects.Visibility
+import io.renku.graph.model.projects.{Role, Visibility}
 import io.renku.graph.model.testentities._
 import io.renku.http.rest.Links
 import io.renku.http.server.EndpointTester.{JsonOps, jsonEntityDecoder}
@@ -44,7 +43,7 @@ class ProjectsResourcesSpec
   private val user        = authUsers.generateOne
   private val accessToken = user.accessToken
 
-  private val (parentProject, project) = {
+  private val parentProject -> project = {
     val creatorGitLabId = personGitLabIds.generateOne
     val creatorEmail    = personEmails.generateOne
     val creator         = cliShapedPersons.generateOne.copy(maybeEmail = creatorEmail.some)
@@ -57,12 +56,12 @@ class ProjectsResourcesSpec
 
     val parentDataProject = dataProjects(parent)
       .map(replaceCreatorFrom(creator, creatorGitLabId))
-      .map(addMemberFrom(creator, creatorGitLabId) >>> addMemberWithId(user.id))
+      .map(addMemberFrom(creator, creatorGitLabId, Role.Owner) >>> addMemberWithId(user.id, Role.Maintainer))
       .generateOne
 
     val childDataProject =
       dataProjects(child.copy(visibility = Visibility.Private, parent = parentDataProject.entitiesProject))
-        .map(addMemberWithId(user.id))
+        .map(addMemberWithId(user.id, Role.Owner))
         .generateOne
 
     parentDataProject -> childDataProject
@@ -71,7 +70,6 @@ class ProjectsResourcesSpec
   Feature("GET knowledge-graph/projects/<namespace>/<name> to find project's details") {
 
     Scenario("As a user I would like to find project's details by calling a REST endpoint") {
-
       Given("the user is authenticated")
       gitLabStub.addAuthenticated(user)
 
@@ -79,17 +77,18 @@ class ProjectsResourcesSpec
       val parentCommitId = commitIds.generateOne
       mockCommitDataOnTripleGenerator(parentProject, toPayloadJsonLD(parentProject), parentCommitId)
       gitLabStub.setupProject(parentProject, parentCommitId)
-
       `data in the Triples Store`(parentProject, parentCommitId, accessToken)
+      waitForAllEventsInFinalState(parentProject.id)
 
-      val commitId = commitIds.generateOne
-      mockCommitDataOnTripleGenerator(project, toPayloadJsonLD(project.entitiesProject), commitId)
+      val commitId    = commitIds.generateOne
+      val jsonPayload = toPayloadJsonLD(project.entitiesProject)
+      mockCommitDataOnTripleGenerator(project, jsonPayload, commitId)
       gitLabStub.setupProject(project, commitId)
       `data in the Triples Store`(project, commitId, accessToken)
       waitForAllEventsInFinalState(project.id)
 
       When("the user fetches project's details with GET knowledge-graph/projects/<namespace>/<name>")
-      val projectDetailsResponse = knowledgeGraphClient.GET(s"knowledge-graph/projects/${project.path}", accessToken)
+      val projectDetailsResponse = knowledgeGraphClient.GET(s"knowledge-graph/projects/${project.slug}", accessToken)
 
       Then("he should get OK response with project's details")
       projectDetailsResponse.status shouldBe Ok
@@ -110,7 +109,7 @@ class ProjectsResourcesSpec
       Then("he should get OK response with the projects datasets")
       datasetsResponseStatus shouldBe Ok
       val foundDatasets = datasetsResponseBody.as[List[Json]].value
-      foundDatasets should contain theSameElementsAs project.entitiesProject.datasets.map(briefJson(_, project.path))
+      foundDatasets should contain theSameElementsAs project.entitiesProject.datasets.map(briefJson(_, project.slug))
 
       When("there's an authenticated user who is not project member")
       val nonMemberUser = authUsers.generateOne
@@ -118,17 +117,17 @@ class ProjectsResourcesSpec
 
       And("he fetches project's details")
       val projectDetailsResponseForNonMember =
-        knowledgeGraphClient.GET(s"knowledge-graph/projects/${project.path}", nonMemberUser.accessToken)
+        knowledgeGraphClient.GET(s"knowledge-graph/projects/${project.slug}", nonMemberUser.accessToken)
 
       Then("he should get NOT_FOUND response")
       projectDetailsResponseForNonMember.status shouldBe NotFound
 
       When("the user calls the Delete Project API")
-      knowledgeGraphClient.DELETE(s"knowledge-graph/projects/${project.path}", accessToken).status shouldBe Accepted
+      knowledgeGraphClient.DELETE(s"knowledge-graph/projects/${project.slug}", accessToken).status shouldBe Accepted
 
       Then("the project should be deleted")
       eventually {
-        knowledgeGraphClient.GET(s"knowledge-graph/projects/${project.path}", accessToken).status shouldBe NotFound
+        knowledgeGraphClient.GET(s"knowledge-graph/projects/${project.slug}", accessToken).status shouldBe NotFound
       }
     }
   }

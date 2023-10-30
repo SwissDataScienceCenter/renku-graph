@@ -18,6 +18,7 @@
 
 package io.renku.graph.model
 
+import RenkuTinyTypeGenerators.projectSlugs
 import cats.syntax.all._
 import io.circe.{DecodingFailure, Json}
 import io.renku.generators.Generators.Implicits._
@@ -28,6 +29,7 @@ import io.renku.tinytypes.constraints.{RelativePath, Url}
 import org.apache.jena.util.URIref
 import org.scalacheck.Gen
 import org.scalacheck.Gen.{alphaChar, const, frequency, numChar}
+import org.scalatest.EitherValues
 import org.scalatest.matchers.should
 import org.scalatest.prop.TableDrivenPropertyChecks
 import org.scalatest.wordspec.AnyWordSpec
@@ -53,11 +55,11 @@ class ProjectGitLabIdSpec extends AnyWordSpec with ScalaCheckPropertyChecks with
   }
 }
 
-class PathSpec extends AnyWordSpec with ScalaCheckPropertyChecks with should.Matchers with RenkuTinyTypeGenerators {
+class SlugSpec extends AnyWordSpec with ScalaCheckPropertyChecks with should.Matchers with RenkuTinyTypeGenerators {
 
   "Path" should {
     "be a RelativePath" in {
-      Path shouldBe a[RelativePath[_]]
+      Slug shouldBe a[RelativePath[_]]
     }
   }
 
@@ -65,50 +67,50 @@ class PathSpec extends AnyWordSpec with ScalaCheckPropertyChecks with should.Mat
 
     "be successful for relative paths with min number of 2 segments" in {
       forAll(relativePaths(minSegments = 2, maxSegments = 22, partsGenerator)) { path =>
-        Path(path).value shouldBe path
+        Slug(path).value shouldBe path
       }
     }
 
     "fail for relative paths of single segment" in {
       an[IllegalArgumentException] shouldBe thrownBy {
-        Path(nonBlankStrings().generateOne.value)
+        Slug(nonBlankStrings().generateOne.value)
       }
     }
 
     "fail when ending with a /" in {
       an[IllegalArgumentException] shouldBe thrownBy {
-        Path(relativePaths(minSegments = 2, maxSegments = 22).generateOne + "/")
+        Slug(relativePaths(minSegments = 2, maxSegments = 22).generateOne + "/")
       }
     }
 
     "fail for absolute URLs" in {
       an[IllegalArgumentException] shouldBe thrownBy {
-        Path(httpUrls().generateOne)
+        Slug(httpUrls().generateOne)
       }
     }
   }
 
-  "toName" should {
+  "toPath" should {
     "extract the very last path segment" in {
-      forAll(projectNamespaces.toGeneratorOfNonEmptyList(), projectNames) { (namespaces, name) =>
-        Path(s"${namespaces.map(_.show).nonEmptyIntercalate("/")}/$name").toName shouldBe name
+      forAll(projectNamespaces.toGeneratorOfNonEmptyList(), projectPaths) { (namespaces, path) =>
+        Slug(s"${namespaces.map(_.show).nonEmptyIntercalate("/")}/$path").toPath shouldBe path
       }
     }
   }
 
   "toNamespaces" should {
-    "extract all the path segments except the last one" in {
-      forAll(projectNamespaces.toGeneratorOfNonEmptyList(), projectNames) { (namespaces, name) =>
-        Path(s"${namespaces.map(_.show).nonEmptyIntercalate("/")}/$name").toNamespaces shouldBe namespaces.toList
+    "extract all the slug segments except the last one" in {
+      forAll(projectNamespaces.toGeneratorOfNonEmptyList(), projectPaths) { (namespaces, path) =>
+        Slug(s"${namespaces.map(_.show).nonEmptyIntercalate("/")}/$path").toNamespaces shouldBe namespaces.toList
       }
     }
   }
 
   "toNamespace" should {
-    "extract the namespace from the path" in {
+    "extract the namespace from the slug" in {
       forAll(projectNamespaces.toGeneratorOfNonEmptyList(), projectNames) { (namespaces, name) =>
         val namespaceAsString = namespaces.map(_.show).nonEmptyIntercalate("/")
-        Path(s"$namespaceAsString/$name").toNamespace shouldBe Namespace(namespaceAsString)
+        Slug(s"$namespaceAsString/$name").toNamespace shouldBe Namespace(namespaceAsString)
       }
     }
   }
@@ -189,7 +191,7 @@ class ProjectResourceIdSpec
 
   "instantiation" should {
 
-    "be successful for URLs ending with a project path" in {
+    "be successful for URLs ending with a project slug" in {
       forAll(httpUrls(pathGenerator = pathGenerator)) { url =>
         ResourceId(url).value shouldBe url
       }
@@ -197,7 +199,7 @@ class ProjectResourceIdSpec
 
     "fail for relative paths" in {
       an[IllegalArgumentException] shouldBe thrownBy {
-        ResourceId(projectPaths.generateOne.value)
+        ResourceId(projectSlugs.generateOne.value)
       }
     }
 
@@ -208,11 +210,11 @@ class ProjectResourceIdSpec
     }
   }
 
-  "toProjectPath converter" should {
+  "toProjectSlug converter" should {
 
-    "convert any Project Resource to ProjectPath" in {
-      forAll { (renkuUrl: RenkuUrl, projectPath: Path) =>
-        ResourceId(projectPath)(renkuUrl).as[Try, Path] shouldBe projectPath.pure[Try]
+    "convert any Project Resource to ProjectSlug" in {
+      forAll { (renkuUrl: RenkuUrl, projectSlug: Slug) =>
+        ResourceId(projectSlug)(renkuUrl).as[Try, Slug] shouldBe projectSlug.pure[Try]
       }
     }
   }
@@ -226,7 +228,28 @@ class ProjectResourceIdSpec
     }
   }
 
-  private lazy val pathGenerator = for {
-    projectPath <- projectPaths
-  } yield s"projects/$projectPath"
+  private lazy val pathGenerator = projectSlugs.map(slug => s"projects/$slug")
+}
+
+class GitHttpUrlSpec extends AnyWordSpec with should.Matchers with EitherValues with ScalaCheckPropertyChecks {
+
+  "HttpUrl" should {
+
+    "instantiate for valid absolute git urls" in {
+      forAll(httpUrls(), projectSlugs) { (httpUrl, projectSlug) =>
+        val url = s"$httpUrl/$projectSlug.git"
+        GitHttpUrl.from(url).map(_.value) shouldBe Right(url)
+      }
+    }
+
+    "fail instantiation for non-absolute urls" in {
+
+      val url = s"${relativePaths().generateOne}/${projectSlugs.generateOne}.git"
+
+      val exception = GitHttpUrl.from(url).left.value
+
+      exception            shouldBe an[IllegalArgumentException]
+      exception.getMessage shouldBe s"$url is not a valid repository http url"
+    }
+  }
 }

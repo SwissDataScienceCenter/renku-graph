@@ -21,7 +21,7 @@ package minprojectinfo
 
 import cats.MonadThrow
 import cats.data.Kleisli
-import cats.effect.MonadCancelThrow
+import cats.effect.Async
 import cats.syntax.all._
 import io.renku.db.{DbClient, SqlStatement}
 import io.renku.eventlog.EventLogDB.SessionResource
@@ -34,7 +34,7 @@ import skunk.data.Completion
 
 import java.time.Instant
 
-private class EventFinderImpl[F[_]: MonadCancelThrow: SessionResource: QueriesExecutionTimes](
+private class EventFinderImpl[F[_]: Async: SessionResource: QueriesExecutionTimes](
     now: () => Instant = () => Instant.now
 ) extends DbClient(Some(QueriesExecutionTimes[F]))
     with EventFinder[F, MinProjectInfoEvent]
@@ -54,7 +54,7 @@ private class EventFinderImpl[F[_]: MonadCancelThrow: SessionResource: QueriesEx
     SqlStatement
       .named(s"${categoryName.show.toLowerCase} - find event")
       .select[Void, MinProjectInfoEvent](
-        sql"""SELECT p.project_id, p.project_path
+        sql"""SELECT p.project_id, p.project_slug
               FROM project p
               WHERE NOT EXISTS (
                 SELECT project_id 
@@ -68,8 +68,8 @@ private class EventFinderImpl[F[_]: MonadCancelThrow: SessionResource: QueriesEx
                   AND e.status = '#${TriplesStore.value}'
               )
               LIMIT 1
-      """.query(projectIdDecoder ~ projectPathDecoder)
-          .map { case (id: projects.GitLabId) ~ (path: projects.Path) => MinProjectInfoEvent(id, path) }
+      """.query(projectIdDecoder ~ projectSlugDecoder)
+          .map { case (id: projects.GitLabId) ~ (slug: projects.Slug) => MinProjectInfoEvent(id, slug) }
       )
       .arguments(Void)
       .build(_.option)
@@ -102,6 +102,6 @@ private class EventFinderImpl[F[_]: MonadCancelThrow: SessionResource: QueriesEx
 }
 
 private object EventFinder {
-  def apply[F[_]: MonadCancelThrow: SessionResource: QueriesExecutionTimes]: F[EventFinder[F, MinProjectInfoEvent]] =
+  def apply[F[_]: Async: SessionResource: QueriesExecutionTimes]: F[EventFinder[F, MinProjectInfoEvent]] =
     MonadThrow[F].catchNonFatal(new EventFinderImpl[F]())
 }

@@ -61,7 +61,7 @@ private class EventHandler[F[_]: MonadCancelThrow: Logger](
     case EventPersister.Result.Created(event) =>
       val maybeUserId = (event.body.maybeAuthorEmail orElse event.body.maybeCommitterEmail).map(UserId(_))
       tgClient
-        .send(ProjectViewedEvent(event.project.path, projects.DateViewed(event.date.value), maybeUserId))
+        .send(ProjectViewedEvent(event.project.slug, projects.DateViewed(event.date.value), maybeUserId))
         .handleErrorWith(
           Logger[F].error(_)(show"$categoryName: sending ${ProjectViewedEvent.categoryName} event failed")
         )

@@ -22,15 +22,14 @@ package eventstatus
 import cats.NonEmptyParallel
 import cats.effect._
 import cats.syntax.all._
+import eu.timepit.refined.auto._
 import io.circe.syntax._
+import io.renku.data.Message
 import io.renku.eventlog.api.events.CommitSyncRequest
 import io.renku.graph.model.projects
 import io.renku.graph.model.projects.GitLabId
-import io.renku.http.ErrorMessage._
-import io.renku.http.InfoMessage._
 import io.renku.http.client.GitLabClient
 import io.renku.http.server.security.model.AuthUser
-import io.renku.http.{ErrorMessage, InfoMessage}
 import io.renku.logging.ExecutionTimeRecorder
 import io.renku.metrics.MetricsRegistry
 import io.renku.triplesgenerator.api.events.ProjectViewedEvent
@@ -70,35 +69,45 @@ private class EndpointImpl[F[_]: Async: NonEmptyParallel: Logger: ExecutionTimeR
         .parFlatMapN {
           case (Some(HookMissing), _) =>
             Ok(StatusInfo.NotActivated.asJson)
-          case (Some(HookExists), Some(si)) =>
-            sendProjectViewed(projectId, authUser) >> Ok(si.asJson)
+          case (Some(HookExists), Some(status)) =>
+            sendProjectViewed(projectId, authUser) >> Ok(status.asJson)
           case (Some(HookExists), None) =>
             sendCommitSyncRequest(projectId, authUser) >> Ok(StatusInfo.webhookReady.widen.asJson)
-          case (None, Some(si)) =>
-            sendProjectViewed(projectId, authUser) >> Ok(si.asJson)
+          case (None, Some(status)) =>
+            sendProjectViewed(projectId, authUser) >> Ok(status.asJson)
           case (None, None) =>
-            NotFound(InfoMessage("Info about project cannot be found"))
+            NotFound(Message.Info("Info about project cannot be found"))
         }
         .handleErrorWith(internalServerError(projectId))
     }
 
   private def sendCommitSyncRequest(projectId: GitLabId, authUser: Option[AuthUser]): F[Unit] = Spawn[F].start {
-    findProjectInfo(projectId)(authUser.map(_.accessToken)) >>= { project =>
-      (elClient send CommitSyncRequest(project))
-        .handleErrorWith(Logger[F].warn(_)("Sending CommitSyncRequest failed"))
-    }
+    findProjectInfo(projectId)(authUser.map(_.accessToken))
+      .flatMap {
+        case Some(project) =>
+          (elClient send CommitSyncRequest(project))
+            .handleErrorWith(Logger[F].warn(_)("Event Status - sending COMMIT_SYNC_REQUEST failed"))
+        case None =>
+          Logger[F].info(s"Event Status - COMMIT_SYNC_REQUEST not sent as no project $projectId found")
+      }
+      .handleErrorWith(Logger[F].error(_)("Event Status - finding project details failed"))
   }.void
 
   private def sendProjectViewed(projectId: GitLabId, authUser: Option[AuthUser]): F[Unit] = Spawn[F].start {
-    findProjectInfo(projectId)(authUser.map(_.accessToken)) >>= { project =>
-      (tgClient send ProjectViewedEvent.forProjectAndUserId(project.path, authUser.map(_.id)))
-        .handleErrorWith(Logger[F].warn(_)("Sending ProjectViewedEvent failed"))
-    }
+    findProjectInfo(projectId)(authUser.map(_.accessToken))
+      .flatMap {
+        case Some(project) =>
+          (tgClient send ProjectViewedEvent.forProjectAndUserId(project.slug, authUser.map(_.id)))
+            .handleErrorWith(Logger[F].warn(_)("Event Status - sending PROJECT_VIEWED failed"))
+        case None =>
+          Logger[F].info(s"Event Status - PROJECT_VIEWED not sent as no project $projectId found")
+      }
+      .handleErrorWith(Logger[F].error(_)("Event Status - finding project details failed"))
   }.void
 
   private def internalServerError(projectId: projects.GitLabId): Throwable => F[Response[F]] = { exception =>
     val message = show"Finding status info for project '$projectId' failed"
-    Logger[F].error(exception)(message) >> InternalServerError(ErrorMessage(message))
+    Logger[F].error(exception)(message) >> InternalServerError(Message.Error.unsafeApply(message))
   }
 
   private def logMessage(projectId: GitLabId): PartialFunction[Response[F], String] =

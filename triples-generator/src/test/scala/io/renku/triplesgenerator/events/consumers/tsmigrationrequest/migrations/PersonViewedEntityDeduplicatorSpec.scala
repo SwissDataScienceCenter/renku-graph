@@ -53,7 +53,7 @@ class PersonViewedProjectDeduplicatorSpec
       upload(to = projectsDataset, project1)
 
       val eventProject1 = ProjectViewedEvent(
-        project1.path,
+        project1.slug,
         projectViewedDates(project1.dateCreated.value).generateOne,
         project1UserId.some
       )
@@ -68,7 +68,7 @@ class PersonViewedProjectDeduplicatorSpec
       upload(to = projectsDataset, project2)
 
       val eventProject2 = ProjectViewedEvent(
-        project2.path,
+        project2.slug,
         projectViewedDates(project2.dateCreated.value).generateOne,
         project2UserId.some
       )

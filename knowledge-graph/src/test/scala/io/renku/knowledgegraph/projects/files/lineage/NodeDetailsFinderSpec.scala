@@ -23,7 +23,7 @@ import cats.effect.IO
 import cats.syntax.all._
 import io.renku.generators.Generators._
 import io.renku.generators.Generators.Implicits._
-import io.renku.graph.model.GraphModelGenerators.projectPaths
+import io.renku.graph.model.GraphModelGenerators.projectSlugs
 import io.renku.graph.model.parameterValues.ValueOverride
 import io.renku.graph.model.testentities._
 import io.renku.graph.model.testentities.StepPlanCommandParameter._
@@ -72,13 +72,13 @@ class NodeDetailsFinderSpec
       val outputEntityNode = NodeDef(project.activities.head, output).toNode
 
       nodeDetailsFinder
-        .findDetails(Set(inputEntityNode.location, outputEntityNode.location), project.path)
+        .findDetails(Set(inputEntityNode.location, outputEntityNode.location), project.slug)
         .unsafeRunSync() shouldBe Set(inputEntityNode, outputEntityNode)
     }
 
     "return no results if no locations given" in new TestCase {
       nodeDetailsFinder
-        .findDetails(Set.empty[Node.Location], projectPaths.generateOne)
+        .findDetails(Set.empty[Node.Location], projectSlugs.generateOne)
         .unsafeRunSync() shouldBe Set.empty
     }
 
@@ -106,7 +106,7 @@ class NodeDetailsFinderSpec
 
       val exception = intercept[Exception] {
         nodeDetailsFinder
-          .findDetails(Set(Node.Location(input.toString), missingLocation), project.path)
+          .findDetails(Set(Node.Location(input.toString), missingLocation), project.slug)
           .unsafeRunSync()
       }
 
@@ -161,7 +161,7 @@ class NodeDetailsFinderSpec
             ExecutionInfo(activity1.asEntityId.show, activity1.startTime.value),
             ExecutionInfo(activity2.asEntityId.show, activity2.startTime.value)
           ),
-          project.path
+          project.slug
         )
         .unsafeRunSync() shouldBe Set(NodeDef(activity1).toNode, NodeDef(activity2).toNode)
     }
@@ -198,7 +198,7 @@ class NodeDetailsFinderSpec
         nodeDetailsFinder
           .findDetails(
             Set(ExecutionInfo(activity.asEntityId.show, activity.startTime.value)),
-            project.path
+            project.slug
           )
           .unsafeRunSync() shouldBe Set(NodeDef(activity).toNode)
       }
@@ -231,7 +231,7 @@ class NodeDetailsFinderSpec
       nodeDetailsFinder
         .findDetails(
           Set(ExecutionInfo(activity.asEntityId.show, activity.startTime.value)),
-          project.path
+          project.slug
         )
         .unsafeRunSync() shouldBe Set(NodeDef(activity).toNode)
     }
@@ -266,14 +266,14 @@ class NodeDetailsFinderSpec
       nodeDetailsFinder
         .findDetails( // returns a set of nodes. A node as a location, a label, and set of types
           ids, // execution info has entityId and date
-          project.path
+          project.slug
         )
         .unsafeRunSync() shouldBe Set(NodeDef(activity).toNode) // a node def is the same as a node
     }
 
     "return no results if no ids given" in new TestCase {
       nodeDetailsFinder
-        .findDetails(Set.empty[ExecutionInfo], projectPaths.generateOne)
+        .findDetails(Set.empty[ExecutionInfo], projectSlugs.generateOne)
         .unsafeRunSync() shouldBe Set.empty
     }
 
@@ -285,7 +285,7 @@ class NodeDetailsFinderSpec
         nodeDetailsFinder
           .findDetails(
             Set(ExecutionInfo(missingPlan, timestampsNotInTheFuture.generateOne)),
-            projectPaths.generateOne
+            projectSlugs.generateOne
           )
           .unsafeRunSync()
       }

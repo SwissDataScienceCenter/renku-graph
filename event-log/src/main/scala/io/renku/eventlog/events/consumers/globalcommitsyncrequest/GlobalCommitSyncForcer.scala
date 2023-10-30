@@ -19,7 +19,7 @@
 package io.renku.eventlog.events.consumers.globalcommitsyncrequest
 
 import cats.data.Kleisli
-import cats.effect.MonadCancelThrow
+import cats.effect.Async
 import cats.syntax.all._
 import com.typesafe.config.{Config, ConfigFactory}
 import io.renku.db.{DbClient, SqlStatement}
@@ -36,10 +36,10 @@ import skunk.implicits._
 import java.time.{Duration, Instant}
 
 private trait GlobalCommitSyncForcer[F[_]] {
-  def moveGlobalCommitSync(projectId: projects.GitLabId, projectPath: projects.Path): F[Unit]
+  def moveGlobalCommitSync(projectId: projects.GitLabId, projectSlug: projects.Slug): F[Unit]
 }
 
-private class GlobalCommitSyncForcerImpl[F[_]: MonadCancelThrow: SessionResource: QueriesExecutionTimes](
+private class GlobalCommitSyncForcerImpl[F[_]: Async: SessionResource: QueriesExecutionTimes](
     syncFrequency:  Duration,
     delayOnRequest: Duration,
     now:            () => Instant = () => Instant.now
@@ -48,10 +48,10 @@ private class GlobalCommitSyncForcerImpl[F[_]: MonadCancelThrow: SessionResource
     with TypeSerializers
     with SubscriptionTypeSerializers {
 
-  override def moveGlobalCommitSync(projectId: projects.GitLabId, projectPath: projects.Path): F[Unit] =
+  override def moveGlobalCommitSync(projectId: projects.GitLabId, projectSlug: projects.Slug): F[Unit] =
     SessionResource[F].useK {
       scheduleGlobalSync(projectId) >>= {
-        case true  => upsertProject(projectId, projectPath)
+        case true  => upsertProject(projectId, projectSlug)
         case false => Kleisli.pure(())
       }
     }
@@ -72,16 +72,15 @@ private class GlobalCommitSyncForcerImpl[F[_]: MonadCancelThrow: SessionResource
       }
   }
 
-  private def upsertProject(projectId: projects.GitLabId, projectPath: projects.Path) = measureExecutionTime {
+  private def upsertProject(projectId: projects.GitLabId, projectSlug: projects.Slug) = measureExecutionTime {
     SqlStatement
       .named(s"${categoryName.value.toLowerCase} - insert project")
-      .command[projects.GitLabId *: projects.Path *: EventDate *: EmptyTuple](sql"""
-        INSERT INTO project (project_id, project_path, latest_event_date)
-        VALUES ($projectIdEncoder, $projectPathEncoder, $eventDateEncoder)
-        ON CONFLICT (project_id)
-        DO NOTHING
+      .command[projects.GitLabId *: projects.Slug *: EventDate *: EmptyTuple](sql"""
+        INSERT INTO project (project_id, project_slug, latest_event_date)
+        VALUES ($projectIdEncoder, $projectSlugEncoder, $eventDateEncoder)
+        ON CONFLICT (project_id) DO NOTHING
         """.command)
-      .arguments(projectId *: projectPath *: EventDate(Instant.EPOCH) *: EmptyTuple)
+      .arguments(projectId *: projectSlug *: EventDate(Instant.EPOCH) *: EmptyTuple)
       .build
       .void
   }
@@ -92,7 +91,7 @@ private object GlobalCommitSyncForcer {
 
   import scala.concurrent.duration.FiniteDuration
 
-  def apply[F[_]: MonadCancelThrow: SessionResource: QueriesExecutionTimes](
+  def apply[F[_]: Async: SessionResource: QueriesExecutionTimes](
       config: Config = ConfigFactory.load()
   ): F[GlobalCommitSyncForcer[F]] = for {
     configFrequency      <- find[F, FiniteDuration]("global-commit-sync-frequency", config)

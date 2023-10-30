@@ -16,8 +16,10 @@
  * limitations under the License.
  */
 
-package io.renku.eventlog.events.consumers.statuschange.totriplesgenerated
+package io.renku.eventlog.events.consumers.statuschange
+package totriplesgenerated
 
+import SkunkExceptionsGenerators.postgresErrors
 import cats.data.Kleisli
 import cats.effect.IO
 import cats.syntax.all._
@@ -32,11 +34,13 @@ import io.renku.graph.model.EventContentGenerators.eventDates
 import io.renku.graph.model.EventsGenerators.{eventIds, eventProcessingTimes, zippedEventPayloads}
 import io.renku.graph.model.events.EventStatus._
 import io.renku.graph.model.events._
+import io.renku.interpreters.TestLogger
 import io.renku.metrics.TestMetricsRegistry
 import io.renku.testtools.IOSpec
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
+import skunk.SqlState.DeadlockDetected
 
 import java.time.Instant
 
@@ -70,7 +74,7 @@ class DbUpdaterSpec
       sessionResource
         .useK(dbUpdater updateDB statusChangeEvent)
         .unsafeRunSync() shouldBe DBUpdateResults.ForProjects(
-        project.path,
+        project.slug,
         statusesToUpdate
           .map(_ -> -1)
           .toMap +
@@ -129,7 +133,7 @@ class DbUpdaterSpec
       sessionResource
         .useK(dbUpdater updateDB statusChangeEvent)
         .unsafeRunSync() shouldBe DBUpdateResults.ForProjects(
-        project.path,
+        project.slug,
         statusCount = Map(GeneratingTriples -> -1, TriplesGenerated -> 1)
       )
 
@@ -147,6 +151,7 @@ class DbUpdaterSpec
     }
 
     "just clean the delivery info if the event is already in the TRIPLES_GENERATED" in new TestCase {
+
       val eventDate = eventDates.generateOne
       val (olderEventId, olderEventStatus, _, _, _) =
         addEvent(New, timestamps(max = eventDate.value).generateAs(EventDate))
@@ -183,7 +188,27 @@ class DbUpdaterSpec
   }
 
   "onRollback" should {
-    "clean the delivery info for the event" in new TestCase {
+
+    "retry updating DB on a DeadlockDetected" in new TestCase {
+
+      val (eventId, _, _, _, _) = addEvent(GeneratingTriples, eventDates.generateOne)
+
+      val statusChangeEvent =
+        ToTriplesGenerated(eventId, project, eventProcessingTimes.generateOne, zippedEventPayloads.generateOne)
+
+      (deliveryInfoRemover.deleteDelivery _).expects(statusChangeEvent.eventId).returning(Kleisli.pure(()))
+
+      val exception = postgresErrors(DeadlockDetected).generateOne
+
+      (dbUpdater onRollback statusChangeEvent)
+        .apply(exception)
+        .unsafeRunSync() shouldBe DBUpdateResults.ForProjects(project.slug,
+                                                              Map(GeneratingTriples -> -1, TriplesGenerated -> 1)
+      )
+    }
+
+    "clean the delivery info for the event if a random exception thrown" in new TestCase {
+
       val event = ToTriplesGenerated(eventIds.generateOne,
                                      project,
                                      eventProcessingTimes.generateOne,
@@ -192,9 +217,11 @@ class DbUpdaterSpec
 
       (deliveryInfoRemover.deleteDelivery _).expects(event.eventId).returning(Kleisli.pure(()))
 
-      sessionResource
-        .useK((dbUpdater onRollback event)(exceptions.generateOne))
-        .unsafeRunSync() shouldBe DBUpdateResults.ForProjects.empty
+      val exception = exceptions.generateOne
+
+      intercept[Exception] {
+        (dbUpdater onRollback event).apply(exception).unsafeRunSync()
+      } shouldBe exception
     }
   }
 
@@ -202,7 +229,8 @@ class DbUpdaterSpec
 
     val project = ConsumersModelGenerators.consumerProjects.generateOne
 
-    val currentTime         = mockFunction[Instant]
+    private implicit val logger: TestLogger[IO] = TestLogger()
+    private val currentTime = mockFunction[Instant]
     val deliveryInfoRemover = mock[DeliveryInfoRemover[IO]]
     private implicit val metricsRegistry:  TestMetricsRegistry[IO]   = TestMetricsRegistry[IO]
     private implicit val queriesExecTimes: QueriesExecutionTimes[IO] = QueriesExecutionTimes[IO]().unsafeRunSync()
@@ -214,7 +242,7 @@ class DbUpdaterSpec
     def addEvent(status:    EventStatus,
                  eventDate: EventDate
     ): (EventId, EventStatus, Option[EventMessage], Option[ZippedEventPayload], List[EventProcessingTime]) =
-      storeGeneratedEvent(status, eventDate, project.id, project.path)
+      storeGeneratedEvent(status, eventDate, project.id, project.slug)
 
     def findFullEvent(eventId: CompoundEventId) = {
       val maybeEvent     = findEvent(eventId)

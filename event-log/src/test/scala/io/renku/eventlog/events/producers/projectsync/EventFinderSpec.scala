@@ -51,12 +51,12 @@ class EventFinderSpec
       finder.popEvent().unsafeRunSync() shouldBe None
 
       val projectId   = projectIds.generateOne
-      val projectPath = projectPaths.generateOne
-      upsertProject(projectId, projectPath, eventDates.generateOne)
+      val projectSlug = projectSlugs.generateOne
+      upsertProject(projectId, projectSlug, eventDates.generateOne)
 
       findProjectCategorySyncTimes(projectId) shouldBe Nil
 
-      finder.popEvent().unsafeRunSync() shouldBe Some(ProjectSyncEvent(projectId, projectPath))
+      finder.popEvent().unsafeRunSync() shouldBe Some(ProjectSyncEvent(projectId, projectSlug))
 
       findProjectCategorySyncTimes(projectId) shouldBe List(
         categoryName -> LastSyncedDate(currentTime.truncatedTo(MICROS))
@@ -69,14 +69,14 @@ class EventFinderSpec
       "with the last_synced > 24h " in new TestCase {
 
         val projectId   = projectIds.generateOne
-        val projectPath = projectPaths.generateOne
-        upsertProject(projectId, projectPath, eventDates.generateOne)
+        val projectSlug = projectSlugs.generateOne
+        upsertProject(projectId, projectSlug, eventDates.generateOne)
         val lastSyncDate = relativeTimestamps(moreThanAgo = Duration.ofMinutes(24 * 60 + 1)).generateAs(LastSyncedDate)
         upsertCategorySyncTime(projectId, categoryName, lastSyncDate)
 
         findProjectCategorySyncTimes(projectId) shouldBe List(categoryName -> lastSyncDate)
 
-        finder.popEvent().unsafeRunSync() shouldBe Some(ProjectSyncEvent(projectId, projectPath))
+        finder.popEvent().unsafeRunSync() shouldBe Some(ProjectSyncEvent(projectId, projectSlug))
 
         findProjectCategorySyncTimes(projectId) shouldBe List(
           categoryName -> LastSyncedDate(currentTime.truncatedTo(MICROS))
@@ -89,25 +89,25 @@ class EventFinderSpec
       "where the projects with no rows in the table should go first" in new TestCase {
 
         val project1Id   = projectIds.generateOne
-        val project1Path = projectPaths.generateOne
-        upsertProject(project1Id, project1Path, eventDates.generateOne)
+        val project1Slug = projectSlugs.generateOne
+        upsertProject(project1Id, project1Slug, eventDates.generateOne)
 
         val project2Id   = projectIds.generateOne
-        val project2Path = projectPaths.generateOne
-        upsertProject(project2Id, project2Path, eventDates.generateOne)
+        val project2Slug = projectSlugs.generateOne
+        upsertProject(project2Id, project2Slug, eventDates.generateOne)
         val project2lastSyncDate = relativeTimestamps(moreThanAgo = Duration.ofDays(7)).generateAs(LastSyncedDate)
         upsertCategorySyncTime(project2Id, categoryName, project2lastSyncDate)
 
         val project3Id   = projectIds.generateOne
-        val project3Path = projectPaths.generateOne
-        upsertProject(project3Id, project3Path, eventDates.generateOne)
+        val project3Slug = projectSlugs.generateOne
+        upsertProject(project3Id, project3Slug, eventDates.generateOne)
         val project3lastSyncDate =
           timestampsNotInTheFuture(butYoungerThan = project2lastSyncDate.value).generateAs(LastSyncedDate)
         upsertCategorySyncTime(project3Id, categoryName, project3lastSyncDate)
 
-        finder.popEvent().unsafeRunSync() shouldBe Some(ProjectSyncEvent(project1Id, project1Path))
-        finder.popEvent().unsafeRunSync() shouldBe Some(ProjectSyncEvent(project2Id, project2Path))
-        finder.popEvent().unsafeRunSync() shouldBe Some(ProjectSyncEvent(project3Id, project3Path))
+        finder.popEvent().unsafeRunSync() shouldBe Some(ProjectSyncEvent(project1Id, project1Slug))
+        finder.popEvent().unsafeRunSync() shouldBe Some(ProjectSyncEvent(project2Id, project2Slug))
+        finder.popEvent().unsafeRunSync() shouldBe Some(ProjectSyncEvent(project3Id, project3Slug))
         finder.popEvent().unsafeRunSync() shouldBe None
       }
   }

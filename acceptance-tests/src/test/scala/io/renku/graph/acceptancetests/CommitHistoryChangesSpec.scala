@@ -28,6 +28,7 @@ import io.renku.graph.acceptancetests.flows.TSProvisioning
 import io.renku.graph.acceptancetests.knowledgegraph.{DatasetsApiEncoders, fullJson}
 import io.renku.graph.acceptancetests.tooling.{AcceptanceSpec, ApplicationServices}
 import io.renku.graph.model.EventsGenerators.commitIds
+import io.renku.graph.model.projects.Role
 import io.renku.graph.model.testentities._
 import io.renku.http.client.AccessToken
 import io.renku.http.rest.Links
@@ -54,7 +55,7 @@ class CommitHistoryChangesSpec
 
       val project = dataProjects(
         renkuProjectEntities(visibilityPublic, creatorGen = cliShapedPersons).modify(removeMembers())
-      ).map(addMemberWithId(user.id)).generateOne
+      ).map(addMemberWithId(user.id, Role.Owner)).generateOne
       val commits = commitIds.generateNonEmptyList(min = 3)
 
       Given("there is data in the TS")
@@ -92,7 +93,7 @@ class CommitHistoryChangesSpec
 
       val project = dataProjects(
         renkuProjectEntities(visibilityPublic, creatorGen = cliShapedPersons).modify(removeMembers())
-      ).map(addMemberWithId(user.id)).generateOne
+      ).map(addMemberWithId(user.id, Role.Owner)).generateOne
       val commits = commitIds.generateNonEmptyList(min = 3)
 
       Given("There is data in the triple store")
@@ -117,7 +118,7 @@ class CommitHistoryChangesSpec
 
       Then("the project and its datasets should be removed from the knowledge-graph")
 
-      knowledgeGraphClient.GET(s"knowledge-graph/projects/${project.path}", user.accessToken).status shouldBe NotFound
+      knowledgeGraphClient.GET(s"knowledge-graph/projects/${project.slug}", user.accessToken).status shouldBe NotFound
 
       project.entitiesProject.datasets foreach { dataset =>
         knowledgeGraphClient
@@ -129,7 +130,7 @@ class CommitHistoryChangesSpec
 
   private def assertProjectDataIsCorrect(project: data.Project, testProject: RenkuProject, accessToken: AccessToken) = {
 
-    val projectDetailsResponse = knowledgeGraphClient.GET(s"knowledge-graph/projects/${project.path}", accessToken)
+    val projectDetailsResponse = knowledgeGraphClient.GET(s"knowledge-graph/projects/${project.slug}", accessToken)
 
     projectDetailsResponse.status shouldBe Ok
     val projectDetails = projectDetailsResponse.jsonBody
@@ -146,14 +147,14 @@ class CommitHistoryChangesSpec
 
     responseStatus shouldBe Ok
     val foundDatasets = responseBody.as[List[Json]].value
-    foundDatasets should contain theSameElementsAs testProject.datasets.map(briefJson(_, project.path))
+    foundDatasets should contain theSameElementsAs testProject.datasets.map(briefJson(_, project.slug))
   }
 
   private def generateNewActivitiesAndDataset(projectEntities: RenkuProject): RenkuProject =
     renkuProjectEntities(visibilityPublic, creatorGen = cliShapedPersons).generateOne
       .copy(
         version = projectEntities.version,
-        path = projectEntities.path,
+        slug = projectEntities.slug,
         name = projectEntities.name,
         maybeDescription = projectEntities.maybeDescription,
         agent = projectEntities.agent,

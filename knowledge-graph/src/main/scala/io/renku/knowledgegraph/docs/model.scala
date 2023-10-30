@@ -22,7 +22,7 @@ import cats.Show
 import cats.syntax.all._
 import io.circe.{Encoder, Json}
 import io.renku.jsonld.JsonLD
-import io.renku.knowledgegraph.docs.model.Example.{JsonExample, JsonLDExample}
+import io.renku.knowledgegraph.docs.model.Example.{JsonExample, JsonLDExample, StringExample}
 import io.renku.knowledgegraph.docs.model.OAuthFlows.OAuthFlow
 import io.renku.knowledgegraph.docs.model.Path.OpMapping
 
@@ -193,6 +193,38 @@ object model {
       )
     }
 
+    def PATCH(summary:           String,
+              description:       String,
+              uri:               Uri,
+              requestBody:       RequestBody,
+              statusAndResponse: (Status, Response)*
+    ): OpMapping = {
+      val parameters = uri.parts.flatMap {
+        case ParameterPart(parameter) => Some(parameter)
+        case _                        => None
+      }
+
+      OpMapping(Uri.getTemplate(uri.parts),
+                Patch(summary.some, description.some, parameters, requestBody.some, statusAndResponse.toMap, Nil)
+      )
+    }
+
+    def POST(summary:           String,
+             description:       String,
+             uri:               Uri,
+             requestBody:       RequestBody,
+             statusAndResponse: (Status, Response)*
+    ): OpMapping = {
+      val parameters = uri.parts.flatMap {
+        case ParameterPart(parameter) => Some(parameter)
+        case _                        => None
+      }
+
+      OpMapping(Uri.getTemplate(uri.parts),
+                Post(summary.some, description.some, parameters, requestBody.some, statusAndResponse.toMap, Nil)
+      )
+    }
+
     def PUT(summary:           String,
             description:       String,
             uri:               Uri,
@@ -223,6 +255,22 @@ object model {
                    requestBody: Option[RequestBody],
                    responses:   Map[Status, Response],
                    security:    List[SecurityRequirement]
+    ) extends Operation
+
+    case class Post(summary:     Option[String],
+                    description: Option[String],
+                    parameters:  List[Parameter],
+                    requestBody: Option[RequestBody],
+                    responses:   Map[Status, Response],
+                    security:    List[SecurityRequirement]
+    ) extends Operation
+
+    case class Patch(summary:     Option[String],
+                     description: Option[String],
+                     parameters:  List[Parameter],
+                     requestBody: Option[RequestBody],
+                     responses:   Map[Status, Response],
+                     security:    List[SecurityRequirement]
     ) extends Operation
 
     case class Put(summary:     Option[String],
@@ -316,6 +364,9 @@ object model {
 
     def `application/json`: MediaType =
       MediaType.WithoutSchema("application/json", Map.empty)
+
+    def `multipart/form-data`(exampleName: String, example: String): MediaType =
+      MediaType.WithoutSchema("multipart/form-data", Map(exampleName -> StringExample(example)))
   }
 
   final case class Response(
@@ -341,7 +392,9 @@ object model {
 
     case object BadRequest   extends Status(400, "Bad Request")
     case object Unauthorized extends Status(401, "Unauthorized")
+    case object Forbidden    extends Status(403, "Forbidden")
     case object NotFound     extends Status(404, "Not Found")
+    case object Conflict     extends Status(409, "Conflict")
 
     case object InternalServerError extends Status(500, "Internal Server Error")
   }

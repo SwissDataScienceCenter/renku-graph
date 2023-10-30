@@ -31,9 +31,10 @@ import io.renku.jsonld.JsonLD
 import io.renku.logging.ExecutionTimeRecorder
 import io.renku.logging.ExecutionTimeRecorder.ElapsedTime
 import io.renku.metrics.{Histogram, MetricsRegistry}
-import io.renku.triplesgenerator.events.consumers.{EventStatusUpdater, ProcessingNonRecoverableError, ProcessingRecoverableError}
+import io.renku.triplesgenerator.errors.{ProcessingNonRecoverableError, ProcessingRecoverableError}
+import io.renku.triplesgenerator.events.consumers.EventStatusUpdater
 import io.renku.triplesgenerator.events.consumers.EventStatusUpdater._
-import io.renku.triplesgenerator.events.consumers.ProcessingRecoverableError._
+import io.renku.triplesgenerator.errors.ProcessingRecoverableError._
 import io.renku.triplesgenerator.events.consumers.awaitinggeneration.triplesgeneration.TriplesGenerator
 import org.typelevel.log4cats.Logger
 
@@ -59,7 +60,7 @@ private class EventProcessorImpl[F[_]: MonadThrow: AccessTokenFinder: Logger](
   def process(event: CommitEvent): F[Unit] = allEventsTimeRecorder.measureExecutionTime {
     for {
       _                                   <- Logger[F].info(s"${logMessageCommon(event)} accepted")
-      implicit0(mat: Option[AccessToken]) <- findAccessToken(event.project.path) recoverWith rollbackEvent(event)
+      implicit0(mat: Option[AccessToken]) <- findAccessToken(event.project.slug) recoverWith rollbackEvent(event)
       uploadingResult                     <- generateAndUpdateStatus(event)
     } yield uploadingResult
   } flatMap logSummary recoverWith logError(event)
@@ -95,14 +96,14 @@ private class EventProcessorImpl[F[_]: MonadThrow: AccessTokenFinder: Logger](
     uploadingResults match {
       case TriplesGenerated(commit, triples, processingTime) =>
         statusUpdater.toTriplesGenerated(CompoundEventId(commit.eventId, commit.project.id),
-                                         commit.project.path,
+                                         commit.project.slug,
                                          triples,
                                          processingTime
         )
       case RecoverableError(commit, cause) =>
         statusUpdater.toFailure(
           CompoundEventId(commit.eventId, commit.project.id),
-          commit.project.path,
+          commit.project.slug,
           EventStatus.GenerationRecoverableFailure,
           cause,
           executionDelay = cause match {
@@ -112,7 +113,7 @@ private class EventProcessorImpl[F[_]: MonadThrow: AccessTokenFinder: Logger](
         )
       case NonRecoverableError(commit, cause) =>
         statusUpdater.toFailure(CompoundEventId(commit.eventId, commit.project.id),
-                                commit.project.path,
+                                commit.project.slug,
                                 EventStatus.GenerationNonRecoverableFailure,
                                 cause
         )
@@ -158,7 +159,7 @@ private class EventProcessorImpl[F[_]: MonadThrow: AccessTokenFinder: Logger](
   private def rollbackEvent(commit: CommitEvent): PartialFunction[Throwable, F[Option[AccessToken]]] = {
     case NonFatal(exception) =>
       statusUpdater
-        .rollback(commit.compoundEventId, commit.project.path, RollbackStatus.New)
+        .rollback(commit.compoundEventId, commit.project.slug, RollbackStatus.New)
         .flatMap(_ => new Exception(s"$categoryName: processing failure -> Event rolled back", exception).raiseError)
   }
 

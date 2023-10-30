@@ -20,12 +20,12 @@ package io.renku.knowledgegraph.projects.datasets.tags
 
 import cats.MonadThrow
 import cats.implicits._
+import eu.timepit.refined.auto._
 import io.circe.Json
 import io.circe.syntax._
 import io.renku.config.renku
+import io.renku.data.Message
 import io.renku.graph.model._
-import io.renku.http.InfoMessage
-import io.renku.http.InfoMessage._
 import io.renku.knowledgegraph.docs
 import io.renku.knowledgegraph.docs.model.Operation.GET
 import io.renku.knowledgegraph.docs.model._
@@ -42,22 +42,22 @@ private class EndpointDocsImpl()(implicit renkuApiUrl: renku.ApiUrl) extends doc
   override lazy val path: Path = Path(
     GET(
       "Project Dataset Tags",
-      "Returns tags of the Dataset with the given name on the project with given path",
-      Uri / "projects" / namespace / projectName / "datasets" / dsName / "tags",
+      "Returns tags of the Dataset with the given name on the project with given slug",
+      Uri / "projects" / namespace / projectName / "datasets" / dsName / "tags" :? page & perPage,
       Status.Ok -> Response("Found tags",
                             Contents(MediaType.`application/json`("Sample response", example)),
                             responseHeaders
       ),
       Status.BadRequest -> Response(
         "In case of invalid query parameters",
-        Contents(MediaType.`application/json`("Reason", InfoMessage("Invalid parameters")))
+        Contents(MediaType.`application/json`("Reason", Message.Info("Invalid parameters")))
       ),
       Status.Unauthorized -> Response(
         "Unauthorized",
-        Contents(MediaType.`application/json`("Invalid token", InfoMessage("Unauthorized")))
+        Contents(MediaType.`application/json`("Invalid token", Message.Info("Unauthorized")))
       ),
       Status.InternalServerError -> Response("Error",
-                                             Contents(MediaType.`application/json`("Reason", InfoMessage("Message")))
+                                             Contents(MediaType.`application/json`("Reason", Message.Info("Message")))
       )
     )
   )
@@ -72,6 +72,19 @@ private class EndpointDocsImpl()(implicit renkuApiUrl: renku.ApiUrl) extends doc
   private lazy val projectName = Parameter.Path("projectName", Schema.String, "Project name".some)
 
   private lazy val dsName = Parameter.Path("dsName", Schema.String, "Dataset name".some)
+
+  private lazy val page = Parameter.Query(
+    "page",
+    Schema.Integer,
+    "the page query parameter is optional and defaults to 1.".some,
+    required = false
+  )
+  private lazy val perPage = Parameter.Query(
+    "per_page",
+    Schema.Integer,
+    "the per_page query parameter is optional and defaults to 20; max value is 100.".some,
+    required = false
+  )
 
   private lazy val responseHeaders = Map(
     "Total"       -> Header("The total number of projects".some, Schema.Integer),

@@ -18,15 +18,16 @@
 
 package io.renku.graph.model.entities
 
-import PlanLens.{getPlanDerivation, setPlanDerivation}
 import cats.Show
 import cats.data.{NonEmptyList, Validated, ValidatedNel}
 import cats.syntax.all._
 import io.renku.cli.model.{CliPerson, CliProject}
 import io.renku.graph.model._
 import io.renku.graph.model.entities.Dataset.Provenance
+import io.renku.graph.model.entities.PlanLens.{getPlanDerivation, setPlanDerivation}
 import io.renku.graph.model.entities.RenkuProject.ProjectFactory
-import io.renku.graph.model.images.{Image, ImageUri}
+import io.renku.graph.model.gitlab.GitLabProjectInfo
+import io.renku.graph.model.images.Image
 import io.renku.graph.model.projects._
 import io.renku.graph.model.versions.{CliVersion, SchemaVersion}
 import io.renku.jsonld.Property
@@ -34,11 +35,11 @@ import io.renku.jsonld.ontology._
 import io.renku.tinytypes.InstantTinyType
 import monocle.{Lens, Traversal}
 
-import Ordered.orderingToOrdered
+import scala.math.Ordered.orderingToOrdered
 
 sealed trait Project extends Product with Serializable {
   val resourceId:       ResourceId
-  val path:             Path
+  val slug:             Slug
   val name:             Name
   val maybeDescription: Option[Description]
   val dateCreated:      DateCreated
@@ -46,14 +47,14 @@ sealed trait Project extends Product with Serializable {
   val maybeCreator:     Option[Person]
   val visibility:       Visibility
   val keywords:         Set[Keyword]
-  val members:          Set[Person]
+  val members:          Set[Project.Member]
   val images:           List[Image]
 
   val activities: List[Activity]
   val datasets:   List[Dataset[Dataset.Provenance]]
   val plans:      List[Plan]
-  lazy val namespaces:     List[Namespace]       = path.toNamespaces
-  lazy val identification: ProjectIdentification = ProjectIdentification(resourceId, path)
+  lazy val namespaces:     List[Namespace]       = slug.toNamespaces
+  lazy val identification: ProjectIdentification = ProjectIdentification(resourceId, slug)
 
   def fold[P](rnp:  RenkuProject.WithoutParent => P,
               rwp:  RenkuProject.WithParent => P,
@@ -76,7 +77,7 @@ sealed trait Parent {
 object NonRenkuProject {
 
   final case class WithoutParent(resourceId:       ResourceId,
-                                 path:             Path,
+                                 slug:             Slug,
                                  name:             Name,
                                  maybeDescription: Option[Description],
                                  dateCreated:      DateCreated,
@@ -84,7 +85,7 @@ object NonRenkuProject {
                                  maybeCreator:     Option[Person],
                                  visibility:       Visibility,
                                  keywords:         Set[Keyword],
-                                 members:          Set[Person],
+                                 members:          Set[Project.Member],
                                  images:           List[Image]
   ) extends NonRenkuProject {
     override def fold[P](rnp:  RenkuProject.WithoutParent => P,
@@ -96,7 +97,7 @@ object NonRenkuProject {
 
   object WithoutParent extends ProjectFactory {
     def from(resourceId:       ResourceId,
-             path:             Path,
+             slug:             Slug,
              name:             Name,
              maybeDescription: Option[Description],
              dateCreated:      DateCreated,
@@ -104,12 +105,12 @@ object NonRenkuProject {
              maybeCreator:     Option[Person],
              visibility:       Visibility,
              keywords:         Set[Keyword],
-             members:          Set[Person],
+             members:          Set[Project.Member],
              images:           List[Image]
     ): ValidatedNel[String, NonRenkuProject.WithoutParent] =
       validateDates(dateCreated, dateModified).as(
         NonRenkuProject.WithoutParent(resourceId,
-                                      path,
+                                      slug,
                                       name,
                                       maybeDescription,
                                       dateCreated,
@@ -124,7 +125,7 @@ object NonRenkuProject {
   }
 
   final case class WithParent(resourceId:       ResourceId,
-                              path:             Path,
+                              slug:             Slug,
                               name:             Name,
                               maybeDescription: Option[Description],
                               dateCreated:      DateCreated,
@@ -132,7 +133,7 @@ object NonRenkuProject {
                               maybeCreator:     Option[Person],
                               visibility:       Visibility,
                               keywords:         Set[Keyword],
-                              members:          Set[Person],
+                              members:          Set[Project.Member],
                               parentResourceId: ResourceId,
                               images:           List[Image]
   ) extends NonRenkuProject
@@ -146,7 +147,7 @@ object NonRenkuProject {
 
   object WithParent extends ProjectFactory {
     def from(resourceId:       ResourceId,
-             path:             Path,
+             slug:             Slug,
              name:             Name,
              maybeDescription: Option[Description],
              dateCreated:      DateCreated,
@@ -154,13 +155,13 @@ object NonRenkuProject {
              maybeCreator:     Option[Person],
              visibility:       Visibility,
              keywords:         Set[Keyword],
-             members:          Set[Person],
+             members:          Set[Project.Member],
              parentResourceId: ResourceId,
              images:           List[Image]
     ): ValidatedNel[String, NonRenkuProject.WithParent] =
       validateDates(dateCreated, dateModified).as(
         NonRenkuProject.WithParent(resourceId,
-                                   path,
+                                   slug,
                                    name,
                                    maybeDescription,
                                    dateCreated,
@@ -187,7 +188,7 @@ sealed trait RenkuProject extends Project with Product with Serializable {
 
 object RenkuProject {
   final case class WithoutParent(resourceId:       ResourceId,
-                                 path:             Path,
+                                 slug:             Slug,
                                  name:             Name,
                                  maybeDescription: Option[Description],
                                  agent:            CliVersion,
@@ -196,7 +197,7 @@ object RenkuProject {
                                  maybeCreator:     Option[Person],
                                  visibility:       Visibility,
                                  keywords:         Set[Keyword],
-                                 members:          Set[Person],
+                                 members:          Set[Project.Member],
                                  version:          SchemaVersion,
                                  activities:       List[Activity],
                                  datasets:         List[Dataset[Dataset.Provenance]],
@@ -213,7 +214,7 @@ object RenkuProject {
   object WithoutParent extends ProjectFactory {
 
     def from(resourceId:       ResourceId,
-             path:             Path,
+             slug:             Slug,
              name:             Name,
              maybeDescription: Option[Description],
              agent:            CliVersion,
@@ -222,7 +223,7 @@ object RenkuProject {
              maybeCreator:     Option[Person],
              visibility:       Visibility,
              keywords:         Set[Keyword],
-             members:          Set[Person],
+             members:          Set[Project.Member],
              version:          SchemaVersion,
              activities:       List[Activity],
              datasets:         List[Dataset[Dataset.Provenance]],
@@ -235,10 +236,10 @@ object RenkuProject {
       updatePlansOriginalId(plans)
     ).mapN { (_, _, _, updatedPlans) =>
       val (syncedActivities, syncedDatasets, syncedPlans) =
-        syncPersons(projectPersons = members ++ maybeCreator, activities, datasets, updatedPlans)
+        syncPersons(projectPersons = members.map(_.person) ++ maybeCreator, activities, datasets, updatedPlans)
       RenkuProject.WithoutParent(
         resourceId,
-        path,
+        slug,
         name,
         maybeDescription,
         agent,
@@ -300,7 +301,7 @@ object RenkuProject {
   }
 
   final case class WithParent(resourceId:       ResourceId,
-                              path:             Path,
+                              slug:             Slug,
                               name:             Name,
                               maybeDescription: Option[Description],
                               agent:            CliVersion,
@@ -309,7 +310,7 @@ object RenkuProject {
                               maybeCreator:     Option[Person],
                               visibility:       Visibility,
                               keywords:         Set[Keyword],
-                              members:          Set[Person],
+                              members:          Set[Project.Member],
                               version:          SchemaVersion,
                               activities:       List[Activity],
                               datasets:         List[Dataset[Dataset.Provenance]],
@@ -328,7 +329,7 @@ object RenkuProject {
   object WithParent extends ProjectFactory {
 
     def from(resourceId:       ResourceId,
-             path:             Path,
+             slug:             Slug,
              name:             Name,
              maybeDescription: Option[Description],
              agent:            CliVersion,
@@ -337,7 +338,7 @@ object RenkuProject {
              maybeCreator:     Option[Person],
              visibility:       Visibility,
              keywords:         Set[Keyword],
-             members:          Set[Person],
+             members:          Set[Project.Member],
              version:          SchemaVersion,
              activities:       List[Activity],
              datasets:         List[Dataset[Dataset.Provenance]],
@@ -352,10 +353,10 @@ object RenkuProject {
       validateCompositePlanData(plans)
     ) mapN { (_, _, _, updatedPlans, _) =>
       val (syncedActivities, syncedDatasets, syncedPlans) =
-        syncPersons(projectPersons = members ++ maybeCreator, activities, datasets, updatedPlans)
+        syncPersons(projectPersons = members.map(_.person) ++ maybeCreator, activities, datasets, updatedPlans)
       RenkuProject.WithParent(
         resourceId,
-        path,
+        slug,
         name,
         maybeDescription,
         agent,
@@ -527,14 +528,14 @@ object RenkuProject {
         (updateAuthors(from) andThen updateAssociationAgents(from))(activities)
 
       private def updateAuthors(from: Set[Person]): List[Activity] => List[Activity] =
-        activitiesLens.composeLens(ActivityLens.activityAuthor).modify { author =>
+        activitiesLens.andThen(ActivityLens.activityAuthor).modify { author =>
           from
             .find(byEmail(author))
             .getOrElse(author)
         }
 
       private def updateAssociationAgents(from: Set[Person]): List[Activity] => List[Activity] =
-        activitiesLens.composeLens(ActivityLens.activityAssociationAgent).modify {
+        activitiesLens.andThen(ActivityLens.activityAssociationAgent).modify {
           case Right(person) =>
             Right(from.find(byEmail(person)).getOrElse(person))
           case other => other
@@ -545,9 +546,9 @@ object RenkuProject {
 
       def updateCreators(from: Set[Person]): List[Dataset[Provenance]] =
         datasetsLens
-          .composeLens(provenanceLens)
-          .composeLens(provCreatorsLens)
-          .composeTraversal(creatorsLens)
+          .andThen(provenanceLens)
+          .andThen(provCreatorsLens)
+          .andThen(creatorsLens)
           .modify(creator => from.find(byEmail(creator)).getOrElse(creator))(datasets)
     }
 
@@ -555,7 +556,7 @@ object RenkuProject {
 
       def updateCreators(from: Set[Person]): List[Plan] =
         plansLens
-          .composeLens(PlanLens.planCreators)
+          .andThen(PlanLens.planCreators)
           .modify(_.map(p => from.find(byEmail(p)).getOrElse(p)))(plans)
     }
 
@@ -583,6 +584,7 @@ object RenkuProject {
 }
 
 object Project {
+  final case class Member(person: Person, role: Role)
 
   import io.renku.jsonld.{EntityTypes, JsonLD, JsonLDEncoder}
 
@@ -590,7 +592,7 @@ object Project {
     new EntityFunctions[P] {
 
       override val findAllPersons: P => Set[Person] = { project =>
-        project.members ++
+        project.members.map(_.person) ++
           project.maybeCreator ++
           project.activities.flatMap(EntityFunctions[Activity].findAllPersons) ++
           project.datasets.flatMap(EntityFunctions[Dataset[Dataset.Provenance]].findAllPersons) ++
@@ -620,8 +622,9 @@ object Project {
           project.resourceId.asEntityId,
           entityTypes,
           schema / "name"             -> project.name.asJsonLD,
-          renku / "projectPath"       -> project.path.asJsonLD,
-          renku / "projectNamespace"  -> project.path.toNamespace.asJsonLD,
+          renku / "slug"              -> project.slug.asJsonLD,
+          renku / "projectPath"       -> project.slug.asJsonLD,
+          renku / "projectNamespace"  -> project.slug.toNamespace.asJsonLD,
           renku / "projectNamespaces" -> project.namespaces.asJsonLD,
           schema / "description"      -> project.maybeDescription.asJsonLD,
           schema / "agent"            -> project.agent.asJsonLD,
@@ -630,7 +633,7 @@ object Project {
           schema / "creator"          -> project.maybeCreator.asJsonLD,
           renku / "projectVisibility" -> project.visibility.asJsonLD,
           schema / "keywords"         -> project.keywords.asJsonLD,
-          schema / "member"           -> project.members.toList.asJsonLD,
+          schema / "member"           -> project.members.map(_.person).toList.asJsonLD,
           schema / "schemaVersion"    -> project.version.asJsonLD,
           renku / "hasActivity"       -> project.activities.asJsonLD,
           renku / "hasPlan"           -> project.plans.asJsonLD,
@@ -650,8 +653,9 @@ object Project {
           project.resourceId.asEntityId,
           entityTypes,
           schema / "name"             -> project.name.asJsonLD,
-          renku / "projectPath"       -> project.path.asJsonLD,
-          renku / "projectNamespace"  -> project.path.toNamespace.asJsonLD,
+          renku / "slug"              -> project.slug.asJsonLD,
+          renku / "projectPath"       -> project.slug.asJsonLD,
+          renku / "projectNamespace"  -> project.slug.toNamespace.asJsonLD,
           renku / "projectNamespaces" -> project.namespaces.asJsonLD,
           schema / "description"      -> project.maybeDescription.asJsonLD,
           schema / "dateCreated"      -> project.dateCreated.asJsonLD,
@@ -659,7 +663,7 @@ object Project {
           schema / "creator"          -> project.maybeCreator.asJsonLD,
           renku / "projectVisibility" -> project.visibility.asJsonLD,
           schema / "keywords"         -> project.keywords.asJsonLD,
-          schema / "member"           -> project.members.toList.asJsonLD,
+          schema / "member"           -> project.members.map(_.person).toList.asJsonLD,
           prov / "wasDerivedFrom"     -> maybeDerivedFrom.asJsonLD,
           schema / "image"            -> project.images.asJsonLD
         )
@@ -679,6 +683,7 @@ object Project {
     val image:   Property = schema / "image"
 
     val nameProperty:         DataProperty.Def = DataProperty(schema / "name", xsd / "string")
+    val slugProperty:         DataProperty.Def = DataProperty(renku / "slug", xsd / "string")
     val pathProperty:         DataProperty.Def = DataProperty(renku / "projectPath", xsd / "string")
     val descriptionProperty:  DataProperty.Def = DataProperty(schema / "description", xsd / "string")
     val dateCreatedProperty:  DataProperty.Def = DataProperty(schema / "dateCreated", xsd / "dateTime")
@@ -704,6 +709,7 @@ object Project {
           ObjectProperty(image, Image.Ontology.typeDef)
         ),
         DataProperties(
+          slugProperty,
           nameProperty,
           pathProperty,
           DataProperty(renku / "projectNamespace", xsd / "string"),
@@ -716,42 +722,5 @@ object Project {
           schemaVersionProperty
         )
       )
-  }
-
-  final case class GitLabProjectInfo(id:               GitLabId,
-                                     name:             Name,
-                                     path:             Path,
-                                     dateCreated:      DateCreated,
-                                     dateModified:     DateModified,
-                                     maybeDescription: Option[Description],
-                                     maybeCreator:     Option[ProjectMember],
-                                     keywords:         Set[Keyword],
-                                     members:          Set[ProjectMember],
-                                     visibility:       Visibility,
-                                     maybeParentPath:  Option[Path],
-                                     avatarUrl:        Option[ImageUri]
-  )
-
-  sealed trait ProjectMember {
-    val name:     persons.Name
-    val username: persons.Username
-    val gitLabId: persons.GitLabId
-  }
-  object ProjectMember {
-
-    def apply(name: persons.Name, username: persons.Username, gitLabId: persons.GitLabId): ProjectMemberNoEmail =
-      ProjectMemberNoEmail(name, username, gitLabId)
-
-    final case class ProjectMemberNoEmail(name: persons.Name, username: persons.Username, gitLabId: persons.GitLabId)
-        extends ProjectMember {
-
-      def add(email: persons.Email): ProjectMemberWithEmail = ProjectMemberWithEmail(name, username, gitLabId, email)
-    }
-
-    final case class ProjectMemberWithEmail(name:     persons.Name,
-                                            username: persons.Username,
-                                            gitLabId: persons.GitLabId,
-                                            email:    persons.Email
-    ) extends ProjectMember
   }
 }

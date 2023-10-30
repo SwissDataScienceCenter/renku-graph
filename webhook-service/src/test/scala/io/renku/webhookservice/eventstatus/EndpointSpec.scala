@@ -21,8 +21,10 @@ package eventstatus
 
 import cats.effect.{IO, Ref}
 import cats.syntax.all._
+import eu.timepit.refined.auto._
 import io.circe.Json
 import io.circe.syntax._
+import io.renku.data.Message
 import io.renku.eventlog.api.events.CommitSyncRequest
 import io.renku.events.consumers.ConsumersModelGenerators.consumerProjects
 import io.renku.events.consumers.Project
@@ -32,12 +34,9 @@ import io.renku.generators.Generators.exceptions
 import io.renku.graph.model.GraphModelGenerators.projectIds
 import io.renku.graph.model.projects
 import io.renku.graph.model.projects.GitLabId
-import io.renku.http.ErrorMessage._
-import io.renku.http.InfoMessage.InfoMessage
 import io.renku.http.client.AccessToken
 import io.renku.http.server.EndpointTester._
 import io.renku.http.server.security.model.AuthUser
-import io.renku.http.{ErrorMessage, InfoMessage}
 import io.renku.interpreters.TestLogger
 import io.renku.interpreters.TestLogger.Level.{Error, Warn}
 import io.renku.logging.TestExecutionTimeRecorder
@@ -76,7 +75,7 @@ class EndpointSpec
         givenStatusInfoFinding(projectId, returning = statusInfo.some.pure[IO])
 
         val project = consumerProjects.generateOne.copy(id = projectId)
-        givenProjectInfoFinding(projectId, authUser, returning = project.pure[IO])
+        givenProjectInfoFinding(projectId, authUser, returning = project.some.pure[IO])
         givenProjectViewedEventSent
 
         val response = endpoint.fetchProcessingStatus(projectId, authUser).unsafeRunSync()
@@ -101,7 +100,7 @@ class EndpointSpec
         givenStatusInfoFinding(projectId, returning = None.pure[IO])
 
         val project = consumerProjects.generateOne.copy(id = projectId)
-        givenProjectInfoFinding(projectId, authUser, returning = project.pure[IO])
+        givenProjectInfoFinding(projectId, authUser, returning = project.some.pure[IO])
         givenCommitSyncRequestSent
 
         val response = endpoint.fetchProcessingStatus(projectId, authUser).unsafeRunSync()
@@ -144,7 +143,7 @@ class EndpointSpec
         givenStatusInfoFinding(projectId, returning = statusInfo.some.pure[IO])
 
         val project = consumerProjects.generateOne.copy(id = projectId)
-        givenProjectInfoFinding(projectId, authUser, returning = project.pure[IO])
+        givenProjectInfoFinding(projectId, authUser, returning = project.some.pure[IO])
         givenProjectViewedEventSent
 
         val response = endpoint.fetchProcessingStatus(projectId, authUser).unsafeRunSync()
@@ -166,9 +165,9 @@ class EndpointSpec
 
         val response = endpoint.fetchProcessingStatus(projectId, authUser).unsafeRunSync()
 
-        response.status                          shouldBe NotFound
-        response.contentType                     shouldBe Some(`Content-Type`(application.json))
-        response.as[InfoMessage].unsafeRunSync() shouldBe InfoMessage("Info about project cannot be found")
+        response.status                      shouldBe NotFound
+        response.contentType                 shouldBe Some(`Content-Type`(application.json))
+        response.as[Message].unsafeRunSync() shouldBe Message.Info("Info about project cannot be found")
       }
 
     "return INTERNAL_SERVER_ERROR when checking if project webhook exists fails" in new TestCase {
@@ -181,9 +180,9 @@ class EndpointSpec
 
       val response = endpoint.fetchProcessingStatus(projectId, authUser).unsafeRunSync()
 
-      response.status                   shouldBe InternalServerError
-      response.contentType              shouldBe Some(`Content-Type`(application.json))
-      response.as[Json].unsafeRunSync() shouldBe ErrorMessage(statusInfoFindingErrorMessage).asJson
+      response.status                      shouldBe InternalServerError
+      response.contentType                 shouldBe Some(`Content-Type`(application.json))
+      response.as[Message].unsafeRunSync() shouldBe Message.Error.unsafeApply(statusInfoFindingErrorMessage)
 
       logger.logged(Error(statusInfoFindingErrorMessage, exception))
     }
@@ -199,9 +198,9 @@ class EndpointSpec
 
       val response = endpoint.fetchProcessingStatus(projectId, authUser).unsafeRunSync()
 
-      response.status                   shouldBe InternalServerError
-      response.contentType              shouldBe Some(`Content-Type`(application.json))
-      response.as[Json].unsafeRunSync() shouldBe ErrorMessage(statusInfoFindingErrorMessage).asJson
+      response.status                      shouldBe InternalServerError
+      response.contentType                 shouldBe Some(`Content-Type`(application.json))
+      response.as[Message].unsafeRunSync() shouldBe Message.Error.unsafeApply(statusInfoFindingErrorMessage)
 
       logger.logged(Error(statusInfoFindingErrorMessage, exception))
     }
@@ -236,11 +235,13 @@ class EndpointSpec
         .expects(projectId)
         .returning(returning)
 
-    def givenProjectInfoFinding(projectId: projects.GitLabId, authUser: Option[AuthUser], returning: IO[Project]) =
-      (projectInfoFinder
-        .findProjectInfo(_: projects.GitLabId)(_: Option[AccessToken]))
-        .expects(projectId, authUser.map(_.accessToken))
-        .returning(returning)
+    def givenProjectInfoFinding(projectId: projects.GitLabId,
+                                authUser:  Option[AuthUser],
+                                returning: IO[Option[Project]]
+    ) = (projectInfoFinder
+      .findProjectInfo(_: projects.GitLabId)(_: Option[AccessToken]))
+      .expects(projectId, authUser.map(_.accessToken))
+      .returning(returning)
 
     private val sentEvents: Ref[IO, List[AnyRef]] = Ref.unsafe(Nil)
 
@@ -261,8 +262,8 @@ class EndpointSpec
     }
 
     def verifyProjectViewedEventSent(project: Project, authUser: Option[AuthUser]) = eventually {
-      sentEvents.get.unsafeRunSync().collect { case e: ProjectViewedEvent => e.path -> e.maybeUserId } shouldBe
-        List(project.path -> authUser.map(_.id).map(UserId(_)))
+      sentEvents.get.unsafeRunSync().collect { case e: ProjectViewedEvent => e.slug -> e.maybeUserId } shouldBe
+        List(project.slug -> authUser.map(_.id).map(UserId(_)))
     }
   }
 }

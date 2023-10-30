@@ -33,7 +33,8 @@ object GitLabApiCallRecorder {
                    name = "gitlab_api_calls",
                    help = "GitLab API Calls",
                    labelName = "call_id",
-                   buckets = Seq(.005, .01, .025, .05, .075, .1, .25, .5, .75, 1, 2.5, 5, 7.5, 10)
+                   buckets = Seq(.005, .01, .025, .05, .075, .1, .25, .5, .75, 1, 2.5, 5, 7.5, 10),
+                   maybeThreshold = None
                  )
     executionTimeRecorder <- ExecutionTimeRecorder[F](maybeHistogram = Some(histogram))
   } yield new GitLabApiCallRecorder(executionTimeRecorder)

@@ -31,7 +31,7 @@ import io.renku.graph.model.projects
 import io.renku.interpreters.TestLogger
 import io.renku.lock.Lock
 import io.renku.testtools.IOSpec
-import io.renku.triplesgenerator.TgLockDB.TsWriteLock
+import io.renku.triplesgenerator.TgDB.TsWriteLock
 import io.renku.triplesgenerator.api.events.CleanUpEvent
 import io.renku.triplesgenerator.events.consumers.TSReadinessForEventsChecker
 import org.scalamock.scalatest.MockFactory
@@ -68,7 +68,7 @@ class EventHandlerSpec extends AnyWordSpec with MockFactory with IOSpec with sho
     "lock while executing" in new TestCase {
       val test = Ref.unsafe[IO, Int](0)
       override val tsWriteLock: TsWriteLock[IO] =
-        Lock.from[IO, projects.Path](Kleisli(_ => test.update(_ + 1)))(Kleisli(_ => test.update(_ + 1)))
+        Lock.from[IO, projects.Slug](Kleisli(_ => test.update(_ + 1)))(Kleisli(_ => test.update(_ + 1)))
 
       val event = consumerProjects.map(CleanUpEvent(_)).generateOne
 
@@ -110,7 +110,7 @@ class EventHandlerSpec extends AnyWordSpec with MockFactory with IOSpec with sho
     val renewSubscriptionCalled       = Ref.unsafe[IO, Boolean](false)
     (subscriptionMechanism.renewSubscription _).expects().returns(renewSubscriptionCalled.set(true))
 
-    def tsWriteLock: TsWriteLock[IO] = Lock.none[IO, projects.Path]
+    def tsWriteLock: TsWriteLock[IO] = Lock.none[IO, projects.Slug]
     lazy val handler = new EventHandler[IO](
       categoryName,
       tsReadinessChecker,

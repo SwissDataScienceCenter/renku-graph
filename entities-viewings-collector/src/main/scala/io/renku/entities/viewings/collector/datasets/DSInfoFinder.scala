@@ -32,7 +32,7 @@ private trait DSInfoFinder[F[_]] {
   def findDSInfo(identifier: datasets.Identifier): F[Option[DSInfo]]
 }
 
-private final case class DSInfo(projectPath: projects.Path, dataset: Dataset)
+private final case class DSInfo(projectSlug: projects.Slug, dataset: Dataset)
 
 private object DSInfoFinder {
 
@@ -63,23 +63,23 @@ private class DSInfoFinderImpl[F[_]: MonadThrow](tsClient: TSClient[F]) extends 
   override def findDSInfo(identifier: datasets.Identifier): F[Option[DSInfo]] =
     findProjects(identifier)
       .map(findOldestProject)
-      .map(_.map { case (path, _, dataset) => DSInfo(path, dataset) })
+      .map(_.map { case (slug, _, dataset) => DSInfo(slug, dataset) })
 
-  private type Row = (projects.Path, projects.DateCreated, Dataset)
+  private type Row = (projects.Slug, projects.DateCreated, Dataset)
 
   private def findProjects(identifier: datasets.Identifier): F[List[Row]] = queryExpecting(
     SparqlQuery
       .ofUnsafe(
         show"${categoryName.show.toLowerCase}: find projects",
         Prefixes of (schema -> "schema", renku -> "renku"),
-        sparql"""|SELECT ?path ?dateCreated ?dsId ?dsIdentifier
+        sparql"""|SELECT ?slug ?dateCreated ?dsId ?dsIdentifier
                  |WHERE {
                  |  GRAPH ?projectId {
                  |    BIND (${identifier.asObject} AS ?dsIdentifier)
                  |    ?dsId a schema:Dataset;
                  |          schema:identifier ?dsIdentifier.
                  |    ?projectId a schema:Project;
-                 |               renku:projectPath ?path;
+                 |               renku:projectPath ?slug;
                  |               schema:dateCreated ?dateCreated.
                  |  }
                  |}
@@ -90,11 +90,11 @@ private class DSInfoFinderImpl[F[_]: MonadThrow](tsClient: TSClient[F]) extends 
   private lazy val rowsDecoder: Decoder[List[Row]] = ResultsDecoder[List, Row] { implicit cur =>
     import io.renku.tinytypes.json.TinyTypeDecoders._
     for {
-      path         <- extract[projects.Path]("path")
+      slug         <- extract[projects.Slug]("slug")
       date         <- extract[projects.DateCreated]("dateCreated")
       dsId         <- extract[datasets.ResourceId]("dsId")
       dsIdentifier <- extract[datasets.Identifier]("dsIdentifier")
-    } yield (path, date, Dataset(dsId, dsIdentifier))
+    } yield (slug, date, Dataset(dsId, dsIdentifier))
   }
 
   private lazy val findOldestProject: List[Row] => Option[Row] =

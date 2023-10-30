@@ -18,16 +18,16 @@
 
 package io.renku.graph.acceptancetests.stubs.gitlab
 
-import GitLabApiStub._
 import cats.Monad
 import cats.syntax.all._
+import io.renku.graph.acceptancetests.stubs.gitlab.GitLabApiStub._
 import io.renku.generators.Generators.Implicits._
 import io.renku.graph.acceptancetests.data.Project
 import io.renku.graph.acceptancetests.stubs.gitlab.GitLabAuth.AuthedReq
 import io.renku.graph.acceptancetests.stubs.gitlab.GitLabAuth.AuthedReq.{AuthedProject, AuthedUser}
-import io.renku.graph.model.{persons, projects, GraphModelGenerators}
 import io.renku.graph.model.events.CommitId
 import io.renku.graph.model.testentities.Person
+import io.renku.graph.model.{GraphModelGenerators, persons, projects}
 import io.renku.http.client.AccessToken.ProjectAccessToken
 import io.renku.http.client.UserAccessToken
 
@@ -92,13 +92,13 @@ trait GitLabStateQueries {
   def projectsFor(userId: Option[persons.GitLabId]): StateQuery[List[Project]] =
     _.projects.filter { p =>
       p.entitiesProject.visibility == projects.Visibility.Public ||
-      userId.exists(p.members.map(_.gitLabId).contains_) ||
+      userId.exists(p.members.map(_.user.gitLabId).contains_) ||
       p.maybeCreator.map(_.gitLabId) == userId
     }
 
   def projectsWhereUserIsMember(userId: persons.GitLabId): StateQuery[List[Project]] =
     _.projects.filter { p =>
-      p.members.map(_.gitLabId).contains_(userId) || p.maybeCreator.forall(_.gitLabId == userId)
+      p.members.map(_.user.gitLabId).contains_(userId) || p.maybeCreator.forall(_.gitLabId == userId)
     }
 
   def findCallerProjects: Option[AuthedReq] => StateQuery[List[Project]] = {
@@ -110,14 +110,14 @@ trait GitLabStateQueries {
   def findProject(id: projects.GitLabId, user: Option[persons.GitLabId]): StateQuery[Option[Project]] =
     projectsFor(user).andThen(_.find(p => p.id == id))
 
-  def findProject(path: projects.Path, user: Option[persons.GitLabId]): StateQuery[Option[Project]] =
+  def findProject(slug: projects.Slug, user: Option[persons.GitLabId]): StateQuery[Option[Project]] =
     for {
       all <- projectsFor(user)
-      project = all.find(p => p.path == path)
+      project = all.find(p => p.slug == slug)
     } yield project
 
-  def findProject(id: projects.GitLabId, path: projects.Path): StateQuery[Option[Project]] =
-    _.projects.find(p => p.path == path && p.id == id)
+  def findProject(id: projects.GitLabId, slug: projects.Slug): StateQuery[Option[Project]] =
+    _.projects.find(p => p.slug == slug && p.id == id)
 
   def findProjectById(id: projects.GitLabId): StateQuery[Option[Project]] =
     _.projects.find(_.id == id)
@@ -130,14 +130,14 @@ trait GitLabStateQueries {
       case None                         => findProject(id, None)
     }
 
-  def findProjectByPath(path: projects.Path): StateQuery[Option[Project]] =
-    _.projects.find(_.path == path)
+  def findProjectBySlug(slug: projects.Slug): StateQuery[Option[Project]] =
+    _.projects.find(_.slug == slug)
 
-  def findProjectByPath(path: projects.Path, maybeAuthedReq: Option[AuthedReq]): StateQuery[Option[Project]] =
+  def findProjectBySlug(slug: projects.Slug, maybeAuthedReq: Option[AuthedReq]): StateQuery[Option[Project]] =
     maybeAuthedReq match {
-      case Some(AuthedProject(id, _))  => findProject(id, path)
-      case Some(AuthedUser(userId, _)) => findProject(path, userId.some)
-      case None                        => findProject(path, None)
+      case Some(AuthedProject(id, _))  => findProject(id, slug)
+      case Some(AuthedUser(userId, _)) => findProject(slug, userId.some)
+      case None                        => findProject(slug, None)
     }
 
   def findWebhooks(projectId: projects.GitLabId): StateQuery[List[Webhook]] =
@@ -146,9 +146,9 @@ trait GitLabStateQueries {
   def isProjectBroken(id: projects.GitLabId): StateQuery[Boolean] =
     _.brokenProjects.contains(id)
 
-  def isProjectBroken(path: projects.Path): StateQuery[Boolean] =
+  def isProjectBroken(slug: projects.Slug): StateQuery[Boolean] =
     for {
-      project <- findProjectByPath(path)
+      project <- findProjectBySlug(slug)
       broken  <- project.traverse(p => isProjectBroken(p.id))
     } yield broken.getOrElse(false)
 

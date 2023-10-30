@@ -26,7 +26,7 @@ import eu.timepit.refined.api.Refined
 import eu.timepit.refined.collection.NonEmpty
 import io.renku.config.ConfigLoader.find
 import io.renku.logging.ExecutionTimeRecorder.ElapsedTime
-import io.renku.metrics.{Histogram, LabeledHistogram, SingleValueHistogram}
+import io.renku.metrics.Histogram
 import io.renku.tinytypes.{LongTinyType, TinyTypeFactory}
 import org.typelevel.log4cats.Logger
 
@@ -39,15 +39,15 @@ abstract class ExecutionTimeRecorder[F[_]](threshold: ElapsedTime) {
       maybeHistogramLabel: Option[String Refined NonEmpty] = None
   ): F[(ElapsedTime, A)]
 
-  def measureAndLogTime[A](condition: PartialFunction[A, String])(
+  def measureAndLogTime[A](message: PartialFunction[A, String])(
       block: F[A]
   )(implicit F: Monad[F], L: Logger[F]): F[A] =
-    measureExecutionTime(block).flatMap(logExecutionTimeWhen(condition))
+    measureExecutionTime(block).flatMap(logExecutionTimeWhen(message))
 
   def logExecutionTimeWhen[A](
-      condition: PartialFunction[A, String]
+      message: PartialFunction[A, String]
   )(implicit F: Applicative[F], L: Logger[F]): ((ElapsedTime, A)) => F[A] = { resultAndTime =>
-    logWarningIfAboveThreshold(resultAndTime, condition.lift).as(resultAndTime._2)
+    logWarningIfAboveThreshold(resultAndTime, message.lift).as(resultAndTime._2)
   }
 
   def logExecutionTime[A](
@@ -58,10 +58,10 @@ abstract class ExecutionTimeRecorder[F[_]](threshold: ElapsedTime) {
 
   private def logWarningIfAboveThreshold[A](
       resultAndTime: (ElapsedTime, A),
-      condition:     A => Option[String]
+      withMessage:   A => Option[String]
   )(implicit F: Applicative[F], L: Logger[F]): F[Unit] = {
     val (elapsedTime, result) = resultAndTime
-    condition(result)
+    withMessage(result)
       .filter(_ => elapsedTime >= threshold)
       .map(message => L.warn(s"$message in ${elapsedTime}ms"))
       .getOrElse(F.unit)
@@ -76,29 +76,16 @@ class ExecutionTimeRecorderImpl[F[_]: Sync: Clock: Logger](
   override def measureExecutionTime[A](
       block:               F[A],
       maybeHistogramLabel: Option[String Refined NonEmpty] = None
-  ): F[(ElapsedTime, A)] = Clock[F]
-    .timed {
-      maybeHistogram match {
-        case None => block
-        case Some(histogram) =>
-          for {
-            maybeTimer <- maybeStartTimer(histogram, maybeHistogramLabel)
-            result     <- block
-            _          <- maybeTimer.map(_.observeDuration.void).getOrElse(().pure[F])
-          } yield result
-      }
-    }
-    .map { case (elapsedTime, result) => ElapsedTime(elapsedTime) -> result }
+  ): F[(ElapsedTime, A)] =
+    Clock[F]
+      .timed(block)
+      .flatTap(updateHistogram(maybeHistogramLabel))
+      .map { case (elapsedTime, result) => ElapsedTime(elapsedTime) -> result }
 
-  private def maybeStartTimer(histogram: Histogram[F], maybeHistogramLabel: Option[String Refined NonEmpty]) =
-    histogram -> maybeHistogramLabel match {
-      case (h: SingleValueHistogram[F], None)    => h.startTimer().map(_.some)
-      case (h: LabeledHistogram[F], Some(label)) => h.startTimer(label.value).map(_.some)
-      case (h: SingleValueHistogram[F], Some(label)) =>
-        Logger[F].error(s"Label $label sent for a Single Value Histogram ${h.name}") >> None.pure[F]
-      case (h: LabeledHistogram[F], None) =>
-        Logger[F].error(s"No label sent for a Labeled Histogram ${h.name}") >> None.pure[F]
-    }
+  private def updateHistogram[A](maybeLabel: Option[String Refined NonEmpty]): ((FiniteDuration, A)) => F[Unit] = {
+    case (duration, _) =>
+      maybeHistogram.fold(ifEmpty = ().pure[F])(_.observe(maybeLabel.map(_.value), duration))
+  }
 }
 
 object ExecutionTimeRecorder {

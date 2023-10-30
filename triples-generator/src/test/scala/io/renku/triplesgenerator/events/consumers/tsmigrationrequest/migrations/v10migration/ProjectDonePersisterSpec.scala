@@ -21,7 +21,7 @@ package io.renku.triplesgenerator.events.consumers.tsmigrationrequest.migrations
 import cats.effect.IO
 import io.renku.generators.Generators.Implicits._
 import io.renku.graph.model.GraphModelGenerators.renkuUrls
-import io.renku.graph.model.RenkuTinyTypeGenerators.projectPaths
+import io.renku.graph.model.RenkuTinyTypeGenerators.projectSlugs
 import io.renku.graph.model.RenkuUrl
 import io.renku.interpreters.TestLogger
 import io.renku.logging.TestSparqlQueryTimeRecorder
@@ -43,17 +43,17 @@ class ProjectDonePersisterSpec
 
   "noteDone" should {
 
-    "persist the (MigrationToV10, renku:migrated, path) triple" in new TestCase {
+    "persist the (MigrationToV10, renku:migrated, slug) triple" in new TestCase {
 
-      val paths       = projectPaths.generateList(min = 2)
-      val insertQuery = BacklogCreator.asToBeMigratedInserts.apply(paths).value
+      val slugs       = projectSlugs.generateList(min = 2)
+      val insertQuery = BacklogCreator.asToBeMigratedInserts.apply(slugs).value
       runUpdate(on = migrationsDataset, insertQuery).unsafeRunSync()
 
-      progressFinder.findProgressInfo.unsafeRunSync() shouldBe s"${paths.size} left from ${paths.size}"
+      progressFinder.findProgressInfo.unsafeRunSync() shouldBe s"${slugs.size} left from ${slugs.size}"
 
-      donePersister.noteDone(Random.shuffle(paths).head).unsafeRunSync()
+      donePersister.noteDone(Random.shuffle(slugs).head).unsafeRunSync()
 
-      progressFinder.findProgressInfo.unsafeRunSync() shouldBe s"${paths.size - 1} left from ${paths.size}"
+      progressFinder.findProgressInfo.unsafeRunSync() shouldBe s"${slugs.size - 1} left from ${slugs.size}"
     }
   }
 

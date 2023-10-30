@@ -20,26 +20,26 @@ package io.renku.eventlog.events.consumers.cleanuprequest
 
 import cats.syntax.all._
 import io.renku.generators.Generators.Implicits._
-import io.renku.graph.model.GraphModelGenerators.{projectIds, projectPaths}
+import io.renku.graph.model.GraphModelGenerators.{projectIds, projectSlugs}
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
 
 class CleanUpRequestEventSpec extends AnyWordSpec with should.Matchers {
 
   "Full.show" should {
-    "return String representation of the underlying project id and path" in {
+    "return String representation of the underlying project id and slug" in {
       val id   = projectIds.generateOne
-      val path = projectPaths.generateOne
+      val slug = projectSlugs.generateOne
 
-      CleanUpRequestEvent(id, path).show shouldBe show"projectId = $id, projectPath = $path"
+      CleanUpRequestEvent(id, slug).show shouldBe show"projectId = $id, projectSlug = $slug"
     }
   }
 
   "Partial.show" should {
-    "return String representation of the underlying project path" in {
-      val path = projectPaths.generateOne
+    "return String representation of the underlying project slug" in {
+      val slug = projectSlugs.generateOne
 
-      CleanUpRequestEvent(path).show shouldBe show"projectPath = $path"
+      CleanUpRequestEvent(slug).show shouldBe show"projectSlug = $slug"
     }
   }
 }

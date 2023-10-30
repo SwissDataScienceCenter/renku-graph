@@ -18,11 +18,12 @@
 
 package io.renku.eventlog.events.consumers.statuschange.toawaitingdeletion
 
-import cats.effect.MonadCancelThrow
+import cats.effect.Async
 import cats.kernel.Monoid
 import cats.syntax.all._
 import eu.timepit.refined.auto._
 import io.renku.db.{DbClient, SqlStatement}
+import io.renku.eventlog.EventLogDB.SessionResource
 import io.renku.eventlog.TypeSerializers._
 import io.renku.eventlog.api.events.StatusChangeEvent.ToAwaitingDeletion
 import io.renku.eventlog.events.consumers.statuschange
@@ -37,7 +38,7 @@ import skunk.implicits._
 
 import java.time.Instant
 
-private[statuschange] class DbUpdater[F[_]: MonadCancelThrow: QueriesExecutionTimes](
+private[statuschange] class DbUpdater[F[_]: Async: QueriesExecutionTimes](
     now: () => Instant = () => Instant.now
 ) extends DbClient(Some(QueriesExecutionTimes[F]))
     with statuschange.DBUpdater[F, ToAwaitingDeletion] {
@@ -63,12 +64,13 @@ private[statuschange] class DbUpdater[F[_]: MonadCancelThrow: QueriesExecutionTi
       .flatMapResult {
         case Some(oldEventStatus) =>
           DBUpdateResults
-            .ForProjects(event.project.path, Map(oldEventStatus -> -1, AwaitingDeletion -> 1))
+            .ForProjects(event.project.slug, Map(oldEventStatus -> -1, AwaitingDeletion -> 1))
             .pure[F]
             .widen[DBUpdateResults]
         case _ => Monoid[DBUpdateResults.ForProjects].empty.pure[F].widen[DBUpdateResults]
       }
   }
 
-  override def onRollback(event: ToAwaitingDeletion): RollbackOp[F] = RollbackOp.empty
+  override def onRollback(event: ToAwaitingDeletion)(implicit sr: SessionResource[F]): RollbackOp[F] =
+    RollbackOp.empty
 }

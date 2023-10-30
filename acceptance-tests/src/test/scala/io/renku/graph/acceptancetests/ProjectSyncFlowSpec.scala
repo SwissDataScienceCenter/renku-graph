@@ -27,7 +27,8 @@ import io.renku.events.CategoryName
 import io.renku.generators.CommonGraphGenerators.authUsers
 import io.renku.generators.Generators.Implicits._
 import io.renku.graph.model.EventsGenerators.commitIds
-import io.renku.graph.model.GraphModelGenerators.projectPaths
+import io.renku.graph.model.GraphModelGenerators.projectSlugs
+import io.renku.graph.model.projects.Role
 import io.renku.graph.model.testentities.cliShapedPersons
 import io.renku.graph.model.testentities.generators.EntitiesGenerators.{removeMembers, renkuProjectEntities, visibilityPublic}
 import org.http4s.Status.{NotFound, Ok}
@@ -45,7 +46,7 @@ class ProjectSyncFlowSpec extends AcceptanceSpec with ApplicationServices with T
       val user = authUsers.generateOne
       val testProject =
         renkuProjectEntities(visibilityPublic, creatorGen = cliShapedPersons).modify(removeMembers()).generateOne
-      val project = dataProjects(testProject).map(addMemberWithId(user.id)).generateOne
+      val project = dataProjects(testProject).map(addMemberWithId(user.id, Role.Owner)).generateOne
 
       Given("repository data in the Triples Store")
       val commitId = commitIds.generateOne
@@ -56,13 +57,13 @@ class ProjectSyncFlowSpec extends AcceptanceSpec with ApplicationServices with T
 
       Then("the project data should exist in the KG")
       eventually {
-        val response = knowledgeGraphClient.GET(s"knowledge-graph/projects/${project.path}")
+        val response = knowledgeGraphClient.GET(s"knowledge-graph/projects/${project.slug}")
         response.status                                        shouldBe Ok
-        response.jsonBody.hcursor.downField("path").as[String] shouldBe project.path.show.asRight
+        response.jsonBody.hcursor.downField("path").as[String] shouldBe project.slug.show.asRight
       }
 
       When("project_path changes in GitLab")
-      val updatedProject = project.copy(entitiesProject = testProject.copy(path = projectPaths.generateOne))
+      val updatedProject = project.copy(entitiesProject = testProject.copy(slug = projectSlugs.generateOne))
       gitLabStub.replaceProject(updatedProject)
       givenAccessTokenPresentFor(updatedProject, user.accessToken)
       resetTriplesGenerator()
@@ -74,13 +75,13 @@ class ProjectSyncFlowSpec extends AcceptanceSpec with ApplicationServices with T
 
       Then("the updated project data should exist in the KG")
       eventually {
-        val response = knowledgeGraphClient.GET(s"knowledge-graph/projects/${updatedProject.path}")
+        val response = knowledgeGraphClient.GET(s"knowledge-graph/projects/${updatedProject.slug}")
         response.status                                        shouldBe Ok
-        response.jsonBody.hcursor.downField("path").as[String] shouldBe updatedProject.path.show.asRight
+        response.jsonBody.hcursor.downField("path").as[String] shouldBe updatedProject.slug.show.asRight
       }
 
       And("the old project data should be removed")
-      knowledgeGraphClient.GET(s"knowledge-graph/projects/${project.path}").status shouldBe NotFound
+      knowledgeGraphClient.GET(s"knowledge-graph/projects/${project.slug}").status shouldBe NotFound
     }
   }
 }

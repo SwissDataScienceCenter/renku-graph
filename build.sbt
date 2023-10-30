@@ -18,7 +18,7 @@
 
 organization := "io.renku"
 name := "renku-graph"
-ThisBuild / scalaVersion := "2.13.11"
+ThisBuild / scalaVersion := "2.13.12"
 
 // This project contains nothing to package, like pure POM maven project
 packagedArtifacts := Map.empty
@@ -42,6 +42,7 @@ lazy val root = project
     renkuCliModel,
     renkuModel,
     graphCommons,
+    eventsQueue,
     eventLogApi,
     eventLog,
     tokenRepository,
@@ -50,7 +51,9 @@ lazy val root = project
     triplesGeneratorApi,
     entitiesSearch,
     entitiesViewingsCollector,
+    projectAuth,
     triplesGenerator,
+    renkuCoreClient,
     knowledgeGraph
   )
 
@@ -106,7 +109,19 @@ lazy val graphCommons = project
   .in(file("graph-commons"))
   .withId("graph-commons")
   .settings(commonSettings)
-  .dependsOn(renkuModel % "compile->compile; test->test")
+  .dependsOn(
+    renkuModel  % "compile->compile; test->test",
+    projectAuth % "compile->compile; test->test"
+  )
+  .enablePlugins(AutomateHeaderPlugin)
+
+lazy val eventsQueue = project
+  .in(file("events-queue"))
+  .withId("events-queue")
+  .settings(commonSettings)
+  .dependsOn(
+    graphCommons % "compile->compile; test->test"
+  )
   .enablePlugins(AutomateHeaderPlugin)
 
 lazy val eventLogApi = project
@@ -129,11 +144,19 @@ lazy val eventLog = project
     AutomateHeaderPlugin
   )
 
+lazy val webhookServiceApi = project
+  .in(file("webhook-service-api"))
+  .withId("webhook-service-api")
+  .settings(commonSettings)
+  .dependsOn(graphCommons % "compile->compile; test->test")
+  .enablePlugins(AutomateHeaderPlugin)
+
 lazy val webhookService = project
   .in(file("webhook-service"))
   .withId("webhook-service")
   .settings(commonSettings)
   .dependsOn(
+    webhookServiceApi   % "compile->compile; test->test",
     eventLogApi         % "compile->compile; test->test",
     triplesGeneratorApi % "compile->compile; test->test"
   )
@@ -159,6 +182,15 @@ lazy val entitiesSearch = project
   .dependsOn(graphCommons % "compile->compile; test->test")
   .enablePlugins(AutomateHeaderPlugin)
 
+lazy val projectAuth = project
+  .in(file("project-auth"))
+  .settings(commonSettings)
+  .dependsOn(
+    renkuModelTinyTypes % "compile->compile; test->test",
+    triplesStoreClient  % "compile->compile; test->test"
+  )
+  .enablePlugins(AutomateHeaderPlugin)
+
 lazy val triplesGeneratorApi = project
   .in(file("triples-generator-api"))
   .withId("triples-generator-api")
@@ -170,7 +202,11 @@ lazy val entitiesViewingsCollector = project
   .in(file("entities-viewings-collector"))
   .withId("entities-viewings-collector")
   .settings(commonSettings)
-  .dependsOn(triplesGeneratorApi % "compile->compile; test->test", entitiesSearch % "compile->compile; test->test")
+  .dependsOn(
+    eventsQueue         % "compile->compile; test->test",
+    triplesGeneratorApi % "compile->compile; test->test",
+    entitiesSearch      % "compile->compile; test->test"
+  )
   .enablePlugins(AutomateHeaderPlugin)
 
 lazy val triplesGenerator = project
@@ -187,7 +223,8 @@ lazy val triplesGenerator = project
   .dependsOn(
     triplesGeneratorApi % "compile->compile; test->test",
     entitiesSearch,
-    entitiesViewingsCollector % "compile->compile; test->test"
+    entitiesViewingsCollector % "compile->compile; test->test",
+    projectAuth               % "compile->compile; test->test"
   )
   .enablePlugins(
     JavaAppPackaging,
@@ -204,6 +241,13 @@ lazy val tokenRepository = project
     AutomateHeaderPlugin
   )
 
+lazy val renkuCoreClient = project
+  .in(file("renku-core-client"))
+  .withId("renku-core-client")
+  .settings(commonSettings)
+  .dependsOn(graphCommons % "compile->compile; test->test")
+  .enablePlugins(AutomateHeaderPlugin)
+
 lazy val knowledgeGraph = project
   .in(file("knowledge-graph"))
   .withId("knowledge-graph")
@@ -219,7 +263,9 @@ lazy val knowledgeGraph = project
   .dependsOn(
     graphCommons        % "compile->compile; test->test",
     entitiesSearch      % "compile->compile; test->test",
+    webhookServiceApi   % "compile->compile; test->test",
     triplesGeneratorApi % "compile->compile; test->test",
+    renkuCoreClient     % "compile->compile; test->test",
     entitiesViewingsCollector
   )
   .enablePlugins(
@@ -305,13 +351,6 @@ lazy val commonSettings = Seq(
 )
 
 import sbtrelease.Vcs
-
-lazy val writeVersionToChart = taskKey[Unit]("Write release version to Chart.yaml")
-writeVersionToChart := writeVersion(lineToChange = "version",
-                                    version => s"version: $version",
-                                    streams.value.log,
-                                    root.base / "helm-chart" / "renku-graph" / "Chart.yaml"
-)
 
 lazy val writeVersionToVersionConf = taskKey[Unit]("Write release version to version.conf files")
 writeVersionToVersionConf := writeVersion(

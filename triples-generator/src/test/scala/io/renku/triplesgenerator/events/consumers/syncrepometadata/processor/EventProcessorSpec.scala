@@ -41,9 +41,9 @@ class EventProcessorSpec extends AsyncFlatSpec with AsyncIOSpec with should.Matc
     val event = syncRepoMetadataEvents.generateOne
 
     eventPayloads[IO].map(_.generateOption) >>= { maybePayload =>
-      givenTSDataFinding(event.path, returning = Option.empty[DataExtract.TS].pure[IO])
-      givenGLDataFinding(event.path, returning = glDataExtracts(having = event.path).generateSome.pure[IO])
-      givenPayloadFinding(event.path, returning = maybePayload.pure[IO])
+      givenTSDataFinding(event.slug, returning = Option.empty[DataExtract.TS].pure[IO])
+      givenGLDataFinding(event.slug, returning = glDataExtracts(having = event.slug).generateSome.pure[IO])
+      givenPayloadFinding(event.slug, returning = maybePayload.pure[IO])
 
       processor.process(event).assertNoException
     }
@@ -54,9 +54,9 @@ class EventProcessorSpec extends AsyncFlatSpec with AsyncIOSpec with should.Matc
     val event = syncRepoMetadataEvents.generateOne
 
     eventPayloads[IO].map(_.generateOption) >>= { maybePayload =>
-      givenTSDataFinding(event.path, returning = tsDataExtracts(having = event.path).generateSome.pure[IO])
-      givenGLDataFinding(event.path, returning = Option.empty[DataExtract.GL].pure[IO])
-      givenPayloadFinding(event.path, returning = maybePayload.pure[IO])
+      givenTSDataFinding(event.slug, returning = tsDataExtracts(having = event.slug).generateSome.pure[IO])
+      givenGLDataFinding(event.slug, returning = Option.empty[DataExtract.GL].pure[IO])
+      givenPayloadFinding(event.slug, returning = maybePayload.pure[IO])
 
       processor.process(event).assertNoException
     }
@@ -69,13 +69,13 @@ class EventProcessorSpec extends AsyncFlatSpec with AsyncIOSpec with should.Matc
 
       val event = syncRepoMetadataEvents.generateOne
 
-      val tsData = tsDataExtracts(having = event.path).generateOne
-      givenTSDataFinding(event.path, returning = tsData.some.pure[IO])
+      val tsData = tsDataExtracts(having = event.slug).generateOne
+      givenTSDataFinding(event.slug, returning = tsData.some.pure[IO])
 
-      val glData = glDataExtracts(having = event.path).generateOne
-      givenGLDataFinding(event.path, returning = glData.some.pure[IO])
+      val glData = glDataExtracts(having = event.slug).generateOne
+      givenGLDataFinding(event.slug, returning = glData.some.pure[IO])
 
-      givenPayloadFinding(event.path, returning = None.pure[IO])
+      givenPayloadFinding(event.slug, returning = None.pure[IO])
 
       val updates = updateCommands.generateList()
       givenUpdateCommandsCalculation(tsData, glData, maybePayloadData = None, returning = updates.pure[IO])
@@ -93,17 +93,17 @@ class EventProcessorSpec extends AsyncFlatSpec with AsyncIOSpec with should.Matc
 
       val event = syncRepoMetadataEvents.generateOne
 
-      val tsData = tsDataExtracts(having = event.path).generateOne
-      givenTSDataFinding(event.path, returning = tsData.some.pure[IO])
+      val tsData = tsDataExtracts(having = event.slug).generateOne
+      givenTSDataFinding(event.slug, returning = tsData.some.pure[IO])
 
-      val glData = glDataExtracts(having = event.path).generateOne
-      givenGLDataFinding(event.path, returning = glData.some.pure[IO])
+      val glData = glDataExtracts(having = event.slug).generateOne
+      givenGLDataFinding(event.slug, returning = glData.some.pure[IO])
 
       eventPayloads[IO].map(_.generateOne) >>= { payload =>
-        givenPayloadFinding(event.path, returning = payload.some.pure[IO])
+        givenPayloadFinding(event.slug, returning = payload.some.pure[IO])
 
-        val maybePayloadData = payloadDataExtracts(having = event.path).generateOption
-        givenPayloadDataExtraction(event.path, payload, returning = maybePayloadData.pure[IO])
+        val maybePayloadData = payloadDataExtracts.generateOption
+        givenPayloadDataExtraction(event.slug, payload, returning = maybePayloadData.pure[IO])
 
         val updates = updateCommands.generateList()
         givenUpdateCommandsCalculation(tsData, glData, maybePayloadData, returning = updates.pure[IO])
@@ -119,12 +119,12 @@ class EventProcessorSpec extends AsyncFlatSpec with AsyncIOSpec with should.Matc
     val event = syncRepoMetadataEvents.generateOne
 
     val exception = exceptions.generateOne
-    givenTSDataFinding(event.path, returning = exception.raiseError[IO, Nothing])
+    givenTSDataFinding(event.slug, returning = exception.raiseError[IO, Nothing])
 
-    val glData = glDataExtracts(having = event.path).generateOne
-    givenGLDataFinding(event.path, returning = glData.some.pure[IO])
+    val glData = glDataExtracts(having = event.slug).generateOne
+    givenGLDataFinding(event.slug, returning = glData.some.pure[IO])
 
-    givenPayloadFinding(event.path, returning = None.pure[IO])
+    givenPayloadFinding(event.slug, returning = None.pure[IO])
 
     processor.process(event).assertNoException >>
       logger.logged(Error(show"$categoryName: $event processing failure", exception)).pure[IO]
@@ -145,26 +145,26 @@ class EventProcessorSpec extends AsyncFlatSpec with AsyncIOSpec with should.Matc
                                                           updateCommandsRunner
   )
 
-  private def givenTSDataFinding(path: projects.Path, returning: IO[Option[DataExtract.TS]]) =
+  private def givenTSDataFinding(slug: projects.Slug, returning: IO[Option[DataExtract.TS]]) =
     (tsDataFinder.fetchTSData _)
-      .expects(path)
+      .expects(slug)
       .returning(returning)
 
-  private def givenGLDataFinding(path: projects.Path, returning: IO[Option[DataExtract.GL]]) =
+  private def givenGLDataFinding(slug: projects.Slug, returning: IO[Option[DataExtract.GL]]) =
     (glDataFinder.fetchGLData _)
-      .expects(path)
+      .expects(slug)
       .returning(returning)
 
-  private def givenPayloadFinding(path: projects.Path, returning: IO[Option[EventPayload]]) =
+  private def givenPayloadFinding(slug: projects.Slug, returning: IO[Option[EventPayload]]) =
     (payloadFinder.fetchLatestPayload _)
-      .expects(path)
+      .expects(slug)
       .returning(returning)
 
-  private def givenPayloadDataExtraction(path:      projects.Path,
+  private def givenPayloadDataExtraction(slug:      projects.Slug,
                                          payload:   EventPayload,
                                          returning: IO[Option[DataExtract.Payload]]
   ) = (payloadDataExtractor.extractPayloadData _)
-    .expects(path, payload)
+    .expects(slug, payload)
     .returning(returning)
 
   private def givenUpdateCommandsCalculation(tsData:           DataExtract.TS,

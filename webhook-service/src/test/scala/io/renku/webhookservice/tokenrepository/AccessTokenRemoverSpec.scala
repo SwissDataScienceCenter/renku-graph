@@ -20,13 +20,13 @@ package io.renku.webhookservice.tokenrepository
 
 import cats.effect.IO
 import com.github.tomakehurst.wiremock.client.WireMock._
+import eu.timepit.refined.auto._
 import io.circe.syntax._
+import io.renku.data.Message
 import io.renku.generators.CommonGraphGenerators.accessTokens
 import io.renku.generators.Generators.Implicits._
 import io.renku.graph.model.GraphModelGenerators.projectIds
 import io.renku.graph.tokenrepository.TokenRepositoryUrl
-import io.renku.http.ErrorMessage
-import io.renku.http.ErrorMessage._
 import io.renku.interpreters.TestLogger
 import io.renku.stubbing.ExternalServiceStubbing
 import io.renku.testtools.IOSpec
@@ -57,7 +57,7 @@ class AccessTokenRemoverSpec
 
     "return an Exception if remote client responds with a status other than NO_CONTENT" in new TestCase {
 
-      val responseBody = ErrorMessage("some error").asJson.noSpaces
+      val responseBody = Message.Error("some error").asJson.noSpaces
       stubFor {
         delete(s"/projects/$projectId/tokens")
           .withAccessToken(maybeAccessToken)

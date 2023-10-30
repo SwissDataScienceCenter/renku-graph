@@ -18,6 +18,7 @@
 
 package io.renku.lock
 
+import io.renku.events.CategoryName
 import io.renku.graph.model.entities.Project
 import io.renku.graph.model.projects
 
@@ -45,9 +46,12 @@ object LongKey {
   implicit val forString: LongKey[String] =
     forInt.contramap(MurmurHash3.stringHash)
 
-  implicit val forProjectPath: LongKey[projects.Path] =
+  implicit val forProjectSlug: LongKey[projects.Slug] =
+    forString.contramap(_.value)
+
+  implicit val forCategoryName: LongKey[CategoryName] =
     forString.contramap(_.value)
 
   implicit val forProject: LongKey[Project] =
-    forProjectPath.contramap(_.path)
+    forProjectSlug.contramap(_.slug)
 }

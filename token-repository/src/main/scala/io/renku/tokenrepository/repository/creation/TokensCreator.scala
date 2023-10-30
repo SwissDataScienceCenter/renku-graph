@@ -31,7 +31,7 @@ import io.renku.http.client.AccessToken.ProjectAccessToken
 import io.renku.http.client.{AccessToken, GitLabClient}
 import io.renku.tokenrepository.repository.AccessTokenCrypto.EncryptedAccessToken
 import io.renku.tokenrepository.repository.ProjectsTokensDB.SessionResource
-import io.renku.tokenrepository.repository.deletion.{TokenRemover, TokensRevoker}
+import io.renku.tokenrepository.repository.deletion.{DeletionResult, TokenRemover, TokensRevoker}
 import io.renku.tokenrepository.repository.fetching.PersistedTokensFinder
 import io.renku.tokenrepository.repository.metrics.QueriesExecutionTimes
 import org.typelevel.log4cats.Logger
@@ -43,13 +43,13 @@ private trait TokensCreator[F[_]] {
 }
 
 private class TokensCreatorImpl[F[_]: MonadThrow: Logger](
-    projectPathFinder:   ProjectPathFinder[F],
+    projectSlugFinder:   ProjectSlugFinder[F],
     accessTokenCrypto:   AccessTokenCrypto[F],
     tokenValidator:      TokenValidator[F],
     tokenDueChecker:     TokenDueChecker[F],
     newTokensCreator:    NewTokensCreator[F],
     tokensPersister:     TokensPersister[F],
-    persistedPathFinder: PersistedPathFinder[F],
+    persistedSlugFinder: PersistedSlugFinder[F],
     tokenRemover:        TokenRemover[F],
     tokenFinder:         PersistedTokensFinder[F],
     tokensRevoker:       TokensRevoker[F],
@@ -57,7 +57,7 @@ private class TokensCreatorImpl[F[_]: MonadThrow: Logger](
 ) extends TokensCreator[F] {
 
   import newTokensCreator._
-  import persistedPathFinder._
+  import persistedSlugFinder._
   import tokenDueChecker._
   import tokenFinder._
   import tokenValidator._
@@ -68,7 +68,7 @@ private class TokensCreatorImpl[F[_]: MonadThrow: Logger](
       .flatMapF(
         decrypt >=>
           removeWhenInvalid(projectId, userToken) >=>
-          replacePathIfChangedOrRemove(projectId, userToken) >=>
+          replaceSlugIfChangedOrRemove(projectId, userToken) >=>
           checkIfDue(projectId)
       )
       .void
@@ -81,49 +81,60 @@ private class TokensCreatorImpl[F[_]: MonadThrow: Logger](
                                 userToken: AccessToken
   ): Option[AccessToken] => F[Option[AccessToken]] = {
     case None => Option.empty[AccessToken].pure[F]
-    case Some(token) =>
-      checkValid(projectId, token) >>= {
-        case true  => token.some.pure[F]
-        case false => tokenRemover.delete(projectId, userToken.some).as(Option.empty)
+    case Some(storedToken) =>
+      checkValid(projectId, storedToken) >>= {
+        case true => storedToken.some.pure[F]
+        case false =>
+          deleteAndLogSuccess(projectId, userToken, show"token removed for $projectId as got invalidated in GL")
+            .as(Option.empty)
       }
   }
 
-  private def replacePathIfChangedOrRemove(
+  private def deleteAndLogSuccess(projectId: projects.GitLabId, mat: AccessToken, message: String) =
+    tokenRemover.delete(projectId, mat.some) >>= {
+      case DeletionResult.Deleted    => Logger[F].info(message)
+      case DeletionResult.NotExisted => ().pure[F]
+    }
+
+  private def replaceSlugIfChangedOrRemove(
       projectId: projects.GitLabId,
       userToken: AccessToken
   ): Option[AccessToken] => F[Option[AccessToken]] = {
     case None => Option.empty[AccessToken].pure[F]
-    case Some(token) =>
-      projectPathFinder
-        .findProjectPath(projectId, token)
-        .semiflatMap(actualPath =>
-          findPersistedProjectPath(projectId).flatMap {
-            case `actualPath` => ().pure[F]
-            case _            => updatePath(Project(projectId, actualPath))
-          }
-        )
-        .cataF(
-          default = tokenRemover.delete(projectId, userToken.some).as(Option.empty),
-          _ => token.some.pure[F]
-        )
+    case Some(storeToken) =>
+      projectSlugFinder
+        .findProjectSlug(projectId, storeToken)
+        .flatMap {
+          case None =>
+            deleteAndLogSuccess(projectId,
+                                userToken,
+                                show"token removed for $projectId as project does not exist in GL"
+            ).as(Option.empty)
+          case Some(actualGLSlug) =>
+            findPersistedProjectSlug(projectId) >>= {
+              case Some(`actualGLSlug`) => storeToken.some.pure[F]
+              case Some(_)              => updateSlug(Project(projectId, actualGLSlug)).as(storeToken.some)
+              case _                    => Option.empty[AccessToken].pure[F]
+            }
+        }
   }
 
   private def checkIfDue(projectId: projects.GitLabId): Option[AccessToken] => F[Option[AccessToken]] = {
-    case Some(token) => checkTokenDue(projectId).map(Option.unless(_)(token))
-    case _           => Option.empty[AccessToken].pure[F]
+    case Some(storedToken) => checkTokenDue(projectId).map(Option.unless(_)(storedToken))
+    case _                 => Option.empty[AccessToken].pure[F]
   }
 
   private def createNew(projectId: projects.GitLabId, userToken: AccessToken) =
     tokenValidator.checkValid(projectId, userToken) >>= {
       case false => ().pure[F]
       case true =>
-        (findProjectPath(projectId, userToken) >>= createNewToken(userToken))
+        (findProjectSlug(projectId, userToken) >>= createNewToken(userToken))
           .semiflatMap(encrypt >=> persist >=> logSuccess >=> tryRevokingOldTokens(userToken))
           .getOrElse(())
     }
 
-  private def findProjectPath(projectId: projects.GitLabId, userToken: AccessToken): OptionT[F, Project] =
-    projectPathFinder.findProjectPath(projectId, userToken).map(Project(projectId, _))
+  private def findProjectSlug(projectId: projects.GitLabId, userToken: AccessToken): OptionT[F, Project] =
+    OptionT(projectSlugFinder.findProjectSlug(projectId, userToken)).map(Project(projectId, _))
 
   private def createNewToken(userToken: AccessToken)(project: Project): OptionT[F, (Project, TokenCreationInfo)] =
     createProjectAccessToken(project.id, userToken).map(project -> _)
@@ -160,12 +171,12 @@ private class TokensCreatorImpl[F[_]: MonadThrow: Logger](
   private def verifyTokenIntegrity(projectId: projects.GitLabId, token: ProjectAccessToken) =
     findStoredToken(projectId)
       .cataF(
-        new Exception(show"Token associator - just saved token cannot be found for project: $projectId")
+        new Exception(show"token for project: $projectId that has been just saved cannot be found")
           .raiseError[F, Unit],
         accessTokenCrypto.decrypt(_) >>= {
           case `token` => ().pure[F]
           case _ =>
-            new Exception(show"Token associator - just saved token integrity check failed for project: $projectId")
+            new Exception(show"token for project: $projectId that has been just saved failed the integrity check")
               .raiseError[F, Unit]
         }
       )
@@ -184,7 +195,7 @@ private object TokensCreator {
   private val maxRetries: Int Refined NonNegative = 3
 
   def apply[F[_]: Async: GitLabClient: Logger: SessionResource: QueriesExecutionTimes]: F[TokensCreator[F]] = for {
-    pathFinder                <- ProjectPathFinder[F]
+    slugFinder                <- ProjectSlugFinder[F]
     accessTokenCrypto         <- AccessTokenCrypto[F]()
     tokenValidator            <- TokenValidator[F]
     tokenDueChecker           <- TokenDueChecker[F]
@@ -192,13 +203,13 @@ private object TokensCreator {
     tokenRemover              <- TokenRemover[F]
     tokensRevoker             <- TokensRevoker[F]
   } yield new TokensCreatorImpl[F](
-    pathFinder,
+    slugFinder,
     accessTokenCrypto,
     tokenValidator,
     tokenDueChecker,
     projectAccessTokenCreator,
     TokensPersister[F],
-    PersistedPathFinder[F],
+    PersistedSlugFinder[F],
     tokenRemover,
     PersistedTokensFinder[F],
     tokensRevoker,

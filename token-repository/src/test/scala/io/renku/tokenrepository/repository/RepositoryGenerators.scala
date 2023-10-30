@@ -19,6 +19,7 @@
 package io.renku.tokenrepository.repository
 
 import AccessTokenCrypto.EncryptedAccessToken
+import deletion.DeletionResult
 import eu.timepit.refined.api.RefType
 import io.renku.generators.Generators.Implicits._
 import io.renku.generators.Generators._
@@ -38,4 +39,7 @@ private object RepositoryGenerators {
 
   val accessTokenIds: Gen[AccessTokenId] =
     positiveInts().toGeneratorOf(v => AccessTokenId(v.value))
+
+  val deletionResults: Gen[DeletionResult] =
+    Gen.oneOf(DeletionResult.Deleted, DeletionResult.NotExisted)
 }

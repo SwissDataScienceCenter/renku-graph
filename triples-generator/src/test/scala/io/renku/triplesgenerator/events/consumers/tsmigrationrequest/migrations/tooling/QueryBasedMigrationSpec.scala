@@ -29,11 +29,11 @@ import io.renku.events.Generators._
 import io.renku.events.producers.EventSender
 import io.renku.generators.Generators.Implicits._
 import io.renku.generators.Generators.exceptions
-import io.renku.graph.model.GraphModelGenerators.projectPaths
+import io.renku.graph.model.GraphModelGenerators.projectSlugs
 import io.renku.graph.model.projects
 import io.renku.interpreters.TestLogger
 import io.renku.testtools.IOSpec
-import io.renku.triplesgenerator.generators.ErrorGenerators._
+import io.renku.triplesgenerator.errors.ErrorGenerators._
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
@@ -50,7 +50,7 @@ class QueryBasedMigrationSpec extends AnyWordSpec with IOSpec with MockFactory w
   "migrate" should {
 
     "run find records and send an event for each of the found projects" in new TestCase {
-      val records = projectPaths.generateNonEmptyList().toList
+      val records = projectSlugs.generateNonEmptyList().toList
 
       (() => projectsFinder.findProjects).expects().returning(records.pure[IO])
 
@@ -76,7 +76,7 @@ class QueryBasedMigrationSpec extends AnyWordSpec with IOSpec with MockFactory w
       "the given strategy returns one" in new TestCase {
         val exception = exceptions.generateOne
 
-        (() => projectsFinder.findProjects).expects().returning(exception.raiseError[IO, List[projects.Path]])
+        (() => projectsFinder.findProjects).expects().returning(exception.raiseError[IO, List[projects.Slug]])
 
         migration.migrate().value.unsafeRunSync() shouldBe recoverableError.asLeft
       }
@@ -84,7 +84,7 @@ class QueryBasedMigrationSpec extends AnyWordSpec with IOSpec with MockFactory w
     "return a Recoverable Error if in case of an exception while sending events " +
       "the given strategy returns one" in new TestCase {
 
-        val record = projectPaths.generateOne
+        val record = projectSlugs.generateOne
         (() => projectsFinder.findProjects).expects().returning(List(record).pure[IO])
 
         val event = eventRequestContentNoPayloads.generateOne
@@ -111,7 +111,7 @@ class QueryBasedMigrationSpec extends AnyWordSpec with IOSpec with MockFactory w
 
     private implicit val logger: TestLogger[IO] = TestLogger[IO]()
     val projectsFinder    = mock[ProjectsFinder[IO]]
-    val eventProducer     = mockFunction[projects.Path, EventData]
+    val eventProducer     = mockFunction[projects.Slug, EventData]
     val eventSender       = mock[EventSender[IO]]
     val executionRegister = mock[MigrationExecutionRegister[IO]]
     val recoverableError  = processingRecoverableErrors.generateOne

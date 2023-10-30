@@ -26,11 +26,12 @@ import io.renku.events.consumers.Project
 import io.renku.graph.model.projects
 import io.renku.http.client.{AccessToken, GitLabClient}
 import io.renku.http.tinytypes.TinyTypeURIEncoder._
+import org.http4s.Status.NotFound
 import org.http4s.implicits._
 import org.typelevel.log4cats.Logger
 
 private trait ProjectInfoFinder[F[_]] {
-  def findProjectInfo(projectId: projects.GitLabId)(implicit maybeAccessToken: Option[AccessToken]): F[Project]
+  def findProjectInfo(projectId: projects.GitLabId)(implicit maybeAccessToken: Option[AccessToken]): F[Option[Project]]
 }
 
 private class ProjectInfoFinderImpl[F[_]: Async: GitLabClient: Logger] extends ProjectInfoFinder[F] {
@@ -40,23 +41,20 @@ private class ProjectInfoFinderImpl[F[_]: Async: GitLabClient: Logger] extends P
   import io.renku.tinytypes.json.TinyTypeDecoders._
   import org.http4s.Status.{Ok, Unauthorized}
   import org.http4s._
-  import org.http4s.circe._
+  import org.http4s.circe.CirceEntityDecoder._
 
-  def findProjectInfo(projectId: projects.GitLabId)(implicit maybeAccessToken: Option[AccessToken]): F[Project] =
+  def findProjectInfo(projectId: projects.GitLabId)(implicit mat: Option[AccessToken]): F[Option[Project]] =
     GitLabClient[F].get(uri"projects" / projectId, "single-project")(mapResponse)
 
-  private lazy val mapResponse: PartialFunction[(Status, Request[F], Response[F]), F[Project]] = {
-    case (Ok, _, response)    => response.as[Project]
+  private lazy val mapResponse: PartialFunction[(Status, Request[F], Response[F]), F[Option[Project]]] = {
+    case (Ok, _, response)    => response.as[Project].map(_.some)
+    case (NotFound, _, _)     => Option.empty[Project].pure[F]
     case (Unauthorized, _, _) => MonadThrow[F].raiseError(UnauthorizedException)
   }
 
-  private implicit lazy val projectEntityDecoder: EntityDecoder[F, Project] = {
-    implicit val projectDecoder: Decoder[Project] = cursor =>
-      (cursor.downField("id").as[projects.GitLabId], cursor.downField("path_with_namespace").as[projects.Path])
-        .mapN(Project(_, _))
-
-    jsonOf[F, Project]
-  }
+  private implicit lazy val projectDecoder: Decoder[Project] = cursor =>
+    (cursor.downField("id").as[projects.GitLabId], cursor.downField("path_with_namespace").as[projects.Slug])
+      .mapN(Project(_, _))
 }
 
 private object ProjectInfoFinder {

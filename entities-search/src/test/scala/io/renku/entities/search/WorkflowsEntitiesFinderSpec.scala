@@ -22,6 +22,7 @@ import Criteria._
 import EntityConverters._
 import cats.syntax.all._
 import io.renku.entities.search.model.Entity.Workflow.WorkflowType
+import io.renku.entities.searchgraphs.SearchInfoDatasets
 import io.renku.generators.Generators.Implicits._
 import io.renku.generators.Generators._
 import io.renku.graph.model._
@@ -40,6 +41,7 @@ class WorkflowsEntitiesFinderSpec
     with FinderSpecOps
     with InMemoryJenaForSpec
     with ProjectsDataset
+    with SearchInfoDatasets
     with IOSpec {
 
   "findEntities - in case of a forks with workflows" should {
@@ -51,7 +53,7 @@ class WorkflowsEntitiesFinderSpec
         .forkOnce()
       val plan :: Nil = fork.plans
 
-      upload(to = projectsDataset, original, fork)
+      provisionTestProjects(original, fork).unsafeRunSync()
 
       val results = finder
         .findEntities(Criteria(Filters(entityTypes = Set(Filters.EntityType.Workflow))))
@@ -73,19 +75,19 @@ class WorkflowsEntitiesFinderSpec
         .withActivities(activityEntities(stepPlanEntities()))
         .generateOne
 
-      val member = personEntities(personGitLabIds.toGeneratorOfSomes).generateOne
+      val member = projectMemberEntities(personGitLabIds.toGeneratorOfSomes).generateOne
       val original -> fork = {
         val original -> fork = publicProject.forkOnce()
         original -> fork.copy(visibility = visibilityNonPublic.generateOne, members = Set(member))
       }
       val plan :: Nil = publicProject.plans
 
-      upload(to = projectsDataset, original, fork)
+      provisionTestProjects(original, fork).unsafeRunSync()
 
       finder
         .findEntities(
           Criteria(filters = Filters(entityTypes = Set(Filters.EntityType.Workflow)),
-                   maybeUser = member.toAuthUser.some
+                   maybeUser = member.person.toAuthUser.some
           )
         )
         .unsafeRunSync()
@@ -94,7 +96,7 @@ class WorkflowsEntitiesFinderSpec
 
     "favour workflows on internal projects over private projects if exist" in new TestCase {
 
-      val member = personEntities(personGitLabIds.toGeneratorOfSomes).generateOne
+      val member = projectMemberEntities(personGitLabIds.toGeneratorOfSomes).generateOne
       val internalProject = renkuProjectEntities(fixed(projects.Visibility.Internal))
         .modify(replaceMembers(to = Set(member)))
         .withActivities(activityEntities(stepPlanEntities()))
@@ -106,12 +108,12 @@ class WorkflowsEntitiesFinderSpec
       }
       val plan :: Nil = internalProject.plans
 
-      upload(to = projectsDataset, original, fork)
+      provisionTestProjects(original, fork).unsafeRunSync()
 
       finder
         .findEntities(
           Criteria(filters = Filters(entityTypes = Set(Filters.EntityType.Workflow)),
-                   maybeUser = member.toAuthUser.some
+                   maybeUser = member.person.toAuthUser.some
           )
         )
         .unsafeRunSync()
@@ -120,19 +122,19 @@ class WorkflowsEntitiesFinderSpec
 
     "select workflows on private projects if there are no projects with broader visibility" in new TestCase {
 
-      val member = personEntities(personGitLabIds.toGeneratorOfSomes).generateOne
+      val member = projectMemberEntities(personGitLabIds.toGeneratorOfSomes).generateOne
       val privateProject = renkuProjectEntities(fixed(projects.Visibility.Private))
         .modify(replaceMembers(to = Set(member)))
         .withActivities(activityEntities(stepPlanEntities()))
         .generateOne
       val plan :: Nil = privateProject.plans
 
-      upload(to = projectsDataset, privateProject)
+      provisionTestProjects(privateProject).unsafeRunSync()
 
       finder
         .findEntities(
           Criteria(filters = Filters(entityTypes = Set(Filters.EntityType.Workflow)),
-                   maybeUser = member.toAuthUser.some
+                   maybeUser = member.person.toAuthUser.some
           )
         )
         .unsafeRunSync()
@@ -152,7 +154,7 @@ class WorkflowsEntitiesFinderSpec
         p.addUnlinkedStepPlan(p.stepPlans.head.invalidate())
       }
 
-      upload(to = projectsDataset, project)
+      provisionTestProjects(project).unsafeRunSync()
 
       finder
         .findEntities(Criteria(filters = Filters(entityTypes = Set(Filters.EntityType.Workflow))))
@@ -170,7 +172,7 @@ class WorkflowsEntitiesFinderSpec
           .generateOne
           .addCompositePlan(CreateCompositePlan(compositePlanEntities(personEntities, _)))
 
-      upload(to = projectsDataset, project)
+      provisionTestProjects(project).unsafeRunSync()
 
       val results = finder
         .findEntities(Criteria(filters = Filters(entityTypes = Set(Filters.EntityType.Workflow))))

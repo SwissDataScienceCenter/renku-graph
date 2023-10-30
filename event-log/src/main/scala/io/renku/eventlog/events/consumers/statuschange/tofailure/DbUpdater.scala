@@ -23,6 +23,7 @@ import cats.effect.{Async, Temporal}
 import cats.syntax.all._
 import io.renku.db.implicits._
 import io.renku.db.{DbClient, SqlStatement}
+import io.renku.eventlog.EventLogDB.SessionResource
 import io.renku.eventlog.TypeSerializers._
 import io.renku.eventlog.api.events.StatusChangeEvent.ToFailure
 import io.renku.eventlog.events.consumers.statuschange
@@ -49,8 +50,13 @@ private[statuschange] class DbUpdater[F[_]: Async: Logger: QueriesExecutionTimes
 
   import deliveryInfoRemover._
 
-  override def onRollback(event: ToFailure): RollbackOp[F] = { _ =>
-    deleteDelivery(event.eventId).as(DBUpdateResults.ForProjects.empty)
+  override def onRollback(event: ToFailure)(implicit sr: SessionResource[F]): RollbackOp[F] = {
+    case DeadlockDetected(_) =>
+      Logger[F].warn(show"Deadlock while updating event ${event.eventId} to ${event.newStatus}") >>
+        Temporal[F].sleep(1 second) >>
+        sr.useK(updateDB(event).map(_.widen)).handleErrorWith(onRollback(event))
+    case ex =>
+      sr.useK(deleteDelivery(event.eventId)) >> ex.raiseError[F, DBUpdateResults]
   }
 
   override def updateDB(event: ToFailure): UpdateOp[F] = for {
@@ -59,53 +65,42 @@ private[statuschange] class DbUpdater[F[_]: Async: Logger: QueriesExecutionTimes
     ancestorsUpdateResult <- maybeUpdateAncestors(event, eventUpdateResult)
   } yield ancestorsUpdateResult combine eventUpdateResult
 
-  private def updateEvent(
-      event: ToFailure
-  ): Kleisli[F, Session[F], DBUpdateResults.ForProjects] = measureExecutionTime {
-    SqlStatement
-      .named(s"to_${event.newStatus.value.toLowerCase} - status update")
-      .command[
-        FailureStatus *: ExecutionDate *: EventMessage *: EventId *: projects.GitLabId *: ProcessingStatus *: EmptyTuple
-      ](
-        sql"""UPDATE event
+  private def updateEvent(event: ToFailure): Kleisli[F, Session[F], DBUpdateResults.ForProjects] =
+    measureExecutionTime {
+      SqlStatement
+        .named(s"to_${event.newStatus.value.toLowerCase} - status update")
+        .command[
+          FailureStatus *: ExecutionDate *: EventMessage *: EventId *: projects.GitLabId *: ProcessingStatus *: EmptyTuple
+        ](sql"""UPDATE event
               SET status = $eventFailureStatusEncoder,
                 execution_date = $executionDateEncoder,
                 message = $eventMessageEncoder
               WHERE event_id = $eventIdEncoder 
                 AND project_id = $projectIdEncoder 
                 AND status = $eventProcessingStatusEncoder
-               """.command
-      )
-      .arguments(
-        event.newStatus *:
-          ExecutionDate(now().plusMillis(event.executionDelay.getOrElse(Duration.ofMillis(0)).toMillis)) *:
-          event.message *:
-          event.eventId.id *:
-          event.eventId.projectId *:
-          event.currentStatus *:
-          EmptyTuple
-      )
-      .build
-      .flatMapResult {
-        case Completion.Update(1) =>
-          DBUpdateResults
-            .ForProjects(event.project.path, Map(event.currentStatus -> -1, event.newStatus -> 1))
-            .pure[F]
-        case Completion.Update(0) => DBUpdateResults.ForProjects.empty.pure[F]
-        case completion =>
-          new Exception(s"Could not update event ${event.eventId} to status ${event.newStatus}: $completion")
-            .raiseError[F, DBUpdateResults.ForProjects]
-      }
-  }.recoverWith(retryUpdating(event))
-
-  private def retryUpdating(
-      event: ToFailure
-  ): PartialFunction[Throwable, Kleisli[F, Session[F], DBUpdateResults.ForProjects]] = { case DeadlockDetected(_) =>
-    Kleisli.liftF[F, Session[F], Unit] {
-      Logger[F].warn(show"Deadlock while updating event ${event.eventId} to ${event.newStatus}") >>
-        Temporal[F].sleep(1 second)
-    } >> updateEvent(event)
-  }
+               """.command)
+        .arguments(
+          event.newStatus *:
+            ExecutionDate(now().plusMillis(event.executionDelay.getOrElse(Duration.ofMillis(0)).toMillis)) *:
+            event.message *:
+            event.eventId.id *:
+            event.eventId.projectId *:
+            event.currentStatus *:
+            EmptyTuple
+        )
+        .build
+        .flatMapResult {
+          case Completion.Update(1) =>
+            DBUpdateResults
+              .ForProjects(event.project.slug, Map(event.currentStatus -> -1, event.newStatus -> 1))
+              .pure[F]
+          case Completion.Update(0) =>
+            DBUpdateResults.ForProjects.empty.pure[F]
+          case completion =>
+            new Exception(s"Could not update event ${event.eventId} to status ${event.newStatus}: $completion")
+              .raiseError[F, DBUpdateResults.ForProjects]
+        }
+    }
 
   private def maybeUpdateAncestors(event: ToFailure, updateResults: DBUpdateResults.ForProjects) =
     updateResults -> event.newStatus match {
@@ -122,8 +117,7 @@ private[statuschange] class DbUpdater[F[_]: Async: Logger: QueriesExecutionTimes
         .select[
           EventStatus *: ExecutionDate *: projects.GitLabId *: projects.GitLabId *: EventId *: EventId *: EmptyTuple,
           EventId
-        ](
-          sql"""UPDATE event evt
+        ](sql"""UPDATE event evt
                 SET status = $eventStatusEncoder, 
                     execution_date = $executionDateEncoder, 
                     message = NULL
@@ -143,8 +137,7 @@ private[statuschange] class DbUpdater[F[_]: Async: Logger: QueriesExecutionTimes
                 ) old_evt
                 WHERE evt.event_id = old_evt.event_id AND evt.project_id = old_evt.project_id 
                 RETURNING evt.event_id
-           """.query(eventIdDecoder)
-        )
+           """.query(eventIdDecoder))
         .arguments(
           newStatus *:
             ExecutionDate(now().plusMillis(event.executionDelay.getOrElse(Duration ofMillis 0).toMillis)) *:
@@ -156,7 +149,8 @@ private[statuschange] class DbUpdater[F[_]: Async: Logger: QueriesExecutionTimes
         )
         .build(_.toList)
         .mapResult { ids =>
-          DBUpdateResults.ForProjects(event.project.path, Map(newStatus -> ids.size, TriplesGenerated -> -ids.size))
+          DBUpdateResults
+            .ForProjects(event.project.slug, Map(newStatus -> ids.size, TriplesGenerated -> -ids.size))
         }
     }
 }

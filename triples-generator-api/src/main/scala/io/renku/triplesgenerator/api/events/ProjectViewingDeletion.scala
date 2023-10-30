@@ -26,17 +26,17 @@ import io.circe.DecodingFailure.Reason.CustomReason
 import io.renku.events.CategoryName
 import io.renku.graph.model.projects
 
-final case class ProjectViewingDeletion(path: projects.Path)
+final case class ProjectViewingDeletion(slug: projects.Slug)
 
 object ProjectViewingDeletion {
 
   val categoryName: CategoryName = CategoryName("PROJECT_VIEWING_DELETION")
 
-  implicit val encoder: Encoder[ProjectViewingDeletion] = Encoder.instance { case ProjectViewingDeletion(path) =>
+  implicit val encoder: Encoder[ProjectViewingDeletion] = Encoder.instance { case ProjectViewingDeletion(slug) =>
     json"""{
       "categoryName": $categoryName,
       "project": {
-        "path": $path
+        "slug": $slug
       }
     }"""
   }
@@ -49,10 +49,10 @@ object ProjectViewingDeletion {
       case other          => DecodingFailure(CustomReason(s"Expected $categoryName but got $other"), cursor).asLeft
     }
 
-    (validateCategory >> cursor.downField("project").downField("path").as[projects.Path])
+    (validateCategory >> cursor.downField("project").downField("slug").as[projects.Slug])
       .map(ProjectViewingDeletion.apply)
   }
 
   implicit val show: Show[ProjectViewingDeletion] =
-    Show.show { case ProjectViewingDeletion(path) => show"projectPath = $path" }
+    Show.show { case ProjectViewingDeletion(slug) => show"projectSlug = $slug" }
 }

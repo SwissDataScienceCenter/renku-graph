@@ -47,7 +47,7 @@ private class DispatchRecoveryImpl[F[_]: MonadThrow: Logger](
         "id":           ${event.id.id},
         "project": {
           "id":   ${event.id.projectId},
-          "path": ${event.projectPath}
+          "slug": ${event.projectSlug}
         },
         "subCategory": "RollbackToTriplesGenerated"
       }"""),
@@ -67,7 +67,7 @@ private class DispatchRecoveryImpl[F[_]: MonadThrow: Logger](
         "id":           ${event.id.id},
         "project": {
           "id":   ${event.id.projectId},
-          "path": ${event.projectPath}
+          "slug": ${event.projectSlug}
         },
         "subCategory": "ToFailure",
         "newStatus": $TransformationNonRecoverableFailure,

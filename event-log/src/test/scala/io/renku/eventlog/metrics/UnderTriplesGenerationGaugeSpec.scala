@@ -22,11 +22,11 @@ import cats.effect.IO
 import cats.syntax.all._
 import io.renku.generators.Generators.Implicits._
 import io.renku.generators.Generators.{nonEmptySet, nonNegativeLongs}
-import io.renku.graph.model.GraphModelGenerators.projectPaths
+import io.renku.graph.model.GraphModelGenerators.projectSlugs
 import io.renku.graph.model.events.EventStatus
 import io.renku.graph.model.events.EventStatus._
 import io.renku.graph.model.projects
-import io.renku.graph.model.projects.Path
+import io.renku.graph.model.projects.Slug
 import io.renku.metrics._
 import io.renku.testtools.IOSpec
 import org.scalacheck.Gen
@@ -47,7 +47,7 @@ class UnderTriplesGenerationGaugeSpec extends AnyWordSpec with IOSpec with MockF
 
       val gauge = UnderTriplesGenerationGauge(statsFinder).unsafeRunSync()
 
-      gauge.isInstanceOf[LabeledGauge[IO, projects.Path]] shouldBe true
+      gauge.isInstanceOf[LabeledGauge[IO, projects.Slug]] shouldBe true
       gauge.name.value                                    shouldBe "events_under_triples_generation_count"
     }
 
@@ -72,7 +72,7 @@ class UnderTriplesGenerationGaugeSpec extends AnyWordSpec with IOSpec with MockF
     val statsFinder = mock[StatsFinder[IO]]
   }
 
-  private lazy val processingEventsGen: Gen[Map[Path, Long]] = nonEmptySet {
-    (projectPaths -> nonNegativeLongs().map(_.value)).mapN(_ -> _)
+  private lazy val processingEventsGen: Gen[Map[Slug, Long]] = nonEmptySet {
+    (projectSlugs -> nonNegativeLongs().map(_.value)).mapN(_ -> _)
   }.map(_.toMap)
 }

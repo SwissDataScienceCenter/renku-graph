@@ -18,7 +18,6 @@
 
 package io.renku.entities.searchgraphs.projects
 
-import io.renku.entities.searchgraphs
 import io.renku.generators.Generators.Implicits._
 import io.renku.graph.model.testentities._
 import io.renku.jsonld.syntax._
@@ -29,17 +28,17 @@ private object Generators {
   implicit lazy val projectSearchInfoObjects: Gen[ProjectSearchInfo] = for {
     id           <- projectResourceIds
     name         <- projectNames
-    path         <- projectPaths
+    slug         <- projectSlugs
     createdDate  <- projectCreatedDates()
     modifiedDate <- projectModifiedDates(createdDate.value)
     visibility   <- projectVisibilities
-    maybeCreator <- searchgraphs.Generators.personInfos.toGeneratorOfOptions
+    maybeCreator <- personResourceIds.toGeneratorOfOptions
     keywords     <- projectKeywords.toGeneratorOfList(max = 2)
     maybeDesc    <- projectDescriptions.toGeneratorOfOptions
     images       <- imageUris.toGeneratorOfList(max = 2).map(convertImageUris(id.asEntityId))
   } yield ProjectSearchInfo(id,
                             name,
-                            path,
+                            slug,
                             visibility,
                             createdDate,
                             modifiedDate,

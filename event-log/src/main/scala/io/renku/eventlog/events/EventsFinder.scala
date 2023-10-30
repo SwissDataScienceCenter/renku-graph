@@ -65,7 +65,7 @@ private class EventsFinderImpl[F[_]: Async: NonEmptyParallel: SessionResource: Q
       }
 
       private val selectEventInfo: Fragment[Void] = sql"""
-        SELECT evt.event_id, prj.project_id, prj.project_path, evt.status, evt.event_date, evt.execution_date, evt.message,  COUNT(times.status)
+        SELECT evt.event_id, prj.project_id, prj.project_slug, evt.status, evt.event_date, evt.execution_date, evt.message, COUNT(times.status)
         FROM event evt
       """
 
@@ -74,9 +74,9 @@ private class EventsFinderImpl[F[_]: Async: NonEmptyParallel: SessionResource: Q
       """
 
       private val filterByProject: projects.Identifier => AppliedFragment = {
-        case path: projects.Path =>
-          val fragment: Fragment[projects.Path] = sql"""AND prj.project_path = $projectPathEncoder"""
-          fragment(path)
+        case slug: projects.Slug =>
+          val fragment: Fragment[projects.Slug] = sql"""AND prj.project_slug = $projectSlugEncoder"""
+          fragment(slug)
         case id: projects.GitLabId =>
           val fragment: Fragment[projects.GitLabId] = sql"""AND prj.project_id = $projectIdEncoder"""
           fragment(id)
@@ -131,7 +131,7 @@ private class EventsFinderImpl[F[_]: Async: NonEmptyParallel: SessionResource: Q
       """
 
       private val groupBy: Fragment[Void] = sql"""
-        GROUP BY evt.event_id, evt.status, evt.event_date, evt.execution_date, evt.message, prj.project_id, prj.project_path
+        GROUP BY evt.event_id, evt.status, evt.event_date, evt.execution_date, evt.message, prj.project_id, prj.project_slug
       """
 
       private val orderBy: Sorting[Criteria.Sort.type] => Fragment[Void] = sorting => {
@@ -157,10 +157,10 @@ private class EventsFinderImpl[F[_]: Async: NonEmptyParallel: SessionResource: Q
             groupBy(Void) |+|
             orderBy(sorting)(Void) |+|
             paginate(((paging.page.value - 1) * paging.perPage.value) *: paging.perPage *: EmptyTuple)
-        case Criteria(Criteria.Filters.ProjectEvents(projectPath, Some(status), maybeDates), sorting, paging) =>
+        case Criteria(Criteria.Filters.ProjectEvents(projectSlug, Some(status), maybeDates), sorting, paging) =>
           selectEventInfo(Void) |+|
             joinProject(Void) |+|
-            filterByProject(projectPath) |+|
+            filterByProject(projectSlug) |+|
             joinProcessingTime(Void) |+|
             whereStatus(status) |+|
             andEventDate(maybeDates) |+|
@@ -226,28 +226,30 @@ private class EventsFinderImpl[F[_]: Async: NonEmptyParallel: SessionResource: Q
 
       private def findStatusProcessingTimes(eventInfo: EventInfo) = measureExecutionTime {
         SqlStatement[F](name = "find event processing times")
-          .select[EventId *: projects.Path *: EmptyTuple, StatusProcessingTime](
+          .select[EventId *: projects.Slug *: EmptyTuple, StatusProcessingTime](
             sql"""SELECT times.status, times.processing_time
               FROM status_processing_time times
               WHERE times.event_id = $eventIdEncoder AND times.project_id = (
-                SELECT project_id FROM project WHERE project_path = $projectPathEncoder
+                SELECT project_id
+                FROM project
+                WHERE project_slug = $projectSlugEncoder
                 ORDER BY project_id DESC
                 LIMIT 1
               )
           """.query(statusProcessingTimesDecoder)
           )
-          .arguments(eventInfo.eventId *: eventInfo.project.path *: EmptyTuple)
+          .arguments(eventInfo.eventId *: eventInfo.project.slug *: EmptyTuple)
           .build(_.toList)
       }
 
       private def countEventQuery: EventsEndpoint.Criteria => AppliedFragment = {
-        case Criteria(Criteria.Filters.ProjectEvents(projectPath: projects.Path, None, maybeDates), _, _) =>
-          val query: Fragment[projects.Path] = sql"""
+        case Criteria(Criteria.Filters.ProjectEvents(projectSlug: projects.Slug, None, maybeDates), _, _) =>
+          val query: Fragment[projects.Slug] = sql"""
              SELECT COUNT(DISTINCT evt.event_id)
              FROM event evt
-             JOIN project prj ON evt.project_id = prj.project_id AND prj.project_path = $projectPathEncoder
+             JOIN project prj ON evt.project_id = prj.project_id AND prj.project_slug = $projectSlugEncoder
            """
-          query(projectPath) |+| whereEventDate(maybeDates)
+          query(projectSlug) |+| whereEventDate(maybeDates)
         case Criteria(Criteria.Filters.ProjectEvents(projectId: projects.GitLabId, None, maybeDates), _, _) =>
           val query: Fragment[projects.GitLabId] = sql"""
              SELECT COUNT(DISTINCT evt.event_id)
@@ -255,14 +257,14 @@ private class EventsFinderImpl[F[_]: Async: NonEmptyParallel: SessionResource: Q
              WHERE evt.project_id = $projectIdEncoder
            """
           query(projectId) |+| whereEventDate(maybeDates)
-        case Criteria(Criteria.Filters.ProjectEvents(projectPath: projects.Path, Some(status), maybeDates), _, _) =>
-          val query: Fragment[projects.Path *: EventStatus *: EmptyTuple] = sql"""
+        case Criteria(Criteria.Filters.ProjectEvents(projectSlug: projects.Slug, Some(status), maybeDates), _, _) =>
+          val query: Fragment[projects.Slug *: EventStatus *: EmptyTuple] = sql"""
              SELECT COUNT(DISTINCT evt.event_id)
              FROM event evt
-             JOIN project prj ON evt.project_id = prj.project_id AND prj.project_path = $projectPathEncoder
+             JOIN project prj ON evt.project_id = prj.project_id AND prj.project_slug = $projectSlugEncoder
              WHERE evt.status = $eventStatusEncoder
            """
-          query(projectPath *: status *: EmptyTuple) |+| andEventDate(maybeDates)
+          query(projectSlug *: status *: EmptyTuple) |+| andEventDate(maybeDates)
         case Criteria(Criteria.Filters.ProjectEvents(projectId: projects.GitLabId, Some(status), maybeDates), _, _) =>
           val query: Fragment[projects.GitLabId *: EventStatus *: EmptyTuple] = sql"""
              SELECT COUNT(DISTINCT evt.event_id)

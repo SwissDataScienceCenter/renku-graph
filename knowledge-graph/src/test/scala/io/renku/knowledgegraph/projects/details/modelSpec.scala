@@ -23,43 +23,24 @@ import io.renku.generators.Generators._
 import io.renku.graph.model.GraphModelGenerators._
 import model.Permissions.AccessLevel
 import model.Permissions.AccessLevel._
-import model.Urls.{HttpUrl, SshUrl}
+import model.Urls.SshUrl
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
 import org.scalatestplus.scalacheck.ScalaCheckPropertyChecks
 
 class modelSpec extends AnyWordSpec with ScalaCheckPropertyChecks with should.Matchers {
 
-  "HttpUrl" should {
-
-    "instantiate for valid absolute git urls" in {
-      forAll(httpUrls(), projectPaths) { (httpUrl, projectPath) =>
-        val url = s"$httpUrl/$projectPath.git"
-        HttpUrl.from(url).map(_.value) shouldBe Right(url)
-      }
-    }
-
-    "fail instantiation for non-absolute urls" in {
-      val url = s"${relativePaths().generateOne}/${projectPaths.generateOne}.git"
-
-      val Left(exception) = HttpUrl.from(url)
-
-      exception            shouldBe an[IllegalArgumentException]
-      exception.getMessage shouldBe s"$url is not a valid repository http url"
-    }
-  }
-
   "SshUrl" should {
 
     "instantiate for valid absolute ssh urls" in {
-      forAll(nonEmptyList(nonBlankStrings()), projectPaths) { (hostParts, projectPath) =>
-        val url = s"git@${hostParts.toList.mkString(".")}:$projectPath.git"
+      forAll(nonEmptyList(nonBlankStrings()), projectSlugs) { (hostParts, projectSlug) =>
+        val url = s"git@${hostParts.toList.mkString(".")}:$projectSlug.git"
         SshUrl.from(url).map(_.value) shouldBe Right(url)
       }
     }
 
     "fail instantiation for non-ssh urls" in {
-      val url = s"${gitLabUrls.generateOne}/${projectPaths.generateOne}.git"
+      val url = s"${gitLabUrls.generateOne}/${projectSlugs.generateOne}.git"
 
       val Left(exception) = SshUrl.from(url)
 

@@ -35,12 +35,12 @@ import org.http4s.{Request, Response}
 import org.typelevel.log4cats.Logger
 
 trait Endpoint[F[_]] {
-  def `GET /projects/:path/datasets/:name/tags`(criteria: Criteria)(implicit request: Request[F]): F[Response[F]]
+  def `GET /projects/:slug/datasets/:name/tags`(criteria: Criteria)(implicit request: Request[F]): F[Response[F]]
 }
 
 object Endpoint {
 
-  final case class Criteria(projectPath: graph.model.projects.Path,
+  final case class Criteria(projectSlug: graph.model.projects.Slug,
                             datasetName: graph.model.datasets.Name,
                             paging:      PagingRequest = PagingRequest.default,
                             maybeUser:   Option[AuthUser] = None
@@ -54,8 +54,8 @@ object Endpoint {
     renkuApiUrl                   <- renku.ApiUrl()
   } yield new EndpointImpl(tagsFinder, renkuUrl, renkuApiUrl)
 
-  def href(renkuApiUrl: renku.ApiUrl, projectPath: graph.model.projects.Path, name: datasets.Name): Href =
-    Href(renkuApiUrl / "projects" / projectPath / "datasets" / name / "tags")
+  def href(renkuApiUrl: renku.ApiUrl, projectSlug: graph.model.projects.Slug, name: datasets.Name): Href =
+    Href(renkuApiUrl / "projects" / projectSlug / "datasets" / name / "tags")
 }
 
 private class EndpointImpl[F[_]: Async: Logger](tagsFinder: TagsFinder[F],
@@ -64,11 +64,11 @@ private class EndpointImpl[F[_]: Async: Logger](tagsFinder: TagsFinder[F],
 ) extends Http4sDsl[F]
     with Endpoint[F] {
 
+  import eu.timepit.refined.auto._
   import io.circe.Encoder._
   import io.circe.Json
   import io.circe.syntax._
-  import io.renku.http.ErrorMessage
-  import io.renku.http.ErrorMessage._
+  import io.renku.data.Message
   import io.renku.http.rest.paging.{PagingHeaders, PagingResponse}
   import org.http4s.circe.jsonEncoderOf
   import org.http4s.{EntityEncoder, Header, Status}
@@ -77,7 +77,7 @@ private class EndpointImpl[F[_]: Async: Logger](tagsFinder: TagsFinder[F],
 
   private implicit val apiUrl: renku.ApiUrl = renkuApiUrl
 
-  override def `GET /projects/:path/datasets/:name/tags`(criteria: Criteria)(implicit
+  override def `GET /projects/:slug/datasets/:name/tags`(criteria: Criteria)(implicit
       request: Request[F]
   ): F[Response[F]] = tagsFinder.findTags(criteria) map toHttpResponse(request) recoverWith httpResult
 
@@ -91,7 +91,7 @@ private class EndpointImpl[F[_]: Async: Logger](tagsFinder: TagsFinder[F],
   private implicit lazy val responseEntityEncoder: EntityEncoder[F, Json] = jsonEncoderOf[F, Json]
 
   private lazy val httpResult: PartialFunction[Throwable, F[Response[F]]] = { case NonFatal(exception) =>
-    val errorMessage = ErrorMessage("Project Dataset Tags search failed")
+    val errorMessage = Message.Error("Project Dataset Tags search failed")
     Logger[F].error(exception)(errorMessage.show) >> InternalServerError(errorMessage)
   }
 }

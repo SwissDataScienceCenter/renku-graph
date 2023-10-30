@@ -18,6 +18,7 @@
 
 package io.renku.tokenrepository.repository.init
 
+import MigrationTools._
 import cats.data.Kleisli
 import cats.effect.MonadCancelThrow
 import cats.syntax.all._
@@ -34,10 +35,10 @@ private object DuplicateProjectsRemover {
 private class DuplicateProjectsRemover[F[_]: MonadCancelThrow: Logger: SessionResource] extends DBMigration[F] {
 
   override def run: F[Unit] = SessionResource[F].useK {
-    for {
-      _ <- deduplicateProjects()
-      _ <- Kleisli.liftF(Logger[F] info "Projects de-duplicated")
-    } yield ()
+    checkColumnExists("projects_tokens", "project_slug") >>= {
+      case true  => Kleisli.liftF(().pure[F])
+      case false => deduplicateProjects().flatMapF(_ => Logger[F] info "Projects de-duplicated")
+    }
   }
 
   private def deduplicateProjects(): Kleisli[F, Session[F], Unit] = {

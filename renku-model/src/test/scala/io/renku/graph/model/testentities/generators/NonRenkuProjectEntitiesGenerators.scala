@@ -21,7 +21,7 @@ package generators
 
 import io.renku.generators.Generators.Implicits._
 import io.renku.graph.model.projects
-import io.renku.graph.model.projects.{ForksCount, Visibility}
+import io.renku.graph.model.projects.{ForksCount, Role, Visibility}
 import org.scalacheck.Gen
 
 import java.time.Instant
@@ -43,28 +43,28 @@ trait NonRenkuProjectEntitiesGenerators {
       creatorGen:     Gen[Person] = personEntities(withGitLabId),
       forksCountGen:  Gen[ForksCount] = anyForksCount
   ): Gen[NonRenkuProject.WithoutParent] = for {
-    path             <- projectPaths
-    name             <- Gen.const(path.toName)
+    slug             <- projectSlugs
+    name             <- Gen.const(slug.toPath.asName)
     maybeDescription <- projectDescriptions.toGeneratorOfOptions
     dateCreated      <- projectCreatedDates(minDateCreated.value)
     dateModified     <- projectModifiedDates(dateCreated.value)
-    maybeCreator     <- creatorGen.toGeneratorOfOptions
+    maybeCreator     <- creatorGen.map(p => Project.Member(p, Role.Owner)).toGeneratorOfOptions
     visibility       <- visibilityGen
     forksCount       <- forksCountGen
     keywords         <- projectKeywords.toGeneratorOfSet(min = 0)
-    members          <- personEntities(withGitLabId).toGeneratorOfSet(min = 0)
+    members          <- projectMemberEntities(withGitLabId).toGeneratorOfSet(min = 0)
     images           <- imageUris.toGeneratorOfList()
   } yield NonRenkuProject.WithoutParent(
-    path,
+    slug,
     name,
     maybeDescription,
     dateCreated,
     dateModified,
-    maybeCreator,
+    maybeCreator.map(_.person),
     visibility,
     forksCount,
     keywords,
-    members ++ maybeCreator,
+    members ++ maybeCreator.toSet,
     images
   )
 

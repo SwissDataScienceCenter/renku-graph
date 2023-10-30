@@ -19,14 +19,16 @@
 package io.renku.knowledgegraph.users.projects
 package finder
 
-import Endpoint.Criteria
 import cats.effect.Async
 import cats.syntax.all._
 import io.circe.Decoder
-import io.renku.graph.model.{projects, GraphClass}
-import io.renku.graph.model.entities.Person
+import io.renku.graph.model.GraphClass
+import io.renku.graph.model.projects.Visibility
+import io.renku.knowledgegraph.users.projects.Endpoint.Criteria
 import io.renku.knowledgegraph.users.projects.model.Project
+import io.renku.projectauth.util.SparqlSnippets
 import io.renku.triplesstore._
+import io.renku.triplesstore.client.sparql.{Fragment, VarName}
 import io.renku.triplesstore.client.syntax._
 import org.typelevel.log4cats.Logger
 
@@ -51,76 +53,56 @@ private class TSProjectFinderImpl[F[_]: Async: Logger: SparqlQueryTimeRecorder](
   override def findProjectsInTS(criteria: Criteria): F[List[Project.Activated]] =
     queryExpecting[List[Project.Activated]](query(criteria))
 
+  private val authSnippets = SparqlSnippets(VarName("projectId"))
+
   private def query(criteria: Criteria) = SparqlQuery.of(
     name = "user projects by id",
     Prefixes of (prov -> "prov", renku -> "renku", schema -> "schema"),
-    s"""|SELECT ?name ?path ?visibility ?dateCreated ?maybeCreatorName 
-        |       (GROUP_CONCAT(?keyword; separator=',') AS ?keywords)
-        |       ?maybeDescription 
-        |WHERE {
-        |  GRAPH ${GraphClass.Persons.id.asSparql.sparql} {
-        |    ?memberSameAs schema:additionalType ${Person.gitLabSameAsAdditionalType.asTripleObject.asSparql.sparql};
-        |                  schema:identifier ${criteria.userId.asObject.asSparql.sparql};
-        |                  ^schema:sameAs ?memberId
-        |  }
-        |  GRAPH ?projectId {
-        |    ?projectId schema:member ?memberId;
-        |               a schema:Project;
-        |               renku:projectPath ?path;
-        |               schema:name ?name;
-        |               renku:projectVisibility ?visibility;
-        |               schema:dateCreated ?dateCreated.
-        |    ${criteria.maybeOnAccessRights("?projectId", "?visibility")}
-        |    OPTIONAL { ?projectId schema:description ?maybeDescription }
-        |    OPTIONAL { ?projectId schema:keywords ?keyword }
-        |    OPTIONAL {
-        |      ?projectId schema:creator ?maybeCreatorResourceId.
-        |      GRAPH ${GraphClass.Persons.id.asSparql.sparql} {
-        |        ?maybeCreatorResourceId schema:name ?maybeCreatorName
-        |      }
-        |    }
-        |  }
-        |}
-        |GROUP BY ?projectId ?name ?path ?visibility ?dateCreated ?maybeCreatorName ?maybeDescription
-        |""".stripMargin
+    sparql"""|SELECT ?name ?slug ?visibility ?dateCreated ?maybeCreatorName
+             |       (GROUP_CONCAT(?keyword; separator=',') AS ?keywords)
+             |       ?maybeDescription 
+             |WHERE {
+             |
+             |  ${memberProjects(criteria)}
+             |
+             |  ${maybeOnAccessRights(criteria)}
+             |
+             |  GRAPH ?projectId {
+             |    ?projectId 
+             |               a schema:Project;
+             |               renku:projectPath ?slug;
+             |               schema:name ?name;
+             |               renku:projectVisibility ?visibility;
+             |               schema:dateCreated ?dateCreated.
+             |
+             |    OPTIONAL { ?projectId schema:description ?maybeDescription }
+             |    OPTIONAL { ?projectId schema:keywords ?keyword }
+             |    OPTIONAL {
+             |      ?projectId schema:creator ?maybeCreatorResourceId.
+             |      GRAPH ${GraphClass.Persons.id} {
+             |        ?maybeCreatorResourceId schema:name ?maybeCreatorName
+             |      }
+             |    }
+             |  }
+             |}
+             |GROUP BY ?projectId ?name ?slug ?visibility ?dateCreated ?maybeCreatorName ?maybeDescription
+             |""".stripMargin
   )
 
-  private implicit class CriteriaOps(criteria: Criteria) {
+  private def memberProjects(criteria: Criteria): Fragment =
+    authSnippets.memberProjects(criteria.userId)
 
-    def maybeOnAccessRights(projectIdVariable: String, visibilityVariable: String): String =
-      criteria.maybeUser match {
-        case Some(user) =>
-          s"""|{
-              |  VALUES ($visibilityVariable) {
-              |    (${projects.Visibility.Public.asObject.asSparql.sparql})
-              |    (${projects.Visibility.Internal.asObject.asSparql.sparql})
-              |  }
-              |} UNION {
-              |  VALUES ($visibilityVariable) {
-              |    (${projects.Visibility.Private.asObject.asSparql.sparql})
-              |  }
-              |  $projectIdVariable schema:member ?projectMemberId
-              |  GRAPH ${GraphClass.Persons.id.asSparql.sparql} {
-              |    ?projectMemberId schema:sameAs ?projectMemberSameAs.
-              |    ?projectMemberSameAs schema:additionalType ${Person.gitLabSameAsAdditionalType.asTripleObject.asSparql.sparql};
-              |                         schema:identifier ${user.id.asObject.asSparql.sparql}
-              |  }
-              |}
-              |""".stripMargin
-        case _ =>
-          s"""|VALUES ($visibilityVariable) {
-              |  (${projects.Visibility.Public.asObject.asSparql.sparql})
-              |}""".stripMargin
-      }
-  }
+  private def maybeOnAccessRights(criteria: Criteria): Fragment =
+    authSnippets
+      .visibleProjects(criteria.maybeUser.map(_.id), Visibility.all)
 
   private implicit lazy val recordsDecoder: Decoder[List[Project.Activated]] = {
     import Decoder._
+    import ResultsDecoder._
     import io.circe.DecodingFailure
     import io.renku.graph.model.persons
     import io.renku.graph.model.projects._
     import io.renku.tinytypes.json.TinyTypeDecoders._
-    import ResultsDecoder._
 
     val toSetOfKeywords: Option[String] => Decoder.Result[Set[Keyword]] =
       _.map(_.split(',').toList.map(Keyword.from).sequence.map(_.toSet)).sequence
@@ -130,13 +112,13 @@ private class TSProjectFinderImpl[F[_]: Async: Logger: SparqlQueryTimeRecorder](
     ResultsDecoder[List, Project.Activated] { implicit cur =>
       for {
         name         <- extract[Name]("name")
-        path         <- extract[Path]("path")
+        slug         <- extract[Slug]("slug")
         visibility   <- extract[Visibility]("visibility")
         dateCreated  <- extract[DateCreated]("dateCreated")
         maybeCreator <- extract[Option[persons.Name]]("maybeCreatorName")
         keywords     <- extract[Option[String]]("keywords").flatMap(toSetOfKeywords)
         maybeDesc    <- extract[Option[Description]]("maybeDescription")
-      } yield Project.Activated(name, path, visibility, dateCreated, maybeCreator, keywords.toList.sorted, maybeDesc)
+      } yield Project.Activated(name, slug, visibility, dateCreated, maybeCreator, keywords.toList.sorted, maybeDesc)
     }
   }
 }

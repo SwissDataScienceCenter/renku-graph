@@ -30,7 +30,7 @@ import io.circe.literal._
 import io.circe.syntax._
 import io.renku.generators.CommonGraphGenerators.accessTokens
 import io.renku.generators.Generators.Implicits._
-import io.renku.graph.model.RenkuTinyTypeGenerators.projectPaths
+import io.renku.graph.model.RenkuTinyTypeGenerators.projectSlugs
 import io.renku.graph.model.projects
 import io.renku.graph.tokenrepository.AccessTokenFinder
 import io.renku.http.client.RestClient.ResponseMappingF
@@ -56,41 +56,41 @@ class GLDataFinderSpec
 
   it should "fetch access token and use it to fetch relevant data from GL" in {
 
-    val path = projectPaths.generateOne
+    val slug = projectSlugs.generateOne
 
     val accessToken = accessTokens.generateOne
-    givenAccessTokenFinding(path, returning = accessToken.some.pure[IO])
+    givenAccessTokenFinding(slug, returning = accessToken.some.pure[IO])
 
-    val data = glDataExtracts(path).generateOne
-    givenSingleProjectAPICall(path, accessToken, returning = data.some.pure[IO])
+    val data = glDataExtracts(slug).generateOne
+    givenSingleProjectAPICall(slug, accessToken, returning = data.some.pure[IO])
 
-    finder.fetchGLData(path).asserting(_ shouldBe data.some)
+    finder.fetchGLData(slug).asserting(_ shouldBe data.some)
   }
 
   it should "return None if access token cannot be found" in {
 
-    val path = projectPaths.generateOne
+    val slug = projectSlugs.generateOne
 
-    givenAccessTokenFinding(path, returning = None.pure[IO])
+    givenAccessTokenFinding(slug, returning = None.pure[IO])
 
-    finder.fetchGLData(path).asserting(_ shouldBe None)
+    finder.fetchGLData(slug).asserting(_ shouldBe None)
   }
 
   it should "return None if GL returns None" in {
 
-    val path = projectPaths.generateOne
+    val slug = projectSlugs.generateOne
 
     val accessToken = accessTokens.generateOne
-    givenAccessTokenFinding(path, returning = accessToken.some.pure[IO])
+    givenAccessTokenFinding(slug, returning = accessToken.some.pure[IO])
 
-    givenSingleProjectAPICall(path, accessToken, returning = None.pure[IO])
+    givenSingleProjectAPICall(slug, accessToken, returning = None.pure[IO])
 
-    finder.fetchGLData(path).asserting(_ shouldBe None)
+    finder.fetchGLData(slug).asserting(_ shouldBe None)
   }
 
   it should "decode relevant data from the response with OK status" in {
 
-    val data = glDataExtracts(projectPaths.generateOne).generateOne
+    val data = glDataExtracts(projectSlugs.generateOne).generateOne
 
     mapResponse(Ok, Request[IO](), Response[IO]().withEntity(data.asJson))
       .asserting(_.value shouldBe data)
@@ -107,38 +107,39 @@ class GLDataFinderSpec
   private implicit val accessTokenFinder: AccessTokenFinder[IO] = mock[AccessTokenFinder[IO]]
   private lazy val finder = new GLDataFinderImpl[IO]
 
-  private def givenAccessTokenFinding(path: projects.Path, returning: IO[Option[AccessToken]]) =
+  private def givenAccessTokenFinding(slug: projects.Slug, returning: IO[Option[AccessToken]]) =
     (accessTokenFinder
-      .findAccessToken(_: projects.Path)(_: projects.Path => String))
-      .expects(path, *)
+      .findAccessToken(_: projects.Slug)(_: projects.Slug => String))
+      .expects(slug, *)
       .returning(returning)
 
-  private def givenSingleProjectAPICall(path:        projects.Path,
+  private def givenSingleProjectAPICall(slug:        projects.Slug,
                                         accessToken: AccessToken,
                                         returning:   IO[Option[DataExtract]]
   ) = {
     val endpointName: String Refined NonEmpty = "single-project"
     (glClient
       .get(_: Uri, _: String Refined NonEmpty)(_: ResponseMappingF[IO, Option[DataExtract]])(_: Option[AccessToken]))
-      .expects(uri"projects" / path, endpointName, *, accessToken.some)
+      .expects(uri"projects" / slug, endpointName, *, accessToken.some)
       .returning(returning)
   }
 
   private lazy val mapResponse: ResponseMappingF[IO, Option[DataExtract]] = {
 
-    val path = projectPaths.generateOne
+    val slug = projectSlugs.generateOne
 
-    givenAccessTokenFinding(path, returning = accessTokens.generateSome.pure[IO])
+    givenAccessTokenFinding(slug, returning = accessTokens.generateSome.pure[IO])
 
-    captureMapping(glClient)(finder.fetchGLData(path).unsafeRunSync(),
-                             glDataExtracts(having = path).toGeneratorOfOptions
+    captureMapping(glClient)(finder.fetchGLData(slug).unsafeRunSync(),
+                             glDataExtracts(having = slug).toGeneratorOfOptions,
+                             underlyingMethod = Get
     )
   }
 
   private implicit lazy val encoder: Encoder[DataExtract.GL] = Encoder.instance { de =>
     json"""{
       "name":                ${de.name},
-      "path_with_namespace": ${de.path},
+      "path_with_namespace": ${de.slug},
       "visibility":          ${de.visibility},
       "updated_at":          ${de.updatedAt},
       "last_activity_at":    ${de.lastActivityAt},

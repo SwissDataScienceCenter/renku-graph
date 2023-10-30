@@ -46,7 +46,7 @@ class ProjectDateViewedDeduplicatorSpec
       val project1 = anyProjectEntities.generateOne.to[entities.Project]
       upload(to = projectsDataset, project1)
 
-      val eventProject1 = projectViewedEvents.generateOne.copy(path = project1.path)
+      val eventProject1 = projectViewedEvents.generateOne.copy(slug = project1.slug)
       provision(eventProject1).unsafeRunSync()
 
       val otherProject1Date = timestamps(max = eventProject1.dateViewed.value).generateAs(projects.DateViewed)
@@ -55,7 +55,7 @@ class ProjectDateViewedDeduplicatorSpec
       val project2 = anyProjectEntities.generateOne.to[entities.Project]
       upload(to = projectsDataset, project2)
 
-      val eventProject2 = projectViewedEvents.generateOne.copy(path = project2.path)
+      val eventProject2 = projectViewedEvents.generateOne.copy(slug = project2.slug)
       provision(eventProject2).unsafeRunSync()
 
       findAllViewings shouldBe Set(

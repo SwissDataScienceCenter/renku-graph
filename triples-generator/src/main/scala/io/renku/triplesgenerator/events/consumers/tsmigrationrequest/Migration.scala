@@ -31,7 +31,7 @@ import io.renku.jsonld.{EntityId, EntityIdEncoder}
 import io.renku.tinytypes.{StringTinyType, TinyTypeFactory}
 import io.renku.tinytypes.constraints.NonBlank
 import io.renku.tinytypes.json.TinyTypeDecoders.stringDecoder
-import io.renku.triplesgenerator.events.consumers.ProcessingRecoverableError
+import io.renku.triplesgenerator.errors.ProcessingRecoverableError
 import org.typelevel.log4cats.Logger
 
 private trait Migration[F[_]] {

@@ -28,7 +28,7 @@ import io.renku.graph.model.GitLabUrl
 import io.renku.http.rest.Links.{Link, Rel, _links}
 import io.renku.json.JsonOps._
 import io.renku.knowledgegraph
-import io.renku.knowledgegraph.projects.images.ImagesEncoder
+import io.renku.knowledgegraph.projects.images.ImageUrisEncoder
 import model.Permissions._
 import model._
 
@@ -40,14 +40,15 @@ private object ProjectJsonEncoder {
   def apply[F[_]: MonadThrow]: F[ProjectJsonEncoder] = renku.ApiUrl[F]().map(new ProjectJsonEncoderImpl(_))
 }
 
-private class ProjectJsonEncoderImpl(renkuApiUrl: renku.ApiUrl) extends ProjectJsonEncoder with ImagesEncoder {
+private class ProjectJsonEncoderImpl(renkuApiUrl: renku.ApiUrl) extends ProjectJsonEncoder with ImageUrisEncoder {
 
   override def encode(project: model.Project)(implicit gitLabUrl: GitLabUrl): Json = project.asJson
 
   private implicit def encoder(implicit gitLabUrl: GitLabUrl): Encoder[Project] = Encoder.instance[Project] { project =>
     json"""{
       "identifier":   ${project.id},
-      "path":         ${project.path},
+      "path":         ${project.slug},
+      "slug":         ${project.slug},
       "name":         ${project.name},
       "visibility":   ${project.visibility},
       "created":      ${project.created},
@@ -57,11 +58,11 @@ private class ProjectJsonEncoderImpl(renkuApiUrl: renku.ApiUrl) extends ProjectJ
       "keywords":     ${project.keywords.toList.sorted},
       "starsCount":   ${project.starsCount},
       "permissions":  ${project.permissions},
-      "images":       ${project.images -> project.path},
+      "images":       ${project.images -> project.slug},
       "statistics":   ${project.statistics}
     }""" deepMerge _links(
-      Link(Rel.Self        -> Endpoint.href(renkuApiUrl, project.path)),
-      Link(Rel("datasets") -> knowledgegraph.projects.datasets.Endpoint.href(renkuApiUrl, project.path))
+      Link(Rel.Self        -> Endpoint.href(renkuApiUrl, project.slug)),
+      Link(Rel("datasets") -> knowledgegraph.projects.datasets.Endpoint.href(renkuApiUrl, project.slug))
     ).addIfDefined("description" -> project.maybeDescription)
       .addIfDefined("version" -> project.maybeVersion)
   }
@@ -90,7 +91,8 @@ private class ProjectJsonEncoderImpl(renkuApiUrl: renku.ApiUrl) extends ProjectJ
 
   private implicit lazy val parentProjectEncoder: Encoder[ParentProject] = Encoder.instance[ParentProject] { parent =>
     json"""{
-      "path":    ${parent.path},
+      "path":    ${parent.slug},
+      "slug":    ${parent.slug},
       "name":    ${parent.name},
       "created": ${parent.created}
     }"""

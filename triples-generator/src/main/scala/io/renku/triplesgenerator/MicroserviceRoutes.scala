@@ -23,30 +23,40 @@ import cats.effect.{Async, Resource}
 import cats.syntax.all._
 import com.typesafe.config.Config
 import io.renku.events.consumers.EventConsumersRegistry
+import io.renku.graph.http.server.binders.ProjectSlug
+import io.renku.graph.model.RenkuUrl
 import io.renku.http.server.version
 import io.renku.metrics.{MetricsRegistry, RoutesMetrics}
+import io.renku.triplesgenerator.TgDB.TsWriteLock
 import io.renku.triplesgenerator.events.EventEndpoint
+import io.renku.triplesstore.{ProjectSparqlClient, SparqlQueryTimeRecorder}
 import org.http4s.dsl.Http4sDsl
 import org.typelevel.log4cats.Logger
 
 import scala.jdk.CollectionConverters._
 
 private class MicroserviceRoutes[F[_]: MonadThrow](
-    eventEndpoint: EventEndpoint[F],
-    routesMetrics: RoutesMetrics[F],
-    versionRoutes: version.Routes[F],
-    config:        Config
+    eventEndpoint:         EventEndpoint[F],
+    projectCreateEndpoint: projects.create.Endpoint[F],
+    projectUpdateEndpoint: projects.update.Endpoint[F],
+    routesMetrics:         RoutesMetrics[F],
+    versionRoutes:         version.Routes[F],
+    config:                Config
 ) extends Http4sDsl[F] {
 
   import eventEndpoint._
   import org.http4s.HttpRoutes
+  import projectCreateEndpoint.`POST /projects`
+  import projectUpdateEndpoint.`PATCH /projects/:slug`
   import routesMetrics._
 
   // format: off
   lazy val routes: Resource[F, HttpRoutes[F]] = HttpRoutes.of[F] {
-    case request @ POST -> Root / "events"        => processEvent(request)
-    case GET            -> Root / "ping"          => Ok("pong")
-    case GET            -> Root / "config-info"   => Ok(configInfo)
+    case req @ POST  -> Root / "events"                       => processEvent(req)
+    case GET         -> Root / "ping"                         => Ok("pong")
+    case req @ POST  -> Root / "projects"                     => `POST /projects`(req)
+    case req @ PATCH -> Root / "projects" / ProjectSlug(slug) => `PATCH /projects/:slug`(slug, req)
+    case GET         -> Root / "config-info"                  => Ok(configInfo)
   }.withMetrics.map(_ <+> versionRoutes())
   // format: on
 
@@ -58,10 +68,15 @@ private class MicroserviceRoutes[F[_]: MonadThrow](
 }
 
 private object MicroserviceRoutes {
-  def apply[F[_]: Async: Logger: MetricsRegistry](consumersRegistry: EventConsumersRegistry[F],
-                                                  config:            Config
-  ): F[MicroserviceRoutes[F]] = for {
-    eventEndpoint <- EventEndpoint(consumersRegistry)
-    versionRoutes <- version.Routes[F]
-  } yield new MicroserviceRoutes(eventEndpoint, new RoutesMetrics[F], versionRoutes, config)
+  def apply[F[_]: Async: Logger: MetricsRegistry: SparqlQueryTimeRecorder](
+      consumersRegistry:   EventConsumersRegistry[F],
+      tsWriteLock:         TsWriteLock[F],
+      projectSparqlClient: ProjectSparqlClient[F],
+      config:              Config
+  )(implicit renkuUrl: RenkuUrl): F[MicroserviceRoutes[F]] = (
+    EventEndpoint(consumersRegistry),
+    projects.create.Endpoint[F](tsWriteLock, projectSparqlClient),
+    projects.update.Endpoint[F](tsWriteLock),
+    version.Routes[F]
+  ).mapN(new MicroserviceRoutes(_, _, _, new RoutesMetrics[F], _, config))
 }

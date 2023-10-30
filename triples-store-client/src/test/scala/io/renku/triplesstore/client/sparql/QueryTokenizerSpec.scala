@@ -22,20 +22,40 @@ import org.scalatest.flatspec.AnyFlatSpec
 import org.scalatest.matchers.should
 
 class QueryTokenizerSpec extends AnyFlatSpec with should.Matchers {
-  val tokenizer = QueryTokenizer.luceneStandard
+  val standard = QueryTokenizer.luceneStandard
+  val letter   = QueryTokenizer.luceneLetters
 
-  it should "split on whitespace" in {
+  "standard" should "split on whitespace" in {
     val input = "  one two\tthree   four\nfive "
-    tokenizer.split(input) shouldBe List("one", "two", "three", "four", "five")
+    standard.split(input) shouldBe List("one", "two", "three", "four", "five")
   }
 
   it should "split on dashes" in {
     val input = "one-two-three-"
-    tokenizer.split(input) shouldBe List("one", "two", "three")
+    standard.split(input) shouldBe List("one", "two", "three")
   }
 
   it should "return different data" in {
     val input = "one 1 two 2-3-4 \"http://hello.com\" next~"
-    tokenizer.split(input) shouldBe List("one", "1", "two", "2", "3", "4", "http", "hello.com", "next")
+    standard.split(input) shouldBe List("one", "1", "two", "2", "3", "4", "http", "hello.com", "next")
+  }
+
+  "splitOn" should "should split on underscores" in {
+    val input = "01_one_two"
+    QueryTokenizer.splitOn('_').split(input) shouldBe List("01", "one", "two")
+  }
+
+  "letter" should "split on whitespace" in {
+    letter.split("  one two\tthree   four\nfive ") shouldBe List("one", "two", "three", "four", "five")
+  }
+
+  it should "split on underscore" in {
+    val input = "one_two_three"
+    letter.split(input) shouldBe List("one", "two", "three")
+  }
+
+  it should "skip numbers" in {
+    val input = "01_test 02 bar"
+    letter.split(input) shouldBe List("test", "bar")
   }
 }

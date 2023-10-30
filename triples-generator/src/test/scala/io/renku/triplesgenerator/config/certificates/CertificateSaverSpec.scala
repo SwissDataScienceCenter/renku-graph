@@ -20,21 +20,23 @@ package io.renku.triplesgenerator.config.certificates
 
 import io.renku.generators.CommonGraphGenerators.certificates
 import io.renku.generators.Generators.Implicits._
+import org.scalatest.TryValues
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
 
 import java.nio.file.Files
 import scala.io.Source
-import scala.util.{Success, Try}
+import scala.util.Try
 
-class CertificateSaverSpec extends AnyWordSpec with should.Matchers {
+class CertificateSaverSpec extends AnyWordSpec with should.Matchers with TryValues {
 
   "save" should {
 
     "save the given certificate into a file" in new TestCase {
+
       val certificate = certificates.generateOne
 
-      val Success(path) = certSaver.save(certificate)
+      val path = certSaver.save(certificate).success.value
 
       try {
         val source = Source.fromFile(path.toAbsolutePath.toString)

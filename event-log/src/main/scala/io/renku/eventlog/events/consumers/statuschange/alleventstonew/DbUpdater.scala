@@ -27,6 +27,7 @@ import io.circe.Encoder
 import io.circe.literal._
 import io.circe.syntax._
 import io.renku.db.{DbClient, SqlStatement}
+import io.renku.eventlog.EventLogDB.SessionResource
 import io.renku.eventlog.TypeSerializers
 import io.renku.eventlog.api.events.StatusChangeEvent.{AllEventsToNew, ProjectEventsToNew}
 import io.renku.eventlog.events.consumers.statuschange
@@ -52,7 +53,8 @@ private[statuschange] class DbUpdater[F[_]: Async: QueriesExecutionTimes](
     createEventsResource(sendEventIfFound(_))
       .as(DBUpdateResults.ForProjects.empty)
 
-  override def onRollback(event: AllEventsToNew.type): RollbackOp[F] = RollbackOp.empty[F]
+  override def onRollback(event: AllEventsToNew.type)(implicit sr: SessionResource[F]): RollbackOp[F] =
+    RollbackOp.empty[F]
 
   private def createEventsResource(
       f: Cursor[F, ProjectEventsToNew] => F[Unit]
@@ -60,11 +62,11 @@ private[statuschange] class DbUpdater[F[_]: Async: QueriesExecutionTimes](
     SqlStatement
       .named("all_to_new - find projects")
       .select[Void, ProjectEventsToNew](
-        sql"""SELECT proj.project_id, proj.project_path
+        sql"""SELECT proj.project_id, proj.project_slug
               FROM project proj
               ORDER BY proj.latest_event_date ASC"""
-          .query(projectIdDecoder ~ projectPathDecoder)
-          .map { case (id: projects.GitLabId) ~ (path: projects.Path) => ProjectEventsToNew(Project(id, path)) }
+          .query(projectIdDecoder ~ projectSlugDecoder)
+          .map { case (id: projects.GitLabId) ~ (slug: projects.Slug) => ProjectEventsToNew(Project(id, slug)) }
       )
       .arguments(Void)
       .buildCursorResource(f)
@@ -90,7 +92,7 @@ private[statuschange] class DbUpdater[F[_]: Async: QueriesExecutionTimes](
       "categoryName": $categoryName,
       "project": {
         "id":   ${event.project.id},
-        "path": ${event.project.path}
+        "slug": ${event.project.slug}
       },
       "subCategory": "ProjectEventsToNew"
     }"""

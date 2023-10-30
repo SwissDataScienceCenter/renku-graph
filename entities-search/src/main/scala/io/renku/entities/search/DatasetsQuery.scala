@@ -23,10 +23,11 @@ import cats.syntax.all._
 import io.circe.{Decoder, DecodingFailure}
 import io.renku.entities.search.Criteria.Filters
 import io.renku.entities.search.model.{Entity, MatchingScore}
+import io.renku.entities.searchgraphs.concatSeparator
 import io.renku.graph.model._
-import io.renku.graph.model.entities.Person
 import io.renku.graph.model.projects.Visibility
 import io.renku.http.server.security.model.AuthUser
+import io.renku.projectauth.util.SparqlSnippets
 import io.renku.triplesstore.client.sparql.{Fragment, LuceneQuery, VarName}
 import io.renku.triplesstore.client.syntax._
 
@@ -35,7 +36,7 @@ object DatasetsQuery extends EntityQuery[Entity.Dataset] {
 
   val matchingScoreVar        = VarName("matchingScore")
   val nameVar                 = VarName("name")
-  val idsPathsVisibilitiesVar = VarName("idsPathsVisibilities")
+  val idsSlugsVisibilitiesVar = VarName("idsSlugsVisibilities")
   val sameAsVar               = VarName("sameAs")
   val maybeDateCreatedVar     = VarName("maybeDateCreated")
   val maybeDatePublishedVar   = VarName("maybeDatePublished")
@@ -46,11 +47,13 @@ object DatasetsQuery extends EntityQuery[Entity.Dataset] {
   val keywordsVar             = VarName("keywords")
   val imagesVar               = VarName("images")
 
+  private val authSnippets = SparqlSnippets(VarName("projId"))
+
   override val selectVariables = Set(
     entityTypeVar,
     matchingScoreVar,
     nameVar,
-    idsPathsVisibilitiesVar,
+    idsSlugsVisibilitiesVar,
     sameAsVar,
     maybeDateCreatedVar,
     maybeDatePublishedVar,
@@ -68,7 +71,7 @@ object DatasetsQuery extends EntityQuery[Entity.Dataset] {
           |SELECT DISTINCT $entityTypeVar
           |       $matchingScoreVar
           |       $nameVar
-          |       $idsPathsVisibilitiesVar
+          |       $idsSlugsVisibilitiesVar
           |       $sameAsVar
           |       $maybeDateCreatedVar
           |       $maybeDatePublishedVar
@@ -82,46 +85,40 @@ object DatasetsQuery extends EntityQuery[Entity.Dataset] {
           |  BIND ('dataset' AS $entityTypeVar)
           |
           |  { # start sub select
-          |    SELECT $sameAsVar $matchingScoreVar
-          |      (GROUP_CONCAT(DISTINCT ?creatorName; separator=',') AS $creatorsNamesVar)
-          |      (GROUP_CONCAT(DISTINCT ?idPathVisibility; separator=',') AS $idsPathsVisibilitiesVar)
-          |      (GROUP_CONCAT(DISTINCT ?keyword; separator=',') AS $keywordsVar)
-          |      (GROUP_CONCAT(DISTINCT ?encodedImageUrl; separator=',') AS $imagesVar)
+          |    SELECT DISTINCT $sameAsVar $matchingScoreVar
+          |      $creatorsNamesVar
+          |      $idsSlugsVisibilitiesVar
+          |      $keywordsVar
+          |      $imagesVar
           |    WHERE {
           |      # textQuery
           |      ${textQueryPart(criteria.filters.maybeQuery)}
           |
-          |      Graph schema:Dataset {
+          |      GRAPH schema:Dataset {
           |        #creator
-          |        $sameAsVar schema:creator / schema:name ?creatorName.
+          |        $sameAsVar renku:creatorsNamesConcat $creatorsNamesVar;
+          |                   renku:projectsVisibilitiesConcat $idsSlugsVisibilitiesVar.
           |
-          |        #keywords
-          |        $keywords
+          |        OPTIONAL { $sameAsVar renku:keywordsConcat $keywordsVar }
+          |        OPTIONAL { $sameAsVar renku:imagesConcat $imagesVar }
           |
           |        # resolve project
           |        $resolveProject
-          |
-          |        # images
-          |        $images
           |      }
           |
-          |      Graph ?projId {
+          |      GRAPH ?projId {
           |        # project namespaces
           |        ${namespacesPart(criteria.filters.namespaces)}
           |
           |        # access restriction
           |        ${accessRightsAndVisibility(criteria.maybeUser, criteria.filters.visibilities)}
-          |
-          |        # path and visibility
-          |        $pathVisibility
           |      }
           |    }
-          |    GROUP BY $sameAsVar $matchingScoreVar
           |  }# end sub select
           |
           |  ${creatorsPart(criteria.filters.creators)}
           |
-          |  Graph schema:Dataset {
+          |  GRAPH schema:Dataset {
           |    # name
           |    $sameAsVar renku:slug $nameVar
           |
@@ -136,62 +133,11 @@ object DatasetsQuery extends EntityQuery[Entity.Dataset] {
           |""".stripMargin.sparql
     }
 
-  private def pathVisibility: Fragment =
-    fr"""|  # Return all visibilities and select the broadest in decoding
-         |  BIND (CONCAT(STR(?projectPath), STR(':'),
-         |               STR(?visibility)) AS ?idPathVisibility)
-         |""".stripMargin
-
   private def accessRightsAndVisibility(maybeUser: Option[AuthUser], visibilities: Set[Visibility]): Fragment =
-    maybeUser match {
-      case Some(user) =>
-        val nonPrivateVisibilities =
-          if (visibilities.isEmpty)
-            projects.Visibility.all - projects.Visibility.Private
-          else (projects.Visibility.all - projects.Visibility.Private) intersect visibilities
-
-        val selectPrivateValue =
-          if (visibilities.isEmpty || visibilities.contains(projects.Visibility.Private))
-            projects.Visibility.Private.asObject
-          else "".asTripleObject
-        fr"""|{
-             |  ?projId renku:projectVisibility ?visibility .
-             |  {
-             |    VALUES (?visibility) {
-             |      ${nonPrivateVisibilities.map(_.asObject)}
-             |    }
-             |  } UNION {
-             |    VALUES (?visibility) {
-             |      ($selectPrivateValue)
-             |    }
-             |    ?projId schema:member ?memberId.
-             |    GRAPH ${GraphClass.Persons.id} {
-             |      ?memberId schema:sameAs ?memberSameAs.
-             |      ?memberSameAs schema:additionalType ${Person.gitLabSameAsAdditionalType.asTripleObject};
-             |                    schema:identifier ${user.id.asObject}
-             |    }
-             |  }
-             |}
-             |""".stripMargin
-      case None =>
-        visibilities match {
-          case v if v.isEmpty || v.contains(projects.Visibility.Public) =>
-            fr"""|?projId renku:projectVisibility ?visibility .
-                 |VALUES (?visibility) { (${projects.Visibility.Public.asObject}) }""".stripMargin
-          case _ =>
-            fr"""|?projId renku:projectVisibility ?visibility .
-                 |VALUES (?visibility) { ('') }""".stripMargin
-        }
-    }
-
-  private def images: Fragment =
-    fr"""|       OPTIONAL {
-         |          ?sameAs schema:image ?imageId .
-         |          ?imageId schema:position ?imagePosition ;
-         |                   schema:contentUrl ?imageUrl .
-         |          BIND (CONCAT(STR(?imagePosition), STR(':'), STR(?imageUrl)) AS ?encodedImageUrl)
-         |       }
-         |""".stripMargin
+    sparql"""
+            |?projId renku:projectVisibility ?visibility .
+            |${authSnippets.visibleProjects(maybeUser.map(_.id), visibilities)}
+            """
 
   private def resolveProject: Fragment =
     fr"""|    $sameAsVar a renku:DiscoverableDataset;
@@ -237,12 +183,6 @@ object DatasetsQuery extends EntityQuery[Entity.Dataset] {
          |""".stripMargin
   }
 
-  private def keywords: Fragment =
-    fr"""|OPTIONAL {
-         |  $sameAsVar schema:keywords ?keyword
-         |}
-         |""".stripMargin
-
   private def description: Fragment =
     fr"""| OPTIONAL {
          |   $sameAsVar schema:description $maybeDescriptionVar
@@ -253,7 +193,7 @@ object DatasetsQuery extends EntityQuery[Entity.Dataset] {
       if (ns.isEmpty) Fragment.empty
       else fr"Values (?namespace) { ${ns.map(_.value)}  }"
 
-    fr"""|  ?projId renku:projectPath ?projectPath;
+    fr"""|  ?projId renku:slug ?projectSlug;
          |          renku:projectNamespace ?namespace.
          |  $matchFrag
       """.stripMargin
@@ -280,7 +220,7 @@ object DatasetsQuery extends EntityQuery[Entity.Dataset] {
              |  SELECT $sameAsVar (MAX(?score) AS $matchingScoreVar)
              |  WHERE {
              |    Graph schema:Dataset {
-             |      (?id ?score) text:query (renku:slug schema:keywords schema:description schema:name $luceneQuery).
+             |      (?id ?score) text:query (renku:slug renku:keywordsConcat schema:description schema:name $luceneQuery).
              |     {
              |       $sameAsVar a renku:DiscoverableDataset;
              |                  schema:creator ?id
@@ -305,13 +245,13 @@ object DatasetsQuery extends EntityQuery[Entity.Dataset] {
     import DecodingTools._
     import io.renku.tinytypes.json.TinyTypeDecoders._
 
-    lazy val toListOfIdsPathsAndVisibilities
-        : Option[String] => Decoder.Result[NonEmptyList[(projects.Path, projects.Visibility)]] =
+    lazy val toListOfIdsSlugsAndVisibilities
+        : Option[String] => Decoder.Result[NonEmptyList[(projects.Slug, projects.Visibility)]] =
       _.map(
-        _.split(",")
+        _.split(concatSeparator)
           .map(_.trim)
-          .map { case s"$projectPath:$visibility" =>
-            (projects.Path.from(projectPath), projects.Visibility.from(visibility)).mapN((_, _))
+          .map { case s"$projectSlug:$visibility" =>
+            (projects.Slug.from(projectSlug), projects.Visibility.from(visibility)).mapN((_, _))
           }
           .toList
           .sequence
@@ -320,41 +260,41 @@ object DatasetsQuery extends EntityQuery[Entity.Dataset] {
             case head :: tail => NonEmptyList.of(head, tail: _*).some
             case Nil          => None
           }
-      ).getOrElse(Option.empty[NonEmptyList[(projects.Path, projects.Visibility)]].asRight)
+      ).getOrElse(Option.empty[NonEmptyList[(projects.Slug, projects.Visibility)]].asRight)
         .flatMap {
           case Some(tuples) => tuples.asRight
-          case None         => DecodingFailure("DS's project path and visibility not found", Nil).asLeft
+          case None         => DecodingFailure("DS's project slug and visibility not found", Nil).asLeft
         }
 
     for {
       matchingScore <- read[MatchingScore](matchingScoreVar)
       name          <- read[datasets.Name](nameVar)
       sameAs        <- read[datasets.TopmostSameAs](sameAsVar)
-      pathAndVisibility <- read[Option[String]](idsPathsVisibilitiesVar)
-                             .flatMap(toListOfIdsPathsAndVisibilities)
+      slugAndVisibility <- read[Option[String]](idsSlugsVisibilitiesVar)
+                             .flatMap(toListOfIdsSlugsAndVisibilities)
                              .map(_.toList.maxBy(_._2))
       maybeDateCreated   <- read[Option[datasets.DateCreated]](maybeDateCreatedVar)
       maybeDatePublished <- read[Option[datasets.DatePublished]](maybeDatePublishedVar)
       maybeDateModified  <- read[Option[datasets.DateCreated]](maybeDateModified)
       date <-
         Either.fromOption(maybeDateCreated.orElse(maybeDatePublished), ifNone = DecodingFailure("No dataset date", Nil))
-      creators <- read[Option[String]](creatorsNamesVar) >>= toListOf[persons.Name, persons.Name.type](persons.Name)
+      creators <- read[Option[String]](creatorsNamesVar) >>= toListOf[persons.Name, persons.Name.type](concatSeparator)
       keywords <-
-        read[Option[String]](keywordsVar) >>= toListOf[datasets.Keyword, datasets.Keyword.type](datasets.Keyword)
+        read[Option[String]](keywordsVar) >>= toListOf[datasets.Keyword, datasets.Keyword.type](concatSeparator)
       maybeDesc <- read[Option[datasets.Description]](maybeDescriptionVar)
-      images    <- read[Option[String]](imagesVar) >>= toListOfImageUris
+      images    <- read[Option[String]](imagesVar) >>= toListOfImageUris(concatSeparator)
     } yield Entity.Dataset(
       matchingScore,
       sameAs,
       name,
-      pathAndVisibility._2,
+      slugAndVisibility._2,
       date,
       maybeDateModified.map(d => datasets.DateModified(d.value)),
       creators,
       keywords,
       maybeDesc,
       images,
-      pathAndVisibility._1
+      slugAndVisibility._1
     )
   }
 }

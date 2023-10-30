@@ -88,11 +88,12 @@ object Criteria {
     final case object ByName          extends Property("name") with SortProperty
     final case object ByMatchingScore extends Property("matchingScore") with SortProperty
     final case object ByDate          extends Property("date") with SortProperty
+    final case object ByDateModified  extends Property("dateModified") with SortProperty
 
-    val byNameAsc = Sort.By(ByName, Direction.Asc)
+    val byNameAsc: Sort.By = Sort.By(ByName, Direction.Asc)
 
     val default: Sorting[Sort.type] = Sorting(byNameAsc)
 
-    override lazy val properties: Set[SortProperty] = Set(ByName, ByMatchingScore, ByDate)
+    override lazy val properties: Set[SortProperty] = Set(ByName, ByMatchingScore, ByDate, ByDateModified)
   }
 }

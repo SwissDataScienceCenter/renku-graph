@@ -34,7 +34,6 @@ import io.renku.stubbing.ExternalServiceStubbing
 import io.renku.testtools.{GitLabClientTools, IOSpec}
 import io.renku.webhookservice.WebhookServiceGenerators.hookIdAndUrls
 import io.renku.webhookservice.hookdeletion.HookRemover.DeletionResult
-import org.http4s.Method.DELETE
 import org.http4s.implicits.http4sLiteralsSyntax
 import org.http4s.{Request, Response, Status, Uri}
 import org.scalacheck.Gen
@@ -107,7 +106,7 @@ class GLHookRemoverSpec
       captureMapping(gitLabClient)(
         remover.delete(projectIds.generateOne, hookIdAndUrls.generateOne, accessTokens.generateOne).unsafeRunSync(),
         Gen.const(DeletionResult.HookDeleted),
-        method = DELETE
+        underlyingMethod = Delete
       )
 
     val deletionResults: Gen[DeletionResult] = Gen.oneOf(DeletionResult.HookDeleted, DeletionResult.HookNotFound)

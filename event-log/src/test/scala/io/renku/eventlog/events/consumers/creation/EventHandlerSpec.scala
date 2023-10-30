@@ -139,7 +139,7 @@ class EventHandlerSpec
 
       (tgClient
         .send(_: ProjectViewedEvent))
-        .expects(ProjectViewedEvent(event.project.path, projects.DateViewed(event.date.value), maybeUserId))
+        .expects(ProjectViewedEvent(event.project.slug, projects.DateViewed(event.date.value), maybeUserId))
         .returning(returning)
     }
   }

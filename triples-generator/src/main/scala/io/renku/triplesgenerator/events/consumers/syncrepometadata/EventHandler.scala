@@ -30,7 +30,7 @@ import io.renku.graph.tokenrepository.AccessTokenFinder
 import io.renku.http.client.GitLabClient
 import io.renku.lock.syntax._
 import io.renku.metrics.MetricsRegistry
-import io.renku.triplesgenerator.TgLockDB.TsWriteLock
+import io.renku.triplesgenerator.TgDB.TsWriteLock
 import io.renku.triplesgenerator.api.events.SyncRepoMetadata
 import io.renku.triplesgenerator.events.consumers.TSReadinessForEventsChecker
 import io.renku.triplesgenerator.events.consumers.tsmigrationrequest.migrations.reprovisioning.ReProvisioningStatus
@@ -50,8 +50,8 @@ private[syncrepometadata] class EventHandler[F[_]: MonadCancelThrow: Logger](
 
   override def createHandlingDefinition(): EventHandlingDefinition =
     EventHandlingDefinition(
-      _.event.getProjectPath.map(SyncRepoMetadata(_)),
-      tsWriteLock.contramap[Event](_.path).surround(eventProcessor.process),
+      _.event.getProjectSlug.map(SyncRepoMetadata(_)),
+      tsWriteLock.contramap[Event](_.slug).surround(eventProcessor.process),
       precondition = tsReadinessChecker.verifyTSReady
     )
 }

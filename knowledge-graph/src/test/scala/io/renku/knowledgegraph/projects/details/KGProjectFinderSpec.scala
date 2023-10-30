@@ -21,6 +21,7 @@ package io.renku.knowledgegraph.projects.details
 import Converters._
 import cats.effect.IO
 import cats.syntax.all._
+import io.renku.entities.searchgraphs.SearchInfoDatasets
 import io.renku.generators.CommonGraphGenerators.authUsers
 import io.renku.generators.Generators.Implicits._
 import io.renku.graph.model.projects.Visibility
@@ -34,6 +35,7 @@ import org.scalacheck.Gen
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
 import org.scalatestplus.scalacheck.ScalaCheckPropertyChecks
+import org.typelevel.log4cats.Logger
 
 class KGProjectFinderSpec
     extends AnyWordSpec
@@ -41,34 +43,38 @@ class KGProjectFinderSpec
     with EntitiesGenerators
     with InMemoryJenaForSpec
     with ProjectsDataset
+    with SearchInfoDatasets
     with ScalaCheckPropertyChecks
     with IOSpec {
 
+  implicit override val ioLogger: Logger[IO] = TestLogger[IO]()
+
   "findProject" should {
 
-    "return details of the project with the given path when there's no parent" in new TestCase {
+    "return details of the project with the given slug when there's no parent" in new TestCase {
       forAll(Gen.oneOf(renkuProjectEntities(anyVisibility), nonRenkuProjectEntities(anyVisibility))) { project =>
-        upload(to = projectsDataset, anyProjectEntities.generateOne, project)
+        provisionTestProjects(anyProjectEntities.generateOne, project).unsafeRunSync()
 
-        kgProjectFinder.findProject(project.path, authUsers.generateOption).unsafeRunSync() shouldBe
+        kgProjectFinder.findProject(project.slug, authUsers.generateOption).unsafeRunSync() shouldBe
           project.to(kgProjectConverter).some
       }
     }
 
-    "return details of the project with the given path if it has a parent project - public projects" in new TestCase {
+    "return details of the project with the given slug if it has a parent project - public projects" in new TestCase {
       forAll(
         Gen.oneOf(renkuProjectWithParentEntities(visibilityPublic), nonRenkuProjectWithParentEntities(visibilityPublic))
       ) { project =>
-        upload(to = projectsDataset, project, project.parent)
+        provisionTestProjects(project, project.parent).unsafeRunSync()
 
-        kgProjectFinder.findProject(project.path, authUsers.generateOption).unsafeRunSync() shouldBe
+        kgProjectFinder.findProject(project.slug, authUsers.generateOption).unsafeRunSync() shouldBe
           project.to(kgProjectConverter).some
       }
     }
 
-    "return details of the project with the given path if it has a parent project - non-public projects" in new TestCase {
+    "return details of the project with the given slug if it has a parent project - non-public projects" in new TestCase {
       val user         = authUsers.generateOne
-      val userAsMember = personEntities.generateOne.copy(maybeGitLabId = user.id.some)
+      val userAsMember = projectMemberEntities(Gen.const(user.id.some)).generateOne
+
       val project = Gen
         .oneOf(
           renkuProjectWithParentEntities(visibilityNonPublic).modify(replaceMembers(Set(userAsMember))),
@@ -78,35 +84,35 @@ class KGProjectFinderSpec
 
       val parent = replaceMembers(Set(userAsMember))(project.parent)
 
-      upload(to = projectsDataset, project, parent)
+      provisionTestProjects(project, parent).unsafeRunSync()
 
-      kgProjectFinder.findProject(project.path, user.some).unsafeRunSync() shouldBe
+      kgProjectFinder.findProject(project.slug, user.some).unsafeRunSync() shouldBe
         project.to(kgProjectConverter).some
     }
 
-    "return details of the project with the given path without info about the parent " +
+    "return details of the project with the given slug without info about the parent " +
       "if the user has no rights to access the parent project" in new TestCase {
         val user = authUsers.generateOne
         val project = Gen
           .oneOf(
             renkuProjectWithParentEntities(visibilityNonPublic)
-              .modify(replaceMembers(Set(personEntities.generateOne.copy(maybeGitLabId = user.id.some)))),
+              .modify(replaceMembers(Set(projectMemberEntities(Gen.const(user.id.some)).generateOne))),
             nonRenkuProjectWithParentEntities(visibilityNonPublic)
-              .modify(replaceMembers(Set(personEntities.generateOne.copy(maybeGitLabId = user.id.some))))
+              .modify(replaceMembers(Set(projectMemberEntities(Gen.const(user.id.some)).generateOne)))
           )
           .generateOne
 
         val parent = (replaceVisibility[Project](to = Visibility.Private) andThen removeMembers())(project.parent)
 
-        upload(to = projectsDataset, project, parent)
+        provisionTestProjects(project, parent).unsafeRunSync()
 
-        kgProjectFinder.findProject(project.path, Some(user)).unsafeRunSync() shouldBe Some {
+        kgProjectFinder.findProject(project.slug, Some(user)).unsafeRunSync() shouldBe Some {
           project.to(kgProjectConverter).copy(maybeParent = None)
         }
       }
 
-    "return None if there's no project with the given path" in new TestCase {
-      kgProjectFinder.findProject(projectPaths.generateOne, authUsers.generateOption).unsafeRunSync() shouldBe None
+    "return None if there's no project with the given slug" in new TestCase {
+      kgProjectFinder.findProject(projectSlugs.generateOne, authUsers.generateOption).unsafeRunSync() shouldBe None
     }
   }
 

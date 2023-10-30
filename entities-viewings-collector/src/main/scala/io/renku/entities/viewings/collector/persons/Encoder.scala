@@ -47,9 +47,9 @@ private object Encoder {
     }
 
   private lazy val viewedProjectEncoder: JsonLDEncoder[PersonViewedProject] =
-    JsonLDEncoder.instance { case PersonViewedProject(userId, Project(id, path), date) =>
+    JsonLDEncoder.instance { case PersonViewedProject(userId, Project(id, slug), date) =>
       JsonLD.entity(
-        EntityId of s"$userId/$path",
+        EntityId of s"$userId/$slug",
         EntityTypes of PersonViewedProjectOntology.classType,
         PersonViewedProjectOntology.projectProperty       -> id.asJsonLD,
         PersonViewedProjectOntology.dateViewedProperty.id -> date.asJsonLD

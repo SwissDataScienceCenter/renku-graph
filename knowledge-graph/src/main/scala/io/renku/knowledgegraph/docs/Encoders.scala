@@ -56,6 +56,8 @@ private object Encoders {
         operation match {
           case _: Operation.Delete => json"""{"delete": $operation}"""
           case _: Operation.Get    => json"""{"get": $operation}"""
+          case _: Operation.Post   => json"""{"post": $operation}"""
+          case _: Operation.Patch  => json"""{"patch": $operation}"""
           case _: Operation.Put    => json"""{"put": $operation}"""
         }
       }

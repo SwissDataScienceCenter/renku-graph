@@ -21,6 +21,7 @@ package finder
 
 import cats.effect.IO
 import cats.syntax.all._
+import io.renku.entities.searchgraphs.SearchInfoDatasets
 import io.renku.generators.CommonGraphGenerators.{authUsers, userAccessTokens}
 import io.renku.generators.Generators.Implicits._
 import io.renku.graph.model.projects
@@ -33,13 +34,17 @@ import io.renku.triplesstore.{InMemoryJenaForSpec, ProjectsDataset, SparqlQueryT
 import org.scalacheck.Gen
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
+import org.typelevel.log4cats.Logger
 
 class TSProjectFinderSpec
     extends AnyWordSpec
     with should.Matchers
     with InMemoryJenaForSpec
     with ProjectsDataset
+    with SearchInfoDatasets
     with IOSpec {
+
+  implicit override val ioLogger: Logger[IO] = TestLogger[IO]()
 
   "findProjectsInTS" should {
 
@@ -50,17 +55,21 @@ class TSProjectFinderSpec
         c.copy(maybeUser = authUsers.generateOne.copy(id = c.userId).some)
       }
 
-      val matchingMember = personEntities(withGitLabId).generateOne.copy(maybeGitLabId = criteria.userId.some)
+      val matchingMember =
+        memberPersonGitLabIdLens.replace(criteria.userId.some)(
+          projectMemberEntities(withGitLabId).generateOne
+        )
       val project1WithMatchingMember = anyProjectEntities
-        .map(replaceMembers(Set(personEntities(withGitLabId).generateOne, matchingMember)))
+        .map(replaceMembers(Set(projectMemberEntities(withGitLabId).generateOne, matchingMember)))
         .generateOne
       val project2WithMatchingMember = anyProjectEntities
-        .map(replaceMembers(personEntities(withGitLabId).generateSet() + matchingMember))
+        .map(replaceMembers(projectMemberEntities(withGitLabId).generateSet() + matchingMember))
         .generateOne
 
       val projectWithoutMatchingMember = projectEntities(visibilityPublic).generateOne
 
-      upload(to = projectsDataset, project1WithMatchingMember, project2WithMatchingMember, projectWithoutMatchingMember)
+      provisionTestProjects(project1WithMatchingMember, project2WithMatchingMember, projectWithoutMatchingMember)
+        .unsafeRunSync()
 
       finder.findProjectsInTS(criteria).unsafeRunSync() should contain theSameElementsAs
         List(project1WithMatchingMember, project2WithMatchingMember).map(_.to[model.Project.Activated])
@@ -68,33 +77,36 @@ class TSProjectFinderSpec
 
     "not see projects the authUser has no access to" in new TestCase {
 
-      val authUser = personEntities(withGitLabId).generateOne
+      val authUserMember = projectMemberEntities(withGitLabId).generateOne
+      val authUser       = authUserMember.person
       val criteria = criterias.generateOne.copy(maybeUser =
         AuthUser(authUser.maybeGitLabId.getOrElse(fail("AuthUser without GL id")), userAccessTokens.generateOne).some
       )
 
-      val matchingMember = personEntities(withGitLabId).generateOne.copy(maybeGitLabId = criteria.userId.some)
+      val matchingMember =
+        memberPersonGitLabIdLens.replace(criteria.userId.some)(
+          projectMemberEntities(withGitLabId).generateOne
+        )
       val privateProjectWithMatchingMemberAndAuthUser = projectEntities(visibilityPrivate)
-        .map(replaceMembers(Set(authUser, matchingMember)))
+        .map(replaceMembers(Set(authUserMember, matchingMember)))
         .generateOne
       val privateProjectWithMatchingMemberOnly = projectEntities(visibilityPrivate)
-        .map(replaceMembers(personEntities(withGitLabId).generateSet() + matchingMember))
+        .map(replaceMembers(projectMemberEntities(withGitLabId).generateSet() + matchingMember))
         .generateOne
       val nonPrivateProjectWithMatchingMemberOnly =
         projectEntities(Gen.oneOf(projects.Visibility.Public, projects.Visibility.Internal))
-          .map(replaceMembers(personEntities(withGitLabId).generateSet() + matchingMember))
+          .map(replaceMembers(projectMemberEntities(withGitLabId).generateSet() + matchingMember))
           .generateOne
       val projectWithMatchingAuthUserOnly = anyProjectEntities
-        .map(replaceMembers(Set(authUser)))
+        .map(replaceMembers(Set(authUserMember)))
         .generateOne
 
-      upload(
-        to = projectsDataset,
+      provisionTestProjects(
         privateProjectWithMatchingMemberAndAuthUser,
         privateProjectWithMatchingMemberOnly,
         nonPrivateProjectWithMatchingMemberOnly,
         projectWithMatchingAuthUserOnly
-      )
+      ).unsafeRunSync()
 
       finder.findProjectsInTS(criteria).unsafeRunSync() should contain theSameElementsAs
         List(privateProjectWithMatchingMemberAndAuthUser, nonPrivateProjectWithMatchingMemberOnly)
@@ -108,7 +120,7 @@ class TSProjectFinderSpec
         c.copy(maybeUser = authUsers.generateOne.copy(id = c.userId).some)
       }
 
-      upload(to = projectsDataset, projectEntities(visibilityPublic).generateOne)
+      provisionTestProjects(projectEntities(visibilityPublic).generateOne).unsafeRunSync()
 
       finder.findProjectsInTS(criteria).unsafeRunSync() shouldBe Nil
     }

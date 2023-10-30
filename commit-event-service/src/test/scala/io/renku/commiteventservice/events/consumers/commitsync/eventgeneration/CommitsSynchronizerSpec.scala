@@ -640,7 +640,10 @@ class CommitsSynchronizerSpec extends AnyWordSpec with IOSpec with should.Matche
 
     def withRequestContent(project: Project) =
       EventRequestContent.NoPayload(
-        json"""{"categoryName": "GLOBAL_COMMIT_SYNC_REQUEST" ,"project":{ "id": ${project.id.value}, "path":${project.path.value}}}"""
+        json"""{
+          "categoryName": "GLOBAL_COMMIT_SYNC_REQUEST",
+          "project": {"id": ${project.id}, "slug": ${project.slug}}
+        }"""
       )
   }
 
@@ -649,14 +652,14 @@ class CommitsSynchronizerSpec extends AnyWordSpec with IOSpec with should.Matche
                          elapsedTime: ElapsedTime,
                          summary:     SynchronizationSummary
   ) = Info(
-    s"$categoryName: id = $commitId, projectId = ${project.id}, projectPath = ${project.path} -> events generation result: ${summary.show} in ${elapsedTime}ms"
+    s"$categoryName: id = $commitId, projectId = ${project.id}, projectSlug = ${project.slug} -> events generation result: ${summary.show} in ${elapsedTime}ms"
   )
 
   private def logNewEventFound(commitId: CommitId, project: Project, elapsedTime: ElapsedTime) = Info(
-    s"$categoryName: id = $commitId, projectId = ${project.id}, projectPath = ${project.path} -> new events found in ${elapsedTime}ms"
+    s"$categoryName: id = $commitId, projectId = ${project.id}, projectSlug = ${project.slug} -> new events found in ${elapsedTime}ms"
   )
   private def logEventFoundForDeletion(commitId: CommitId, project: Project, elapsedTime: ElapsedTime) = Info(
-    s"$categoryName: id = $commitId, projectId = ${project.id}, projectPath = ${project.path} -> events found for deletion in ${elapsedTime}ms"
+    s"$categoryName: id = $commitId, projectId = ${project.id}, projectSlug = ${project.slug} -> events found for deletion in ${elapsedTime}ms"
   )
 
   private def logErrorSynchronization(commitId:    CommitId,
@@ -665,7 +668,7 @@ class CommitsSynchronizerSpec extends AnyWordSpec with IOSpec with should.Matche
                                       exception:   Exception,
                                       message:     String = "Synchronization failed"
   ) = Error(
-    s"$categoryName: id = $commitId, projectId = ${project.id}, projectPath = ${project.path} -> $message in ${elapsedTime}ms",
+    s"$categoryName: id = $commitId, projectId = ${project.id}, projectSlug = ${project.slug} -> $message in ${elapsedTime}ms",
     exception
   )
 }

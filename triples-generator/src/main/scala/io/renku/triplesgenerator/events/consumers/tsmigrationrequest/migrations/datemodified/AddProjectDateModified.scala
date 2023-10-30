@@ -24,7 +24,7 @@ import cats.data.EitherT
 import cats.effect.Async
 import cats.syntax.all._
 import io.renku.metrics.MetricsRegistry
-import io.renku.triplesgenerator.events.consumers.ProcessingRecoverableError
+import io.renku.triplesgenerator.errors.ProcessingRecoverableError
 import io.renku.triplesstore.{ProjectsConnectionConfig, SparqlQueryTimeRecorder}
 import org.typelevel.log4cats.Logger
 import tooling.{MigrationExecutionRegister, RecoverableErrorsRecovery}
@@ -67,12 +67,12 @@ private class AddProjectDateModified[F[_]: Async: Logger](
         .evalMap(_ => nextProjectsPage())
         .takeThrough(_.nonEmpty)
         .flatMap(Stream.emits(_))
-        .evalMap(path => findProgressInfo.map(path -> _))
-        .evalTap { case (path, info) => logInfo(show"provisioning '$path'", info) }
-        .evalMap { case (path, info) => fetchProject(path).map(p => (path, p, info)) }
+        .evalMap(slug => findProgressInfo.map(slug -> _))
+        .evalTap { case (slug, info) => logInfo(show"provisioning '$slug'", info) }
+        .evalMap { case (slug, info) => fetchProject(slug).map(p => (slug, p, info)) }
         .evalTap { case (_, maybeProj, _) => maybeProj.map(persistDateModified).getOrElse(().pure[F]) }
-        .evalTap { case (path, _, _) => noteDone(path) }
-        .evalTap { case (path, _, info) => logInfo(show"'$path' provisioned", info) }
+        .evalTap { case (slug, _, _) => noteDone(slug) }
+        .evalTap { case (slug, _, info) => logInfo(show"'$slug' provisioned", info) }
         .compile
         .drain
         .map(_.asRight[ProcessingRecoverableError])

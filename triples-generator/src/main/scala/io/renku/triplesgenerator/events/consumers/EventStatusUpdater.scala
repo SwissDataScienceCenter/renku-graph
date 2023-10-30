@@ -21,7 +21,7 @@ package io.renku.triplesgenerator.events.consumers
 import cats.effect.{Async, Sync}
 import cats.syntax.all._
 import io.renku.compression.Zip
-import io.renku.data.ErrorMessage
+import io.renku.data.Message
 import io.renku.events
 import io.renku.events.consumers.Project
 import io.renku.events.producers.EventSender
@@ -42,23 +42,23 @@ import java.time.Duration
 
 private trait EventStatusUpdater[F[_]] {
   def toTriplesGenerated(eventId:        CompoundEventId,
-                         projectPath:    projects.Path,
+                         projectSlug:    projects.Slug,
                          payload:        JsonLD,
                          processingTime: EventProcessingTime
   ): F[Unit]
 
-  def toTriplesStore(eventId: CompoundEventId, projectPath: projects.Path, processingTime: EventProcessingTime): F[Unit]
+  def toTriplesStore(eventId: CompoundEventId, projectSlug: projects.Slug, processingTime: EventProcessingTime): F[Unit]
 
-  def rollback(eventId: CompoundEventId, projectPath: projects.Path, status: RollbackStatus): F[Unit]
+  def rollback(eventId: CompoundEventId, projectSlug: projects.Slug, status: RollbackStatus): F[Unit]
 
   def toFailure(eventId:     CompoundEventId,
-                projectPath: projects.Path,
+                projectSlug: projects.Slug,
                 eventStatus: FailureStatus,
                 exception:   Throwable
   ): F[Unit]
 
   def toFailure(eventId:        CompoundEventId,
-                projectPath:    projects.Path,
+                projectSlug:    projects.Slug,
                 eventStatus:    FailureStatus,
                 exception:      Throwable,
                 executionDelay: ExecutionDelay
@@ -77,7 +77,7 @@ private class EventStatusUpdaterImpl[F[_]: Sync](
   import zipper._
 
   override def toTriplesGenerated(eventId:        CompoundEventId,
-                                  projectPath:    projects.Path,
+                                  projectSlug:    projects.Slug,
                                   payload:        JsonLD,
                                   processingTime: EventProcessingTime
   ): F[Unit] = for {
@@ -89,7 +89,7 @@ private class EventStatusUpdaterImpl[F[_]: Sync](
                        "id": ${eventId.id},
                        "project": {
                          "id":   ${eventId.projectId},
-                         "path": $projectPath
+                         "slug": $projectSlug
                        },
                        "subCategory": "ToTriplesGenerated",
                        "processingTime": $processingTime
@@ -103,7 +103,7 @@ private class EventStatusUpdaterImpl[F[_]: Sync](
   } yield ()
 
   override def toTriplesStore(eventId:        CompoundEventId,
-                              projectPath:    projects.Path,
+                              projectSlug:    projects.Slug,
                               processingTime: EventProcessingTime
   ): F[Unit] = eventSender.sendEvent(
     eventContent = EventRequestContent.NoPayload(json"""{
@@ -111,7 +111,7 @@ private class EventStatusUpdaterImpl[F[_]: Sync](
       "id": ${eventId.id},
       "project": {
         "id":   ${eventId.projectId},
-        "path": $projectPath
+        "slug": $projectSlug
       },
       "subCategory": "ToTriplesStore",
       "processingTime": $processingTime
@@ -123,7 +123,7 @@ private class EventStatusUpdaterImpl[F[_]: Sync](
 
   override def rollback(
       eventId:        CompoundEventId,
-      projectPath:    projects.Path,
+      projectSlug:    projects.Slug,
       rollbackStatus: RollbackStatus
   ): F[Unit] = eventSender.sendEvent(
     eventContent = EventRequestContent.NoPayload(json"""{
@@ -131,7 +131,7 @@ private class EventStatusUpdaterImpl[F[_]: Sync](
       "id":           ${eventId.id},
       "project": {
         "id":   ${eventId.projectId},
-        "path": $projectPath
+        "slug": $projectSlug
       },
       "subCategory": ${rollbackStatus.subCategory}
     }"""),
@@ -142,20 +142,20 @@ private class EventStatusUpdaterImpl[F[_]: Sync](
   )
 
   override def toFailure(eventId:     CompoundEventId,
-                         projectPath: projects.Path,
+                         projectSlug: projects.Slug,
                          eventStatus: FailureStatus,
                          exception:   Throwable
-  ): F[Unit] = toFailure(eventId, projectPath, eventStatus, exception, None)
+  ): F[Unit] = toFailure(eventId, projectSlug, eventStatus, exception, None)
 
   override def toFailure(eventId:        CompoundEventId,
-                         projectPath:    projects.Path,
+                         projectSlug:    projects.Slug,
                          eventStatus:    FailureStatus,
                          exception:      Throwable,
                          executionDelay: ExecutionDelay
-  ): F[Unit] = toFailure(eventId, projectPath, eventStatus, exception, Some(executionDelay))
+  ): F[Unit] = toFailure(eventId, projectSlug, eventStatus, exception, Some(executionDelay))
 
   def toFailure(eventId:             CompoundEventId,
-                projectPath:         projects.Path,
+                projectSlug:         projects.Slug,
                 eventStatus:         FailureStatus,
                 exception:           Throwable,
                 maybeExecutionDelay: Option[ExecutionDelay]
@@ -165,11 +165,11 @@ private class EventStatusUpdaterImpl[F[_]: Sync](
       "id":           ${eventId.id},
       "project": {
         "id":   ${eventId.projectId},
-        "path": $projectPath
+        "slug": $projectSlug
       },
       "subCategory": "ToFailure",
       "newStatus": $eventStatus,
-      "message":   ${ErrorMessage.withStackTrace(exception).show}
+      "message":   ${Message.Error.fromStackTrace(exception).show}
     }""".addIfDefined("executionDelay" -> maybeExecutionDelay)),
     EventSender.EventContext(CategoryName("EVENTS_STATUS_CHANGE"),
                              errorMessage = s"$categoryName: Change event status as $eventStatus failed"
@@ -181,7 +181,7 @@ private class EventStatusUpdaterImpl[F[_]: Sync](
       "categoryName": "EVENTS_STATUS_CHANGE",
       "project": {
         "id":   ${project.id},
-        "path": ${project.path}
+        "slug": ${project.slug}
       },
       "subCategory": "ProjectEventsToNew"
     }"""),

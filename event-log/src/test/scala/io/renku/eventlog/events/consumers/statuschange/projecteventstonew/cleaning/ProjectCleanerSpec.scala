@@ -62,14 +62,14 @@ class ProjectCleanerSpec
         val otherProject = consumerProjects.generateOne
         insertCleanUpEvent(otherProject)
 
-        givenProjectViewingDeletionEventSent(project.path, returning = ().pure[IO])
+        givenProjectViewingDeletionEventSent(project.slug, returning = ().pure[IO])
         givenHookAndTokenRemoval(project, returning = ().pure[IO])
 
         sessionResource.useK(projectCleaner cleanUp project).unsafeRunSync()
 
         findProjects.find(_._1 == project.id)    shouldBe None
         findProjectCategorySyncTimes(project.id) shouldBe List.empty[(CategoryName, LastSyncedDate)]
-        findCleanUpEvents                        shouldBe List(otherProject.id -> otherProject.path)
+        findCleanUpEvents                        shouldBe List(otherProject.id -> otherProject.slug)
 
         logger.loggedOnly(Info(show"$categoryName: $project removed"))
       }
@@ -77,7 +77,7 @@ class ProjectCleanerSpec
     "log an error if sending ProjectViewingDeletion event fails" in new TestCase {
 
       val exception = exceptions.generateOne
-      givenProjectViewingDeletionEventSent(project.path, returning = exception.raiseError[IO, Unit])
+      givenProjectViewingDeletionEventSent(project.slug, returning = exception.raiseError[IO, Unit])
       givenHookAndTokenRemoval(project, returning = ().pure[IO])
 
       sessionResource.useK(projectCleaner cleanUp project).unsafeRunSync()
@@ -93,7 +93,7 @@ class ProjectCleanerSpec
 
     "log an error if removal of webhook and token fails" in new TestCase {
 
-      givenProjectViewingDeletionEventSent(project.path, returning = ().pure[IO])
+      givenProjectViewingDeletionEventSent(project.slug, returning = ().pure[IO])
       val exception = exceptions.generateOne
       givenHookAndTokenRemoval(project, returning = exception.raiseError[IO, Unit])
 
@@ -112,7 +112,7 @@ class ProjectCleanerSpec
   private trait TestCase {
     val project = consumerProjects.generateOne
 
-    upsertProject(project.id, project.path, eventDates.generateOne)
+    upsertProject(project.id, project.slug, eventDates.generateOne)
     insertCleanUpEvent(project)
     upsertCategorySyncTime(project.id, categoryNames.generateOne, lastSyncedDates.generateOne)
 
@@ -123,10 +123,10 @@ class ProjectCleanerSpec
     private val tgClient           = mock[triplesgenerator.api.events.Client[IO]]
     val projectCleaner             = new ProjectCleanerImpl[IO](tgClient, projectHookRemover)
 
-    def givenProjectViewingDeletionEventSent(path: projects.Path, returning: IO[Unit]) =
+    def givenProjectViewingDeletionEventSent(slug: projects.Slug, returning: IO[Unit]) =
       (tgClient
         .send(_: ProjectViewingDeletion))
-        .expects(ProjectViewingDeletion(path))
+        .expects(ProjectViewingDeletion(slug))
         .returning(returning)
 
     def givenHookAndTokenRemoval(project: consumers.Project, returning: IO[Unit]) =

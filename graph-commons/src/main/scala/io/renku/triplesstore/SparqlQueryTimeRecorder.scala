@@ -18,33 +18,36 @@
 
 package io.renku.triplesstore
 
+import cats.Monad
 import cats.effect.Sync
 import cats.syntax.all._
+import eu.timepit.refined.api.Refined
 import eu.timepit.refined.auto._
+import eu.timepit.refined.collection.NonEmpty
 import io.renku.logging.ExecutionTimeRecorder
-import io.renku.metrics.LabeledHistogramImpl
+import io.renku.metrics.Histogram
 import org.typelevel.log4cats.Logger
 
 import scala.concurrent.duration._
 
-class SparqlQueryTimeRecorder[F[_]](val instance: ExecutionTimeRecorder[F])
+final class SparqlQueryTimeRecorder[F[_]](val instance: ExecutionTimeRecorder[F]) {
+  def reportTime[A](label: String Refined NonEmpty)(work: F[A])(implicit L: Logger[F], M: Monad[F]): F[A] =
+    instance.measureExecutionTime(work, label.some).flatMap(instance.logExecutionTime(s"Executed $label"))
+}
 
 object SparqlQueryTimeRecorder {
 
   import io.renku.metrics.MetricsRegistry
 
-  def apply[F[_]: Sync: Logger: MetricsRegistry](): F[SparqlQueryTimeRecorder[F]] = MetricsRegistry[F]
-    .register {
-      new LabeledHistogramImpl[F](
-        name = "sparql_execution_times",
-        help = "Sparql execution times",
-        labelName = "query_id",
-        buckets = Seq(.05, .1, .5, 1, 2.5, 5, 10, 25, 50),
-        maybeThreshold = (750 millis).some
-      )
-    }
-    .flatMap(histogram => ExecutionTimeRecorder[F](maybeHistogram = Some(histogram)))
-    .map(new SparqlQueryTimeRecorder(_))
+  def create[F[_]: Sync: Logger: MetricsRegistry](): F[SparqlQueryTimeRecorder[F]] =
+    Histogram[F](
+      name = "sparql_execution_times",
+      help = "Sparql execution times",
+      labelName = "query_id",
+      buckets = Seq(.05, .1, .5, 1, 2.5, 5, 10, 25, 50, 100),
+      maybeThreshold = (50 millis).some
+    ).flatMap(histogram => ExecutionTimeRecorder[F](maybeHistogram = Some(histogram)))
+      .map(new SparqlQueryTimeRecorder(_))
 
   def apply[F[_]](implicit ev: SparqlQueryTimeRecorder[F]): SparqlQueryTimeRecorder[F] = ev
 }

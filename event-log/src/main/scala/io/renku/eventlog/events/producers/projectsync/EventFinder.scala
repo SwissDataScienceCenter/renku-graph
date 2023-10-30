@@ -21,7 +21,7 @@ package projectsync
 
 import cats.MonadThrow
 import cats.data.Kleisli
-import cats.effect.MonadCancelThrow
+import cats.effect.Async
 import cats.syntax.all._
 import io.renku.db.{DbClient, SqlStatement}
 import io.renku.eventlog.EventLogDB.SessionResource
@@ -34,7 +34,7 @@ import skunk.implicits._
 
 import java.time.Instant
 
-private class EventFinderImpl[F[_]: MonadCancelThrow: SessionResource: QueriesExecutionTimes](
+private class EventFinderImpl[F[_]: Async: SessionResource: QueriesExecutionTimes](
     now: () => Instant = () => Instant.now
 ) extends DbClient(Some(QueriesExecutionTimes[F]))
     with EventFinder[F, ProjectSyncEvent]
@@ -52,10 +52,10 @@ private class EventFinderImpl[F[_]: MonadCancelThrow: SessionResource: QueriesEx
     SqlStatement
       .named(s"${categoryName.value.toLowerCase} - find event")
       .select[LastSyncedDate, (projects.GitLabId, Option[LastSyncedDate], ProjectSyncEvent)](
-        sql"""SELECT candidate.project_id, candidate.real_sync, candidate.project_path
+        sql"""SELECT candidate.project_id, candidate.real_sync, candidate.project_slug
               FROM (
                 SELECT proj.project_id, 
-                  proj.project_path,
+                  proj.project_slug,
                   sync_time.last_synced,
                   sync_time.last_synced AS real_sync
                 FROM project proj
@@ -64,7 +64,7 @@ private class EventFinderImpl[F[_]: MonadCancelThrow: SessionResource: QueriesEx
                 WHERE ($lastSyncedDateEncoder - sync_time.last_synced) > INTERVAL '1 day' 
                 UNION
                 SELECT proj.project_id, 
-                  proj.project_path,
+                  proj.project_slug,
                   TIMESTAMP WITH TIME ZONE 'epoch' AS last_synced,
                   NULL AS real_sync
                 FROM project proj
@@ -74,8 +74,8 @@ private class EventFinderImpl[F[_]: MonadCancelThrow: SessionResource: QueriesEx
               ) candidate
               ORDER BY candidate.last_synced ASC
               LIMIT 1
-      """.query(projectIdDecoder ~ lastSyncedDateDecoder.opt ~ projectPathDecoder)
-          .map { case id ~ maybeDate ~ path => (id, maybeDate, ProjectSyncEvent(id, path)) }
+      """.query(projectIdDecoder ~ lastSyncedDateDecoder.opt ~ projectSlugDecoder)
+          .map { case id ~ maybeDate ~ slug => (id, maybeDate, ProjectSyncEvent(id, slug)) }
       )
       .arguments(LastSyncedDate(now()))
       .build(_.option)
@@ -138,6 +138,6 @@ private class EventFinderImpl[F[_]: MonadCancelThrow: SessionResource: QueriesEx
 }
 
 private object EventFinder {
-  def apply[F[_]: MonadCancelThrow: SessionResource: QueriesExecutionTimes]: F[EventFinder[F, ProjectSyncEvent]] =
+  def apply[F[_]: Async: SessionResource: QueriesExecutionTimes]: F[EventFinder[F, ProjectSyncEvent]] =
     MonadThrow[F].catchNonFatal(new EventFinderImpl[F]())
 }

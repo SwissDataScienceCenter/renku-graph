@@ -22,9 +22,12 @@ import cats.effect.{IO, Resource, Temporal}
 import cats.{Applicative, Monad}
 import eu.timepit.refined.auto._
 import io.renku.db.DBConfigProvider
-import io.renku.triplesgenerator.TgLockDB.SessionResource
-import io.renku.triplesgenerator.{TgLockDB, TgLockDbConfigProvider}
+import io.renku.graph.model.{RenkuUrl, projects}
+import io.renku.projectauth.{ProjectAuthData, QueryFilter}
+import io.renku.triplesgenerator.TgDB.SessionResource
+import io.renku.triplesgenerator.{TgDB, TgLockDbConfigProvider}
 import io.renku.triplesstore._
+import io.renku.triplesstore.client.util.JenaRunMode
 import org.typelevel.log4cats.Logger
 
 import scala.concurrent.duration._
@@ -34,7 +37,7 @@ object TriplesStore extends InMemoryJena with ProjectsDataset with MigrationsDat
 
   protected override val jenaRunMode: JenaRunMode = JenaRunMode.FixedPortContainer(3030)
 
-  private val dbConfig: DBConfigProvider.DBConfig[TgLockDB] =
+  private val dbConfig: DBConfigProvider.DBConfig[TgDB] =
     new TgLockDbConfigProvider[Try].get().fold(throw _, identity)
 
   lazy val sessionResource: Resource[IO, SessionResource[IO]] =
@@ -53,4 +56,10 @@ object TriplesStore extends InMemoryJena with ProjectsDataset with MigrationsDat
   private def waitForReadiness(implicit logger: Logger[IO]): IO[Unit] =
     Monad[IO].whileM_(IO(!isRunning))(logger.info("Waiting for TS") >> (Temporal[IO] sleep (500 millis)))
 
+  def findProjectAuth(
+      slug: projects.Slug
+  )(implicit renkuUrl: RenkuUrl, sqtr: SparqlQueryTimeRecorder[IO], L: Logger[IO]): IO[Option[ProjectAuthData]] =
+    ProjectSparqlClient[IO](projectsDSConnectionInfo)
+      .map(_.asProjectAuthService)
+      .use(_.getAll(QueryFilter.all.withSlug(slug)).compile.last)
 }

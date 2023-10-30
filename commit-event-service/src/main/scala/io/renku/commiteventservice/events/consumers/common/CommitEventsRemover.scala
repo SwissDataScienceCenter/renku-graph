@@ -49,7 +49,7 @@ private class CommitEventsRemoverImpl[F[_]: MonadThrow](eventSender: EventSender
           "id":           $commitId,
           "project": {
             "id":   ${project.id},
-            "path": ${project.path}
+            "slug": ${project.slug}
           },
           "subCategory": "ToAwaitingDeletion"
         }"""),

@@ -58,7 +58,8 @@ class PersonsEntitiesFinderSpec
       finder
         .findEntities(Criteria(Filters(maybeQuery = Query(query.value).some)))
         .unsafeRunSync()
-        .resultsWithSkippedMatchingScore should {
+        .resultsWithSkippedMatchingScore
+        .sortBy(_.name)(nameOrdering) should {
         be(List(person1SameName, person3).map(_.to[model.Entity.Person]).sortBy(_.name)(nameOrdering)) or
           be(List(person2SameName, person3).map(_.to[model.Entity.Person]).sortBy(_.name)(nameOrdering))
       }

@@ -19,8 +19,8 @@
 package io.renku.interpreters
 
 import cats.effect.{IO, Resource}
-import io.renku.db.SessionResource
+import io.renku.db.SessionResourceImpl
 import skunk.Session
 
 class TestSessionResource[TargetDB](sessionResource: Resource[IO, Session[IO]])
-    extends SessionResource[IO, TargetDB](sessionResource)
+    extends SessionResourceImpl[IO, TargetDB](sessionResource)

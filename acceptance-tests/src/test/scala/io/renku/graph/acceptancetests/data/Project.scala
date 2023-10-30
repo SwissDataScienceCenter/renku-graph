@@ -25,8 +25,8 @@ import eu.timepit.refined.auto._
 import eu.timepit.refined.collection.NonEmpty
 import eu.timepit.refined.numeric.Positive
 import io.renku.graph.acceptancetests.data.Project._
-import io.renku.graph.model.entities.Project.ProjectMember
-import io.renku.graph.model.projects.{GitLabId, Name, Path}
+import io.renku.graph.model.gitlab.{GitLabMember, GitLabUser}
+import io.renku.graph.model.projects.{GitLabId, Name, Slug}
 import io.renku.graph.model.testentities
 import io.renku.tinytypes._
 import io.renku.tinytypes.constraints._
@@ -35,14 +35,14 @@ import java.net.{MalformedURLException, URL}
 
 final case class Project(entitiesProject: testentities.RenkuProject,
                          id:              GitLabId,
-                         maybeCreator:    Option[ProjectMember],
-                         members:         NonEmptyList[ProjectMember],
+                         maybeCreator:    Option[GitLabUser],
+                         members:         NonEmptyList[GitLabMember],
                          urls:            Urls,
                          starsCount:      StarsCount,
                          permissions:     Permissions,
                          statistics:      Statistics
 ) {
-  val path: Path = entitiesProject.path
+  val slug: Slug = entitiesProject.slug
   val name: Name = entitiesProject.name
 }
 

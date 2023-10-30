@@ -24,6 +24,6 @@ private object Generators {
 
   lazy val projectSyncEvents = for {
     id   <- projectIds
-    path <- projectPaths
-  } yield ProjectSyncEvent(id, path)
+    slug <- projectSlugs
+  } yield ProjectSyncEvent(id, slug)
 }

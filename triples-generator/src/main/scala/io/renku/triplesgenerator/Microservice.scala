@@ -27,9 +27,10 @@ import io.renku.config.certificates.CertificateLoader
 import io.renku.config.sentry.SentryInitializer
 import io.renku.db.{SessionPoolResource, SessionResource}
 import io.renku.entities.viewings
-import io.renku.events.consumers
+import io.renku.events.{CategoryName, consumers}
 import io.renku.events.consumers.EventConsumersRegistry
-import io.renku.graph.model.projects
+import io.renku.graph.config.RenkuUrlLoader
+import io.renku.graph.model.{RenkuUrl, projects}
 import io.renku.graph.tokenrepository.AccessTokenFinder
 import io.renku.http.client.GitLabClient
 import io.renku.http.server.HttpServer
@@ -39,10 +40,10 @@ import io.renku.microservices.{IOMicroservice, ResourceUse, ServiceReadinessChec
 import io.renku.triplesgenerator.config.certificates.GitCertificateInstaller
 import io.renku.triplesgenerator.events.consumers._
 import io.renku.triplesgenerator.events.consumers.tsmigrationrequest.migrations.reprovisioning.ReProvisioningStatus
-import io.renku.triplesgenerator.events.consumers.tsprovisioning.{minprojectinfo, triplesgenerated}
+import io.renku.triplesgenerator.events.consumers.{minprojectinfo, triplesgenerated}
 import io.renku.triplesgenerator.init.{CliVersionCompatibilityChecker, CliVersionCompatibilityVerifier}
 import io.renku.triplesgenerator.metrics.MetricsService
-import io.renku.triplesstore.{ProjectsConnectionConfig, SparqlQueryTimeRecorder}
+import io.renku.triplesstore.{ProjectSparqlClient, ProjectsConnectionConfig, SparqlQueryTimeRecorder}
 import natchez.Trace.Implicits.noop
 import org.http4s.server.Server
 import org.typelevel.log4cats.Logger
@@ -66,44 +67,55 @@ object Microservice extends IOMicroservice {
     val resources = for {
       config <- Resource.eval(parseConfigArgs(args))
       dbSessionPool <- Resource
-                         .eval(new TgLockDbConfigProvider[IO].map(SessionPoolResource[IO, TgLockDB]))
+                         .eval(new TgLockDbConfigProvider[IO].map(SessionPoolResource[IO, TgDB]))
                          .flatMap(identity)
-    } yield (config, dbSessionPool)
+      implicit0(mr: MetricsRegistry[IO])           <- Resource.eval(MetricsRegistry[IO]())
+      implicit0(sqtr: SparqlQueryTimeRecorder[IO]) <- Resource.eval(SparqlQueryTimeRecorder.create[IO]())
 
-    resources.use { case (config, dbSessionPool) =>
-      doRun(config, dbSessionPool)
+      projectConnConfig <- Resource.eval(ProjectsConnectionConfig[IO](config))
+      projectsSparql    <- ProjectSparqlClient[IO](projectConnConfig)
+    } yield (config, dbSessionPool, projectsSparql, mr, sqtr)
+
+    resources.use { case (config, dbSessionPool, projectSparqlClient, mr, sqtr) =>
+      doRun(config, dbSessionPool, projectSparqlClient)(mr, sqtr)
     }
   }
 
-  private def doRun(config: Config, dbSessionPool: SessionResource[IO, TgLockDB]): IO[ExitCode] = for {
-    implicit0(mr: MetricsRegistry[IO])           <- MetricsRegistry[IO]()
-    implicit0(sqtr: SparqlQueryTimeRecorder[IO]) <- SparqlQueryTimeRecorder[IO]()
-    implicit0(gc: GitLabClient[IO])              <- GitLabClient[IO]()
-    implicit0(acf: AccessTokenFinder[IO])        <- AccessTokenFinder[IO]()
-    implicit0(rp: ReProvisioningStatus[IO])      <- ReProvisioningStatus[IO]()
+  private def doRun(
+      config:              Config,
+      sessionResource:     SessionResource[IO, TgDB],
+      projectSparqlClient: ProjectSparqlClient[IO]
+  )(implicit mr: MetricsRegistry[IO], sqtr: SparqlQueryTimeRecorder[IO]): IO[ExitCode] = for {
 
-    _ <- TgLockDB.migrate[IO](dbSessionPool, 20.seconds)
+    implicit0(gc: GitLabClient[IO])         <- GitLabClient[IO]()
+    implicit0(acf: AccessTokenFinder[IO])   <- AccessTokenFinder[IO]()
+    implicit0(rp: ReProvisioningStatus[IO]) <- ReProvisioningStatus[IO]()
+    implicit0(rurl: RenkuUrl)               <- RenkuUrlLoader[IO](config)
 
-    metricsService <- MetricsService[IO](dbSessionPool)
+    _ <- TgDB.migrate[IO](sessionResource, 20.seconds)
+
+    metricsService <- MetricsService[IO](sessionResource)
     _ <- metricsService.collectEvery(Duration.fromNanos(config.getDuration("metrics-interval").toNanos)).start
 
-    tsWriteLock = TgLockDB.createLock[IO, projects.Path](dbSessionPool, 0.5.seconds)
+    tsWriteLock  = TgDB.createLock[IO, projects.Slug](sessionResource, 0.5.seconds)
+    categoryLock = TgDB.createLock[IO, CategoryName](sessionResource, 0.5.seconds)
     projectConnConfig              <- ProjectsConnectionConfig[IO](config)
     certificateLoader              <- CertificateLoader[IO]
     gitCertificateInstaller        <- GitCertificateInstaller[IO]
     sentryInitializer              <- SentryInitializer[IO]
     cliVersionCompatChecker        <- CliVersionCompatibilityChecker[IO](config)
     awaitingGenerationSubscription <- awaitinggeneration.SubscriptionFactory[IO]
-    membersSyncSubscription        <- membersync.SubscriptionFactory[IO](tsWriteLock)
-    triplesGeneratedSubscription   <- triplesgenerated.SubscriptionFactory[IO](tsWriteLock)
-    cleanUpSubscription            <- cleanup.SubscriptionFactory[IO](tsWriteLock)
-    minProjectInfoSubscription     <- minprojectinfo.SubscriptionFactory[IO](tsWriteLock)
+    membersSyncSubscription        <- membersync.SubscriptionFactory[IO](tsWriteLock, projectSparqlClient)
+    triplesGeneratedSubscription   <- triplesgenerated.SubscriptionFactory[IO](tsWriteLock, projectSparqlClient)
+    cleanUpSubscription            <- cleanup.SubscriptionFactory[IO](tsWriteLock, projectSparqlClient)
+    minProjectInfoSubscription     <- minprojectinfo.SubscriptionFactory[IO](tsWriteLock, projectSparqlClient)
     migrationRequestSubscription   <- tsmigrationrequest.SubscriptionFactory[IO](config)
     syncRepoMetadataSubscription   <- syncrepometadata.SubscriptionFactory[IO](config, tsWriteLock)
     projectActivationsSubscription <- viewings.collector.projects.activated.SubscriptionFactory[IO](projectConnConfig)
-    projectViewingsSubscription    <- viewings.collector.projects.viewed.SubscriptionFactory[IO](projectConnConfig)
-    datasetViewingsSubscription    <- viewings.collector.datasets.SubscriptionFactory[IO](projectConnConfig)
-    viewingDeletionSubscription    <- viewings.deletion.projects.SubscriptionFactory[IO](projectConnConfig)
+    projectViewingsSubscription <-
+      viewings.collector.projects.viewed.SubscriptionFactory[IO, TgDB](categoryLock, sessionResource, projectConnConfig)
+    datasetViewingsSubscription <- viewings.collector.datasets.SubscriptionFactory[IO](projectConnConfig)
+    viewingDeletionSubscription <- viewings.deletion.projects.SubscriptionFactory[IO](projectConnConfig)
     eventConsumersRegistry <- consumers.EventConsumersRegistry(
                                 awaitingGenerationSubscription,
                                 membersSyncSubscription,
@@ -118,8 +130,9 @@ object Microservice extends IOMicroservice {
                                 viewingDeletionSubscription
                               )
     serviceReadinessChecker <- ServiceReadinessChecker[IO](ServicePort)
-    microserviceRoutes      <- MicroserviceRoutes[IO](eventConsumersRegistry, config).map(_.routes)
-    termSignal              <- SignallingRef.of[IO, Boolean](false)
+    microserviceRoutes <-
+      MicroserviceRoutes[IO](eventConsumersRegistry, tsWriteLock, projectSparqlClient, config).map(_.routes)
+    termSignal <- SignallingRef.of[IO, Boolean](false)
     exitCode <- microserviceRoutes.use { routes =>
                   new MicroserviceRunner[IO](
                     serviceReadinessChecker,

@@ -26,42 +26,37 @@ import io.renku.jsonld.ontology._
 
 object ProjectSearchInfoOntology {
 
-  val nameProperty:         DataProperty.Def = Project.Ontology.nameProperty
-  val pathProperty:         DataProperty.Def = Project.Ontology.pathProperty
-  val visibilityProperty:   DataProperty.Def = Project.Ontology.visibilityProperty
-  val dateCreatedProperty:  DataProperty.Def = Project.Ontology.dateCreatedProperty
-  val dateModifiedProperty: DataProperty.Def = Project.Ontology.dateModifiedProperty
-  val keywordsProperty:     DataProperty.Def = Project.Ontology.keywordsProperty
-  val descriptionProperty:  DataProperty.Def = Project.Ontology.descriptionProperty
-  val creatorProperty:      Property         = Project.Ontology.creator
-  val imageProperty:        Property         = Project.Ontology.image
+  val nameProperty:           DataProperty.Def = Project.Ontology.nameProperty
+  val slugProperty:           DataProperty.Def = Project.Ontology.slugProperty
+  val pathProperty:           DataProperty.Def = Project.Ontology.pathProperty
+  val visibilityProperty:     DataProperty.Def = Project.Ontology.visibilityProperty
+  val dateCreatedProperty:    DataProperty.Def = Project.Ontology.dateCreatedProperty
+  val dateModifiedProperty:   DataProperty.Def = Project.Ontology.dateModifiedProperty
+  val keywordsProperty:       DataProperty.Def = Project.Ontology.keywordsProperty
+  val keywordsConcatProperty: DataProperty.Def = DataProperty(renku / "keywordsConcat", xsd / "string")
+  val descriptionProperty:    DataProperty.Def = Project.Ontology.descriptionProperty
+  val creatorProperty:        Property         = Project.Ontology.creator
+  val imageProperty:          Property         = Project.Ontology.image
+  val imagesConcatProperty:   DataProperty.Def = DataProperty(renku / "imagesConcat", xsd / "string")
 
   lazy val typeDef: Type = Type.Def(
     Class(renku / "DiscoverableProject"),
     ObjectProperties(
-      ObjectProperty(creatorProperty, PersonInfoOntology.typeDef),
+      ObjectProperty(creatorProperty, Person.Ontology.typeDef),
       ObjectProperty(imageProperty, Image.Ontology.typeDef)
     ),
     DataProperties(
       nameProperty,
+      slugProperty,
       pathProperty,
       visibilityProperty,
       dateCreatedProperty,
       dateModifiedProperty,
       keywordsProperty,
-      descriptionProperty
+      keywordsConcatProperty,
+      descriptionProperty,
+      imagesConcatProperty
     )
-  )
-}
-
-object PersonInfoOntology {
-
-  val nameProperty: DataProperty.Def = Person.Ontology.nameProperty
-
-  lazy val typeDef: Type = Type.Def(
-    Class(renku / "DiscoverableDatasetPerson"),
-    ObjectProperties(),
-    DataProperties(nameProperty)
   )
 }
 
