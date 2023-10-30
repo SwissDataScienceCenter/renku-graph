@@ -79,6 +79,6 @@ private object MicroserviceRoutes {
     EventEndpoint(consumersRegistry),
     projects.create.Endpoint[F](tsWriteLock, topSameAsLock, projectSparqlClient),
     projects.update.Endpoint[F](tsWriteLock),
-    version.Routes[F],
+    version.Routes[F]
   ).mapN(new MicroserviceRoutes(_, _, _, new RoutesMetrics[F], _, config))
 }
