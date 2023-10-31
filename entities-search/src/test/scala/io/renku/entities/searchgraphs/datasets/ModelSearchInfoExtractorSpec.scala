@@ -39,7 +39,7 @@ class ModelSearchInfoExtractorSpec extends AnyFlatSpec with should.Matchers {
 
     val datasets = project.datasets
 
-    ModelSearchInfoExtractor.extractModelSearchInfo[Try](project)(datasets) shouldBe datasets
+    ModelSearchInfoExtractor.extractModelSearchInfos[Try](project)(datasets) shouldBe datasets
       .map { ds =>
         ModelDatasetSearchInfo(
           ds.provenance.topmostSameAs,
@@ -66,7 +66,7 @@ class ModelSearchInfoExtractorSpec extends AnyFlatSpec with should.Matchers {
     val originalDataset  = project.datasets.head
     val lastModification = project.datasets.last
 
-    ModelSearchInfoExtractor.extractModelSearchInfo[Try](project)(List(lastModification)) shouldBe List(
+    ModelSearchInfoExtractor.extractModelSearchInfos[Try](project)(List(lastModification)) shouldBe List(
       ModelDatasetSearchInfo(
         lastModification.provenance.topmostSameAs,
         lastModification.identification.name,

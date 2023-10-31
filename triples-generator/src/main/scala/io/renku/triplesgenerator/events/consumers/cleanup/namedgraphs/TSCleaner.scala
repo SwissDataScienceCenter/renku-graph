@@ -24,8 +24,9 @@ import eu.timepit.refined.api.Refined
 import eu.timepit.refined.numeric.NonNegative
 import io.renku.entities.searchgraphs.SearchGraphsCleaner
 import io.renku.graph.model.entities.ProjectIdentification
-import io.renku.graph.model.{GraphClass, RenkuUrl, projects}
+import io.renku.graph.model.{GraphClass, RenkuUrl, datasets, projects}
 import io.renku.http.client.RestClient.{MaxRetriesAfterConnectionTimeout, SleepAfterConnectionIssue}
+import io.renku.lock.Lock
 import io.renku.triplesgenerator.events.consumers.membersync.ProjectAuthSync
 import io.renku.triplesstore.client.syntax._
 import io.renku.triplesstore.{ProjectSparqlClient, ProjectsConnectionConfig, SparqlQueryTimeRecorder, TSClientImpl}
@@ -40,22 +41,23 @@ private[cleanup] trait TSCleaner[F[_]] {
 private[cleanup] object TSCleaner {
   def apply[F[_]: Async: Logger: SparqlQueryTimeRecorder](
       projectAuthSync:  ProjectAuthSync[F],
+      topSameAsLock:    Lock[F, datasets.TopmostSameAs],
       connectionConfig: ProjectsConnectionConfig,
       retryInterval:    FiniteDuration = SleepAfterConnectionIssue,
       maxRetries:       Int Refined NonNegative = MaxRetriesAfterConnectionTimeout
   ): TSCleaner[F] =
     new TSCleanerImpl[F](ProjectIdFinder[F](connectionConfig),
-                         SearchGraphsCleaner(connectionConfig),
+                         SearchGraphsCleaner(topSameAsLock, connectionConfig),
                          projectAuthSync,
                          connectionConfig,
                          retryInterval,
                          maxRetries
     )
 
-  def default[F[_]: Async: Logger: SparqlQueryTimeRecorder](projectSparqlClient: ProjectSparqlClient[F])(implicit
-      renkuUrl: RenkuUrl
-  ): F[TSCleaner[F]] =
-    ProjectsConnectionConfig[F]().map(apply(ProjectAuthSync(projectSparqlClient), _))
+  def default[F[_]: Async: Logger: SparqlQueryTimeRecorder](topSameAsLock:       Lock[F, datasets.TopmostSameAs],
+                                                            projectSparqlClient: ProjectSparqlClient[F]
+  )(implicit renkuUrl: RenkuUrl): F[TSCleaner[F]] =
+    ProjectsConnectionConfig[F]().map(apply(ProjectAuthSync(projectSparqlClient), topSameAsLock, _))
 }
 
 private class TSCleanerImpl[F[_]: Async: Logger: SparqlQueryTimeRecorder](

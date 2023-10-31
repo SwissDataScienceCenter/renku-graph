@@ -18,16 +18,21 @@
 
 package io.renku.graph.acceptancetests.tooling
 
+import cats.Monad
 import cats.effect._
 import cats.effect.std.Semaphore
 import io.renku._
-import io.renku.graph.acceptancetests.db.{EventLog, TokenRepository, TriplesStore}
+import io.renku.eventlog.MigrationStatus
+import io.renku.graph.acceptancetests.db.{EventLog, TokenRepository, TriplesGenerator, TriplesStore}
 import io.renku.graph.acceptancetests.stubs.RemoteTriplesGenerator
 import io.renku.graph.acceptancetests.stubs.gitlab.GitLabStubSupport
 import io.renku.graph.acceptancetests.tooling.KnowledgeGraphClient.KnowledgeGraphClient
 import io.renku.graph.acceptancetests.tooling.WebhookServiceClient.WebhookServiceClient
 import io.renku.triplesstore.FusekiUrl
 import org.scalatest.BeforeAndAfterAll
+import org.typelevel.log4cats.Logger
+
+import scala.concurrent.duration._
 
 trait ApplicationServices extends GitLabStubSupport with RemoteTriplesGenerator with BeforeAndAfterAll {
   self: AcceptanceSpec =>
@@ -87,8 +92,17 @@ trait ApplicationServices extends GitLabStubSupport with RemoteTriplesGenerator 
     "triples-generator",
     service = triplesgenerator.Microservice,
     serviceClient = triplesGeneratorClient,
-    preServiceStart = List(TriplesStore.start())
+    preServiceStart = List(TriplesGenerator.startDB(), TriplesStore.start()),
+    postServiceStart = List(waitForTSMigrations)
   )
+
+  private def waitForTSMigrations: IO[Unit] =
+    Monad[IO].whileM_ {
+      EventLog.findTSMigrationsStatus.flatMap {
+        case Some(status @ MigrationStatus.Done) => Logger[IO].info(s"TS migrations status: $status").as(false)
+        case other => Logger[IO].info(s"TS migrations status: ${other getOrElse "unknown"}; waiting").as(true)
+      }
+    }(Temporal[IO] sleep (1 second))
 
   private lazy val servicesRunner = (Semaphore[IO](1) map (new ServicesRunner(_))).unsafeRunSync()
 }

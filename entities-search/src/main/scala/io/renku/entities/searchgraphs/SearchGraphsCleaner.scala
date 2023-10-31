@@ -23,7 +23,9 @@ import cats.effect.Async
 import cats.syntax.all._
 import io.renku.entities.searchgraphs.datasets.DatasetsGraphCleaner
 import io.renku.entities.searchgraphs.projects.ProjectsGraphCleaner
+import io.renku.graph.model.datasets
 import io.renku.graph.model.entities.ProjectIdentification
+import io.renku.lock.Lock
 import io.renku.triplesstore.{ProjectsConnectionConfig, SparqlQueryTimeRecorder}
 import org.typelevel.log4cats.Logger
 
@@ -32,10 +34,12 @@ trait SearchGraphsCleaner[F[_]] {
 }
 
 object SearchGraphsCleaner {
-  def apply[F[_]: Async: Logger: SparqlQueryTimeRecorder](
-      connectionConfig: ProjectsConnectionConfig
+  def apply[F[_]: Async: Logger: SparqlQueryTimeRecorder](lock:             Lock[F, datasets.TopmostSameAs],
+                                                          connectionConfig: ProjectsConnectionConfig
   ): SearchGraphsCleaner[F] =
-    new SearchGraphsCleanerImpl[F](ProjectsGraphCleaner[F](connectionConfig), DatasetsGraphCleaner[F](connectionConfig))
+    new SearchGraphsCleanerImpl[F](ProjectsGraphCleaner[F](connectionConfig),
+                                   DatasetsGraphCleaner[F](lock, connectionConfig)
+    )
 }
 
 private class SearchGraphsCleanerImpl[F[_]: MonadThrow: Logger](

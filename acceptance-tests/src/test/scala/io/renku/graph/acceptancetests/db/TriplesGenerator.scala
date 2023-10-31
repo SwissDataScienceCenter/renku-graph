@@ -16,19 +16,23 @@
  * limitations under the License.
  */
 
-package io.renku.entities.searchgraphs.datasets
-package commands
+package io.renku.graph.acceptancetests.db
 
-import Generators._
-import io.renku.graph.model.entities
-import io.renku.graph.model.testentities._
-import org.scalacheck.Gen
+import cats.effect.IO
+import io.renku.db.DBConfigProvider
+import io.renku.triplesgenerator.{TgDB, TgDbConfigProvider}
+import org.typelevel.log4cats.Logger
 
-private object CalculatorInfoSetGenerators {
+import scala.util.Try
 
-  lazy val calculatorInfoSets: Gen[CalculatorInfoSet] = for {
-    project   <- anyRenkuProjectEntities(anyVisibility).map(_.to[entities.Project])
-    modelInfo <- modelDatasetSearchInfoObjects(project)
-    tsInfo    <- tsDatasetSearchInfoObjects(project)
-  } yield CalculatorInfoSet.BothInfos(project.identification, modelInfo, tsInfo)
+object TriplesGenerator {
+
+  private val dbConfig: DBConfigProvider.DBConfig[TgDB] =
+    new TgDbConfigProvider[Try].get().fold(throw _, identity)
+
+  def startDB()(implicit logger: Logger[IO]): IO[Unit] = for {
+    _ <- PostgresDB.startPostgres
+    _ <- PostgresDB.initializeDatabase(dbConfig)
+    _ <- logger.info("triples_generator DB started")
+  } yield ()
 }

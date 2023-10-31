@@ -19,7 +19,6 @@
 package io.renku.entities.searchgraphs.datasets
 package commands
 
-import CalculatorInfoSetGenerators._
 import Encoders._
 import io.renku.entities.searchgraphs.UpdateCommand._
 import io.renku.entities.searchgraphs.datasets.Generators._

@@ -31,7 +31,7 @@ import io.renku.jsonld.syntax._
 import io.renku.triplesstore.client.model.{Quad, QuadsEncoder, TripleObject}
 import io.renku.triplesstore.client.syntax._
 
-private object Encoders {
+private[datasets] object Encoders {
 
   implicit val imageEncoder: QuadsEncoder[Image] = QuadsEncoder.instance { case Image(resourceId, uri, position) =>
     Set(
