@@ -70,12 +70,12 @@ private class DatasetsGraphProvisionerImpl[F[_]: Async](tsSearchInfoFetcher: TSS
       .map(_.filterNot(tsDS => modelInfos.exists(_.topmostSameAs == tsDS.topmostSameAs)))
 
   private def update(project: Project, mi: ModelDatasetSearchInfo) =
-    lock
-      .run(mi.topmostSameAs)
-      .use(_ => toUpdateCommands(project.identification, mi).flatMap(searchInfoUploader.upload))
+    lock(mi.topmostSameAs).surround(
+      toUpdateCommands(project.identification, mi).flatMap(searchInfoUploader.upload)
+    )
 
   private def update(project: Project, tsi: TSDatasetSearchInfo) =
-    lock
-      .run(tsi.topmostSameAs)
-      .use(_ => toUpdateCommands(project.identification, tsi).flatMap(searchInfoUploader.upload))
+    lock(tsi.topmostSameAs).surround(
+      toUpdateCommands(project.identification, tsi).flatMap(searchInfoUploader.upload)
+    )
 }

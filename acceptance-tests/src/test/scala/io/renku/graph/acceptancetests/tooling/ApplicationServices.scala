@@ -100,7 +100,7 @@ trait ApplicationServices extends GitLabStubSupport with RemoteTriplesGenerator 
     Monad[IO].whileM_ {
       EventLog.findTSMigrationsStatus.flatMap {
         case Some(status @ MigrationStatus.Done) => Logger[IO].info(s"TS migrations status: $status").as(false)
-        case other => Logger[IO].info(s"TS migrations status: ${other.getOrElse("unknown")}; waiting").as(true)
+        case other => Logger[IO].info(s"TS migrations status: ${other getOrElse "unknown"}; waiting").as(true)
       }
     }(Temporal[IO] sleep (1 second))
 
