@@ -88,7 +88,6 @@ private[tsmigrationrequest] object Migrations {
                     datasetsGraphCreatorsFlattener,
                     datasetsGraphSlugsVisibsFlattener,
                     projectMembersRemover,
-                    datasetsGraphSlugsVisibsFlattener,
                     datasetTitleMigration
                   )
   } yield migrations
