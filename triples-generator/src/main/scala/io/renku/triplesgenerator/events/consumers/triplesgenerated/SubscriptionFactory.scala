@@ -25,9 +25,10 @@ import io.renku.events.Subscription.SubscriberCapacity
 import io.renku.events.consumers
 import io.renku.events.consumers.subscriptions.SubscriptionMechanism
 import io.renku.events.consumers.subscriptions.SubscriptionPayloadComposer.defaultSubscriptionPayloadComposerFactory
-import io.renku.graph.model.RenkuUrl
+import io.renku.graph.model.{RenkuUrl, datasets}
 import io.renku.graph.tokenrepository.AccessTokenFinder
 import io.renku.http.client.GitLabClient
+import io.renku.lock.Lock
 import io.renku.metrics.MetricsRegistry
 import io.renku.triplesgenerator.Microservice
 import io.renku.triplesgenerator.TgDB.TsWriteLock
@@ -40,6 +41,7 @@ object SubscriptionFactory {
       _
   ]: Async: NonEmptyParallel: Parallel: ReProvisioningStatus: GitLabClient: AccessTokenFinder: Logger: MetricsRegistry: SparqlQueryTimeRecorder](
       tsWriteLock:         TsWriteLock[F],
+      topSameAsLock:       Lock[F, datasets.TopmostSameAs],
       projectSparqlClient: ProjectSparqlClient[F]
   )(implicit renkuUrl: RenkuUrl): F[(consumers.EventHandler[F], SubscriptionMechanism[F])] = for {
     concurrentProcessesNumber <- ConcurrentProcessesNumber[F]()
@@ -51,7 +53,8 @@ object SubscriptionFactory {
                                                   SubscriberCapacity(concurrentProcessesNumber.value)
         )
       )
-    _       <- ReProvisioningStatus[F].registerForNotification(subscriptionMechanism)
-    handler <- EventHandler(subscriptionMechanism, concurrentProcessesNumber, tsWriteLock, projectSparqlClient)
+    _ <- ReProvisioningStatus[F].registerForNotification(subscriptionMechanism)
+    handler <-
+      EventHandler(subscriptionMechanism, concurrentProcessesNumber, tsWriteLock, topSameAsLock, projectSparqlClient)
   } yield handler -> subscriptionMechanism
 }

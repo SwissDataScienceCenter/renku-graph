@@ -29,7 +29,8 @@ import io.renku.triplesstore.{ProjectsConnectionConfig, SparqlQueryTimeRecorder}
 import org.typelevel.log4cats.Logger
 
 private[datasets] trait UpdateCommandsProducer[F[_]] {
-  def toUpdateCommands(project: ProjectIdentification)(modelInfos: List[ModelDatasetSearchInfo]): F[List[UpdateCommand]]
+  def toUpdateCommands(project: ProjectIdentification, modelInfo: ModelDatasetSearchInfo): F[List[UpdateCommand]]
+  def toUpdateCommands(project: ProjectIdentification, tsInfo:    TSDatasetSearchInfo):    F[List[UpdateCommand]]
 }
 
 private[datasets] object UpdateCommandsProducer {
@@ -43,34 +44,17 @@ private class UpdateCommandsProducerImpl[F[_]: MonadThrow](tsInfoFetcher: TSSear
                                                            commandsCalculator: CommandsCalculator
 ) extends UpdateCommandsProducer[F] {
 
-  import tsInfoFetcher.{findTSInfoBySameAs, findTSInfosByProject}
+  import tsInfoFetcher.findTSInfoBySameAs
 
-  def toUpdateCommands(
-      project: ProjectIdentification
-  )(modelInfos: List[ModelDatasetSearchInfo]): F[List[UpdateCommand]] =
-    for {
-      tsInfosByProject <- findTSInfosByProject(project.resourceId)
-      infoSets         <- toInfoSets(project, modelInfos, tsInfosByProject)
-    } yield infoSets >>= commandsCalculator.calculateCommands
+  override def toUpdateCommands(project: ProjectIdentification, mi: ModelDatasetSearchInfo): F[List[UpdateCommand]] =
+    findTSInfoBySameAs(mi.topmostSameAs)
+      .map(mi.some -> _)
+      .flatMap(toInfoSet(project))
+      .map(commandsCalculator.calculateCommands)
 
-  private def toInfoSets(project:          ProjectIdentification,
-                         modelInfos:       List[ModelDatasetSearchInfo],
-                         tsInfosByProject: List[TSDatasetSearchInfo]
-  ): F[List[CalculatorInfoSet]] =
-    matchInfosBySameAs(modelInfos, tsInfosByProject).toList
-      .map {
-        case (Some(mi), None) => findTSInfoBySameAs(mi.topmostSameAs).map(mi.some -> _)
-        case tuple            => tuple.pure[F]
-      }
-      .sequence
-      .flatMap(_.map(toInfoSet(project)).sequence)
-
-  private def matchInfosBySameAs(modelInfos: List[ModelDatasetSearchInfo], tsInfos: List[TSDatasetSearchInfo]) = {
-    val distinctDatasets = modelInfos.map(_.topmostSameAs).toSet ++ tsInfos.map(_.topmostSameAs)
-    distinctDatasets.map(topSameAs =>
-      modelInfos.find(_.topmostSameAs == topSameAs) -> tsInfos.find(_.topmostSameAs == topSameAs)
-    )
-  }
+  override def toUpdateCommands(project: ProjectIdentification, tsInfo: TSDatasetSearchInfo): F[List[UpdateCommand]] =
+    toInfoSet(project)(None -> tsInfo.some)
+      .map(commandsCalculator.calculateCommands)
 
   private def toInfoSet(
       project: ProjectIdentification

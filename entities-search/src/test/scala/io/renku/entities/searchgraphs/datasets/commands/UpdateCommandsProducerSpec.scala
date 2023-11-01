@@ -19,137 +19,57 @@
 package io.renku.entities.searchgraphs.datasets
 package commands
 
-import SearchInfoLens.updateLinkProject
-import TSDatasetSearchInfo.tsSearchInfoLinks
 import cats.syntax.all._
 import io.renku.entities.searchgraphs.Generators.updateCommands
 import io.renku.entities.searchgraphs.UpdateCommand
-import io.renku.entities.searchgraphs.datasets.Generators.{linkObjectsGen, modelDatasetSearchInfoObjects}
+import io.renku.entities.searchgraphs.datasets.Generators.{modelDatasetSearchInfoObjects, tsDatasetSearchInfoObjects}
 import io.renku.entities.searchgraphs.datasets.ModelDatasetSearchInfo
-import io.renku.entities.searchgraphs.datasets.commands.CalculatorInfoSetGenerators.tsDatasetSearchInfoObjects
 import io.renku.generators.Generators.Implicits._
-import io.renku.graph.model.{datasets, entities}
 import io.renku.graph.model.testentities._
+import io.renku.graph.model.{datasets, entities}
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.TryValues
-import org.scalatest.flatspec.AnyFlatSpec
 import org.scalatest.matchers.should
+import org.scalatest.wordspec.AnyWordSpec
 
-import scala.util.{Random, Try}
+import scala.util.Try
 
-class UpdateCommandsProducerSpec extends AnyFlatSpec with should.Matchers with MockFactory with TryValues {
+class UpdateCommandsProducerSpec extends AnyWordSpec with should.Matchers with MockFactory with TryValues {
 
-  it should "fetch Datasets currently associated with the given Project in the TS, " +
-    "zip them with the datasets found on the Project and generate update commands for them " +
-    "- case when all the model infos have counterparts in the TS " +
-    "and there is the same and sole project only on the infos in TS" in {
+  "toUpdateCommands(ModelDatasetSearchInfo)" should {
 
-      val project    = anyProjectEntities.generateOne.to[entities.Project]
-      val modelInfos = modelDatasetSearchInfoObjects(withLinkTo = project).generateList(min = 1)
-      val tsInfos =
-        modelInfos.map(info => tsDatasetSearchInfoObjects(withLinkTo = project, info.topmostSameAs).generateOne)
+    "find matching Info in the TS and generate update commands for the tuple" in {
 
-      givenTSFetchingByProject(project, returning = Random.shuffle(tsInfos).pure[Try])
+      val project     = anyProjectEntities.generateOne.to[entities.Project]
+      val modelInfo   = modelDatasetSearchInfoObjects(project).generateOne
+      val maybeTSInfo = tsDatasetSearchInfoObjects(withLinkTo = project, modelInfo.topmostSameAs).generateSome
 
-      val expectedCommands =
-        toInfoSets(project, modelInfos.map(Option(_)), tsInfos.map(Option(_)))
-          .flatMap(givenCommandsCalculation(_, returning = updateCommands.generateList()))
-
-      commandsProducer.toUpdateCommands(project.identification)(modelInfos).map(_.toSet).success.value shouldBe
-        expectedCommands.toSet
-    }
-
-  it should "fetch Datasets currently associated with the given Project in the TS, " +
-    "zip them with the datasets found on the Project and generate update commands for them " +
-    "- case when infos in the TS has more or different projects" in {
-
-      val project    = anyProjectEntities.generateOne.to[entities.Project]
-      val modelInfo1 = modelDatasetSearchInfoObjects(withLinkTo = project).generateOne
-      val modelInfo2 = modelDatasetSearchInfoObjects(withLinkTo = project).generateOne
-      val modelInfos = List(modelInfo1, modelInfo2)
-
-      val tsInfo1Project = anyProjectEntities.generateOne.to[entities.Project]
-      val tsInfo1        = tsDatasetSearchInfoObjects(withLinkTo = tsInfo1Project, modelInfo1.topmostSameAs).generateOne
-      val tsInfo2Project = anyProjectEntities.generateOne.to[entities.Project]
-      val tsInfo2 =
-        tsDatasetSearchInfoObjects(withLinkTo = project, modelInfo2.topmostSameAs).map { info =>
-          val linkToOtherProject = updateLinkProject(tsInfo2Project)(linkObjectsGen(info.topmostSameAs).generateOne)
-          tsSearchInfoLinks.modify(linkToOtherProject :: _)(info)
-        }.generateOne
-      val tsInfos = List(tsInfo1, tsInfo2)
-
-      givenTSFetchingByProject(project, returning = Random.shuffle(tsInfos).pure[Try])
+      givenTSFetchingByTopSameAs(modelInfo.topmostSameAs, returning = maybeTSInfo.pure[Try])
 
       val expectedCommands =
-        toInfoSets(project, modelInfos.map(Option(_)), tsInfos.map(Option(_)))
-          .flatMap(givenCommandsCalculation(_, returning = updateCommands.generateList()))
+        givenCommandsCalculation(toInfoSet(project, modelInfo.some, maybeTSInfo),
+                                 returning = updateCommands.generateList()
+        )
 
-      commandsProducer
-        .toUpdateCommands(project.identification)(modelInfos)
-        .map(_.toSet)
-        .success
-        .value shouldBe expectedCommands.toSet
+      commandsProducer.toUpdateCommands(project.identification, modelInfo).success.value shouldBe expectedCommands
     }
+  }
 
-  it should "produce commands - " +
-    "case when not all model infos have counterparts in the TS" in {
+  "toUpdateCommands(TSDatasetSearchInfo)" should {
 
-      val project    = anyProjectEntities.generateOne.to[entities.Project]
-      val modelInfos = modelDatasetSearchInfoObjects(withLinkTo = project).generateList(min = 2)
-      val tsInfos =
-        modelInfos.tail.map(info => tsDatasetSearchInfoObjects(withLinkTo = project, info.topmostSameAs).generateOne)
+    "find matching Info in the TS and generate update commands for the tuple" in {
 
-      givenTSFetchingByProject(project, returning = Random.shuffle(tsInfos).pure[Try])
-      givenTSFetchingByTopSameAs(modelInfos.head.topmostSameAs, returning = None.pure[Try])
+      val project = anyProjectEntities.generateOne.to[entities.Project]
+      val tsInfo  = tsDatasetSearchInfoObjects(withLinkTo = project).generateOne
 
       val expectedCommands =
-        toInfoSets(project, modelInfos.map(_.some), None :: tsInfos.map(_.some))
-          .flatMap(givenCommandsCalculation(_, returning = updateCommands.generateList()))
+        givenCommandsCalculation(toInfoSet(project, maybeModelInfo = None, tsInfo.some),
+                                 returning = updateCommands.generateList()
+        )
 
-      commandsProducer.toUpdateCommands(project.identification)(modelInfos).map(_.toSet).success.value shouldBe
-        expectedCommands.toSet
+      commandsProducer.toUpdateCommands(project.identification, tsInfo).success.value shouldBe expectedCommands
     }
-
-  it should "produce commands - " +
-    "case when not all model infos have counterparts in the TS where the project is linked, " +
-    "however, the dataset exists already for other project" in {
-
-      val project    = anyProjectEntities.generateOne.to[entities.Project]
-      val modelInfos = modelDatasetSearchInfoObjects(withLinkTo = project).generateList(min = 2)
-      val tsInfos =
-        modelInfos.tail.map(info => tsDatasetSearchInfoObjects(withLinkTo = project, info.topmostSameAs).generateOne)
-
-      givenTSFetchingByProject(project, returning = Random.shuffle(tsInfos).pure[Try])
-
-      val tsInfoBySameAs = tsDatasetSearchInfoObjects(withLinkTo = project, modelInfos.head.topmostSameAs).generateOne
-      givenTSFetchingByTopSameAs(modelInfos.head.topmostSameAs, returning = tsInfoBySameAs.some.pure[Try])
-
-      val expectedCommands =
-        toInfoSets(project, modelInfos.map(_.some), tsInfoBySameAs.some :: tsInfos.map(_.some))
-          .flatMap(givenCommandsCalculation(_, returning = updateCommands.generateList()))
-
-      commandsProducer.toUpdateCommands(project.identification)(modelInfos).map(_.toSet).success.value shouldBe
-        expectedCommands.toSet
-    }
-
-  it should "produce commands - " +
-    "case when not all TS infos have counterparts in the model" in {
-
-      val project           = anyProjectEntities.generateOne.to[entities.Project]
-      val initialModelInfos = modelDatasetSearchInfoObjects(withLinkTo = project).generateList(min = 2)
-      val modelInfos        = initialModelInfos.tail
-      val tsInfos =
-        initialModelInfos.map(info => tsDatasetSearchInfoObjects(withLinkTo = project, info.topmostSameAs).generateOne)
-
-      givenTSFetchingByProject(project, returning = Random.shuffle(tsInfos).pure[Try])
-
-      val expectedCommands =
-        toInfoSets(project, None :: modelInfos.map(_.some), tsInfos.map(_.some))
-          .flatMap(givenCommandsCalculation(_, returning = updateCommands.generateList()))
-
-      commandsProducer.toUpdateCommands(project.identification)(modelInfos).map(_.toSet).success.value shouldBe
-        expectedCommands.toSet
-    }
+  }
 
   private val calculateCommand = mockFunction[CalculatorInfoSet, List[UpdateCommand]]
   private val tsInfoFetcher    = mock[TSSearchInfoFetcher[Try]]
@@ -159,11 +79,6 @@ class UpdateCommandsProducerSpec extends AnyFlatSpec with should.Matchers with M
       override def calculateCommands: CalculatorInfoSet => List[UpdateCommand] = calculateCommand
     }
   )
-
-  private def givenTSFetchingByProject(project: entities.Project, returning: Try[List[TSDatasetSearchInfo]]) =
-    (tsInfoFetcher.findTSInfosByProject _)
-      .expects(project.resourceId)
-      .returning(returning)
 
   private def givenTSFetchingByTopSameAs(topSameAs: datasets.TopmostSameAs,
                                          returning: Try[Option[TSDatasetSearchInfo]]
@@ -176,14 +91,11 @@ class UpdateCommandsProducerSpec extends AnyFlatSpec with should.Matchers with M
     returning
   }
 
-  private def toInfoSets(project:    entities.Project,
-                         modelInfos: List[Option[ModelDatasetSearchInfo]],
-                         tsInfos:    List[Option[TSDatasetSearchInfo]]
-  ): Seq[CalculatorInfoSet] =
-    (modelInfos zip tsInfos)
-      .map { case (maybeModelInfo, maybeTsInfo) =>
-        CalculatorInfoSet
-          .from(project.identification, maybeModelInfo, maybeTsInfo)
-          .fold(throw _, identity)
-      }
+  private def toInfoSet(project:        entities.Project,
+                        maybeModelInfo: Option[ModelDatasetSearchInfo],
+                        maybeTsInfo:    Option[TSDatasetSearchInfo]
+  ): CalculatorInfoSet =
+    CalculatorInfoSet
+      .from(project.identification, maybeModelInfo, maybeTsInfo)
+      .fold(throw _, identity)
 }

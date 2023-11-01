@@ -59,6 +59,7 @@ private[tsmigrationrequest] object Migrations {
     datasetsGraphImagesFlattener        <- DatasetsGraphImagesFlattener[F]
     datasetsGraphCreatorsFlattener      <- DatasetsGraphCreatorsFlattener[F]
     datasetsGraphSlugsVisibsFlattener   <- DatasetsGraphSlugsVisibilitiesFlattener[F]
+    projectMembersRemover               <- ProjectMembersRemover[F]
     datasetTitleMigration               <- DatasetSearchTitleMigration[F]
     migrations <- validateNames(
                     datasetsCreator,
@@ -85,6 +86,8 @@ private[tsmigrationrequest] object Migrations {
                     datasetsGraphKeywordsFlattener,
                     datasetsGraphImagesFlattener,
                     datasetsGraphCreatorsFlattener,
+                    datasetsGraphSlugsVisibsFlattener,
+                    projectMembersRemover,
                     datasetsGraphSlugsVisibsFlattener,
                     datasetTitleMigration
                   )

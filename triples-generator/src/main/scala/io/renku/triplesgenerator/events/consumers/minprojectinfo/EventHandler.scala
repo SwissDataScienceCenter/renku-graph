@@ -24,9 +24,10 @@ import cats.syntax.all._
 import io.renku.events.{CategoryName, consumers}
 import io.renku.events.consumers.subscriptions.SubscriptionMechanism
 import io.renku.events.consumers.ProcessExecutor
-import io.renku.graph.model.RenkuUrl
+import io.renku.graph.model.{RenkuUrl, datasets}
 import io.renku.graph.tokenrepository.AccessTokenFinder
 import io.renku.http.client.GitLabClient
+import io.renku.lock.Lock
 import io.renku.lock.syntax._
 import io.renku.metrics.MetricsRegistry
 import io.renku.triplesgenerator.TgDB.TsWriteLock
@@ -69,11 +70,12 @@ private object EventHandler {
   ]: Async: NonEmptyParallel: Parallel: ReProvisioningStatus: GitLabClient: AccessTokenFinder: MetricsRegistry: Logger: SparqlQueryTimeRecorder](
       subscriptionMechanism: SubscriptionMechanism[F],
       tsWriteLock:           TsWriteLock[F],
+      topSameAsLock:         Lock[F, datasets.TopmostSameAs],
       projectSparqlClient:   ProjectSparqlClient[F],
       config:                Config = ConfigFactory.load()
   )(implicit renkuUrl: RenkuUrl): F[consumers.EventHandler[F]] = for {
     tsReadinessChecker <- TSReadinessForEventsChecker[F]
-    eventProcessor     <- EventProcessor[F](projectSparqlClient)
+    eventProcessor     <- EventProcessor[F](topSameAsLock, projectSparqlClient)
     processesCount     <- find[F, Int Refined Positive]("add-min-project-info-max-concurrent-processes", config)
     processExecutor    <- ProcessExecutor.concurrent(processesCount)
   } yield new EventHandler[F](

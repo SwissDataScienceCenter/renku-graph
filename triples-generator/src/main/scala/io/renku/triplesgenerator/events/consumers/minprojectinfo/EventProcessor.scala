@@ -21,9 +21,10 @@ package io.renku.triplesgenerator.events.consumers.minprojectinfo
 import cats.effect.Async
 import cats.syntax.all._
 import cats.{MonadThrow, NonEmptyParallel, Parallel}
-import io.renku.graph.model.RenkuUrl
+import io.renku.graph.model.{RenkuUrl, datasets}
 import io.renku.graph.tokenrepository.AccessTokenFinder
 import io.renku.http.client.{AccessToken, GitLabClient}
+import io.renku.lock.Lock
 import io.renku.logging.ExecutionTimeRecorder
 import io.renku.logging.ExecutionTimeRecorder.ElapsedTime
 import io.renku.metrics.{Histogram, MetricsRegistry}
@@ -166,9 +167,10 @@ private object EventProcessor {
   def apply[F[
       _
   ]: Async: NonEmptyParallel: Parallel: GitLabClient: AccessTokenFinder: Logger: MetricsRegistry: SparqlQueryTimeRecorder](
+      topSameAsLock:       Lock[F, datasets.TopmostSameAs],
       projectSparqlClient: ProjectSparqlClient[F]
   )(implicit renkuUrl: RenkuUrl): F[EventProcessor[F]] = for {
-    tsProvisioner           <- TSProvisioner[F](projectSparqlClient)
+    tsProvisioner           <- TSProvisioner[F](topSameAsLock, projectSparqlClient)
     entityBuilder           <- EntityBuilder[F]
     projectExistenceChecker <- ProjectExistenceChecker[F]
     tgClient                <- triplesgenerator.api.events.Client[F]

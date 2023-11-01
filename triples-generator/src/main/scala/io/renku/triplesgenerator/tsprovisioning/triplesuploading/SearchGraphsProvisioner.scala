@@ -24,7 +24,9 @@ import cats.data.EitherT
 import cats.effect.Async
 import cats.syntax.all._
 import io.renku.entities.searchgraphs
+import io.renku.graph.model.datasets
 import io.renku.graph.model.entities.Project
+import io.renku.lock.Lock
 import io.renku.triplesgenerator.errors.{ProcessingRecoverableError, RecoverableErrorsRecovery}
 import io.renku.triplesstore.{ProjectsConnectionConfig, SparqlQueryTimeRecorder}
 import org.typelevel.log4cats.Logger
@@ -34,13 +36,15 @@ private trait SearchGraphsProvisioner[F[_]] {
 }
 
 private object SearchGraphsProvisioner {
-  def apply[F[_]: Async: Logger: SparqlQueryTimeRecorder](
-      connectionConfig: ProjectsConnectionConfig
+  def apply[F[_]: Async: Logger: SparqlQueryTimeRecorder](topSameAsLock:    Lock[F, datasets.TopmostSameAs],
+                                                          connectionConfig: ProjectsConnectionConfig
   ): SearchGraphsProvisioner[F] =
-    new SearchGraphsProvisionerImpl[F](searchgraphs.SearchGraphsProvisioner[F](connectionConfig))
+    new SearchGraphsProvisionerImpl[F](searchgraphs.SearchGraphsProvisioner[F](topSameAsLock, connectionConfig))
 
-  def default[F[_]: Async: Logger: SparqlQueryTimeRecorder]: F[SearchGraphsProvisioner[F]] =
-    ProjectsConnectionConfig[F]().map(apply(_))
+  def default[F[_]: Async: Logger: SparqlQueryTimeRecorder](
+      topSameAsLock: Lock[F, datasets.TopmostSameAs]
+  ): F[SearchGraphsProvisioner[F]] =
+    ProjectsConnectionConfig[F]().map(apply(topSameAsLock, _))
 }
 
 private class SearchGraphsProvisionerImpl[F[_]: MonadThrow](

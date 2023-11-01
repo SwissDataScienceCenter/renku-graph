@@ -19,7 +19,6 @@
 package io.renku.entities.searchgraphs.datasets
 package commands
 
-import CalculatorInfoSetGenerators._
 import Generators._
 import cats.data.NonEmptyList
 import cats.syntax.all._

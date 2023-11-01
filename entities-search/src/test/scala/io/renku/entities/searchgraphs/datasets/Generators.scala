@@ -106,4 +106,26 @@ private object Generators {
                                     projectIdGen:  Gen[projects.ResourceId] = projectResourceIds
   ): Gen[Link] = (datasetResourceIds, projectIdGen, projectSlugs, projectVisibilities)
     .mapN(Link.from(topmostSameAs, _, _, _, _))
+
+  implicit lazy val tsDatasetSearchInfoObjects: Gen[TSDatasetSearchInfo] = for {
+    topmostSameAs <- datasetTopmostSameAs
+    links <- linkObjectsGen(topmostSameAs).toGeneratorOfList(max = 2)
+  } yield TSDatasetSearchInfo(topmostSameAs, links)
+
+  def tsDatasetSearchInfoObjects(withLinkTo: projects.ResourceId, and: projects.ResourceId*): Gen[TSDatasetSearchInfo] =
+    tsDatasetSearchInfoObjects.map { i =>
+      tsSearchInfoLinks.replace {
+        List.from(withLinkTo :: and.toList).map(linkProjectId.replace(_)(linkObjectsGen(i.topmostSameAs).generateOne))
+      }(i)
+    }
+
+  def tsDatasetSearchInfoObjects(withLinkTo: entities.Project,
+                                 topSameAsGen: Gen[datasets.TopmostSameAs] = datasetTopmostSameAs
+                                ): Gen[TSDatasetSearchInfo] =
+    tsDatasetSearchInfoObjects.map(_.copy(topmostSameAs = topSameAsGen.generateOne)).flatMap { si =>
+      linkObjectsGen(si.topmostSameAs)
+        .map(linkProjectId replace withLinkTo.resourceId)
+        .map(linkVisibility replace withLinkTo.visibility)
+        .map(link => tsSearchInfoLinks.replace(List(link))(si))
+    }
 }

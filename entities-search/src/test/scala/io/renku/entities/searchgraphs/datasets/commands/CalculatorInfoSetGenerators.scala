@@ -20,36 +20,11 @@ package io.renku.entities.searchgraphs.datasets
 package commands
 
 import Generators._
-import SearchInfoLens.{linkProjectId, linkVisibility}
-import TSDatasetSearchInfo._
-import io.renku.generators.Generators.Implicits._
+import io.renku.graph.model.entities
 import io.renku.graph.model.testentities._
-import io.renku.graph.model.{datasets, entities, projects}
 import org.scalacheck.Gen
 
 private object CalculatorInfoSetGenerators {
-
-  implicit lazy val tsDatasetSearchInfoObjects: Gen[TSDatasetSearchInfo] = for {
-    topmostSameAs <- datasetTopmostSameAs
-    links         <- linkObjectsGen(topmostSameAs).toGeneratorOfList(max = 2)
-  } yield TSDatasetSearchInfo(topmostSameAs, links)
-
-  def tsDatasetSearchInfoObjects(withLinkTo: projects.ResourceId, and: projects.ResourceId*): Gen[TSDatasetSearchInfo] =
-    tsDatasetSearchInfoObjects.map { i =>
-      tsSearchInfoLinks.replace {
-        List.from(withLinkTo :: and.toList).map(linkProjectId.replace(_)(linkObjectsGen(i.topmostSameAs).generateOne))
-      }(i)
-    }
-
-  def tsDatasetSearchInfoObjects(withLinkTo:   entities.Project,
-                                 topSameAsGen: Gen[datasets.TopmostSameAs] = datasetTopmostSameAs
-  ): Gen[TSDatasetSearchInfo] =
-    tsDatasetSearchInfoObjects.map(_.copy(topmostSameAs = topSameAsGen.generateOne)).flatMap { si =>
-      linkObjectsGen(si.topmostSameAs)
-        .map(linkProjectId replace withLinkTo.resourceId)
-        .map(linkVisibility replace withLinkTo.visibility)
-        .map(link => tsSearchInfoLinks.replace(List(link))(si))
-    }
 
   lazy val calculatorInfoSets: Gen[CalculatorInfoSet] = for {
     project   <- anyRenkuProjectEntities(anyVisibility).map(_.to[entities.Project])

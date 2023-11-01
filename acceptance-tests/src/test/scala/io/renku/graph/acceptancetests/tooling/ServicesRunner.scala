@@ -47,18 +47,20 @@ class ServicesRunner(semaphore: Semaphore[IO])(implicit logger: Logger[IO]) {
 
   import scala.concurrent.duration._
 
-  def run(services: ServiceRun*)(implicit ioRuntime: IORuntime): IO[Unit] = for {
-    _ <- semaphore.acquire
-    _ <- whenNotStarted(services.toList) {
-           for {
-             _ <- services.toList.map(start).parSequence
-             _ <- Logger[IO].info("Waiting for the services to finish init tasks")
-             _ <- Temporal[IO].sleep(20 seconds)
-             _ <- Logger[IO].info("Waiting for the services to finish init tasks - done")
-           } yield ()
-         }
-    _ <- semaphore.release
-  } yield ()
+  def run(services: ServiceRun*)(implicit ioRuntime: IORuntime): IO[Unit] =
+    semaphore.tryPermit.use {
+      case false =>
+        new Exception("A permit to run services wasn't acquired").raiseError[IO, Unit]
+      case true =>
+        whenNotStarted(services.toList) {
+          for {
+            _ <- services.toList.map(start).parSequence
+            _ <- Logger[IO].info("Waiting for the services to finish init tasks")
+            _ <- Temporal[IO].sleep(5 seconds)
+            _ <- Logger[IO].info("Waiting for the services to finish init tasks - done")
+          } yield ()
+        }
+    }
 
   private def start(serviceRun: ServiceRun)(implicit ioRuntime: IORuntime): IO[Unit] = {
     import serviceRun._

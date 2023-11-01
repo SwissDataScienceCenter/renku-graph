@@ -16,10 +16,23 @@
  * limitations under the License.
  */
 
-package io.renku.triplesgenerator.events.consumers.membersync
+package io.renku.graph.acceptancetests.db
 
-import io.renku.graph.model.persons
+import cats.effect.IO
+import io.renku.db.DBConfigProvider
+import io.renku.triplesgenerator.{TgDB, TgDbConfigProvider}
+import org.typelevel.log4cats.Logger
 
-private final case class SyncSummary(membersAdded: Int, membersRemoved: Int)
+import scala.util.Try
 
-private final case class KGProjectMember(resourceId: persons.ResourceId, gitLabId: persons.GitLabId)
+object TriplesGenerator {
+
+  private val dbConfig: DBConfigProvider.DBConfig[TgDB] =
+    new TgDbConfigProvider[Try].get().fold(throw _, identity)
+
+  def startDB()(implicit logger: Logger[IO]): IO[Unit] = for {
+    _ <- PostgresDB.startPostgres
+    _ <- PostgresDB.initializeDatabase(dbConfig)
+    _ <- logger.info("triples_generator DB started")
+  } yield ()
+}

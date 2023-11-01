@@ -16,12 +16,17 @@
  * limitations under the License.
  */
 
-package io.renku.triplesgenerator.events.consumers.membersync
+package io.renku.entities.searchgraphs.datasets
 
-import io.renku.graph.model.testentities.Project
+import cats.Show
+import cats.syntax.all._
+import io.renku.graph.model.datasets
 
-private object PersonOps {
+private final case class TSDatasetSearchInfo(topmostSameAs: datasets.TopmostSameAs, links: List[Link])
 
-  implicit lazy val toKGProjectMember: Project.Member => Option[KGProjectMember] =
-    member => member.person.maybeGitLabId.map(gitLabId => KGProjectMember(member.person.resourceId, gitLabId))
+private object TSDatasetSearchInfo {
+
+  implicit lazy val show: Show[TSDatasetSearchInfo] = Show.show { case TSDatasetSearchInfo(topSameAs, links) =>
+    show"topmostSameAs = $topSameAs, links = [${links.mkString_("; ")}]"
+  }
 }
