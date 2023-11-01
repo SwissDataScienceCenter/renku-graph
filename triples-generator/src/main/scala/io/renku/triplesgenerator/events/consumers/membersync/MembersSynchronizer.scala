@@ -21,30 +21,26 @@ package io.renku.triplesgenerator.events.consumers.membersync
 import cats.MonadThrow
 import cats.effect.Async
 import cats.syntax.all._
+import io.renku.graph.config.RenkuUrlLoader
 import io.renku.graph.model.projects
 import io.renku.graph.tokenrepository.AccessTokenFinder
 import io.renku.http.client.{AccessToken, GitLabClient}
-import io.renku.logging.ExecutionTimeRecorder
-import io.renku.logging.ExecutionTimeRecorder.ElapsedTime
+import io.renku.projectauth.{ProjectAuthData, ProjectMember}
 import io.renku.triplesstore._
 import org.typelevel.log4cats.Logger
-
-import scala.util.control.NonFatal
 
 private trait MembersSynchronizer[F[_]] {
   def synchronizeMembers(slug: projects.Slug): F[Unit]
 }
 
 private class MembersSynchronizerImpl[F[_]: MonadThrow: AccessTokenFinder: Logger](
-    glMembersFinder:       GLProjectMembersFinder[F],
-    glVisibilityFinder:    GLProjectVisibilityFinder[F],
-    kgSynchronizer:        KGSynchronizer[F],
-    executionTimeRecorder: ExecutionTimeRecorder[F]
+    glMembersFinder:    GLProjectMembersFinder[F],
+    glVisibilityFinder: GLProjectVisibilityFinder[F],
+    projectAuthSync:    ProjectAuthSync[F]
 ) extends MembersSynchronizer[F] {
 
   private val accessTokenFinder: AccessTokenFinder[F] = AccessTokenFinder[F]
   import accessTokenFinder._
-  import executionTimeRecorder._
 
   override def synchronizeMembers(slug: projects.Slug): F[Unit] = {
     for {
@@ -52,34 +48,28 @@ private class MembersSynchronizerImpl[F[_]: MonadThrow: AccessTokenFinder: Logge
       implicit0(mat: Option[AccessToken]) <- findAccessToken(slug)
       membersInGL                         <- glMembersFinder.findProjectMembers(slug)
       maybeVisibility                     <- glVisibilityFinder.findVisibility(slug)
-      _ <- syncMembers(slug, kgSynchronizer.syncMembers(_, membersInGL, maybeVisibility))
+      _ <- maybeVisibility match {
+             case None      => projectAuthSync.removeAuthData(slug)
+             case Some(vis) => projectAuthSync.syncProject(ProjectAuthData(slug, toAuthMembers(membersInGL), vis))
+           }
+
     } yield ()
-  } recoverWith { case NonFatal(exception) =>
+  } handleErrorWith { exception =>
     Logger[F].error(exception)(s"$categoryName: Members synchronized for project $slug failed")
   }
 
-  private def syncMembers(slug: projects.Slug, sync: projects.Slug => F[SyncSummary]) =
-    measureExecutionTime(sync(slug)) >>= logSummary(slug)
-
-  private def logSummary(slug: projects.Slug): ((ElapsedTime, SyncSummary)) => F[Unit] = {
-    case (elapsedTime, SyncSummary(membersAdded, membersRemoved)) =>
-      Logger[F].info(
-        s"$categoryName: members for project: $slug synchronized in ${elapsedTime}ms: " +
-          s"$membersAdded member(s) added, $membersRemoved member(s) removed"
-      )
-  }
+  private lazy val toAuthMembers: Set[GitLabProjectMember] => Set[ProjectMember] =
+    _.map(_.toProjectAuthMember)
 }
 
 private object MembersSynchronizer {
   def apply[F[_]: Async: GitLabClient: AccessTokenFinder: Logger: SparqlQueryTimeRecorder](
       projectSparqlClient: ProjectSparqlClient[F]
   ): F[MembersSynchronizer[F]] =
-    for {
-      kgSynchronizer        <- KGSynchronizer[F](projectSparqlClient)
-      executionTimeRecorder <- ExecutionTimeRecorder[F](maybeHistogram = None)
-    } yield new MembersSynchronizerImpl[F](GLProjectMembersFinder[F],
-                                           GLProjectVisibilityFinder[F],
-                                           kgSynchronizer,
-                                           executionTimeRecorder
-    )
+    RenkuUrlLoader[F]().map { implicit ru =>
+      new MembersSynchronizerImpl[F](GLProjectMembersFinder[F],
+                                     GLProjectVisibilityFinder[F],
+                                     ProjectAuthSync[F](projectSparqlClient)
+      )
+    }
 }
