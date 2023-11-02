@@ -20,13 +20,13 @@ package io.renku.tinytypes.constraints
 
 import io.renku.tinytypes._
 
-import java.net.URL
+import java.net.URI
 import scala.language.implicitConversions
 import scala.util.Try
 
 trait Url[TT <: TinyType { type V = String }] extends Constraints[TT] {
   addConstraint(
-    check = url => Try(new URL(url)).isSuccess,
+    check = url => Try(new URI(url).toURL).isSuccess,
     message = (url: String) => s"Cannot instantiate $typeName with '$url'"
   )
 }
