@@ -23,6 +23,7 @@ import cats.MonadThrow
 import cats.effect.Async
 import cats.syntax.all._
 import com.typesafe.config.Config
+import io.renku.graph.triplesstore.DatasetTTLs.ProjectsTTL
 import io.renku.metrics.MetricsRegistry
 import io.renku.triplesstore.SparqlQueryTimeRecorder
 import org.typelevel.log4cats.Logger
@@ -33,24 +34,32 @@ private[tsmigrationrequest] object Migrations {
   def apply[F[_]: Async: ReProvisioningStatus: Logger: MetricsRegistry: SparqlQueryTimeRecorder](
       config: Config
   ): F[List[Migration[F]]] = for {
-    datasetsCreator                <- DatasetsCreator[F]
-    datasetsRemover                <- DatasetsRemover[F]
-    reProvisioning                 <- ReProvisioning[F](config)
-    removeNotLinkedPersons         <- RemoveNotLinkedPersons[F]
-    fixMultipleProjectCreatedDates <- FixMultipleProjectCreatedDates[F]
-    addRenkuPlanWhereMissing       <- AddRenkuPlanWhereMissing[F]
-    migrationToV10                 <- v10migration.MigrationToV10[F]
-    v10VersionSetter               <- V10VersionUpdater[F]
-    projectsDateViewedCreator      <- ProjectsDateViewedCreator[F]
-    projectDateViewedDeduplicator  <- ProjectDateViewedDeduplicator[F]
-    personViewedEntityDeduplicator <- PersonViewedEntityDeduplicator[F]
-    provisionProjectsGraph         <- projectsgraph.ProvisionProjectsGraph[F]
-    addProjectDateModified         <- datemodified.AddProjectDateModified[F]
-    fixMultipleProjectVersions     <- FixMultipleProjectVersions[F]
-    addProjectSlug                 <- projectslug.AddProjectSlug[F]
-    datasetsGraphPersonRemover     <- DatasetsGraphPersonRemover[F]
-    projectsGraphPersonRemover     <- ProjectsGraphPersonRemover[F]
-    reindexLuceneStdTokenizer      <- lucenereindex.ReindexLucene[F](suffix = "- std tokenizer")
+    datasetsCreator                     <- DatasetsCreator[F]
+    datasetsRemover                     <- DatasetsRemover[F]
+    reProvisioning                      <- ReProvisioning[F](config)
+    removeNotLinkedPersons              <- RemoveNotLinkedPersons[F]
+    fixMultipleProjectCreatedDates      <- FixMultipleProjectCreatedDates[F]
+    addRenkuPlanWhereMissing            <- AddRenkuPlanWhereMissing[F]
+    migrationToV10                      <- v10migration.MigrationToV10[F]
+    v10VersionSetter                    <- V10VersionUpdater[F]
+    projectsDateViewedCreator           <- ProjectsDateViewedCreator[F]
+    projectDateViewedDeduplicator       <- ProjectDateViewedDeduplicator[F]
+    personViewedEntityDeduplicator      <- PersonViewedEntityDeduplicator[F]
+    provisionProjectsGraph              <- projectsgraph.ProvisionProjectsGraph[F]
+    addProjectDateModified              <- datemodified.AddProjectDateModified[F]
+    fixMultipleProjectVersions          <- FixMultipleProjectVersions[F]
+    addProjectSlug                      <- projectslug.AddProjectSlug[F]
+    datasetsGraphPersonRemover          <- DatasetsGraphPersonRemover[F]
+    projectsGraphPersonRemover          <- ProjectsGraphPersonRemover[F]
+    reindexLuceneStdTokenizer           <- lucenereindex.ReindexLucene[F](suffix = "- std tokenizer")
+    projectsDSRecreatorSearchFlattening <- TSDatasetRecreator[F, ProjectsTTL]("- search flattening", ProjectsTTL)
+    projectsGraphKeywordsFlattener      <- ProjectsGraphKeywordsFlattener[F]
+    projectsGraphImagesFlattener        <- ProjectsGraphImagesFlattener[F]
+    datasetsGraphKeywordsFlattener      <- DatasetsGraphKeywordsFlattener[F]
+    datasetsGraphImagesFlattener        <- DatasetsGraphImagesFlattener[F]
+    datasetsGraphCreatorsFlattener      <- DatasetsGraphCreatorsFlattener[F]
+    datasetsGraphSlugsVisibsFlattener   <- DatasetsGraphSlugsVisibilitiesFlattener[F]
+    projectMembersRemover               <- ProjectMembersRemover[F]
     migrations <- validateNames(
                     datasetsCreator,
                     datasetsRemover,
@@ -69,7 +78,15 @@ private[tsmigrationrequest] object Migrations {
                     addProjectSlug,
                     datasetsGraphPersonRemover,
                     projectsGraphPersonRemover,
-                    reindexLuceneStdTokenizer
+                    reindexLuceneStdTokenizer,
+                    projectsDSRecreatorSearchFlattening,
+                    projectsGraphKeywordsFlattener,
+                    projectsGraphImagesFlattener,
+                    datasetsGraphKeywordsFlattener,
+                    datasetsGraphImagesFlattener,
+                    datasetsGraphCreatorsFlattener,
+                    datasetsGraphSlugsVisibsFlattener,
+                    projectMembersRemover
                   )
   } yield migrations
 

@@ -16,10 +16,13 @@
  * limitations under the License.
  */
 
-package io.renku.entities.searchgraphs.projects
+package io.renku.entities.searchgraphs
+package projects
 package commands
 
 import Generators._
+import ProjectSearchInfoOntology._
+import cats.syntax.all._
 import io.renku.generators.Generators.Implicits._
 import io.renku.generators.Generators.positiveInts
 import io.renku.generators.jsonld.JsonLDGenerators.entityIds
@@ -32,8 +35,9 @@ import io.renku.triplesstore.client.model.Quad
 import io.renku.triplesstore.client.syntax._
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
+import org.scalatestplus.scalacheck.ScalaCheckPropertyChecks
 
-class EncodersSpec extends AnyWordSpec with should.Matchers {
+class EncodersSpec extends AnyWordSpec with should.Matchers with ScalaCheckPropertyChecks {
 
   import Encoders._
 
@@ -61,44 +65,62 @@ class EncodersSpec extends AnyWordSpec with should.Matchers {
 
     "turn a SearchInfo object into a Set of relevant Quads" in {
 
-      val searchInfo = projectSearchInfoObjects.generateOne
-
-      searchInfo.asQuads shouldBe Set(
-        ProjectsQuad(searchInfo.id, rdf / "type", renku / "DiscoverableProject"),
-        ProjectsQuad(searchInfo.id, ProjectSearchInfoOntology.nameProperty.id, searchInfo.name.asObject),
-        ProjectsQuad(searchInfo.id, ProjectSearchInfoOntology.slugProperty.id, searchInfo.slug.asObject),
-        ProjectsQuad(searchInfo.id, ProjectSearchInfoOntology.pathProperty.id, searchInfo.slug.asObject),
-        ProjectsQuad(searchInfo.id, ProjectSearchInfoOntology.visibilityProperty.id, searchInfo.visibility.asObject),
-        ProjectsQuad(searchInfo.id, ProjectSearchInfoOntology.dateCreatedProperty.id, searchInfo.dateCreated.asObject),
-        ProjectsQuad(searchInfo.id, ProjectSearchInfoOntology.dateModifiedProperty.id, searchInfo.dateModified.asObject)
-      ) ++
-        creatorToQuads(searchInfo) ++
-        keywordsToQuads(searchInfo) ++
-        maybeDescToQuad(searchInfo) ++
-        imagesToQuads(searchInfo)
+      forAll(projectSearchInfoObjects) { searchInfo =>
+        searchInfo.asQuads shouldBe Set(
+          ProjectsQuad(searchInfo.id, rdf / "type", renku / "DiscoverableProject"),
+          ProjectsQuad(searchInfo.id, nameProperty.id, searchInfo.name.asObject),
+          ProjectsQuad(searchInfo.id, slugProperty.id, searchInfo.slug.asObject),
+          ProjectsQuad(searchInfo.id, pathProperty.id, searchInfo.slug.asObject),
+          ProjectsQuad(searchInfo.id, visibilityProperty.id, searchInfo.visibility.asObject),
+          ProjectsQuad(searchInfo.id, dateCreatedProperty.id, searchInfo.dateCreated.asObject),
+          ProjectsQuad(searchInfo.id, dateModifiedProperty.id, searchInfo.dateModified.asObject)
+        ) ++
+          creatorToQuads(searchInfo) ++
+          keywordsToQuads(searchInfo) ++
+          maybeDescToQuad(searchInfo) ++
+          maybeKeywordsConcatToQuad(searchInfo).toSet ++
+          maybeImagesConcatToQuad(searchInfo).toSet ++
+          imagesToQuads(searchInfo)
+      }
     }
+
   }
 
   private def creatorToQuads(searchInfo: ProjectSearchInfo): Set[Quad] =
     searchInfo.maybeCreator.toSet.map { (resourceId: persons.ResourceId) =>
-      ProjectsQuad(searchInfo.id, ProjectSearchInfoOntology.creatorProperty, resourceId.asEntityId)
+      ProjectsQuad(searchInfo.id, creatorProperty, resourceId.asEntityId)
     }
 
   private def keywordsToQuads(searchInfo: ProjectSearchInfo): Set[Quad] =
     searchInfo.keywords
-      .map(k => ProjectsQuad(searchInfo.id, ProjectSearchInfoOntology.keywordsProperty.id, k.asObject))
+      .map(k => ProjectsQuad(searchInfo.id, keywordsProperty.id, k.asObject))
       .toSet
 
   private def maybeDescToQuad(searchInfo: ProjectSearchInfo): Set[Quad] = searchInfo.maybeDescription.toSet.map {
     (d: projects.Description) =>
-      ProjectsQuad(searchInfo.id, ProjectSearchInfoOntology.descriptionProperty.id, d.asObject)
+      ProjectsQuad(searchInfo.id, descriptionProperty.id, d.asObject)
   }
+
+  private def maybeKeywordsConcatToQuad(searchInfo: ProjectSearchInfo): Option[Quad] =
+    searchInfo.keywords match {
+      case Nil => Option.empty[Quad]
+      case k =>
+        ProjectsQuad(searchInfo.id, keywordsConcatProperty.id, k.mkString(concatSeparator.toString).asTripleObject).some
+    }
+
+  private def maybeImagesConcatToQuad(searchInfo: ProjectSearchInfo): Option[Quad] =
+    searchInfo.images match {
+      case Nil => Option.empty[Quad]
+      case images =>
+        ProjectsQuad(searchInfo.id,
+                     imagesConcatProperty.id,
+                     images.map(i => s"${i.position}:${i.uri}").mkString(concatSeparator.toString).asTripleObject
+        ).some
+    }
 
   private def imagesToQuads(searchInfo: ProjectSearchInfo): Set[Quad] =
     searchInfo.images
-      .map(i =>
-        i.asQuads + ProjectsQuad(searchInfo.id, ProjectSearchInfoOntology.imageProperty, i.resourceId.asEntityId)
-      )
+      .map(i => i.asQuads + ProjectsQuad(searchInfo.id, imageProperty, i.resourceId.asEntityId))
       .toSet
       .flatten
 }

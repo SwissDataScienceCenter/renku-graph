@@ -16,10 +16,17 @@
  * limitations under the License.
  */
 
-package io.renku.triplesgenerator.events.consumers.membersync
+package io.renku.entities.searchgraphs.datasets
 
-import io.renku.graph.model.persons
+import cats.Show
+import cats.syntax.all._
+import io.renku.graph.model.datasets
 
-private final case class SyncSummary(membersAdded: Int, membersRemoved: Int)
+private final case class TSDatasetSearchInfo(topmostSameAs: datasets.TopmostSameAs, links: List[Link])
 
-private final case class KGProjectMember(resourceId: persons.ResourceId, gitLabId: persons.GitLabId)
+private object TSDatasetSearchInfo {
+
+  implicit lazy val show: Show[TSDatasetSearchInfo] = Show.show { case TSDatasetSearchInfo(topSameAs, links) =>
+    show"topmostSameAs = $topSameAs, links = [${links.mkString_("; ")}]"
+  }
+}

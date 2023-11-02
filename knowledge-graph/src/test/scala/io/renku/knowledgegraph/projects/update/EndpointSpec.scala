@@ -60,7 +60,7 @@ class EndpointSpec extends AsyncFlatSpec with CustomAsyncIOSpec with should.Matc
 
     val authUser = authUsers.generateOne
     val slug     = projectSlugs.generateOne
-    val updates  = projectUpdatesGen.generateOne
+    val updates  = projectUpdatesGen.suchThat(_ != ProjectUpdates.empty).generateOne
 
     givenUpdatingProject(slug, updates, authUser, returning = ().pure[IO])
 

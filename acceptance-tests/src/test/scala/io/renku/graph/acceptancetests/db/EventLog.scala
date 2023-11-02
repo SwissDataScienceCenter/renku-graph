@@ -74,6 +74,21 @@ object EventLog extends TypeSerializers {
   def findSyncEvents(projectId: GitLabId)(implicit ioRuntime: IORuntime): List[CategoryName] =
     findSyncEventsIO(projectId).unsafeRunSync()
 
+  def findTSMigrationsStatus: IO[Option[MigrationStatus]] = {
+
+    val query: Query[Void, MigrationStatus] =
+      sql"""SELECT status
+            FROM ts_migration
+            ORDER BY change_date DESC
+            LIMIT 1"""
+        .query(varchar)
+        .map(MigrationStatus.apply _)
+
+    sessionResource.flatMap(_.session).use { session =>
+      session.prepare(query).flatMap(_.option(Void))
+    }
+  }
+
   def forceCategoryEventTriggering(categoryName: CategoryName, projectId: projects.GitLabId)(implicit
       ioRuntime: IORuntime
   ): Unit = execute { session =>

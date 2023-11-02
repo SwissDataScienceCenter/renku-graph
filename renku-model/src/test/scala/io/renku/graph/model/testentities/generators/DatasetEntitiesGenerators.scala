@@ -337,6 +337,9 @@ trait DatasetEntitiesGenerators {
   def replaceDSKeywords[P <: Dataset.Provenance](to: List[datasets.Keyword]): Dataset[P] => Dataset[P] =
     additionalInfoLens[P].modify(_.copy(keywords = to))
 
+  def replaceDSImages[P <: Dataset.Provenance](to: List[images.ImageUri]): Dataset[P] => Dataset[P] =
+    additionalInfoLens[P].modify(_.copy(images = to))
+
   def replaceDSDesc[P <: Dataset.Provenance](to: Option[datasets.Description]): Dataset[P] => Dataset[P] =
     additionalInfoLens[P].modify(_.copy(maybeDescription = to))
 

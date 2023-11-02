@@ -25,10 +25,9 @@ import io.renku.generators.CommonGraphGenerators.serviceVersions
 import io.renku.generators.Generators.Implicits._
 import io.renku.generators.Generators._
 import io.renku.testtools.IOSpec
-import org.http4s.EntityDecoder
 import org.http4s.MediaType.application
 import org.http4s.Status.Ok
-import org.http4s.circe.jsonOf
+import org.http4s.circe.CirceEntityDecoder._
 import org.http4s.headers.`Content-Type`
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
@@ -38,6 +37,7 @@ class EndpointSpec extends AnyWordSpec with should.Matchers with IOSpec {
   "/GET version" should {
 
     "return OK with json object containing service name and version" in new TestCase {
+
       val response = endpoint.`GET /version`.unsafeRunSync()
 
       response.status                                            shouldBe Ok
@@ -52,15 +52,11 @@ class EndpointSpec extends AnyWordSpec with should.Matchers with IOSpec {
     val endpoint       = new EndpointImpl[IO](serviceName, serviceVersion)
   }
 
-  private implicit lazy val entityDecoder: EntityDecoder[IO, (ServiceName, ServiceVersion)] = {
-    implicit val decoder: Decoder[(ServiceName, ServiceVersion)] = Decoder.instance { cursor =>
-      for {
-        serviceName    <- cursor.downField("name").as[String].map(ServiceName(_))
-        firstVersion   <- cursor.downField("versions").as[List[Json]].map(_.head)
-        serviceVersion <- firstVersion.hcursor.downField("version").as[String].map(ServiceVersion(_))
-      } yield serviceName -> serviceVersion
-    }
-
-    jsonOf[IO, (ServiceName, ServiceVersion)]
+  private implicit val decoder: Decoder[(ServiceName, ServiceVersion)] = Decoder.instance { cursor =>
+    for {
+      serviceName    <- cursor.downField("name").as[String].map(ServiceName(_))
+      firstVersion   <- cursor.downField("versions").as[List[Json]].map(_.head)
+      serviceVersion <- firstVersion.hcursor.downField("version").as[String].map(ServiceVersion(_))
+    } yield serviceName -> serviceVersion
   }
 }

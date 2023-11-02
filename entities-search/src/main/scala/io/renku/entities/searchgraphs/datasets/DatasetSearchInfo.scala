@@ -22,110 +22,54 @@ import cats.Show
 import cats.data.NonEmptyList
 import cats.syntax.all._
 import io.renku.graph.model.images.Image
-import io.renku.graph.model.{datasets, persons, projects}
+import io.renku.graph.model.{datasets, projects}
 
 private final case class DatasetSearchInfo(topmostSameAs:      datasets.TopmostSameAs,
                                            name:               datasets.Name,
-                                           visibility:         projects.Visibility,
                                            createdOrPublished: datasets.CreatedOrPublished,
                                            maybeDateModified:  Option[datasets.DateModified],
-                                           creators:           NonEmptyList[persons.ResourceId],
+                                           creators:           NonEmptyList[Creator],
                                            keywords:           List[datasets.Keyword],
                                            maybeDescription:   Option[datasets.Description],
                                            images:             List[Image],
                                            links:              NonEmptyList[Link]
 ) {
-  def findLink(projectId: projects.ResourceId): Option[Link] =
-    links.find(_.projectId == projectId)
+  val visibility: projects.Visibility = links.map(_.visibility).maximum
 }
 
 private object DatasetSearchInfo {
 
   implicit val show: Show[DatasetSearchInfo] = Show.show {
-    case DatasetSearchInfo(topSameAs,
-                           name,
-                           visibility,
-                           createdOrPublished,
-                           maybeDateModified,
-                           creators,
-                           keywords,
-                           maybeDescription,
-                           images,
-                           links
+    case info @ DatasetSearchInfo(topSameAs,
+                                  name,
+                                  createdOrPublished,
+                                  maybeDateModified,
+                                  creators,
+                                  keywords,
+                                  maybeDescription,
+                                  images,
+                                  links
         ) =>
       List(
         show"topmostSameAs = $topSameAs".some,
         show"name = $name".some,
-        show"visibility = $visibility".some,
+        show"visibility = ${info.visibility}".some,
         createdOrPublished match {
           case d: datasets.DateCreated   => show"dateCreated = $d".some
           case d: datasets.DatePublished => show"datePublished = $d".some
         },
         maybeDateModified.map(d => show"dateModified = $d"),
-        show"creators = [${creators.map(_.show).intercalate("; ")}}]".some,
+        show"creators = [${creators.mkString_("; ")}]".some,
         keywords match {
           case Nil => None
-          case k   => show"keywords = [${k.mkString(", ")}]".some
+          case k   => show"keywords = [${k.mkString("; ")}]".some
         },
         maybeDescription.map(d => show"description = $d"),
         images match {
           case Nil => None
-          case i   => show"images = [${i.sortBy(_.position).map(i => show"${i.uri.value}").mkString(", ")}]".some
+          case i   => show"images = [${i.sortBy(_.position).map(_.uri).mkString_("; ")}]".some
         },
-        show"links = [${links.map(_.show).intercalate("; ")}}]".some
+        show"links = [${links.mkString_("; ")}]".some
       ).flatten.mkString(", ")
-  }
-}
-
-private sealed trait Link {
-  val resourceId: links.ResourceId
-  val datasetId:  datasets.ResourceId
-  val projectId:  projects.ResourceId
-}
-private object Link {
-  def apply(topmostSameAs: datasets.TopmostSameAs,
-            datasetId:     datasets.ResourceId,
-            projectId:     projects.ResourceId,
-            projectSlug:   projects.Slug
-  ): Link =
-    if (topmostSameAs.value == datasetId.value)
-      OriginalDataset(links.ResourceId.from(topmostSameAs, projectSlug), datasetId, projectId)
-    else
-      ImportedDataset(links.ResourceId.from(topmostSameAs, projectSlug), datasetId, projectId)
-
-  def apply(linkId: links.ResourceId, datasetId: datasets.ResourceId, projectId: projects.ResourceId): Link =
-    if (linkId.value startsWith datasetId.value)
-      OriginalDataset(linkId, datasetId, projectId)
-    else
-      ImportedDataset(linkId, datasetId, projectId)
-
-  final case class OriginalDataset(resourceId: links.ResourceId,
-                                   datasetId:  datasets.ResourceId,
-                                   projectId:  projects.ResourceId
-  ) extends Link
-  final case class ImportedDataset(resourceId: links.ResourceId,
-                                   datasetId:  datasets.ResourceId,
-                                   projectId:  projects.ResourceId
-  ) extends Link
-
-  implicit lazy val show: Show[Link] = Show.show { link =>
-    show"id = ${link.resourceId}, projectId = ${link.projectId}, datasetId = ${link.datasetId}"
-  }
-}
-
-private object links {
-  import io.renku.graph.model.views.EntityIdJsonLDOps
-  import io.renku.tinytypes.constraints.{Url => UrlConstraint}
-  import io.renku.tinytypes.{StringTinyType, TinyTypeFactory}
-
-  class ResourceId private (val value: String) extends AnyVal with StringTinyType
-  implicit object ResourceId
-      extends TinyTypeFactory[ResourceId](new ResourceId(_))
-      with UrlConstraint[ResourceId]
-      with EntityIdJsonLDOps[ResourceId] {
-
-    def from(topmostSameAs: datasets.TopmostSameAs, projectSlug: projects.Slug): ResourceId = ResourceId(
-      (topmostSameAs / projectSlug).value
-    )
   }
 }

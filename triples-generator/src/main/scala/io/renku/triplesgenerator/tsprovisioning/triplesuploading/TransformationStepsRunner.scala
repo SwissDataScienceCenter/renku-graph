@@ -23,8 +23,9 @@ import cats.MonadThrow
 import cats.data.EitherT
 import cats.effect.Async
 import cats.syntax.all._
-import io.renku.graph.model.RenkuUrl
+import io.renku.graph.model.{RenkuUrl, datasets}
 import io.renku.graph.model.entities.Project
+import io.renku.lock.Lock
 import io.renku.projectauth.{ProjectAuthData, ProjectMember}
 import io.renku.triplesgenerator.errors.ProcessingRecoverableError
 import io.renku.triplesgenerator.events.consumers.membersync.ProjectAuthSync
@@ -117,11 +118,11 @@ private class TransformationStepsRunnerImpl[F[_]: MonadThrow](
 
 private[tsprovisioning] object TransformationStepsRunner {
 
-  def apply[F[_]: Async: Logger: SparqlQueryTimeRecorder](
-      projectSparqlClient: ProjectSparqlClient[F]
+  def apply[F[_]: Async: Logger: SparqlQueryTimeRecorder](topSameAsLock:       Lock[F, datasets.TopmostSameAs],
+                                                          projectSparqlClient: ProjectSparqlClient[F]
   )(implicit renkuUrl: RenkuUrl): F[TransformationStepsRunner[F]] = for {
     resultsUploader         <- TransformationResultsUploader[F]
-    searchGraphsProvisioner <- SearchGraphsProvisioner.default[F]
+    searchGraphsProvisioner <- SearchGraphsProvisioner.default[F](topSameAsLock)
     projectAuthSync = ProjectAuthSync(projectSparqlClient)
   } yield new TransformationStepsRunnerImpl[F](resultsUploader, searchGraphsProvisioner, projectAuthSync)
 }

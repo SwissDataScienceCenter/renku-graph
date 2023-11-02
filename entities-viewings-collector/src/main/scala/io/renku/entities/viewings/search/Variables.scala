@@ -22,6 +22,7 @@ import cats.syntax.all._
 import io.circe.{Decoder, DecodingFailure}
 import io.renku.entities.search.DecodingTools.{toListOf, toListOfImageUris}
 import io.renku.entities.search.model.{MatchingScore, Entity => SearchEntity}
+import io.renku.entities.searchgraphs.concatSeparator
 import io.renku.graph.model.{datasets, persons, projects}
 import io.renku.tinytypes.json.TinyTypeDecoders._
 import io.renku.triplesstore.ResultsDecoder.read
@@ -82,11 +83,11 @@ object Variables {
           Either.fromOption(maybeDateModified.orElse(maybeDateCreated.orElse(maybeDatePublished)),
                             ifNone = DecodingFailure("No dataset date", Nil)
           )
-        creators <- read[Option[String]](creatorNames) >>= toListOf[persons.Name, persons.Name.type](persons.Name)
+        creators <- read[Option[String]](creatorNames) >>= toListOf[persons.Name, persons.Name.type](concatSeparator)
         keywords <-
-          read[Option[String]](keywords) >>= toListOf[datasets.Keyword, datasets.Keyword.type](datasets.Keyword)
+          read[Option[String]](keywords) >>= toListOf[datasets.Keyword, datasets.Keyword.type](concatSeparator)
         maybeDesc <- read[Option[datasets.Description]](description)
-        images    <- read[Option[String]](images) >>= toListOfImageUris
+        images    <- read[Option[String]](images) >>= toListOfImageUris(concatSeparator)
       } yield SearchEntity.Dataset(
         matchingScore,
         sameAs,
@@ -143,9 +144,9 @@ object Variables {
         dateModified     <- read[projects.DateModified](dateModified)
         maybeCreatorName <- read[Option[persons.Name]](creatorNames)
         keywords <-
-          read[Option[String]](keywords) >>= toListOf[projects.Keyword, projects.Keyword.type](projects.Keyword)
+          read[Option[String]](keywords) >>= toListOf[projects.Keyword, projects.Keyword.type](concatSeparator)
         maybeDescription <- read[Option[projects.Description]](description)
-        images           <- read[Option[String]](images) >>= toListOfImageUris
+        images           <- read[Option[String]](images) >>= toListOfImageUris(concatSeparator)
       } yield SearchEntity.Project(
         matchingScore,
         slug,

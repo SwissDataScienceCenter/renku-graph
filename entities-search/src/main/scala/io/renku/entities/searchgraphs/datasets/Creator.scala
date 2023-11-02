@@ -16,12 +16,20 @@
  * limitations under the License.
  */
 
-package io.renku.triplesgenerator.events.consumers.membersync
+package io.renku.entities.searchgraphs.datasets
 
-import io.renku.graph.model.testentities.Project
+import cats.Show
+import cats.syntax.all._
+import io.renku.graph.model.{entities, persons}
 
-private object PersonOps {
+private final case class Creator(resourceId: persons.ResourceId, name: persons.Name)
 
-  implicit lazy val toKGProjectMember: Project.Member => Option[KGProjectMember] =
-    member => member.person.maybeGitLabId.map(gitLabId => KGProjectMember(member.person.resourceId, gitLabId))
+private object Creator {
+
+  def from(person: entities.Person): Creator =
+    Creator(person.resourceId, person.name)
+
+  implicit lazy val show: Show[Creator] = Show.show { case Creator(id, name) =>
+    show"id = $id, name = $name"
+  }
 }

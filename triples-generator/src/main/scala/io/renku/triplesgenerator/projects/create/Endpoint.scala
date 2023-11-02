@@ -23,7 +23,8 @@ import cats.effect.Async
 import cats.syntax.all._
 import eu.timepit.refined.auto._
 import io.renku.data.Message
-import io.renku.graph.model.RenkuUrl
+import io.renku.graph.model.{RenkuUrl, datasets}
+import io.renku.lock.Lock
 import io.renku.triplesgenerator.TgDB.TsWriteLock
 import io.renku.triplesgenerator.api.NewProject
 import io.renku.triplesstore.{ProjectSparqlClient, SparqlQueryTimeRecorder}
@@ -39,9 +40,10 @@ trait Endpoint[F[_]] {
 object Endpoint {
   def apply[F[_]: Async: Logger: SparqlQueryTimeRecorder](
       tsWriteLock:         TsWriteLock[F],
+      topSameAsLock:       Lock[F, datasets.TopmostSameAs],
       projectSparqlClient: ProjectSparqlClient[F]
   )(implicit renkuUrl: RenkuUrl): F[Endpoint[F]] =
-    ProjectCreator[F](tsWriteLock, projectSparqlClient).map(new EndpointImpl[F](_))
+    ProjectCreator[F](tsWriteLock, topSameAsLock, projectSparqlClient).map(new EndpointImpl[F](_))
 }
 
 private class EndpointImpl[F[_]: Async: Logger](projectCreator: ProjectCreator[F])

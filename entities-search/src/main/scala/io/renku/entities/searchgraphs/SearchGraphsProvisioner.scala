@@ -23,7 +23,9 @@ import cats.effect.Async
 import cats.syntax.all._
 import io.renku.entities.searchgraphs.datasets.DatasetsGraphProvisioner
 import io.renku.entities.searchgraphs.projects.ProjectsGraphProvisioner
+import io.renku.graph.model.datasets
 import io.renku.graph.model.entities.Project
+import io.renku.lock.Lock
 import io.renku.triplesstore.{ProjectsConnectionConfig, SparqlQueryTimeRecorder}
 import org.typelevel.log4cats.Logger
 
@@ -32,11 +34,11 @@ trait SearchGraphsProvisioner[F[_]] {
 }
 
 object SearchGraphsProvisioner {
-  def apply[F[_]: Async: Logger: SparqlQueryTimeRecorder](
-      connectionConfig: ProjectsConnectionConfig
+  def apply[F[_]: Async: Logger: SparqlQueryTimeRecorder](lock:             Lock[F, datasets.TopmostSameAs],
+                                                          connectionConfig: ProjectsConnectionConfig
   ): SearchGraphsProvisioner[F] =
     new SearchGraphsProvisionerImpl(ProjectsGraphProvisioner[F](connectionConfig),
-                                    DatasetsGraphProvisioner[F](connectionConfig)
+                                    DatasetsGraphProvisioner[F](lock, connectionConfig)
     )
 }
 

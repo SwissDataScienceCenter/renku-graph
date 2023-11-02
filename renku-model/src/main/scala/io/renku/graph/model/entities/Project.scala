@@ -633,7 +633,6 @@ object Project {
           schema / "creator"          -> project.maybeCreator.asJsonLD,
           renku / "projectVisibility" -> project.visibility.asJsonLD,
           schema / "keywords"         -> project.keywords.asJsonLD,
-          schema / "member"           -> project.members.map(_.person).toList.asJsonLD,
           schema / "schemaVersion"    -> project.version.asJsonLD,
           renku / "hasActivity"       -> project.activities.asJsonLD,
           renku / "hasPlan"           -> project.plans.asJsonLD,
@@ -663,7 +662,6 @@ object Project {
           schema / "creator"          -> project.maybeCreator.asJsonLD,
           renku / "projectVisibility" -> project.visibility.asJsonLD,
           schema / "keywords"         -> project.keywords.asJsonLD,
-          schema / "member"           -> project.members.map(_.person).toList.asJsonLD,
           prov / "wasDerivedFrom"     -> maybeDerivedFrom.asJsonLD,
           schema / "image"            -> project.images.asJsonLD
         )
@@ -701,7 +699,6 @@ object Project {
         ObjectProperties(
           ObjectProperty(schema / "agent", Agent.ontology),
           ObjectProperty(creator, Person.Ontology.typeDef),
-          ObjectProperty(schema / "member", Person.Ontology.typeDef),
           ObjectProperty(renku / "hasActivity", Activity.ontology),
           ObjectProperty(renku / "hasPlan", Plan.ontology),
           ObjectProperty(renku / "hasDataset", Dataset.Ontology.typeDef),

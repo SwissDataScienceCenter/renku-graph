@@ -18,12 +18,13 @@
 
 package io.renku.entities.searchgraphs.datasets
 
-import cats.MonadThrow
 import cats.effect.Async
 import cats.syntax.all._
 import io.renku.entities.searchgraphs.UpdateCommandsUploader
 import io.renku.entities.searchgraphs.datasets.commands.UpdateCommandsProducer
+import io.renku.graph.model.datasets
 import io.renku.graph.model.entities.ProjectIdentification
+import io.renku.lock.Lock
 import io.renku.triplesstore.{ProjectsConnectionConfig, SparqlQueryTimeRecorder}
 import org.typelevel.log4cats.Logger
 
@@ -32,21 +33,30 @@ private[searchgraphs] trait DatasetsGraphCleaner[F[_]] {
 }
 
 private[searchgraphs] object DatasetsGraphCleaner {
-  def apply[F[_]: Async: Logger: SparqlQueryTimeRecorder](
-      connectionConfig: ProjectsConnectionConfig
+  def apply[F[_]: Async: Logger: SparqlQueryTimeRecorder](lock:             Lock[F, datasets.TopmostSameAs],
+                                                          connectionConfig: ProjectsConnectionConfig
   ): DatasetsGraphCleaner[F] = {
-    val updatesProducer    = UpdateCommandsProducer[F](connectionConfig)
-    val searchInfoUploader = UpdateCommandsUploader[F](connectionConfig)
-    new DatasetsGraphCleanerImpl[F](updatesProducer, searchInfoUploader)
+    val tsSearchInfoFetcher = TSSearchInfoFetcher[F](connectionConfig)
+    val updatesProducer     = UpdateCommandsProducer[F](connectionConfig)
+    val searchInfoUploader  = UpdateCommandsUploader[F](connectionConfig)
+    new DatasetsGraphCleanerImpl[F](tsSearchInfoFetcher, updatesProducer, searchInfoUploader, lock)
   }
 }
 
-private class DatasetsGraphCleanerImpl[F[_]: MonadThrow](updatesProducer: UpdateCommandsProducer[F],
-                                                         searchInfoUploader: UpdateCommandsUploader[F]
+private class DatasetsGraphCleanerImpl[F[_]: Async](tsSearchInfoFetcher: TSSearchInfoFetcher[F],
+                                                    updatesProducer:    UpdateCommandsProducer[F],
+                                                    searchInfoUploader: UpdateCommandsUploader[F],
+                                                    lock:               Lock[F, datasets.TopmostSameAs]
 ) extends DatasetsGraphCleaner[F] {
 
+  import tsSearchInfoFetcher.findTSInfosByProject
   import updatesProducer.toUpdateCommands
 
   override def cleanDatasetsGraph(project: ProjectIdentification): F[Unit] =
-    toUpdateCommands(project)(Nil) >>= searchInfoUploader.upload
+    findTSInfosByProject(project.resourceId).flatMap(_.map(update(project)).sequence).void
+
+  private def update(project: ProjectIdentification)(tsi: TSDatasetSearchInfo) =
+    lock
+      .run(tsi.topmostSameAs)
+      .use(_ => toUpdateCommands(project, tsi).flatMap(searchInfoUploader.upload))
 }
