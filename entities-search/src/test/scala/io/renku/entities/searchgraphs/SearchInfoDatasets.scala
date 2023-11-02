@@ -22,7 +22,8 @@ import cats.effect.IO
 import cats.syntax.all._
 import io.renku.graph.model.entities.EntityFunctions
 import io.renku.graph.model.projects.Role
-import io.renku.graph.model.{RenkuUrl, entities, testentities}
+import io.renku.graph.model.{RenkuUrl, datasets, entities, testentities}
+import io.renku.lock.Lock
 import io.renku.logging.{ExecutionTimeRecorder, TestExecutionTimeRecorder}
 import io.renku.projectauth.{ProjectAuthData, ProjectAuthService, ProjectMember}
 import io.renku.triplesstore._
@@ -81,6 +82,6 @@ trait SearchInfoDatasets {
     implicit val sparqlQueryTimeRecorder: SparqlQueryTimeRecorder[IO] =
       new SparqlQueryTimeRecorder[IO](execTimeRecorder)
 
-    IO(SearchGraphsProvisioner[IO](projectsDSConnectionInfo))
+    IO(SearchGraphsProvisioner[IO](Lock.none[IO, datasets.TopmostSameAs], projectsDSConnectionInfo))
   }
 }

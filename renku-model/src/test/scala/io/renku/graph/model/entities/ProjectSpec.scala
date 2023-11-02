@@ -1034,7 +1034,6 @@ class ProjectSpec
               schema / "creator"          -> project.maybeCreator.asJsonLD,
               renku / "projectVisibility" -> project.visibility.asJsonLD,
               schema / "keywords"         -> project.keywords.asJsonLD,
-              schema / "member"           -> project.members.map(_.person).toList.asJsonLD,
               schema / "schemaVersion"    -> project.version.asJsonLD,
               renku / "hasActivity"       -> project.activities.asJsonLD,
               renku / "hasPlan"           -> project.plans.asJsonLD,
@@ -1070,7 +1069,6 @@ class ProjectSpec
               schema / "creator"          -> project.maybeCreator.asJsonLD,
               renku / "projectVisibility" -> project.visibility.asJsonLD,
               schema / "keywords"         -> project.keywords.asJsonLD,
-              schema / "member"           -> project.members.map(_.person).toList.asJsonLD,
               prov / "wasDerivedFrom"     -> maybeParentId.map(_.asEntityId).asJsonLD,
               schema / "image"            -> project.images.asJsonLD
             )
@@ -1113,7 +1111,6 @@ class ProjectSpec
               schema / "creator"          -> project.maybeCreator.map(_.resourceId.asEntityId).asJsonLD,
               renku / "projectVisibility" -> project.visibility.asJsonLD,
               schema / "keywords"         -> project.keywords.asJsonLD,
-              schema / "member"           -> project.members.map(_.person.resourceId.asEntityId).toList.asJsonLD,
               schema / "schemaVersion"    -> project.version.asJsonLD,
               renku / "hasActivity"       -> project.activities.asJsonLD,
               renku / "hasPlan"           -> project.plans.asJsonLD,
@@ -1153,7 +1150,6 @@ class ProjectSpec
               schema / "creator"          -> project.maybeCreator.map(_.resourceId.asEntityId).asJsonLD,
               renku / "projectVisibility" -> project.visibility.asJsonLD,
               schema / "keywords"         -> project.keywords.asJsonLD,
-              schema / "member"           -> project.members.map(_.person.resourceId.asEntityId).toList.asJsonLD,
               prov / "wasDerivedFrom"     -> maybeParentId.map(_.asEntityId).asJsonLD,
               schema / "image"            -> project.images.asJsonLD
             )
@@ -1197,7 +1193,6 @@ class ProjectSpec
               schema / "creator"          -> project.maybeCreator.map(_.resourceId.asEntityId).asJsonLD,
               renku / "projectVisibility" -> project.visibility.asJsonLD,
               schema / "keywords"         -> project.keywords.asJsonLD,
-              schema / "member"           -> project.members.map(_.person.resourceId.asEntityId).toList.asJsonLD,
               prov / "wasDerivedFrom"     -> maybeParentId.map(_.asEntityId).asJsonLD
             )
           )

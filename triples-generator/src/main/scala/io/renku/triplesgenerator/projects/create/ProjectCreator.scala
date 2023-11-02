@@ -21,7 +21,8 @@ package io.renku.triplesgenerator.projects.create
 import cats.effect.Async
 import cats.effect.kernel.MonadCancelThrow
 import cats.syntax.all._
-import io.renku.graph.model.RenkuUrl
+import io.renku.graph.model.{RenkuUrl, datasets}
+import io.renku.lock.Lock
 import io.renku.triplesgenerator.TgDB.TsWriteLock
 import io.renku.triplesgenerator.api.NewProject
 import io.renku.triplesgenerator.projects.ProjectExistenceChecker
@@ -37,12 +38,13 @@ private trait ProjectCreator[F[_]] {
 private object ProjectCreator {
   def apply[F[_]: Async: Logger: SparqlQueryTimeRecorder](
       tsWriteLock:         TsWriteLock[F],
+      topSameAsLock:       Lock[F, datasets.TopmostSameAs],
       projectSparqlClient: ProjectSparqlClient[F]
   )(implicit renkuUrl: RenkuUrl): F[ProjectCreator[F]] =
     for {
       connectionConfig <- ProjectsConnectionConfig[F]()
       payloadConverter <- PayloadConverter[F]
-      tsProvisioner    <- TSProvisioner[F](projectSparqlClient)
+      tsProvisioner    <- TSProvisioner[F](topSameAsLock, projectSparqlClient)
     } yield new ProjectCreatorImpl[F](ProjectExistenceChecker[F](connectionConfig),
                                       payloadConverter,
                                       tsProvisioner,

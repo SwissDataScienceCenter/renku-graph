@@ -20,8 +20,9 @@ package io.renku.triplesgenerator.tsprovisioning
 
 import cats.effect.Async
 import cats.syntax.all._
-import io.renku.graph.model.RenkuUrl
+import io.renku.graph.model.{RenkuUrl, datasets}
 import io.renku.graph.model.entities.Project
+import io.renku.lock.Lock
 import io.renku.triplesstore.{ProjectSparqlClient, SparqlQueryTimeRecorder}
 import org.typelevel.log4cats.Logger
 import transformation.TransformationStepsCreator
@@ -33,9 +34,10 @@ trait TSProvisioner[F[_]] {
 
 object TSProvisioner {
   def apply[F[_]: Async: Logger: SparqlQueryTimeRecorder](
+      topSameAsLock:       Lock[F, datasets.TopmostSameAs],
       projectSparqlClient: ProjectSparqlClient[F]
   )(implicit renkuUrl: RenkuUrl): F[TSProvisioner[F]] =
-    (TransformationStepsCreator[F], TransformationStepsRunner[F](projectSparqlClient))
+    (TransformationStepsCreator[F], TransformationStepsRunner[F](topSameAsLock, projectSparqlClient))
       .mapN(new TSProvisionerImpl[F](_, _))
 }
 

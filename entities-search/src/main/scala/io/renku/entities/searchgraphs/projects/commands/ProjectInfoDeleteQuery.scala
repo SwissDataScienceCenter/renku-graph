@@ -27,6 +27,7 @@ import io.renku.triplesstore.SparqlQuery.Prefixes
 import io.renku.triplesstore.client.syntax._
 
 private[projects] object ProjectInfoDeleteQuery {
+
   def apply(projectId: projects.ResourceId): SparqlQuery =
     SparqlQuery.ofUnsafe(
       "delete project info",
@@ -34,7 +35,6 @@ private[projects] object ProjectInfoDeleteQuery {
       sparql"""|DELETE {
                |  GRAPH ${GraphClass.Projects.id} {
                |    ?imageId ?imagePred ?imageObj.
-               |    ?creatorId ?creatorPred ?creatorObj.
                |    ?projId ?projPred ?projObj.
                |  }
                |}
@@ -45,11 +45,6 @@ private[projects] object ProjectInfoDeleteQuery {
                |    OPTIONAL {
                |      ?projId schema:image ?imageId.
                |      ?imageId ?imagePred ?imageObj.
-               |    }
-               |
-               |    OPTIONAL {
-               |      ?projId schema:creator ?creatorId.
-               |      ?creatorId ?creatorPred ?creatorObj.
                |    }
                |
                |    ?projId ?projPred ?projObj.

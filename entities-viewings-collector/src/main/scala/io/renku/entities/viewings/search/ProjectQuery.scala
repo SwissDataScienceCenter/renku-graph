@@ -23,6 +23,7 @@ import io.renku.entities.viewings.search.RecentEntitiesFinder.{Criteria, EntityT
 import io.renku.graph.model.entities.Person
 import io.renku.graph.model.projects.Visibility
 import io.renku.graph.model.{GraphClass, Schemas}
+import io.renku.projectauth.ProjectAuth
 import io.renku.projectauth.util.SparqlSnippets
 import io.renku.triplesstore.SparqlQuery
 import io.renku.triplesstore.SparqlQuery.Prefixes
@@ -40,60 +41,56 @@ object ProjectQuery extends (Criteria => Option[SparqlQuery]) {
     SparqlQuery.of(
       name = "recent-entity projects",
       Prefixes.of(Schemas.prov -> "prov", Schemas.renku -> "renku", Schemas.schema -> "schema", Schemas.xsd -> "xsd"),
-      sparql"""|SELECT DISTINCT
-               |  ${v.all.dropRight(2)}
-               |  (GROUP_CONCAT(DISTINCT ?keyword; separator=',') AS ${v.keywords})
-               |  (GROUP_CONCAT(?encodedImageUrl; separator=',') AS ${v.images})
-               |  WHERE {
-               |    BIND (1.0 AS ${v.matchingScore})
-               |    BIND ('project' AS ${v.entityType})
+      sparql"""|SELECT DISTINCT ${v.all}
+               |WHERE {
+               |  BIND (1.0 AS ${v.matchingScore})
+               |  BIND ('project' AS ${v.entityType})
                |
-               |    graph ${GraphClass.PersonViewings.id} {
-               |      ?personId a renku:PersonViewing;
-               |                renku:viewedProject ?viewedProject.
+               |  GRAPH ${GraphClass.PersonViewings.id} {
+               |    ?personId a renku:PersonViewing;
+               |              renku:viewedProject ?viewedProject.
                |
-               |      ?viewedProject a renku:ViewedProject;
-               |                     renku:project ?projectId;
-               |                     renku:dateViewed ${v.viewedDate}
-               |    }
-               |    Graph ${GraphClass.Persons.id} {
-               |      ?personId a schema:Person;
-               |                schema:sameAs ?personSameAs.
-               |      ?personSameAs schema:additionalType ${Person.gitLabSameAsAdditionalType};
-               |                    schema:identifier ${criteria.authUser.id.value}.
-               |    }
+               |    ?viewedProject a renku:ViewedProject;
+               |                   renku:project ?projectId;
+               |                   renku:dateViewed ${v.viewedDate}
+               |  }
+               |  GRAPH ${GraphClass.Persons.id} {
+               |    ?personId a schema:Person;
+               |              schema:sameAs ?personSameAs.
+               |    ?personSameAs schema:additionalType ${Person.gitLabSameAsAdditionalType};
+               |                  schema:identifier ${criteria.authUser.id.value}.
+               |  }
                |
-               |    ${authSnippets.visibleProjects(Some(criteria.authUser.id), Visibility.all)}
+               |  ${authSnippets.visibleProjects(Some(criteria.authUser.id), Visibility.all)}
                |
-               |    Graph ?projectId {
-               |      ?projectId a schema:Project;
+               |  GRAPH ${ProjectAuth.graph} {
+               |    ?projectId renku:visibility ${v.visibility}
+               |  }
+               |
+               |  GRAPH ${GraphClass.Projects.id} {
+               |    ?projectId a renku:DiscoverableProject;
                |               schema:name ${v.projectName};
-               |               renku:projectPath ${v.projectSlug};
-               |               renku:projectVisibility ${v.visibility};
+               |               renku:slug ${v.projectSlug};
                |               schema:dateModified ${v.dateModified};
                |               schema:dateCreated ${v.dateCreated}.
                |
-               |      Optional {
-               |        ?projectId schema:creator ?creator.
-               |        Graph ${GraphClass.Persons.id} {
-               |          ?creator schema:name ${v.creatorNames}
-               |        }
-               |      }
-               |      Optional {
-               |        ?projectId schema:description ${v.description}
-               |      }
-               |      Optional {
-               |        ?projectId schema:keywords ?keyword
-               |      }
-               |      Optional {
-               |        ?projectId schema:image ?imageId.
-               |        ?imageId schema:position ?imagePosition;
-               |                 schema:contentUrl ?imageUrl.
-               |        BIND(CONCAT(STR(?imagePosition), STR(':'), STR(?imageUrl)) AS ?encodedImageUrl)
+               |    OPTIONAL {
+               |      ?projectId schema:creator ?creator.
+               |      GRAPH ${GraphClass.Persons.id} {
+               |        ?creator schema:name ${v.creatorNames}
                |      }
                |    }
+               |    OPTIONAL {
+               |      ?projectId schema:description ${v.description}
+               |    }
+               |    OPTIONAL {
+               |      ?projectId renku:keywordsConcat ${v.keywords}
+               |    }
+               |    OPTIONAL {
+               |      ?projectId renku:imagesConcat ${v.images}
+               |    }
                |  }
-               |  GROUP BY ${v.all.dropRight(2)}
+               |}
                |""".stripMargin
     )
 }

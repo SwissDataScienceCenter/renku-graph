@@ -18,96 +18,97 @@
 
 package io.renku.entities.searchgraphs.datasets
 
+import Generators._
+import cats.effect.IO
+import cats.effect.testing.scalatest.AsyncIOSpec
 import cats.syntax.all._
 import io.renku.entities.searchgraphs.Generators.updateCommands
 import io.renku.entities.searchgraphs.datasets.DatasetsCollector._
-import io.renku.entities.searchgraphs.datasets.SearchInfoExtractor._
+import io.renku.entities.searchgraphs.datasets.ModelSearchInfoExtractor._
 import io.renku.entities.searchgraphs.datasets.commands.UpdateCommandsProducer
 import io.renku.entities.searchgraphs.{UpdateCommand, UpdateCommandsUploader}
 import io.renku.generators.Generators.Implicits._
-import io.renku.generators.Generators.{exceptions, positiveInts}
-import io.renku.graph.model.entities
+import io.renku.generators.Generators.positiveInts
 import io.renku.graph.model.testentities._
-import org.scalamock.scalatest.MockFactory
-import org.scalatest.TryValues
+import io.renku.graph.model.{datasets, entities}
+import io.renku.lock.Lock
+import org.scalamock.scalatest.AsyncMockFactory
 import org.scalatest.matchers.should
-import org.scalatest.wordspec.AnyWordSpec
+import org.scalatest.wordspec.AsyncWordSpec
 
-import scala.util.Try
-
-class DatasetsGraphProvisionerSpec extends AnyWordSpec with should.Matchers with TryValues with MockFactory {
+class DatasetsGraphProvisionerSpec extends AsyncWordSpec with AsyncIOSpec with should.Matchers with AsyncMockFactory {
 
   "provisionDatasetsGraph" should {
 
     "collect all the Datasets that are the latest modifications and not invalidations, " +
-      "extract the Datasets graph relevant data " +
-      "produce TS update commands and " +
-      "push the commands into the TS" in new TestCase {
+      "extract the Datasets graph relevant data," +
+      "fetch from TS datasets for the project, " +
+      "produce TS update commands and push them to the TS for each found DS" in {
 
         val project = anyRenkuProjectEntities
-          .withDatasets(
-            List.fill(positiveInts(max = 5).generateOne.value)(datasetEntities(provenanceNonModified)): _*
-          )
+          .withDatasets(List.fill(positiveInts(max = 5).generateOne.value)(datasetEntities(provenanceNonModified)): _*)
           .generateOne
           .to[entities.Project]
 
-        val searchInfos = givenSearchInfoExtraction(project).success.value
+        for {
+          // updates for datasets found in model
+          modelSearchInfos <- givenSearchInfoExtraction(project)
+          _ = modelSearchInfos foreach { mi =>
+                val updates = updateCommands.generateList()
+                givenUpdatesProducing(project.identification, mi, returning = updates.pure[IO])
+                givenUploading(updates, returning = ().pure[IO])
+              }
 
-        val updates = updateCommands.generateList()
-        givenUpdatesProducing(project.identification, searchInfos, returning = updates.pure[Try])
+          // updates for datasets in TS
+          tsOnlyInfos = tsDatasetSearchInfoObjects(project).generateList(min = 1)
+          modelAndTSInfo =
+            tsDatasetSearchInfoObjects(project, project.datasets.head.provenance.topmostSameAs).generateOne
+          _ = givenTSSearchInfosForProject(project.identification, returning = (modelAndTSInfo :: tsOnlyInfos).pure[IO])
+          _ = tsOnlyInfos foreach { tsi =>
+                val updates = updateCommands.generateList()
+                givenUpdatesProducing(project.identification, tsi, returning = updates.pure[IO])
+                givenUploading(updates, returning = ().pure[IO])
+              }
 
-        givenUploading(updates, returning = ().pure[Try])
-
-        provisioner.provisionDatasetsGraph(project).success.value shouldBe ()
+          result <- provisioner.provisionDatasetsGraph(project).assertNoException
+        } yield result
       }
-
-    "fail if updates producing step fails" in new TestCase {
-
-      val project = anyRenkuProjectEntities.generateOne.to[entities.Project]
-
-      val searchInfos = givenSearchInfoExtraction(project).success.value
-
-      val failure = exceptions.generateOne.raiseError[Try, List[UpdateCommand]]
-      givenUpdatesProducing(project.identification, searchInfos, returning = failure)
-
-      provisioner.provisionDatasetsGraph(project) shouldBe failure
-    }
-
-    "fail if updates uploading fails" in new TestCase {
-
-      val project = anyRenkuProjectEntities.generateOne.to[entities.Project]
-
-      val searchInfos = givenSearchInfoExtraction(project).success.value
-
-      val updates = updateCommands.generateList()
-      givenUpdatesProducing(project.identification, searchInfos, returning = updates.pure[Try])
-
-      val failure = exceptions.generateOne.raiseError[Try, Unit]
-      givenUploading(updates, returning = failure)
-
-      provisioner.provisionDatasetsGraph(project) shouldBe failure
-    }
   }
 
-  private trait TestCase {
-    private val commandsProducer = mock[UpdateCommandsProducer[Try]]
-    private val commandsUploader = mock[UpdateCommandsUploader[Try]]
-    val provisioner              = new DatasetsGraphProvisionerImpl[Try](commandsProducer, commandsUploader)
+  private val topSameAsLock: Lock[IO, datasets.TopmostSameAs] = Lock.none[IO, datasets.TopmostSameAs]
+  private val commandsProducer    = mock[UpdateCommandsProducer[IO]]
+  private val commandsUploader    = mock[UpdateCommandsUploader[IO]]
+  private val tsSearchInfoFetcher = mock[TSSearchInfoFetcher[IO]]
+  private lazy val provisioner =
+    new DatasetsGraphProvisionerImpl[IO](tsSearchInfoFetcher, commandsProducer, commandsUploader, topSameAsLock)
 
-    def givenSearchInfoExtraction(project: entities.Project): Try[List[DatasetSearchInfo]] =
-      (collectLastVersions >>> extractSearchInfo[Try](project))(project)
+  private def givenSearchInfoExtraction(project: entities.Project): IO[List[ModelDatasetSearchInfo]] =
+    (collectLastVersions >>> extractModelSearchInfos[IO](project))(project)
 
-    def givenUpdatesProducing(project:     entities.ProjectIdentification,
-                              searchInfos: List[DatasetSearchInfo],
-                              returning:   Try[List[UpdateCommand]]
-    ) = (commandsProducer
-      .toUpdateCommands(_: entities.ProjectIdentification)(_: List[DatasetSearchInfo]))
-      .expects(project, searchInfos)
+  private def givenTSSearchInfosForProject(project:   entities.ProjectIdentification,
+                                           returning: IO[List[TSDatasetSearchInfo]]
+  ) = (tsSearchInfoFetcher.findTSInfosByProject _)
+    .expects(project.resourceId)
+    .returning(returning)
+
+  private def givenUpdatesProducing(project:    entities.ProjectIdentification,
+                                    searchInfo: ModelDatasetSearchInfo,
+                                    returning:  IO[List[UpdateCommand]]
+  ) = (commandsProducer
+    .toUpdateCommands(_: entities.ProjectIdentification, _: ModelDatasetSearchInfo))
+    .expects(project, searchInfo)
+    .returning(returning)
+
+  private def givenUpdatesProducing(project:    entities.ProjectIdentification,
+                                    searchInfo: TSDatasetSearchInfo,
+                                    returning:  IO[List[UpdateCommand]]
+  ) = (commandsProducer
+    .toUpdateCommands(_: entities.ProjectIdentification, _: TSDatasetSearchInfo))
+    .expects(project, searchInfo)
+    .returning(returning)
+
+  private def givenUploading(commands: List[UpdateCommand], returning: IO[Unit]) =
+    (commandsUploader.upload _)
+      .expects(commands)
       .returning(returning)
-
-    def givenUploading(commands: List[UpdateCommand], returning: Try[Unit]) =
-      (commandsUploader.upload _)
-        .expects(commands)
-        .returning(returning)
-  }
 }

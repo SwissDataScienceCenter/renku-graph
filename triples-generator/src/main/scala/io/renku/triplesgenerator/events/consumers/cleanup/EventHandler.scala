@@ -24,7 +24,8 @@ import eu.timepit.refined.auto._
 import io.renku.events.consumers.ProcessExecutor
 import io.renku.events.consumers.subscriptions.SubscriptionMechanism
 import io.renku.events.{CategoryName, consumers}
-import io.renku.graph.model.RenkuUrl
+import io.renku.graph.model.{RenkuUrl, datasets}
+import io.renku.lock.Lock
 import io.renku.metrics.MetricsRegistry
 import io.renku.lock.syntax._
 import io.renku.triplesgenerator.TgDB.TsWriteLock
@@ -59,10 +60,11 @@ private object EventHandler {
   def apply[F[_]: Async: ReProvisioningStatus: Logger: MetricsRegistry: SparqlQueryTimeRecorder](
       subscriptionMechanism: SubscriptionMechanism[F],
       tsWriteLock:           TsWriteLock[F],
+      topSameAsLock:         Lock[F, datasets.TopmostSameAs],
       projectSparqlClient:   ProjectSparqlClient[F]
   )(implicit renkuUrl: RenkuUrl): F[consumers.EventHandler[F]] = for {
     tsReadinessChecker <- TSReadinessForEventsChecker[F]
-    eventProcessor     <- EventProcessor[F](projectSparqlClient)
+    eventProcessor     <- EventProcessor[F](topSameAsLock, projectSparqlClient)
     processExecutor    <- ProcessExecutor.concurrent(processesCount = 1)
   } yield new EventHandler[F](
     categoryName,

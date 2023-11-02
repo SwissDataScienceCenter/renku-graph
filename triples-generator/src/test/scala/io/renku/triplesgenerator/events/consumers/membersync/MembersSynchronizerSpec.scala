@@ -31,7 +31,7 @@ import io.renku.graph.tokenrepository.AccessTokenFinder.Implicits.projectSlugToP
 import io.renku.http.client.AccessToken
 import io.renku.interpreters.TestLogger
 import io.renku.interpreters.TestLogger.Level.{Error, Info}
-import io.renku.logging.TestExecutionTimeRecorder
+import io.renku.projectauth.ProjectAuthData
 import io.renku.testtools.CustomAsyncIOSpec
 import org.scalamock.scalatest.AsyncMockFactory
 import org.scalatest.BeforeAndAfterEach
@@ -45,25 +45,42 @@ class MembersSynchronizerSpec
     with should.Matchers
     with BeforeAndAfterEach {
 
-  it should "pulls members and visibility from GitLab and sync the members in the TS" in {
+  it should "pulls members and visibility from GitLab and sync the Auth data " +
+    "when project visibility is found" in {
 
-    val projectSlug = projectSlugs.generateOne
+      val projectSlug = projectSlugs.generateOne
 
-    val maybeAccessToken = accessTokens.generateOption
-    givenAccessTokenFinding(projectSlug, returning = maybeAccessToken.pure[IO])
+      val maybeAccessToken = accessTokens.generateOption
+      givenAccessTokenFinding(projectSlug, returning = maybeAccessToken.pure[IO])
 
-    val membersInGitLab = gitLabProjectMembers.generateSet()
-    givenProjectMembersFinding(projectSlug, maybeAccessToken, returning = membersInGitLab.pure[IO])
+      val membersInGitLab = gitLabProjectMembers.generateSet()
+      givenProjectMembersFinding(projectSlug, maybeAccessToken, returning = membersInGitLab.pure[IO])
 
-    val maybeVisibility = projectVisibilities.generateOption
-    givenProjectVisibilityFinding(projectSlug, maybeAccessToken, returning = maybeVisibility.pure[IO])
+      val visibility = projectVisibilities.generateOne
+      givenProjectVisibilityFinding(projectSlug, maybeAccessToken, returning = visibility.some.pure[IO])
 
-    val syncSummary = syncSummaries.generateOne
-    givenMemberSynchro(projectSlug, membersInGitLab, maybeVisibility, returning = syncSummary.pure[IO])
+      givenAuthDataUpdating(projectSlug, membersInGitLab, visibility, returning = ().pure[IO])
 
-    synchronizer.synchronizeMembers(projectSlug).assertNoException >>
-      IO(logger.loggedOnly(Info(show"$categoryName: $projectSlug accepted"), infoMessage(projectSlug, syncSummary)))
-  }
+      synchronizer.synchronizeMembers(projectSlug).assertNoException
+    }
+
+  it should "pulls members and visibility from GitLab and remove the Auth data " +
+    "when project visibility is found" in {
+
+      val projectSlug = projectSlugs.generateOne
+
+      val maybeAccessToken = accessTokens.generateOption
+      givenAccessTokenFinding(projectSlug, returning = maybeAccessToken.pure[IO])
+
+      val membersInGitLab = gitLabProjectMembers.generateSet()
+      givenProjectMembersFinding(projectSlug, maybeAccessToken, returning = membersInGitLab.pure[IO])
+
+      givenProjectVisibilityFinding(projectSlug, maybeAccessToken, returning = None.pure[IO])
+
+      givenAuthDataRemoval(projectSlug, returning = ().pure[IO])
+
+      synchronizer.synchronizeMembers(projectSlug).assertNoException
+    }
 
   it should "recover with log statement if collaborator fails" in {
 
@@ -76,25 +93,19 @@ class MembersSynchronizerSpec
     givenProjectMembersFinding(projectSlug, maybeAccessToken, returning = exception.raiseError[IO, Nothing])
 
     synchronizer.synchronizeMembers(projectSlug).assertNoException >>
-      IO(logger.logged(Error(s"$categoryName: Members synchronized for project $projectSlug failed", exception)))
+      logger.loggedOnlyF(
+        Info(s"$categoryName: $projectSlug accepted"),
+        Error(s"$categoryName: Members synchronized for project $projectSlug failed", exception)
+      )
   }
 
   private implicit lazy val logger:       TestLogger[IO]        = TestLogger[IO]()
   private implicit val accessTokenFinder: AccessTokenFinder[IO] = mock[AccessTokenFinder[IO]]
   private val glProjectMembersFinder    = mock[GLProjectMembersFinder[IO]]
   private val glProjectVisibilityFinder = mock[GLProjectVisibilityFinder[IO]]
-  private val kgSynchronizer            = mock[KGSynchronizer[IO]]
-  private val executionTimeRecorder     = TestExecutionTimeRecorder[IO](maybeHistogram = None)
-  private lazy val synchronizer = new MembersSynchronizerImpl[IO](glProjectMembersFinder,
-                                                                  glProjectVisibilityFinder,
-                                                                  kgSynchronizer,
-                                                                  executionTimeRecorder
-  )
-
-  private def infoMessage(projectSlug: projects.Slug, syncSummary: SyncSummary) = Info(
-    s"$categoryName: members for project: $projectSlug synchronized in ${executionTimeRecorder.elapsedTime}ms: " +
-      s"${syncSummary.membersAdded} member(s) added, ${syncSummary.membersRemoved} member(s) removed"
-  )
+  private val projectAuthSync           = mock[ProjectAuthSync[IO]]
+  private lazy val synchronizer =
+    new MembersSynchronizerImpl[IO](glProjectMembersFinder, glProjectVisibilityFinder, projectAuthSync)
 
   private def givenAccessTokenFinding(projectSlug: projects.Slug, returning: IO[Option[AccessToken]]) =
     (accessTokenFinder
@@ -118,13 +129,18 @@ class MembersSynchronizerSpec
     .expects(projectSlug, mat)
     .returning(returning)
 
-  private def givenMemberSynchro(projectSlug:     projects.Slug,
-                                 membersInGL:     Set[GitLabProjectMember],
-                                 maybeVisibility: Option[projects.Visibility],
-                                 returning:       IO[SyncSummary]
-  ) = (kgSynchronizer.syncMembers _)
-    .expects(projectSlug, membersInGL, maybeVisibility)
+  private def givenAuthDataUpdating(projectSlug:     projects.Slug,
+                                    membersInGitLab: Set[GitLabProjectMember],
+                                    visibility:      projects.Visibility,
+                                    returning:       IO[Unit]
+  ) = (projectAuthSync.syncProject _)
+    .expects(ProjectAuthData(projectSlug, membersInGitLab.map(_.toProjectAuthMember), visibility))
     .returning(returning)
+
+  private def givenAuthDataRemoval(projectSlug: projects.Slug, returning: IO[Unit]) =
+    (projectAuthSync.removeAuthData _)
+      .expects(projectSlug)
+      .returning(returning)
 
   protected override def beforeEach() = logger.reset()
 }

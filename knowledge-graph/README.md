@@ -22,9 +22,10 @@ The following routes may be slightly different when accessed via the main Renku 
 | GET    | ```/knowledge-graph/projects/:namespace/:name/files/:location/lineage``` | Returns the lineage for a the path (location) of a file on a project                 |
 | GET    | ```/knowledge-graph/spec.json```                                         | Returns OpenAPI specification of the service's resources                             |
 | GET    | ```/knowledge-graph/users/:id/projects```                                | Returns all user's projects                                                          |
+| GET    | ```/knowledge-graph/version```                                           | Returns info about service version                                                   |
 | GET    | ```/metrics```                                                           | Serves Prometheus metrics                                                            |
 | GET    | ```/ping```                                                              | To check if service is healthy                                                       |
-| GET    | ```/version```                                                           | Returns info about service version                                                   |
+| GET    | ```/version```                                                           | Returns info about service version; same as `GET /knowledge-graph/version`           |
 
 #### GET /knowledge-graph/datasets
 
@@ -1275,6 +1276,30 @@ Response body example:
 ]
 ```
 
+#### GET /knowledge-graph/version
+
+Returns info about service version. It's the same as `GET /version` but it's exposed to the Internet.
+
+**Response**
+
+| Status                       | Description            |
+|------------------------------|------------------------|
+| OK (200)                     | If version is returned |
+| INTERNAL SERVER ERROR (500)  | Otherwise              |
+
+Response body example:
+
+```json
+{
+  "name": "commit-event-service",
+  "versions": [
+    {
+      "version": "2.3.0"
+    }
+  ]
+}
+```
+
 #### GET /metrics  (Internal use only)
 
 Serves Prometheus metrics.
@@ -1297,7 +1322,7 @@ Verifies service health.
 | OK (200)                     | If service is healthy |
 | INTERNAL SERVER ERROR (500)  | Otherwise             |
 
-#### GET /version  (Internal use only)
+#### GET /version (Internal use only)
 
 Returns info about service version
 

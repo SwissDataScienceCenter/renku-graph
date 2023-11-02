@@ -16,9 +16,10 @@
  * limitations under the License.
  */
 
-package io.renku.entities.searchgraphs.datasets.commands
+package io.renku.entities.searchgraphs.datasets
+package commands
 
-import io.renku.entities.searchgraphs.datasets.Generators._
+import Generators._
 import io.renku.graph.model.entities
 import io.renku.graph.model.testentities._
 import org.scalacheck.Gen
@@ -27,10 +28,7 @@ private object CalculatorInfoSetGenerators {
 
   lazy val calculatorInfoSets: Gen[CalculatorInfoSet] = for {
     project   <- anyRenkuProjectEntities(anyVisibility).map(_.to[entities.Project])
-    modelInfo <- datasetSearchInfoObjects(project.resourceId).map(_.copy(visibility = project.visibility))
-  } yield CalculatorInfoSet.AllInfos(project.identification,
-                                     modelInfo = modelInfo,
-                                     tsInfo = modelInfo,
-                                     tsVisibilities = Map(project.resourceId -> project.visibility)
-  )
+    modelInfo <- modelDatasetSearchInfoObjects(project)
+    tsInfo    <- tsDatasetSearchInfoObjects(project)
+  } yield CalculatorInfoSet.BothInfos(project.identification, modelInfo, tsInfo)
 }
