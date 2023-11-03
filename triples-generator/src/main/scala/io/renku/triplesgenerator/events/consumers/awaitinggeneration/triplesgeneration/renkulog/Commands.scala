@@ -54,7 +54,7 @@ private object Commands {
 
   class GitLabRepoUrlFinderImpl[F[_]: MonadThrow](gitLabUrl: GitLabUrl) extends GitLabRepoUrlFinder[F] {
 
-    import java.net.URL
+    import java.net.URI
 
     override def findRepositoryUrl(projectSlug: projects.Slug)(implicit
         maybeAccessToken: Option[AccessToken]
@@ -72,7 +72,7 @@ private object Commands {
       MonadThrow[F].fromEither {
         ServiceUrl.from {
           val url              = gitLabUrl.value
-          val protocol         = new URL(url).getProtocol
+          val protocol         = new URI(url).toURL.getProtocol
           val serviceWithToken = url.replace(s"$protocol://", s"$protocol://$urlTokenPart")
           s"$serviceWithToken/$projectSlug.git"
         }
