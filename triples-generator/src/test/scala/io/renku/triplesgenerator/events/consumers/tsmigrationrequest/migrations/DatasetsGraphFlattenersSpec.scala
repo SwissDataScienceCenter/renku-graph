@@ -89,6 +89,10 @@ class DatasetsGraphFlattenersSpec
 
       for {
         _ <- provisionProjects(project1, project2).assertNoException
+        _ <- runUpdates(projectsDataset, insertSchemaKeywords(ds1TopSameAs, ds1)).assertNoException
+        _ <- runUpdates(projectsDataset, insertSchemaImages(ds1TopSameAs, ds1)).assertNoException
+        _ <- runUpdates(projectsDataset, insertSchemaKeywords(ds2TopSameAs, ds2)).assertNoException
+        _ <- runUpdates(projectsDataset, insertSchemaImages(ds2TopSameAs, ds2)).assertNoException
 
         _ <- fetchKeywords(ds1TopSameAs).asserting(_ shouldBe ds1.additionalInfo.keywords)
         _ <- fetchImages(ds1TopSameAs).asserting(_ shouldBe ds1.additionalInfo.images.map(_.uri))
@@ -229,6 +233,37 @@ class DatasetsGraphFlattenersSpec
         )
         .getOrElse(List.empty[(projects.Slug, projects.Visibility)])
     )
+
+  private def insertSchemaKeywords(topSameAs: datasets.TopmostSameAs, ds: entities.Dataset[_]) =
+    ds.additionalInfo.keywords.map { keyword =>
+      SparqlQuery.ofUnsafe(
+        "test insert ds keyword",
+        Prefixes of (renku -> "renku", schema -> "schema"),
+        sparql"""|INSERT DATA {
+                 |  GRAPH ${GraphClass.Datasets.id} {
+                 |    ${topSameAs.asEntityId} schema:keywords ${keyword.asObject}.
+                 |  }
+                 |}
+                 |""".stripMargin
+      )
+    }
+
+  private def insertSchemaImages(topSameAs: datasets.TopmostSameAs, ds: entities.Dataset[_]) =
+    ds.additionalInfo.images.map { image =>
+      SparqlQuery.ofUnsafe(
+        "test insert ds image",
+        Prefixes of (rdf -> "rdf", renku -> "renku", schema -> "schema"),
+        sparql"""|INSERT DATA {
+                 |  GRAPH ${GraphClass.Datasets.id} {
+                 |    ${topSameAs.asEntityId} schema:image ${image.resourceId.asEntityId}.
+                 |    ${image.resourceId.asEntityId} rdf:type schema:ImageObject.
+                 |    ${image.resourceId.asEntityId} schema:contentUrl ${image.uri.asObject}.
+                 |    ${image.resourceId.asEntityId} schema:position ${image.position.asObject}.
+                 |  }
+                 |}
+                 |""".stripMargin
+      )
+    }
 
   private def deleteKeywords(topSameAs: datasets.TopmostSameAs) =
     SparqlQuery.ofUnsafe(

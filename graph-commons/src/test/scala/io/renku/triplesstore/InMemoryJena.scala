@@ -105,6 +105,9 @@ trait InMemoryJena {
   def runUpdate(on: DatasetName, query: SparqlQuery): IO[Unit] =
     queryRunnerFor(on).flatMap(_.runUpdate(query))
 
+  def runUpdates(on: DatasetName, queries: List[SparqlQuery]): IO[Unit] =
+    queries.map(runUpdate(on, _)).sequence.void
+
   def triplesCount(on: DatasetName): IO[Long] =
     queryRunnerFor(on)
       .flatMap(
