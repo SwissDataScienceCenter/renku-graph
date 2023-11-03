@@ -23,12 +23,7 @@ package commands
 import Generators._
 import ProjectSearchInfoOntology._
 import cats.syntax.all._
-import io.renku.generators.Generators.Implicits._
-import io.renku.generators.Generators.positiveInts
-import io.renku.generators.jsonld.JsonLDGenerators.entityIds
-import io.renku.graph.model.GraphModelGenerators.imageUris
-import io.renku.graph.model.Schemas.{rdf, renku, schema}
-import io.renku.graph.model.images.{Image, ImagePosition, ImageResourceId}
+import io.renku.graph.model.Schemas.{rdf, renku}
 import io.renku.graph.model.{persons, projects}
 import io.renku.jsonld.syntax._
 import io.renku.triplesstore.client.model.Quad
@@ -40,26 +35,6 @@ import org.scalatestplus.scalacheck.ScalaCheckPropertyChecks
 class EncodersSpec extends AnyWordSpec with should.Matchers with ScalaCheckPropertyChecks {
 
   import Encoders._
-
-  "imageEncoder" should {
-
-    "turn an Image object into a Set of relevant Quads" in {
-
-      val image = {
-        for {
-          id       <- entityIds.toGeneratorOf(id => ImageResourceId(id.toString))
-          uri      <- imageUris
-          position <- positiveInts().toGeneratorOf(p => ImagePosition(p.value))
-        } yield Image(id, uri, position)
-      }.generateOne
-
-      image.asQuads shouldBe Set(
-        ProjectsQuad(image.resourceId, rdf / "type", schema / "ImageObject"),
-        ProjectsQuad(image.resourceId, Image.Ontology.contentUrlProperty.id, image.uri.asObject),
-        ProjectsQuad(image.resourceId, Image.Ontology.positionProperty.id, image.position.asObject)
-      )
-    }
-  }
 
   "searchInfoEncoder" should {
 
@@ -76,11 +51,9 @@ class EncodersSpec extends AnyWordSpec with should.Matchers with ScalaCheckPrope
           ProjectsQuad(searchInfo.id, dateModifiedProperty.id, searchInfo.dateModified.asObject)
         ) ++
           creatorToQuads(searchInfo) ++
-          keywordsToQuads(searchInfo) ++
           maybeDescToQuad(searchInfo) ++
           maybeKeywordsConcatToQuad(searchInfo).toSet ++
-          maybeImagesConcatToQuad(searchInfo).toSet ++
-          imagesToQuads(searchInfo)
+          maybeImagesConcatToQuad(searchInfo).toSet
       }
     }
 
@@ -90,11 +63,6 @@ class EncodersSpec extends AnyWordSpec with should.Matchers with ScalaCheckPrope
     searchInfo.maybeCreator.toSet.map { (resourceId: persons.ResourceId) =>
       ProjectsQuad(searchInfo.id, creatorProperty, resourceId.asEntityId)
     }
-
-  private def keywordsToQuads(searchInfo: ProjectSearchInfo): Set[Quad] =
-    searchInfo.keywords
-      .map(k => ProjectsQuad(searchInfo.id, keywordsProperty.id, k.asObject))
-      .toSet
 
   private def maybeDescToQuad(searchInfo: ProjectSearchInfo): Set[Quad] = searchInfo.maybeDescription.toSet.map {
     (d: projects.Description) =>
@@ -117,10 +85,4 @@ class EncodersSpec extends AnyWordSpec with should.Matchers with ScalaCheckPrope
                      images.map(i => s"${i.position}:${i.uri}").mkString(concatSeparator.toString).asTripleObject
         ).some
     }
-
-  private def imagesToQuads(searchInfo: ProjectSearchInfo): Set[Quad] =
-    searchInfo.images
-      .map(i => i.asQuads + ProjectsQuad(searchInfo.id, imageProperty, i.resourceId.asEntityId))
-      .toSet
-      .flatten
 }
