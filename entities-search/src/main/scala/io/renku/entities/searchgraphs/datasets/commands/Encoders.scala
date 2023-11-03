@@ -33,14 +33,6 @@ import io.renku.triplesstore.client.syntax._
 
 private[datasets] object Encoders {
 
-  implicit val imageEncoder: QuadsEncoder[Image] = QuadsEncoder.instance { case Image(resourceId, uri, position) =>
-    Set(
-      DatasetsQuad(resourceId, rdf / "type", Image.Ontology.typeClass.id),
-      DatasetsQuad(resourceId, Image.Ontology.contentUrlProperty.id, uri.asObject),
-      DatasetsQuad(resourceId, Image.Ontology.positionProperty.id, position.asObject)
-    )
-  }
-
   implicit val linkEncoder: QuadsEncoder[Link] = QuadsEncoder.instance { link =>
     val typeQuads = link match {
       case _: OriginalDataset =>
@@ -93,17 +85,8 @@ private[datasets] object Encoders {
     val maybeCreatorsNamesConcatQuad =
       maybeConcatQuad[persons.Name](creatorsNamesConcatProperty.id, info.creators.toList.map(_.name).distinct, _.value)
 
-    val keywordsQuads = info.keywords.toSet.map { (k: datasets.Keyword) =>
-      searchInfoQuad(keywordsProperty.id, k.asObject)
-    }
-
     val maybeKeywordsConcatQuad =
       maybeConcatQuad[datasets.Keyword](keywordsConcatProperty.id, info.keywords.distinct, _.value)
-
-    val imagesQuads = info.images.toSet.flatMap { (i: Image) =>
-      i.asQuads +
-        searchInfoQuad(imageProperty, i.resourceId.asEntityId)
-    }
 
     val maybeImagesConcatQuad =
       maybeConcatQuad[Image](imagesConcatProperty.id,
@@ -129,6 +112,6 @@ private[datasets] object Encoders {
       maybeCreatorsNamesConcatQuad,
       maybeKeywordsConcatQuad,
       maybeImagesConcatQuad
-    ).flatten ++ projectsVisibilitiesConcatQuads ++ creatorsQuads ++ keywordsQuads ++ imagesQuads ++ linksQuads
+    ).flatten ++ projectsVisibilitiesConcatQuads ++ creatorsQuads ++ linksQuads
   }
 }

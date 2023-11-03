@@ -34,7 +34,6 @@ private object DatasetInfoDeleteQuery {
       Prefixes of (renku -> "renku", schema -> "schema"),
       sparql"""|DELETE {
                |  GRAPH ${GraphClass.Datasets.id} {
-               |    ?imageId ?imagePred ?imageObj.
                |    ?linkId ?linkPred ?linkObj.
                |    ?topSameAs ?dsPred ?dsObj.
                |  }
@@ -42,11 +41,6 @@ private object DatasetInfoDeleteQuery {
                |WHERE {
                |  GRAPH ${GraphClass.Datasets.id} {
                |    BIND (${topmostSameAs.asEntityId} AS ?topSameAs)
-               |
-               |    OPTIONAL {
-               |      ?topSameAs schema:image ?imageId.
-               |      ?imageId ?imagePred ?imageObj.
-               |    }
 
                |    OPTIONAL {
                |      ?topSameAs renku:datasetProjectLink ?linkId.
