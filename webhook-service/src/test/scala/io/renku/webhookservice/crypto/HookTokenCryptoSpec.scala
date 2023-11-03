@@ -80,7 +80,7 @@ class HookTokenCryptoSpec extends AnyWordSpec with should.Matchers with TryValue
         Map(
           "services" -> Map(
             "gitlab" -> Map(
-              "hook-token-secret" -> aesCryptoSecrets.generateOne.toBase64
+              "hook-token-secret" -> aesCryptoSecrets.generateOne.decodeAscii.fold(throw _, identity)
             ).asJava
           ).asJava
         ).asJava

@@ -44,7 +44,7 @@ class SecretSpec extends AnyWordSpec with should.Matchers with EitherValues with
 
       forAll(aesCryptoSecrets) { secret =>
         val config = ConfigFactory.parseMap(
-          Map(keyName -> new String(secret.value.toArray, "US-ASCII")).asJava
+          Map(keyName -> secret.decodeAscii.fold(throw _, identity)).asJava
         )
 
         ConfigSource.fromConfig(config).at(keyName).load[Secret].value shouldBe secret

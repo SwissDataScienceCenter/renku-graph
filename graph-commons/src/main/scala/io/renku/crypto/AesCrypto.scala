@@ -26,6 +26,7 @@ import pureconfig.ConfigReader
 import pureconfig.error.FailureReason
 import scodec.bits.ByteVector
 
+import java.nio.charset.CharacterCodingException
 import java.nio.charset.StandardCharsets.UTF_8
 import java.util.Base64
 import javax.crypto.Cipher
@@ -63,7 +64,8 @@ abstract class AesCrypto[F[_]: MonadThrow, NONENCRYPTED, ENCRYPTED](secret: Secr
 object AesCrypto {
 
   final class Secret private (val value: ByteVector) extends AnyVal {
-    override def toString: String = "<sensitive>"
+    override def toString: String                                   = "<sensitive>"
+    def decodeAscii:       Either[CharacterCodingException, String] = value.decodeAscii
   }
 
   object Secret {
