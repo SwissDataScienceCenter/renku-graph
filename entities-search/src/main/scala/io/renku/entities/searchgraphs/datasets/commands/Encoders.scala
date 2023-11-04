@@ -22,7 +22,7 @@ package commands
 import DatasetSearchInfoOntology._
 import Link.{ImportedDataset, OriginalDataset}
 import cats.syntax.all._
-import io.renku.entities.searchgraphs.toConcatValue
+import io.renku.entities.searchgraphs.maybeTripleObject
 import io.renku.graph.model.Schemas.{rdf, renku}
 import io.renku.graph.model.images.Image
 import io.renku.graph.model.{datasets, persons}
@@ -51,7 +51,7 @@ private[datasets] object Encoders {
 
   implicit val projectsVisibilitiesConcatEncoder: QuadsEncoder[(datasets.TopmostSameAs, List[Link])] =
     QuadsEncoder.instance { case (topSameAs, links) =>
-      toConcatValue[Link](links, link => s"${link.projectSlug.value}:${link.visibility.value}")
+      maybeTripleObject[Link](links, link => s"${link.projectSlug.value}:${link.visibility.value}")
         .map(DatasetsQuad(topSameAs, projectsVisibilitiesConcatProperty.id, _))
         .toSet
     }
@@ -61,7 +61,7 @@ private[datasets] object Encoders {
       DatasetsQuad(info.topmostSameAs, predicate, obj)
 
     def maybeConcatQuad[A](property: Property, values: List[A], toValue: A => String): Option[Quad] =
-      toConcatValue(values, toValue).map(searchInfoQuad(property, _))
+      maybeTripleObject(values, toValue).map(searchInfoQuad(property, _))
 
     val createdOrPublishedQuad = info.createdOrPublished match {
       case d: datasets.DateCreated =>

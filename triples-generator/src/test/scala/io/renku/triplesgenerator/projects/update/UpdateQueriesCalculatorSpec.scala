@@ -21,7 +21,7 @@ package io.renku.triplesgenerator.projects.update
 import cats.effect.IO
 import cats.syntax.all._
 import eu.timepit.refined.auto._
-import io.renku.entities.searchgraphs.SearchInfoDatasets
+import io.renku.entities.searchgraphs.{SearchInfoDatasets, concatSeparator}
 import io.renku.generators.Generators.Implicits._
 import io.renku.graph.model.images.ImageUri
 import io.renku.graph.model.testentities._
@@ -277,8 +277,8 @@ class UpdateQueriesCalculatorSpec
         "UpdateQueriesCalculator Project fetch",
         Prefixes of (renku -> "renku", schema -> "schema"),
         sparql"""|SELECT DISTINCT ?maybeDesc ?visibility
-                 |  (GROUP_CONCAT(DISTINCT ?keyword; separator=',') AS ?keywords)
-                 |  (GROUP_CONCAT(?encodedImageUrl; separator=',') AS ?images)
+                 |  (GROUP_CONCAT(DISTINCT ?keyword; separator=$concatSeparator) AS ?keywords)
+                 |  (GROUP_CONCAT(?encodedImageUrl; separator=$concatSeparator) AS ?images)
                  |WHERE {
                  |  BIND (${GraphClass.Project.id(project.resourceId)} AS ?id)
                  |  GRAPH ?id {
@@ -305,24 +305,16 @@ class UpdateQueriesCalculatorSpec
       SparqlQuery.ofUnsafe(
         "UpdateQueriesCalculator Projects fetch",
         Prefixes of (renku -> "renku", schema -> "schema"),
-        sparql"""|SELECT DISTINCT ?maybeDesc ?visibility
-                 |  (GROUP_CONCAT(DISTINCT ?keyword; separator=',') AS ?keywords)
-                 |  (GROUP_CONCAT(?encodedImageUrl; separator=',') AS ?images)
+        sparql"""|SELECT DISTINCT ?maybeDesc ?visibility ?keywords ?images
                  |WHERE {
                  |  BIND (${project.resourceId.asEntityId} AS ?id)
                  |  GRAPH ${GraphClass.Projects.id} {
                  |    ?id renku:projectVisibility ?visibility.
                  |    OPTIONAL { ?id schema:description ?maybeDesc }
-                 |    OPTIONAL { ?id schema:keywords ?keyword }
-                 |    OPTIONAL {
-                 |      ?id schema:image ?imageId.
-                 |      ?imageId schema:position ?imagePosition;
-                 |               schema:contentUrl ?imageUrl.
-                 |      BIND(CONCAT(STR(?imagePosition), STR(':'), STR(?imageUrl)) AS ?encodedImageUrl)
-                 |    }
+                 |    OPTIONAL { ?id renku:keywordsConcat ?keywords }
+                 |    OPTIONAL { ?id renku:imagesConcat ?images }
                  |  }
                  |}
-                 |GROUP BY ?maybeDesc ?visibility
                  |""".stripMargin
       )
     ).map(toDataExtract).flatMap(toOptionOrFail)
@@ -338,10 +330,10 @@ class UpdateQueriesCalculatorSpec
     }
 
   private lazy val toSetOfKeywords: Option[String] => Set[projects.Keyword] =
-    _.map(_.split(',').toList.map(projects.Keyword(_)).toSet).getOrElse(Set.empty)
+    _.map(_.split(concatSeparator).toList.map(projects.Keyword(_)).toSet).getOrElse(Set.empty)
 
   private lazy val toListOfImages: Option[String] => List[ImageUri] =
-    _.map(ImageUri.fromSplitString(',')(_).fold(throw _, identity)).getOrElse(Nil)
+    _.map(ImageUri.fromSplitString(concatSeparator)(_).fold(throw _, identity)).getOrElse(Nil)
 
   private lazy val toOptionOrFail: List[TSData] => IO[Option[TSData]] = {
     case Nil      => Option.empty[TSData].pure[IO]

@@ -22,6 +22,8 @@ package processor
 import cats.Monad
 import cats.syntax.all._
 import eu.timepit.refined.auto._
+import io.renku.entities.searchgraphs.projects.ProjectSearchInfoOntology.{imagesConcatProperty, keywordsConcatProperty}
+import io.renku.entities.searchgraphs.projects.commands.Encoders.{maybeImagesQuad, maybeKeywordsQuad}
 import io.renku.eventlog.api.events.StatusChangeEvent
 import io.renku.graph.model.Schemas.{rdf, schema}
 import io.renku.graph.model.images.Image
@@ -225,14 +227,17 @@ private class UpdateCommandsCalculatorImpl[F[_]: Monad: Logger](newValuesCalcula
     SparqlQuery.ofUnsafe(
       show"$categoryName: update keywords in Projects",
       Prefixes of schema -> "schema",
-      sparql"""|DELETE { GRAPH ${GraphClass.Projects.id} { ?id schema:keywords ?keyword } }
-               |INSERT { GRAPH ${GraphClass.Projects.id} {
-               |  ${newValue.map(k => fr"""?id schema:keywords ${k.asObject}.""").toList.intercalate(fr"\n")}
-               |} }
+      sparql"""|DELETE { GRAPH ${GraphClass.Projects.id} {
+               |    ?id ${keywordsConcatProperty.id} ?keywords
+               |  }
+               |}
+               |INSERT {
+               |  ${maybeKeywordsQuad(id, newValue.toList)}
+               |}
                |WHERE {
                |  BIND (${id.asEntityId} AS ?id)
                |  GRAPH ${GraphClass.Projects.id} {
-               |    OPTIONAL { ?id schema:keywords ?keyword }
+               |    OPTIONAL { ?id ${keywordsConcatProperty.id} ?keywords }
                |  }
                |}""".stripMargin
     )
@@ -266,21 +271,20 @@ private class UpdateCommandsCalculatorImpl[F[_]: Monad: Logger](newValuesCalcula
 
   private def imagesInProjectsUpdate(id: projects.ResourceId, newValue: List[Image]) =
     SparqlQuery.ofUnsafe(
-      show"$categoryName: update keywords in Projects",
+      show"$categoryName: update images in Projects",
       Prefixes of (rdf -> "rdf", schema -> "schema"),
       sparql"""|DELETE { GRAPH ${GraphClass.Projects.id} {
-               |  ?id schema:image ?imageId.
-               |  ?imageId ?p ?o
-               |} }
-               |INSERT { GRAPH ${GraphClass.Projects.id} {
-               |  ${newValue.flatMap(toTriple).intercalate(fr"\n ")}
-               |} }
+               |    ?id ${imagesConcatProperty.id} ?images
+               |  }
+               |}
+               |INSERT {
+               |  ${maybeImagesQuad(id, newValue)}
+               |}
                |WHERE {
                |  BIND (${id.asEntityId} AS ?id)
                |  GRAPH ${GraphClass.Projects.id} {
                |    OPTIONAL {
-               |      ?id schema:image ?imageId.
-               |      ?imageId ?p ?o
+               |      ?id ${imagesConcatProperty.id} ?images.
                |    }
                |  }
                |}""".stripMargin

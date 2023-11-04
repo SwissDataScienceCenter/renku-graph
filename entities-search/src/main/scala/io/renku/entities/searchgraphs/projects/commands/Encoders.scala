@@ -30,14 +30,23 @@ import io.renku.jsonld.syntax._
 import io.renku.triplesstore.client.model.{Quad, QuadsEncoder, TripleObject}
 import io.renku.triplesstore.client.syntax._
 
-private object Encoders {
+object Encoders {
 
-  implicit val searchInfoEncoder: QuadsEncoder[ProjectSearchInfo] = QuadsEncoder.instance { info =>
+  def maybeKeywordsObject(keywords: List[projects.Keyword]): Option[TripleObject] =
+    maybeTripleObject[projects.Keyword](keywords.distinct, _.value)
+
+  def maybeKeywordsQuad(id: projects.ResourceId, keywords: List[projects.Keyword]): Option[Quad] =
+    maybeKeywordsObject(keywords).map(ProjectsQuad(id, keywordsConcatProperty.id, _))
+
+  def maybeImagesObject(images: List[Image]): Option[TripleObject] =
+    maybeTripleObject[Image](images, image => s"${image.position.value}:${image.uri.value}")
+
+  def maybeImagesQuad(id: projects.ResourceId, images: List[Image]): Option[Quad] =
+    maybeImagesObject(images).map(ProjectsQuad(id, imagesConcatProperty.id, _))
+
+  private[commands] implicit val searchInfoEncoder: QuadsEncoder[ProjectSearchInfo] = QuadsEncoder.instance { info =>
     def searchInfoQuad(predicate: Property, obj: TripleObject): Quad =
       ProjectsQuad(info.id, predicate, obj)
-
-    def maybeConcatQuad[A](property: Property, values: List[A], toValue: A => String): Option[Quad] =
-      toConcatValue(values, toValue).map(searchInfoQuad(property, _))
 
     val maybeDescriptionQuad = info.maybeDescription.map { d =>
       searchInfoQuad(descriptionProperty.id, d.asObject)
@@ -47,14 +56,9 @@ private object Encoders {
       searchInfoQuad(creatorProperty, resourceId.asEntityId)
     }
 
-    val maybeKeywordsConcatQuad =
-      maybeConcatQuad[projects.Keyword](keywordsConcatProperty.id, info.keywords.distinct, _.value)
+    val maybeKeywordsConcatQuad = maybeKeywordsQuad(info.id, info.keywords)
 
-    val maybeImagesConcatQuad =
-      maybeConcatQuad[Image](imagesConcatProperty.id,
-                             info.images,
-                             image => s"${image.position.value}:${image.uri.value}"
-      )
+    val maybeImagesConcatQuad = maybeImagesQuad(info.id, info.images)
 
     Set(
       searchInfoQuad(rdf / "type", typeDef.clazz.id).some,
