@@ -56,7 +56,7 @@ private class EndpointDocsImpl()(implicit gitLabUrl: GitLabUrl, renkuApiUrl: ren
                             responseHeaders
       ),
       Status.BadRequest -> Response(
-        "In case of invalid query parameters",
+        "In case of invalid query parameters or `owned` parameter specified but no auth user present",
         Contents(MediaType.`application/json`("Reason", Message.Info("Invalid parameters")))
       ),
       Status.Unauthorized -> Response(

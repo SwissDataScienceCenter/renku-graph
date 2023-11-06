@@ -292,9 +292,6 @@ class MicroserviceRoutesSpec
             uri"/knowledge-graph/entities" +? ("creator" -> name.value) -> Criteria(Filters(creators = Set(name)))
           )
           .generateOne,
-        ownedParams
-          .map(p => uri"/knowledge-graph/entities" +? ("owned" -> p.value) -> Criteria(Filters(maybeOwned = p.some)))
-          .generateOne,
         personNames
           .toGeneratorOfList(min = 2)
           .map { list =>
@@ -381,6 +378,7 @@ class MicroserviceRoutesSpec
       )
     } { (uri, criteria) =>
       s"read the query parameters from $uri, pass them to the endpoint and return received response" in new TestCase {
+
         val request = Request[IO](GET, uri)
 
         val responseBody = jsons.generateOne
@@ -394,6 +392,35 @@ class MicroserviceRoutesSpec
         response.contentType shouldBe Some(`Content-Type`(application.json))
         response.body[Json]  shouldBe responseBody
       }
+    }
+
+    "read the 'owned' query parameter from the uri and pass it to the endpoint when auth user present" in new TestCase {
+
+      val maybeAuthUser = MaybeAuthUser(authUsers.generateOne)
+      val ownedParam    = ownedParams.generateOne
+      val criteria      = Criteria(Filters(maybeOwned = ownedParam.some), maybeUser = maybeAuthUser.option)
+      val request       = Request[IO](GET, uri"/knowledge-graph/entities" +? ("owned" -> ownedParam.value))
+
+      val responseBody = jsons.generateOne
+      (entitiesEndpoint.`GET /entities` _)
+        .expects(criteria, request)
+        .returning(Response[IO](Ok).withEntity(responseBody).pure[IO])
+
+      val response = routes(maybeAuthUser).call(request)
+
+      response.status      shouldBe Ok
+      response.contentType shouldBe Some(`Content-Type`(application.json))
+      response.body[Json]  shouldBe responseBody
+    }
+
+    s"return $BadRequest 'owned' query parameter given but no auth user present" in new TestCase {
+
+      val response =
+        routes().call(Request[IO](GET, uri"/knowledge-graph/entities" +? ("owned" -> ownedParams.generateOne.value)))
+
+      response.status        shouldBe BadRequest
+      response.contentType   shouldBe Some(`Content-Type`(application.json))
+      response.body[Message] shouldBe Message.Error("'owned' parameter present but no access token")
     }
 
     s"return $BadRequest for invalid parameter values" in new TestCase {

@@ -329,12 +329,12 @@ When the `query` parameter is given, the match is done on the following fields:
 
 **Response**
 
-| Status                       | Description                                      |
-|------------------------------|--------------------------------------------------|
-| OK (200)                     | If results are found; `[]` if nothing is found   |
-| BAD_REQUEST (400)            | If illegal values for query parameters are given |
-| UNAUTHORIZED (401)           | If given auth header cannot be authenticated     |
-| INTERNAL SERVER ERROR (500)  | Otherwise                                        |
+| Status                       | Description                                                                                    |
+|------------------------------|------------------------------------------------------------------------------------------------|
+| OK (200)                     | If results are found; `[]` if nothing is found                                                 |
+| BAD_REQUEST (400)            | If illegal values for query parameters are given or `owned` specified but no auth user present |
+| UNAUTHORIZED (401)           | If given auth header cannot be authenticated                                                   |
+| INTERNAL SERVER ERROR (500)  | Otherwise                                                                                      |
 
 Response headers:
 

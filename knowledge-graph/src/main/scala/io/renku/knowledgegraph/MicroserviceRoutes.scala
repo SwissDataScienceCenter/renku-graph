@@ -251,13 +251,18 @@ private class MicroserviceRoutes[F[_]: Async](
       sorting.map(Sorting.fromListOrDefault(_, Sort.default)),
       PagingRequest(maybePage, maybePerPage),
       (maybeSince -> maybeUntil)
-        .mapN(_ -> _)
+        .mapN(Tuple2.apply)
         .map {
           case (Valid(since), Valid(until)) if (since.value compareTo until.value) > 0 =>
             ParseFailure("'since' parameter > 'until'", "").invalidNel[Unit]
           case _ => ().validNel[ParseFailure]
         }
-        .getOrElse(().validNel[ParseFailure])
+        .getOrElse(().validNel[ParseFailure]),
+      maybeOwned match {
+        case Some(Valid(_)) if maybeUser.isEmpty =>
+          ParseFailure("'owned' parameter present but no access token", "").invalidNel[Unit]
+        case _ => ().validNel[ParseFailure]
+      }
     ).mapN {
       case (maybeQuery,
             types,
@@ -269,6 +274,7 @@ private class MicroserviceRoutes[F[_]: Async](
             maybeUntil,
             sorting,
             paging,
+            _,
             _
           ) =>
         `GET /entities`(
