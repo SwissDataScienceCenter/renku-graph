@@ -28,7 +28,7 @@ import io.renku.tinytypes.constraints.{NonBlank, PositiveInt, Url}
 import Subscription._
 import io.renku.tinytypes.json.TinyTypeDecoders.{intDecoder, stringDecoder}
 
-import java.net.URL
+import java.net.URI
 
 trait Subscription {
   val categoryName: CategoryName
@@ -64,7 +64,7 @@ object Subscription {
 
     implicit val microserviceBaseUrlConverter: TinyTypeConverter[SubscriberUrl, MicroserviceBaseUrl] =
       (subscriberUrl: SubscriberUrl) => {
-        val url = new URL(subscriberUrl.value)
+        val url = new URI(subscriberUrl.value).toURL
         MicroserviceBaseUrl(s"${url.getProtocol}://${url.getHost}:${url.getPort}").asRight[IllegalArgumentException]
       }
   }

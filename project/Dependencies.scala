@@ -18,8 +18,8 @@ object Dependencies {
     val http4s                 = "0.23.23"
     val http4sEmber            = "0.23.23"
     val http4sPrometheus       = "0.24.6"
-    val ip4s                   = "3.3.0"
-    val jsonld4s               = "0.12.0"
+    val ip4s                   = "3.4.0"
+    val jsonld4s               = "0.13.0"
     val log4cats               = "2.6.0"
     val log4jCore              = "2.21.1"
     val logback                = "1.4.11"
@@ -33,12 +33,12 @@ object Dependencies {
     val scalamock              = "5.2.0"
     val scalatest              = "3.2.17"
     val scalatestScalacheck    = "3.2.14.0"
-    val sentryLogback          = "6.32.0"
+    val sentryLogback          = "6.33.0"
     val skunk                  = "0.6.1"
     val swaggerParser          = "2.1.18"
     val testContainersScala    = "0.41.0"
     val widoco                 = "1.4.20"
-    val wiremock               = "3.2.0"
+    val wiremock               = "3.3.1"
   }
 
   val ip4s = Seq(

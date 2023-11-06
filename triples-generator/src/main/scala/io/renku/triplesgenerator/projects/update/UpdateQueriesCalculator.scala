@@ -21,6 +21,8 @@ package io.renku.triplesgenerator.projects.update
 import cats.syntax.all._
 import cats.{Applicative, MonadThrow}
 import eu.timepit.refined.auto._
+import io.renku.entities.searchgraphs.projects.ProjectSearchInfoOntology.{imagesConcatProperty, keywordsConcatProperty}
+import io.renku.entities.searchgraphs.projects.commands.Encoders._
 import io.renku.graph.config.RenkuUrlLoader
 import io.renku.graph.model.Schemas.{rdf, renku, schema}
 import io.renku.graph.model.images.{Image, ImageUri}
@@ -149,14 +151,18 @@ private class UpdateQueriesCalculatorImpl[F[_]: Applicative: Logger](implicit ru
     SparqlQuery.ofUnsafe(
       show"$reportingPrefix: update keywords in Projects",
       Prefixes of (renku -> "renku", schema -> "schema"),
-      sparql"""|DELETE { GRAPH ${GraphClass.Projects.id} { ?id schema:keywords ?keyword } }
+      sparql"""|DELETE { GRAPH ${GraphClass.Projects.id} {
+               |    ?id ${keywordsConcatProperty.id} ?keywords
+               |  }
+               |}
                |INSERT { GRAPH ${GraphClass.Projects.id} {
-               |  ${newValue.map(k => fr"""?id schema:keywords ${k.asObject}.""").toList.intercalate(fr"\n")}
-               |} }
+               |    ${maybeKeywordsObject(newValue.toList).map(k => fr"""?id ${keywordsConcatProperty.id} $k""")}
+               |  }
+               |}
                |WHERE {
                |  GRAPH ${GraphClass.Projects.id} {
                |    ?id renku:slug ${slug.asObject}.
-               |    OPTIONAL { ?id schema:keywords ?keyword }
+               |    OPTIONAL { ?id ${keywordsConcatProperty.id} ?keywords }
                |  }
                |}""".stripMargin
     )
@@ -194,21 +200,19 @@ private class UpdateQueriesCalculatorImpl[F[_]: Applicative: Logger](implicit ru
 
   private def imagesInProjectsUpdate(slug: projects.Slug, newValue: List[Image]) =
     SparqlQuery.ofUnsafe(
-      show"$reportingPrefix: update keywords in Projects",
+      show"$reportingPrefix: update images in Projects",
       Prefixes of (rdf -> "rdf", renku -> "renku", schema -> "schema"),
       sparql"""|DELETE { GRAPH ${GraphClass.Projects.id} {
-               |  ?id schema:image ?imageId.
-               |  ?imageId ?p ?o
+               |  ?id ${imagesConcatProperty.id} ?images.
                |} }
                |INSERT { GRAPH ${GraphClass.Projects.id} {
-               |  ${newValue.flatMap(toTriple).intercalate(fr"\n ")}
+               |  ${maybeImagesObject(newValue).map(i => fr"""?id ${imagesConcatProperty.id} $i""")}
                |} }
                |WHERE {
                |  GRAPH ${GraphClass.Projects.id} {
                |    ?id renku:slug ${slug.asObject}.
                |    OPTIONAL {
-               |      ?id schema:image ?imageId.
-               |      ?imageId ?p ?o
+               |      ?id ${imagesConcatProperty.id} ?images.
                |    }
                |  }
                |}""".stripMargin
