@@ -85,14 +85,7 @@ object QueryParamDecoders {
     val parameterName: String = "creator"
   }
 
-  private implicit val ownedParameterDecoder: QueryParamDecoder[Owned] =
-    (value: QueryParameterValue) =>
-      value.value.toBooleanOption
-        .toRight(parsingFailure(owned.parameterName))
-        .map(Owned)
-        .toValidatedNel
-
-  object owned extends OptionalValidatingQueryParamDecoderMatcher[Owned]("owned") {
+  object owned extends OptionalValidatingQueryParamDecoderMatcher[Boolean]("owned") {
     val parameterName: String = "owned"
   }
 

@@ -27,7 +27,7 @@ import io.renku.http.rest.paging.PagingRequest
 import io.renku.http.server.security.model.AuthUser
 import io.renku.tinytypes.constraints.{LocalDateNotInTheFuture, NonBlank}
 import io.renku.tinytypes.json.TinyTypeDecoders
-import io.renku.tinytypes.{BooleanTinyType, LocalDateTinyType, StringTinyType, TinyTypeFactory}
+import io.renku.tinytypes.{LocalDateTinyType, StringTinyType, TinyTypeFactory}
 
 import java.time.LocalDate
 
@@ -54,8 +54,7 @@ object Criteria {
     final class Query private (val value: String) extends AnyVal with StringTinyType
     object Query                                  extends TinyTypeFactory[Query](new Query(_)) with NonBlank[Query]
 
-    final class Owned private (val value: Boolean) extends AnyVal with BooleanTinyType
-    object Owned                                   extends TinyTypeFactory[Owned](new Owned(_))
+    final case class Owned(boolean: Boolean, userId: persons.GitLabId)
 
     sealed trait EntityType extends StringTinyType with Product
     object EntityType extends TinyTypeFactory[EntityType](EntityTypeApply) {

@@ -19,7 +19,7 @@
 package io.renku.knowledgegraph
 
 import QueryParamDecoders._
-import cats.data.Validated.Valid
+import cats.data.Validated.{Invalid, Valid}
 import cats.data.{EitherT, Validated, ValidatedNel}
 import cats.effect.{Async, Resource}
 import cats.syntax.all._
@@ -226,7 +226,7 @@ private class MicroserviceRoutes[F[_]: Async](
       maybeQuery:   Option[ValidatedNel[ParseFailure, EntitiesSearchCriteria.Filters.Query]],
       types:        ValidatedNel[ParseFailure, List[EntitiesSearchCriteria.Filters.EntityType]],
       creators:     ValidatedNel[ParseFailure, List[persons.Name]],
-      maybeOwned:   Option[ValidatedNel[ParseFailure, EntitiesSearchCriteria.Filters.Owned]],
+      maybeOwned:   Option[ValidatedNel[ParseFailure, Boolean]],
       visibilities: ValidatedNel[ParseFailure, List[model.projects.Visibility]],
       namespaces:   ValidatedNel[ParseFailure, List[model.projects.Namespace]],
       maybeSince:   Option[ValidatedNel[ParseFailure, EntitiesSearchCriteria.Filters.Since]],
@@ -243,7 +243,13 @@ private class MicroserviceRoutes[F[_]: Async](
       maybeQuery.map(_.map(Option.apply)).getOrElse(Validated.validNel(Option.empty[Query])),
       types.map(_.toSet),
       creators.map(_.toSet),
-      maybeOwned.map(_.map(Option.apply)).getOrElse(Validated.validNel(Option.empty[Owned])),
+      maybeOwned -> maybeUser match {
+        case (Some(Valid(boolean)), Some(authUser)) => Owned(boolean, authUser.id).some.validNel[ParseFailure]
+        case (Some(Valid(_)), None) =>
+          ParseFailure("'owned' parameter present but no access token", "").invalidNel[Option[Owned]]
+        case (None, _)             => Option.empty[Owned].validNel[ParseFailure]
+        case (Some(Invalid(e)), _) => e.invalid[Option[Owned]]
+      },
       visibilities.map(_.toSet),
       namespaces.map(_.toSet),
       maybeSince.map(_.map(Option.apply)).getOrElse(Validated.validNel(Option.empty[Since])),
@@ -257,12 +263,7 @@ private class MicroserviceRoutes[F[_]: Async](
             ParseFailure("'since' parameter > 'until'", "").invalidNel[Unit]
           case _ => ().validNel[ParseFailure]
         }
-        .getOrElse(().validNel[ParseFailure]),
-      maybeOwned match {
-        case Some(Valid(_)) if maybeUser.isEmpty =>
-          ParseFailure("'owned' parameter present but no access token", "").invalidNel[Unit]
-        case _ => ().validNel[ParseFailure]
-      }
+        .getOrElse(().validNel[ParseFailure])
     ).mapN {
       case (maybeQuery,
             types,
@@ -274,7 +275,6 @@ private class MicroserviceRoutes[F[_]: Async](
             maybeUntil,
             sorting,
             paging,
-            _,
             _
           ) =>
         `GET /entities`(
