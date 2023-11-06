@@ -275,9 +275,7 @@ class MicroserviceRoutesSpec
         "uri"                          -> "criteria",
         uri"/knowledge-graph/entities" -> Criteria(),
         queryParams
-          .map(query =>
-            uri"/knowledge-graph/entities" +? ("query" -> query.value) -> Criteria(Filters(maybeQuery = query.some))
-          )
+          .map(q => uri"/knowledge-graph/entities" +? ("query" -> q.value) -> Criteria(Filters(maybeQuery = q.some)))
           .generateOne,
         typeParams
           .map(t => uri"/knowledge-graph/entities" +? ("type" -> t.value) -> Criteria(Filters(entityTypes = Set(t))))
@@ -293,6 +291,9 @@ class MicroserviceRoutesSpec
           .map(name =>
             uri"/knowledge-graph/entities" +? ("creator" -> name.value) -> Criteria(Filters(creators = Set(name)))
           )
+          .generateOne,
+        ownedParams
+          .map(p => uri"/knowledge-graph/entities" +? ("owned" -> p.value) -> Criteria(Filters(maybeOwned = p.some)))
           .generateOne,
         personNames
           .toGeneratorOfList(min = 2)
@@ -1115,9 +1116,10 @@ class MicroserviceRoutesSpec
       .expects(identifier, maybeAuthUser)
       .returning(returning)
 
-    def givenDSSameAsAuthorizer(sameAs:        model.datasets.SameAs,
-                                maybeAuthUser: Option[AuthUser],
-                                returning: EitherT[IO, EndpointSecurityException, AuthContext[model.datasets.SameAs]]
+    private def givenDSSameAsAuthorizer(
+        sameAs:        model.datasets.SameAs,
+        maybeAuthUser: Option[AuthUser],
+        returning:     EitherT[IO, EndpointSecurityException, AuthContext[model.datasets.SameAs]]
     ) = (datasetSameAsAuthorizer.authorize _)
       .expects(sameAs, maybeAuthUser)
       .returning(returning)

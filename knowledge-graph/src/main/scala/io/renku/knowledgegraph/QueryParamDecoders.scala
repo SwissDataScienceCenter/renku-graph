@@ -85,6 +85,17 @@ object QueryParamDecoders {
     val parameterName: String = "creator"
   }
 
+  private implicit val ownedParameterDecoder: QueryParamDecoder[Owned] =
+    (value: QueryParameterValue) =>
+      value.value.toBooleanOption
+        .toRight(parsingFailure(owned.parameterName))
+        .map(Owned)
+        .toValidatedNel
+
+  object owned extends OptionalValidatingQueryParamDecoderMatcher[Owned]("owned") {
+    val parameterName: String = "owned"
+  }
+
   private implicit val visibilityParameterDecoder: QueryParamDecoder[projects.Visibility] =
     (value: QueryParameterValue) =>
       projects.Visibility

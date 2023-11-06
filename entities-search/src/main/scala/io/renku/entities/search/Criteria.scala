@@ -27,7 +27,7 @@ import io.renku.http.rest.paging.PagingRequest
 import io.renku.http.server.security.model.AuthUser
 import io.renku.tinytypes.constraints.{LocalDateNotInTheFuture, NonBlank}
 import io.renku.tinytypes.json.TinyTypeDecoders
-import io.renku.tinytypes.{LocalDateTinyType, StringTinyType, TinyTypeFactory}
+import io.renku.tinytypes.{BooleanTinyType, LocalDateTinyType, StringTinyType, TinyTypeFactory}
 
 import java.time.LocalDate
 
@@ -42,6 +42,7 @@ object Criteria {
   final case class Filters(maybeQuery:   Option[Filters.Query] = None,
                            entityTypes:  Set[Filters.EntityType] = Set.empty,
                            creators:     Set[persons.Name] = Set.empty,
+                           maybeOwned:   Option[Filters.Owned] = None,
                            visibilities: Set[projects.Visibility] = Set.empty,
                            namespaces:   Set[projects.Namespace] = Set.empty,
                            maybeSince:   Option[Filters.Since] = None,
@@ -53,7 +54,10 @@ object Criteria {
     final class Query private (val value: String) extends AnyVal with StringTinyType
     object Query                                  extends TinyTypeFactory[Query](new Query(_)) with NonBlank[Query]
 
-    sealed trait EntityType extends StringTinyType with Product with Serializable
+    final class Owned private (val value: Boolean) extends AnyVal with BooleanTinyType
+    object Owned                                   extends TinyTypeFactory[Owned](new Owned(_))
+
+    sealed trait EntityType extends StringTinyType with Product
     object EntityType extends TinyTypeFactory[EntityType](EntityTypeApply) {
 
       final case object Project  extends EntityType { override val value: String = "project" }
