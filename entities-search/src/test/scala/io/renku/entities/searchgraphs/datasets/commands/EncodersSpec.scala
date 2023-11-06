@@ -24,12 +24,9 @@ import Generators.{datasetSearchInfoObjects, importedDatasetLinkObjectsGen, orig
 import cats.syntax.all._
 import io.renku.entities.searchgraphs.concatSeparator
 import io.renku.generators.Generators.Implicits._
-import io.renku.generators.Generators.positiveInts
-import io.renku.generators.jsonld.JsonLDGenerators.entityIds
-import io.renku.graph.model.GraphModelGenerators.{datasetTopmostSameAs, imageUris}
-import io.renku.graph.model.Schemas.{rdf, renku, schema}
+import io.renku.graph.model.GraphModelGenerators.datasetTopmostSameAs
+import io.renku.graph.model.Schemas.{rdf, renku}
 import io.renku.graph.model.datasets
-import io.renku.graph.model.images.{Image, ImagePosition, ImageResourceId}
 import io.renku.jsonld.syntax._
 import io.renku.triplesstore.client.model.Quad
 import io.renku.triplesstore.client.syntax._
@@ -40,26 +37,6 @@ import org.scalatestplus.scalacheck.ScalaCheckPropertyChecks
 class EncodersSpec extends AnyWordSpec with should.Matchers with ScalaCheckPropertyChecks {
 
   import Encoders._
-
-  "imageEncoder" should {
-
-    "turn an Image object into a Set of relevant Quads" in {
-
-      val image = {
-        for {
-          id       <- entityIds.toGeneratorOf(id => ImageResourceId(id.toString))
-          uri      <- imageUris
-          position <- positiveInts().toGeneratorOf(p => ImagePosition(p.value))
-        } yield Image(id, uri, position)
-      }.generateOne
-
-      image.asQuads shouldBe Set(
-        DatasetsQuad(image.resourceId, rdf / "type", schema / "ImageObject"),
-        DatasetsQuad(image.resourceId, Image.Ontology.contentUrlProperty.id, image.uri.asObject),
-        DatasetsQuad(image.resourceId, Image.Ontology.positionProperty.id, image.position.asObject)
-      )
-    }
-  }
 
   "linkEncoder" should {
 
@@ -106,11 +83,9 @@ class EncodersSpec extends AnyWordSpec with should.Matchers with ScalaCheckPrope
         ) ++
           maybeDateModifiedToQuad(searchInfo.topmostSameAs)(searchInfo.maybeDateModified) ++
           creatorsToQuads(searchInfo) ++
-          keywordsToQuads(searchInfo) ++
           maybeDescToQuad(searchInfo.topmostSameAs)(searchInfo.maybeDescription) ++
           maybeKeywordsConcatToQuad(searchInfo).toSet ++
           maybeImagesConcatToQuad(searchInfo).toSet ++
-          imagesToQuads(searchInfo) ++
           linksToQuads(searchInfo)
       }
     }
@@ -140,11 +115,6 @@ class EncodersSpec extends AnyWordSpec with should.Matchers with ScalaCheckPrope
   private def creatorsNamesConcat(searchInfo: DatasetSearchInfo) =
     searchInfo.creators.map(_.name.value).intercalate(concatSeparator.toString).asTripleObject
 
-  private def keywordsToQuads(searchInfo: DatasetSearchInfo): Set[Quad] =
-    searchInfo.keywords
-      .map(k => DatasetsQuad(searchInfo.topmostSameAs, keywordsProperty.id, k.asObject))
-      .toSet
-
   private def maybeKeywordsConcatToQuad(searchInfo: DatasetSearchInfo): Option[Quad] =
     searchInfo.keywords match {
       case Nil => Option.empty[Quad]
@@ -171,12 +141,6 @@ class EncodersSpec extends AnyWordSpec with should.Matchers with ScalaCheckPrope
                      images.map(i => s"${i.position}:${i.uri}").mkString(concatSeparator.toString).asTripleObject
         ).some
     }
-
-  private def imagesToQuads(searchInfo: DatasetSearchInfo): Set[Quad] =
-    searchInfo.images
-      .map(i => i.asQuads + DatasetsQuad(searchInfo.topmostSameAs, imageProperty, i.resourceId.asEntityId))
-      .toSet
-      .flatten
 
   private def linksToQuads(searchInfo: DatasetSearchInfo): Set[Quad] =
     searchInfo.links

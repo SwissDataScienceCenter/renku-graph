@@ -24,7 +24,7 @@ import io.renku.triplesstore.client.syntax._
 package object searchgraphs {
   val concatSeparator: Char = ';'
 
-  private[searchgraphs] def toConcatValue[A](values: List[A], toValue: A => String): Option[TripleObject] =
+  private[searchgraphs] def maybeTripleObject[A](values: List[A], toValue: A => String): Option[TripleObject] =
     values match {
       case Nil => Option.empty[TripleObject]
       case vls =>
