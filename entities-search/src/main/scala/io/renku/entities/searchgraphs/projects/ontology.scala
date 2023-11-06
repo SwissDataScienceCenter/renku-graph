@@ -19,8 +19,7 @@
 package io.renku.entities.searchgraphs.projects
 
 import io.renku.graph.model.Schemas.renku
-import io.renku.graph.model.entities.{Dataset, Person, Project}
-import io.renku.graph.model.images.Image
+import io.renku.graph.model.entities.{Person, Project}
 import io.renku.jsonld.Property
 import io.renku.jsonld.ontology._
 
@@ -32,18 +31,15 @@ object ProjectSearchInfoOntology {
   val visibilityProperty:     DataProperty.Def = Project.Ontology.visibilityProperty
   val dateCreatedProperty:    DataProperty.Def = Project.Ontology.dateCreatedProperty
   val dateModifiedProperty:   DataProperty.Def = Project.Ontology.dateModifiedProperty
-  val keywordsProperty:       DataProperty.Def = Project.Ontology.keywordsProperty
   val keywordsConcatProperty: DataProperty.Def = DataProperty(renku / "keywordsConcat", xsd / "string")
   val descriptionProperty:    DataProperty.Def = Project.Ontology.descriptionProperty
   val creatorProperty:        Property         = Project.Ontology.creator
-  val imageProperty:          Property         = Project.Ontology.image
   val imagesConcatProperty:   DataProperty.Def = DataProperty(renku / "imagesConcat", xsd / "string")
 
   lazy val typeDef: Type = Type.Def(
     Class(renku / "DiscoverableProject"),
     ObjectProperties(
-      ObjectProperty(creatorProperty, Person.Ontology.typeDef),
-      ObjectProperty(imageProperty, Image.Ontology.typeDef)
+      ObjectProperty(creatorProperty, Person.Ontology.typeDef)
     ),
     DataProperties(
       nameProperty,
@@ -52,25 +48,9 @@ object ProjectSearchInfoOntology {
       visibilityProperty,
       dateCreatedProperty,
       dateModifiedProperty,
-      keywordsProperty,
       keywordsConcatProperty,
       descriptionProperty,
       imagesConcatProperty
     )
-  )
-}
-
-object LinkOntology {
-
-  val project: Property = renku / "project"
-  val dataset: Property = renku / "dataset"
-
-  lazy val typeDef: Type = Type.Def(
-    Class(renku / "DatasetProjectLink"),
-    ObjectProperties(
-      ObjectProperty(project, Project.Ontology.typeDef),
-      ObjectProperty(dataset, Dataset.Ontology.typeDef)
-    ),
-    DataProperties()
   )
 }

@@ -75,6 +75,10 @@ class ProjectsGraphFlattenersSpec
 
     for {
       _ <- provisionProjects(project1, project2).assertNoException
+      _ <- runUpdates(projectsDataset, insertSchemaKeywords(project1.resourceId, project1)).assertNoException
+      _ <- runUpdates(projectsDataset, insertSchemaImages(project1.resourceId, project1)).assertNoException
+      _ <- runUpdates(projectsDataset, insertSchemaKeywords(project2.resourceId, project2)).assertNoException
+      _ <- runUpdates(projectsDataset, insertSchemaImages(project2.resourceId, project2)).assertNoException
 
       _ <- fetchKeywords(project1.resourceId).asserting(_ shouldBe project1.keywords)
       _ <- fetchImages(project1.resourceId).asserting(_ shouldBe project1.images.map(_.uri))
@@ -149,6 +153,37 @@ class ProjectsGraphFlattenersSpec
         )
         .getOrElse(List.empty[images.ImageUri])
     )
+
+  private def insertSchemaKeywords(projectId: projects.ResourceId, project: entities.Project) =
+    project.keywords.toList.map { keyword =>
+      SparqlQuery.ofUnsafe(
+        "test insert project keyword",
+        Prefixes of (renku -> "renku", schema -> "schema"),
+        sparql"""|INSERT DATA {
+                 |  GRAPH ${GraphClass.Projects.id} {
+                 |    ${projectId.asEntityId} schema:keywords ${keyword.asObject}.
+                 |  }
+                 |}
+                 |""".stripMargin
+      )
+    }
+
+  private def insertSchemaImages(projectId: projects.ResourceId, project: entities.Project) =
+    project.images.map { image =>
+      SparqlQuery.ofUnsafe(
+        "test insert project image",
+        Prefixes of (rdf -> "rdf", renku -> "renku", schema -> "schema"),
+        sparql"""|INSERT DATA {
+                 |  GRAPH ${GraphClass.Projects.id} {
+                 |    ${projectId.asEntityId} schema:image ${image.resourceId.asEntityId}.
+                 |    ${image.resourceId.asEntityId} rdf:type schema:ImageObject.
+                 |    ${image.resourceId.asEntityId} schema:contentUrl ${image.uri.asObject}.
+                 |    ${image.resourceId.asEntityId} schema:position ${image.position.asObject}.
+                 |  }
+                 |}
+                 |""".stripMargin
+      )
+    }
 
   private def deleteKeywords(projectId: projects.ResourceId) =
     SparqlQuery.ofUnsafe(

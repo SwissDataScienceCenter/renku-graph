@@ -34,19 +34,12 @@ private[projects] object ProjectInfoDeleteQuery {
       Prefixes of schema -> "schema",
       sparql"""|DELETE {
                |  GRAPH ${GraphClass.Projects.id} {
-               |    ?imageId ?imagePred ?imageObj.
                |    ?projId ?projPred ?projObj.
                |  }
                |}
                |WHERE {
                |  GRAPH ${GraphClass.Projects.id} {
                |    BIND (${projectId.asEntityId} AS ?projId)
-               |
-               |    OPTIONAL {
-               |      ?projId schema:image ?imageId.
-               |      ?imageId ?imagePred ?imageObj.
-               |    }
-               |
                |    ?projId ?projPred ?projObj.
                |  }
                |}
