@@ -20,7 +20,6 @@ package io.renku.entities.searchgraphs.datasets
 
 import io.renku.graph.model.Schemas.{xsd, _}
 import io.renku.graph.model.entities.{Dataset, Person, Project}
-import io.renku.graph.model.images.Image
 import io.renku.jsonld.Property
 import io.renku.jsonld.ontology._
 
@@ -31,12 +30,10 @@ object DatasetSearchInfoOntology {
   val dateCreatedProperty:         DataProperty.Def = Dataset.Ontology.dateCreatedProperty
   val datePublishedProperty:       DataProperty.Def = Dataset.Ontology.datePublishedProperty
   val dateModifiedProperty:        DataProperty.Def = DataProperty(schema / "dateModified", xsd / "dateTime")
-  val keywordsProperty:            DataProperty.Def = Dataset.Ontology.keywordsProperty
   val keywordsConcatProperty:      DataProperty.Def = DataProperty(renku / "keywordsConcat", xsd / "string")
   val descriptionProperty:         DataProperty.Def = Dataset.Ontology.descriptionProperty
   val creatorProperty:             Property         = Dataset.Ontology.creator
   val creatorsNamesConcatProperty: DataProperty.Def = DataProperty(renku / "creatorsNamesConcat", xsd / "string")
-  val imageProperty:               Property         = Dataset.Ontology.image
   val imagesConcatProperty:        DataProperty.Def = DataProperty(renku / "imagesConcat", xsd / "string")
   val linkProperty:                Property         = renku / "datasetProjectLink"
   val projectsVisibilitiesConcatProperty: DataProperty.Def =
@@ -46,7 +43,6 @@ object DatasetSearchInfoOntology {
     Class(renku / "DiscoverableDataset"),
     ObjectProperties(
       ObjectProperty(creatorProperty, Person.Ontology.typeDef),
-      ObjectProperty(imageProperty, Image.Ontology.typeDef),
       ObjectProperty(linkProperty, LinkOntology.typeDef)
     ),
     DataProperties(
@@ -55,7 +51,6 @@ object DatasetSearchInfoOntology {
       dateCreatedProperty,
       datePublishedProperty,
       dateModifiedProperty,
-      keywordsProperty,
       keywordsConcatProperty,
       descriptionProperty,
       creatorsNamesConcatProperty,

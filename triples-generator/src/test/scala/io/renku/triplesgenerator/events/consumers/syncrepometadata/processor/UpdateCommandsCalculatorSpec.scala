@@ -22,7 +22,7 @@ import Generators._
 import cats.effect.IO
 import cats.syntax.all._
 import eu.timepit.refined.auto._
-import io.renku.entities.searchgraphs.SearchInfoDatasets
+import io.renku.entities.searchgraphs.{SearchInfoDatasets, concatSeparator}
 import io.renku.eventlog.api.events.StatusChangeEvent
 import io.renku.generators.Generators.Implicits._
 import io.renku.graph.model.RenkuTinyTypeGenerators.projectNames
@@ -379,8 +379,8 @@ class UpdateCommandsCalculatorSpec
         "UpdateCommandsCalculator Project fetch",
         Prefixes of (renku -> "renku", schema -> "schema"),
         sparql"""|SELECT ?id ?slug ?name ?visibility ?maybeDateModified ?maybeDesc
-                 |  (GROUP_CONCAT(DISTINCT ?keyword; separator=',') AS ?keywords)
-                 |  (GROUP_CONCAT(?encodedImageUrl; separator=',') AS ?images)
+                 |  (GROUP_CONCAT(DISTINCT ?keyword; separator=$concatSeparator) AS ?keywords)
+                 |  (GROUP_CONCAT(?encodedImageUrl; separator=$concatSeparator) AS ?images)
                  |WHERE {
                  |  BIND (${GraphClass.Project.id(project.resourceId)} AS ?id)
                  |  GRAPH ?id {
@@ -409,9 +409,7 @@ class UpdateCommandsCalculatorSpec
       SparqlQuery.ofUnsafe(
         "UpdateCommandsCalculator Projects fetch",
         Prefixes of (renku -> "renku", schema -> "schema"),
-        sparql"""|SELECT ?id ?slug ?name ?visibility ?maybeDateModified ?maybeDesc
-                 |  (GROUP_CONCAT(DISTINCT ?keyword; separator=',') AS ?keywords)
-                 |  (GROUP_CONCAT(?encodedImageUrl; separator=',') AS ?images)
+        sparql"""|SELECT ?id ?slug ?name ?visibility ?maybeDateModified ?maybeDesc ?keywords ?images
                  |WHERE {
                  |  BIND (${project.resourceId.asEntityId} AS ?id)
                  |  GRAPH ${GraphClass.Projects.id} {
@@ -420,16 +418,10 @@ class UpdateCommandsCalculatorSpec
                  |        renku:projectVisibility ?visibility.
                  |    OPTIONAL { ?id schema:dateModified ?maybeDateModified }
                  |    OPTIONAL { ?id schema:description ?maybeDesc }
-                 |    OPTIONAL { ?id schema:keywords ?keyword }
-                 |    OPTIONAL {
-                 |      ?id schema:image ?imageId.
-                 |      ?imageId schema:position ?imagePosition;
-                 |               schema:contentUrl ?imageUrl.
-                 |      BIND(CONCAT(STR(?imagePosition), STR(':'), STR(?imageUrl)) AS ?encodedImageUrl)
-                 |    }
+                 |    OPTIONAL { ?id renku:keywordsConcat ?keywords }
+                 |    OPTIONAL { ?id renku:imagesConcat ?images }
                  |  }
                  |}
-                 |GROUP BY ?id ?slug ?name ?visibility ?maybeDateModified ?maybeDesc
                  |""".stripMargin
       )
     ).map(toDataExtract).flatMap(toOptionOrFail)
@@ -448,10 +440,10 @@ class UpdateCommandsCalculatorSpec
     }
 
   private lazy val toSetOfKeywords: Option[String] => Set[projects.Keyword] =
-    _.map(_.split(',').toList.map(projects.Keyword(_)).toSet).getOrElse(Set.empty)
+    _.map(_.split(concatSeparator).toList.map(projects.Keyword(_)).toSet).getOrElse(Set.empty)
 
   private lazy val toListOfImages: Option[String] => List[ImageUri] =
-    _.map(ImageUri.fromSplitString(',')(_).fold(throw _, identity)).getOrElse(Nil)
+    _.map(ImageUri.fromSplitString(concatSeparator)(_).fold(throw _, identity)).getOrElse(Nil)
 
   private def givenNewValuesFinding(tsData:           DataExtract.TS,
                                     glData:           DataExtract.GL,
