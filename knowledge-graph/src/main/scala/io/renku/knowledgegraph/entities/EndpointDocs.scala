@@ -50,7 +50,7 @@ private class EndpointDocsImpl()(implicit gitLabUrl: GitLabUrl, renkuApiUrl: ren
     GET(
       "Cross-Entity Search",
       "Finds entities by the given criteria",
-      Uri / "entities" :? query & `type` & creator & visibility & namespace & since & until & sort & page & perPage,
+      Uri / "entities" :? query & `type` & creator & owned & visibility & namespace & since & until & sort & page & perPage,
       Status.Ok -> Response("Found entities",
                             Contents(MediaType.`application/json`("Sample response", example)),
                             responseHeaders
@@ -85,6 +85,12 @@ private class EndpointDocsImpl()(implicit gitLabUrl: GitLabUrl, renkuApiUrl: ren
     "creator",
     Schema.String,
     "to filter by creator(s); the filter would require creator's name; multiple creator parameters allowed".some,
+    required = false
+  )
+  private lazy val owned = Parameter.Query(
+    "owned",
+    Schema.String,
+    "to reduce the results to entities where the caller is an owner; allowed values: `true` and `false`".some,
     required = false
   )
   private lazy val visibility = Parameter.Query(
