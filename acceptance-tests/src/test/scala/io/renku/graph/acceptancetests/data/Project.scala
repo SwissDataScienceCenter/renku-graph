@@ -31,7 +31,7 @@ import io.renku.graph.model.testentities
 import io.renku.tinytypes._
 import io.renku.tinytypes.constraints._
 
-import java.net.{MalformedURLException, URL}
+import java.net.URI
 
 final case class Project(entitiesProject: testentities.RenkuProject,
                          id:              GitLabId,
@@ -120,7 +120,7 @@ object Project {
       addConstraint(
         check = url =>
           (url endsWith ".git") && Validated
-            .catchOnly[MalformedURLException](new URL(url))
+            .catchOnly[IllegalArgumentException](new URI(url).toURL)
             .isValid,
         message = url => s"$url is not a valid repository http url"
       )

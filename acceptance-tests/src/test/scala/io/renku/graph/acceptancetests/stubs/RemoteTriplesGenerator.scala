@@ -32,7 +32,7 @@ import io.renku.graph.model._
 import io.renku.graph.model.events.CommitId
 import io.renku.jsonld.JsonLD
 
-import java.net.URL
+import java.net.URI
 
 trait RemoteTriplesGenerator {
   self: ApplicationServices =>
@@ -122,9 +122,9 @@ trait RemoteTriplesGenerator {
 private object RemoteTriplesGeneratorWiremockInstance {
   private val logger = TestLogger()
 
-  private val remoteTriplesGeneratorUrl = new URL(
+  private val remoteTriplesGeneratorUrl = new URI(
     ConfigFactory.load().getString("services.remote-triples-generator.url")
-  )
+  ).toURL
 
   private val port: Int = remoteTriplesGeneratorUrl.getPort
 
