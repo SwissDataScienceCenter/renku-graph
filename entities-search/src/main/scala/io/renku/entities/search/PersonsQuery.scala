@@ -35,31 +35,34 @@ private case object PersonsQuery extends EntityQuery[model.Entity.Person] {
   override def query(criteria: Criteria): Option[String] =
     (criteria.filters whenRequesting (entityType, criteria.filters.withNoOrPublicVisibility, criteria.filters.namespaces.isEmpty, criteria.filters.maybeSince.isEmpty, criteria.filters.maybeUntil.isEmpty)) {
       import criteria._
-      // format: off
-      s"""|{
-          |  SELECT DISTINCT ?entityType ?matchingScore ?name
-          |  WHERE {
-          |    {
-          |      SELECT (SAMPLE(?id) AS ?personId) ?name (MAX(?score) AS ?matchingScore)
-          |      WHERE {
-          |        ${filters.onQuery(
-                   s"""(?id ?score) text:query (schema:name '${filters.query.query}').""",
-                   matchingScoreVariableName = "?score")}
-          |        GRAPH <${GraphClass.Persons.id}> {
-          |          ?id a schema:Person;
-          |              schema:name ?name.
-          |          ${filterOnOwned(criteria.filters.maybeOwned).sparql}
-          |        }
-          |        ${filters.maybeOnCreatorName(VarName("name")).sparql}
-          |      }
-          |      GROUP BY ?name
-          |    }
-          |    BIND ('person' AS ?entityType)
-          |  }
-          |}
-          |""".stripMargin
-    // format: on
+      sparql"""|{
+               |  SELECT DISTINCT ?entityType ?matchingScore ?name
+               |  WHERE {
+               |    {
+               |      SELECT (SAMPLE(?id) AS ?personId) ?name (MAX(?score) AS ?matchingScore)
+               |      WHERE {
+               |        ${textPart(criteria.filters)}
+               |        
+               |        GRAPH ${GraphClass.Persons.id} {
+               |          ?id a schema:Person;
+               |              schema:name ?name.
+               |          ${filterOnOwned(criteria.filters.maybeOwned)}
+               |        }
+               |        ${filters.maybeOnCreatorName(VarName("name"))}
+               |      }
+               |      GROUP BY ?name
+               |    }
+               |    BIND ('person' AS ?entityType)
+               |  }
+               |}
+               |""".stripMargin.sparql
     }
+
+  private def textPart(filters: Criteria.Filters) =
+    filters.onQuery(
+      snippet = fr"""(?id ?score) text:query (schema:name ${filters.query.query.asTripleObject}).""",
+      matchingScoreVariableName = VarName("score")
+    )
 
   private lazy val filterOnOwned: Option[Criteria.Filters.Owned] => Fragment = {
     case Some(Criteria.Filters.Owned(userId)) =>

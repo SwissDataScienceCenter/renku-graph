@@ -43,8 +43,8 @@ package object search {
       Option.when(typeMatching && predicates.forall(_ == true))(query)
     }
 
-    def onQuery(snippet: String, matchingScoreVariableName: String = "?matchingScore"): String =
-      foldQuery(_ => snippet, s"BIND (xsd:float(1.0) AS $matchingScoreVariableName)")
+    def onQuery(snippet: Fragment, matchingScoreVariableName: VarName = VarName("matchingScore")): Fragment =
+      foldQuery(_ => snippet, fr"BIND (xsd:float(1.0) AS $matchingScoreVariableName)")
 
     def foldQuery[A](ifPresent: LuceneQuery => A, ifMissing: => A): A =
       if (query.isQueryAll) ifMissing

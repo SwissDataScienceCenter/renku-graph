@@ -631,7 +631,7 @@ class EntitiesFinderSpec
         .modify(replaceMembers(Set(owner)))
         .addDataset(datasetEntities(provenanceNonModified).modify(replaceDSCreators(NonEmptyList.of(owner.person))))
         .generateOne
-      val dsAndNonPublicProject @ _ -> nonPublicProject = renkuProjectEntities(visibilityNonPublic)
+      val _ -> nonPublicProject = renkuProjectEntities(visibilityNonPublic)
         .modify(replaceMembers(Set(owner)))
         .addDataset(datasetEntities(provenanceNonModified).modify(replaceDSCreators(NonEmptyList.of(owner.person))))
         .generateOne
