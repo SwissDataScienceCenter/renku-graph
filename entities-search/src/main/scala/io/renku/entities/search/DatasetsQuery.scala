@@ -25,7 +25,6 @@ import io.renku.entities.search.Criteria.Filters
 import io.renku.entities.search.model.{Entity, MatchingScore}
 import io.renku.entities.searchgraphs.concatSeparator
 import io.renku.graph.model._
-import io.renku.graph.model.projects.Visibility
 import io.renku.http.server.security.model.AuthUser
 import io.renku.projectauth.util.SparqlSnippets
 import io.renku.triplesstore.client.sparql.{Fragment, LuceneQuery, VarName}
@@ -34,22 +33,23 @@ import io.renku.triplesstore.client.syntax._
 object DatasetsQuery extends EntityQuery[Entity.Dataset] {
   override val entityType: Filters.EntityType = Filters.EntityType.Dataset
 
-  val matchingScoreVar        = VarName("matchingScore")
-  val nameVar                 = VarName("name")
-  val idsSlugsVisibilitiesVar = VarName("idsSlugsVisibilities")
-  val sameAsVar               = VarName("sameAs")
-  val maybeDateCreatedVar     = VarName("maybeDateCreated")
-  val maybeDatePublishedVar   = VarName("maybeDatePublished")
-  val maybeDateModified       = VarName("maybeDateModified")
-  val dateVar                 = VarName("date")
-  val creatorsNamesVar        = VarName("creatorsNames")
-  val maybeDescriptionVar     = VarName("maybeDescription")
-  val keywordsVar             = VarName("keywords")
-  val imagesVar               = VarName("images")
+  private val matchingScoreVar        = VarName("matchingScore")
+  private val nameVar                 = VarName("name")
+  private val idsSlugsVisibilitiesVar = VarName("idsSlugsVisibilities")
+  private val sameAsVar               = VarName("sameAs")
+  private val maybeDateCreatedVar     = VarName("maybeDateCreated")
+  private val maybeDatePublishedVar   = VarName("maybeDatePublished")
+  private val maybeDateModified       = VarName("maybeDateModified")
+  private val dateVar                 = VarName("date")
+  private val creatorsNamesVar        = VarName("creatorsNames")
+  private val maybeDescriptionVar     = VarName("maybeDescription")
+  private val keywordsVar             = VarName("keywords")
+  private val imagesVar               = VarName("images")
 
-  private val authSnippets = SparqlSnippets(VarName("projId"))
+  private val projIdVar    = VarName("projId")
+  private val authSnippets = SparqlSnippets(projIdVar)
 
-  override val selectVariables = Set(
+  override val selectVariables: Set[String] = Set(
     entityTypeVar,
     matchingScoreVar,
     nameVar,
@@ -111,7 +111,7 @@ object DatasetsQuery extends EntityQuery[Entity.Dataset] {
           |        ${namespacesPart(criteria.filters.namespaces)}
           |
           |        # access restriction
-          |        ${accessRightsAndVisibility(criteria.maybeUser, criteria.filters.visibilities)}
+          |        ${accessRightsAndVisibility(criteria.maybeUser, criteria.filters)}
           |      }
           |    }
           |  }# end sub select
@@ -133,11 +133,21 @@ object DatasetsQuery extends EntityQuery[Entity.Dataset] {
           |""".stripMargin.sparql
     }
 
-  private def accessRightsAndVisibility(maybeUser: Option[AuthUser], visibilities: Set[Visibility]): Fragment =
-    sparql"""
-            |?projId renku:projectVisibility ?visibility .
-            |${authSnippets.visibleProjects(maybeUser.map(_.id), visibilities)}
-            """
+  private def accessRightsAndVisibility(maybeUser: Option[AuthUser], filters: Criteria.Filters): Fragment =
+    filters.maybeOwned match {
+      case Some(Criteria.Filters.Owned(true, ownerId)) =>
+        fr"""|$projIdVar renku:projectVisibility ?visibility .
+             |${authSnippets.ownedProjects(ownerId)}
+             |""".stripMargin
+      case Some(Criteria.Filters.Owned(false, ownerId)) =>
+        fr"""|$projIdVar renku:projectVisibility ?visibility .
+             |${authSnippets.notOwnedProjects(ownerId)}
+             |""".stripMargin
+      case None =>
+        fr"""|$projIdVar renku:projectVisibility ?visibility .
+             |${authSnippets.visibleProjects(maybeUser.map(_.id), filters.visibilities)}
+             |""".stripMargin
+    }
 
   private def resolveProject: Fragment =
     fr"""|    $sameAsVar a renku:DiscoverableDataset;

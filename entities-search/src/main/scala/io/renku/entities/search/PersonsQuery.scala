@@ -21,16 +21,18 @@ package io.renku.entities.search
 import io.circe.Decoder
 import io.renku.entities.search.Criteria.Filters.EntityType
 import io.renku.entities.search.model.{Entity, MatchingScore}
+import io.renku.graph.model.entities.Person.gitLabSameAsAdditionalType
 import io.renku.graph.model.{GraphClass, persons}
-import io.renku.triplesstore.client.sparql.VarName
+import io.renku.triplesstore.client.sparql.{Fragment, VarName}
+import io.renku.triplesstore.client.syntax._
 
 private case object PersonsQuery extends EntityQuery[model.Entity.Person] {
 
   override val entityType: EntityType = EntityType.Person
 
-  override val selectVariables = Set("?entityType", "?matchingScore", "?name")
+  override val selectVariables: Set[String] = Set("?entityType", "?matchingScore", "?name")
 
-  override def query(criteria: Criteria) =
+  override def query(criteria: Criteria): Option[String] =
     (criteria.filters whenRequesting (entityType, criteria.filters.withNoOrPublicVisibility, criteria.filters.namespaces.isEmpty, criteria.filters.maybeSince.isEmpty, criteria.filters.maybeUntil.isEmpty)) {
       import criteria._
       // format: off
@@ -45,7 +47,8 @@ private case object PersonsQuery extends EntityQuery[model.Entity.Person] {
                    matchingScoreVariableName = "?score")}
           |        GRAPH <${GraphClass.Persons.id}> {
           |          ?id a schema:Person;
-          |              schema:name ?name
+          |              schema:name ?name.
+          |          ${filterOnOwned(criteria.filters.maybeOwned).sparql}
           |        }
           |        ${filters.maybeOnCreatorName(VarName("name")).sparql}
           |      }
@@ -57,6 +60,22 @@ private case object PersonsQuery extends EntityQuery[model.Entity.Person] {
           |""".stripMargin
     // format: on
     }
+
+  private lazy val filterOnOwned: Option[Criteria.Filters.Owned] => Fragment = {
+    case Some(Criteria.Filters.Owned(true, userId)) =>
+      fr"""|?id schema:sameAs ?sameAsId.
+           |?sameAsId schema:additionalType ${gitLabSameAsAdditionalType.asTripleObject};
+           |          schema:identifier ${userId.asObject}.
+           |""".stripMargin
+    case Some(Criteria.Filters.Owned(false, userId)) =>
+      fr"""|?id schema:sameAs ?sameAsId.
+           |FILTER NOT EXISTS {
+           |  ?sameAsId schema:additionalType ${gitLabSameAsAdditionalType.asTripleObject};
+           |            schema:identifier ${userId.asObject}.
+           |}
+           |""".stripMargin
+    case None => Fragment.empty
+  }
 
   override def decoder[EE >: Entity.Person]: Decoder[EE] = { implicit cursor =>
     import io.renku.tinytypes.json.TinyTypeDecoders._

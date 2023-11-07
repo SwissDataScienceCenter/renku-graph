@@ -35,7 +35,7 @@ import io.renku.generators.Generators._
 import io.renku.graph.model._
 import io.renku.graph.model.projects.Visibility
 import io.renku.graph.model.testentities.generators.EntitiesGenerators
-import io.renku.graph.model.testentities.{Dataset, StepPlan}
+import io.renku.graph.model.testentities.{Dataset, Project, StepPlan}
 import io.renku.graph.model.tools.AdditionalMatchers
 import io.renku.http.rest.paging.PagingRequest
 import io.renku.http.rest.paging.model._
@@ -541,6 +541,41 @@ class EntitiesFinderSpec
       }
 
       results.results shouldBe Nil
+    }
+  }
+
+  "findEntities - with owned filter" should {
+
+    "return entities where the given user is an owner" in new TestCase {
+
+      val ownerId = personGitLabIds.generateOne
+      val owner   = Project.Member(personEntities(ownerId.some).generateOne, projects.Role.Owner)
+
+      val soleProject = renkuProjectEntities(anyVisibility)
+        .modify(replaceMembers(Set(owner)))
+        .generateOne
+
+      val dsAndProject @ _ -> dsProject = renkuProjectEntities(anyVisibility)
+        .modify(replaceMembers(Set(owner)))
+        .addDataset(
+          datasetEntities(provenanceNonModified)
+            .modify(replaceDSCreators(NonEmptyList.of(personEntities.generateOne, owner.person)))
+        )
+        .generateOne
+
+      val results = IOBody {
+        provisionTestProjects(soleProject, dsProject, projectEntities(visibilityPublic).generateOne) *>
+          finder.findEntities(Criteria(Filters(maybeOwned = Criteria.Filters.Owned.by(ownerId).some)))
+      }
+
+      val expected = List(
+        soleProject.to[model.Entity.Project],
+        dsProject.to[model.Entity.Project],
+        dsAndProject.to[model.Entity.Dataset],
+        owner.person.to[model.Entity.Person]
+      ).sortBy(_.name)(nameOrdering)
+
+      results.results shouldMatchTo expected
     }
   }
 

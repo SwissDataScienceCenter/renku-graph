@@ -87,7 +87,7 @@ private case object ProjectsQuery extends EntityQuery[model.Entity.Project] {
              |
              |      ${filters.maybeOnDateCreated(maybeDateCreatedVar)}
              |
-             |      ${accessRightsAndVisibility(criteria.maybeUser, criteria.filters.visibilities)}
+             |      ${accessRightsAndVisibility(criteria.maybeUser, criteria.filters)}
              |
              |      GRAPH $projectIdVar {
              |        ${namespacesPart(criteria.filters.namespaces)}
@@ -138,11 +138,21 @@ private case object ProjectsQuery extends EntityQuery[model.Entity.Project] {
            |""".stripMargin
   }
 
-  private def accessRightsAndVisibility(maybeUser: Option[AuthUser], visibilities: Set[projects.Visibility]): Fragment =
-    sparql"""
-            |$projectIdVar renku:projectVisibility $visibilityVar .
-            |${authSnippets.visibleProjects(maybeUser.map(_.id), visibilities)}
-              """.stripMargin
+  private def accessRightsAndVisibility(maybeUser: Option[AuthUser], filters: Criteria.Filters): Fragment =
+    filters.maybeOwned match {
+      case Some(Criteria.Filters.Owned(true, ownerId)) =>
+        fr"""|$projectIdVar renku:projectVisibility $visibilityVar .
+             |${authSnippets.ownedProjects(ownerId)}
+             |""".stripMargin
+      case Some(Criteria.Filters.Owned(false, ownerId)) =>
+        fr"""|$projectIdVar renku:projectVisibility $visibilityVar .
+             |${authSnippets.notOwnedProjects(ownerId)}
+             |""".stripMargin
+      case None =>
+        fr"""|$projectIdVar renku:projectVisibility $visibilityVar .
+             |${authSnippets.visibleProjects(maybeUser.map(_.id), filters.visibilities)}
+             |""".stripMargin
+    }
 
   private def namespacesPart(ns: Set[projects.Namespace]): Fragment = {
     val matchFrag =
