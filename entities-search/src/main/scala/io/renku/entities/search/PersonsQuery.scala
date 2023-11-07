@@ -32,7 +32,7 @@ private case object PersonsQuery extends EntityQuery[model.Entity.Person] {
 
   override val selectVariables: Set[String] = Set("?entityType", "?matchingScore", "?name")
 
-  override def query(criteria: Criteria): Option[String] =
+  override def query(criteria: Criteria): Option[Fragment] =
     (criteria.filters whenRequesting (entityType, criteria.filters.withNoOrPublicVisibility, criteria.filters.namespaces.isEmpty, criteria.filters.maybeSince.isEmpty, criteria.filters.maybeUntil.isEmpty)) {
       import criteria._
       sparql"""|{
@@ -42,7 +42,7 @@ private case object PersonsQuery extends EntityQuery[model.Entity.Person] {
                |      SELECT (SAMPLE(?id) AS ?personId) ?name (MAX(?score) AS ?matchingScore)
                |      WHERE {
                |        ${textPart(criteria.filters)}
-               |        
+               |
                |        GRAPH ${GraphClass.Persons.id} {
                |          ?id a schema:Person;
                |              schema:name ?name.
@@ -55,7 +55,7 @@ private case object PersonsQuery extends EntityQuery[model.Entity.Person] {
                |    BIND ('person' AS ?entityType)
                |  }
                |}
-               |""".stripMargin.sparql
+               |""".stripMargin
     }
 
   private def textPart(filters: Criteria.Filters) =

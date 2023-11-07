@@ -21,12 +21,12 @@ package io.renku.entities.search
 import io.circe.Decoder
 import io.renku.entities.search.Criteria.Filters.EntityType
 import io.renku.triplesstore.ResultsDecoder
-import io.renku.triplesstore.client.sparql.VarName
+import io.renku.triplesstore.client.sparql.{Fragment, VarName}
 
 private[entities] trait EntityQuery[+E <: model.Entity] extends ResultsDecoder with EntityQueryVars {
   val entityType:      EntityType
   val selectVariables: Set[String]
-  def query(criteria: Criteria): Option[String]
+  def query(criteria: Criteria): Option[Fragment]
   def decoder[EE >: E]: Decoder[EE]
 
   def getDecoder[EE >: E](entityType: EntityType): Option[Decoder[EE]] =

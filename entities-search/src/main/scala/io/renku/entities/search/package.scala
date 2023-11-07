@@ -35,7 +35,7 @@ package object search {
     lazy val query: LuceneQuery =
       filters.maybeQuery.map(q => LuceneQuery.fuzzy(q.value)).getOrElse(LuceneQuery.queryAll)
 
-    def whenRequesting(entityType: Filters.EntityType, predicates: Boolean*)(query: => String): Option[String] = {
+    def whenRequesting(entityType: Filters.EntityType, predicates: Boolean*)(query: => Fragment): Option[Fragment] = {
       val typeMatching = filters.entityTypes match {
         case t if t.isEmpty => true
         case t              => t contains entityType

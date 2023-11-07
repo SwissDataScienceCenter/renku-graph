@@ -48,7 +48,7 @@ private case object WorkflowsQuery extends EntityQuery[model.Entity.Workflow] {
 
   private val authSnippets = SparqlSnippets(VarName("projectId"))
 
-  override def query(criteria: Criteria): Option[String] = (criteria.filters whenRequesting entityType) {
+  override def query(criteria: Criteria): Option[Fragment] = (criteria.filters whenRequesting entityType) {
     import criteria._
     // format: off
     sparql"""|{
@@ -109,7 +109,7 @@ private case object WorkflowsQuery extends EntityQuery[model.Entity.Workflow] {
         |    BIND ('workflow' AS ?entityType)
         |  }
         |}
-        |""".stripMargin.sparql
+        |""".stripMargin
     // format: on
   }
 

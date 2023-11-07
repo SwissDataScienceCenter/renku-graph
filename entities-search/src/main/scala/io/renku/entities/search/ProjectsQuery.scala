@@ -63,7 +63,7 @@ private case object ProjectsQuery extends EntityQuery[model.Entity.Project] {
       imagesVar
     ).map(_.name)
 
-  override def query(criteria: Criteria): Option[String] = (criteria.filters whenRequesting entityType) {
+  override def query(criteria: Criteria): Option[Fragment] = (criteria.filters whenRequesting entityType) {
     import criteria._
     sparql"""|{
              |  SELECT DISTINCT $entityTypeVar $matchingScoreVar $nameVar $slugVar $visibilityVar
@@ -107,7 +107,7 @@ private case object ProjectsQuery extends EntityQuery[model.Entity.Project] {
              |    }
              |  }
              |}
-             |""".stripMargin.sparql
+             |""".stripMargin
   }
 
   private def textQueryPart: Option[Criteria.Filters.Query] => Fragment = {

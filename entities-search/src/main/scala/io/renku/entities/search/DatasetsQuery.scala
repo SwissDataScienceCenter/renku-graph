@@ -65,7 +65,7 @@ object DatasetsQuery extends EntityQuery[Entity.Dataset] {
     imagesVar
   ).map(_.name)
 
-  override def query(criteria: Criteria): Option[String] =
+  override def query(criteria: Criteria): Option[Fragment] =
     criteria.filters.whenRequesting(entityType) {
       fr"""{
           |SELECT DISTINCT $entityTypeVar
@@ -130,7 +130,7 @@ object DatasetsQuery extends EntityQuery[Entity.Dataset] {
           |  }
           |}
           |}
-          |""".stripMargin.sparql
+          |""".stripMargin
     }
 
   private def accessRightsAndVisibility(maybeUser: Option[AuthUser], filters: Criteria.Filters): Fragment =
