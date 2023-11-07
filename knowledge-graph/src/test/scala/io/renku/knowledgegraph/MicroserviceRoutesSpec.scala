@@ -275,9 +275,7 @@ class MicroserviceRoutesSpec
         "uri"                          -> "criteria",
         uri"/knowledge-graph/entities" -> Criteria(),
         queryParams
-          .map(query =>
-            uri"/knowledge-graph/entities" +? ("query" -> query.value) -> Criteria(Filters(maybeQuery = query.some))
-          )
+          .map(q => uri"/knowledge-graph/entities" +? ("query" -> q.value) -> Criteria(Filters(maybeQuery = q.some)))
           .generateOne,
         typeParams
           .map(t => uri"/knowledge-graph/entities" +? ("type" -> t.value) -> Criteria(Filters(entityTypes = Set(t))))
@@ -380,6 +378,7 @@ class MicroserviceRoutesSpec
       )
     } { (uri, criteria) =>
       s"read the query parameters from $uri, pass them to the endpoint and return received response" in new TestCase {
+
         val request = Request[IO](GET, uri)
 
         val responseBody = jsons.generateOne
@@ -393,6 +392,34 @@ class MicroserviceRoutesSpec
         response.contentType shouldBe Some(`Content-Type`(application.json))
         response.body[Json]  shouldBe responseBody
       }
+    }
+
+    "read the 'owned' query parameter from the uri and pass it to the endpoint when auth user present" in new TestCase {
+
+      val authUser      = authUsers.generateOne
+      val maybeAuthUser = MaybeAuthUser(authUser)
+      val criteria = Criteria(Filters(maybeOwned = Filters.Owned(authUser.id).some), maybeUser = maybeAuthUser.option)
+      val request  = Request[IO](GET, uri"/knowledge-graph/entities" +? "owned")
+
+      val responseBody = jsons.generateOne
+      (entitiesEndpoint.`GET /entities` _)
+        .expects(criteria, request)
+        .returning(Response[IO](Ok).withEntity(responseBody).pure[IO])
+
+      val response = routes(maybeAuthUser).call(request)
+
+      response.status      shouldBe Ok
+      response.contentType shouldBe Some(`Content-Type`(application.json))
+      response.body[Json]  shouldBe responseBody
+    }
+
+    s"return $BadRequest 'owned' query parameter given but no auth user present" in new TestCase {
+
+      val response = routes().call(Request[IO](GET, uri"/knowledge-graph/entities" +? "owned"))
+
+      response.status        shouldBe BadRequest
+      response.contentType   shouldBe Some(`Content-Type`(application.json))
+      response.body[Message] shouldBe Message.Error("'owned' parameter present but no access token")
     }
 
     s"return $BadRequest for invalid parameter values" in new TestCase {
@@ -1115,9 +1142,10 @@ class MicroserviceRoutesSpec
       .expects(identifier, maybeAuthUser)
       .returning(returning)
 
-    def givenDSSameAsAuthorizer(sameAs:        model.datasets.SameAs,
-                                maybeAuthUser: Option[AuthUser],
-                                returning: EitherT[IO, EndpointSecurityException, AuthContext[model.datasets.SameAs]]
+    private def givenDSSameAsAuthorizer(
+        sameAs:        model.datasets.SameAs,
+        maybeAuthUser: Option[AuthUser],
+        returning:     EitherT[IO, EndpointSecurityException, AuthContext[model.datasets.SameAs]]
     ) = (datasetSameAsAuthorizer.authorize _)
       .expects(sameAs, maybeAuthUser)
       .returning(returning)

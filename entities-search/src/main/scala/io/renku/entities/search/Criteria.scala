@@ -42,6 +42,7 @@ object Criteria {
   final case class Filters(maybeQuery:   Option[Filters.Query] = None,
                            entityTypes:  Set[Filters.EntityType] = Set.empty,
                            creators:     Set[persons.Name] = Set.empty,
+                           maybeOwned:   Option[Filters.Owned] = None,
                            visibilities: Set[projects.Visibility] = Set.empty,
                            namespaces:   Set[projects.Namespace] = Set.empty,
                            maybeSince:   Option[Filters.Since] = None,
@@ -53,7 +54,9 @@ object Criteria {
     final class Query private (val value: String) extends AnyVal with StringTinyType
     object Query                                  extends TinyTypeFactory[Query](new Query(_)) with NonBlank[Query]
 
-    sealed trait EntityType extends StringTinyType with Product with Serializable
+    final case class Owned(userId: persons.GitLabId)
+
+    sealed trait EntityType extends StringTinyType with Product
     object EntityType extends TinyTypeFactory[EntityType](EntityTypeApply) {
 
       final case object Project  extends EntityType { override val value: String = "project" }

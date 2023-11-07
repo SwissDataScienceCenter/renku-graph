@@ -35,7 +35,7 @@ package object search {
     lazy val query: LuceneQuery =
       filters.maybeQuery.map(q => LuceneQuery.fuzzy(q.value)).getOrElse(LuceneQuery.queryAll)
 
-    def whenRequesting(entityType: Filters.EntityType, predicates: Boolean*)(query: => String): Option[String] = {
+    def whenRequesting(entityType: Filters.EntityType, predicates: Boolean*)(query: => Fragment): Option[Fragment] = {
       val typeMatching = filters.entityTypes match {
         case t if t.isEmpty => true
         case t              => t contains entityType
@@ -43,8 +43,8 @@ package object search {
       Option.when(typeMatching && predicates.forall(_ == true))(query)
     }
 
-    def onQuery(snippet: String, matchingScoreVariableName: String = "?matchingScore"): String =
-      foldQuery(_ => snippet, s"BIND (xsd:float(1.0) AS $matchingScoreVariableName)")
+    def onQuery(snippet: Fragment, matchingScoreVariableName: VarName = VarName("matchingScore")): Fragment =
+      foldQuery(_ => snippet, fr"BIND (xsd:float(1.0) AS $matchingScoreVariableName)")
 
     def foldQuery[A](ifPresent: LuceneQuery => A, ifMissing: => A): A =
       if (query.isQueryAll) ifMissing

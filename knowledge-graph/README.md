@@ -300,6 +300,7 @@ Allows finding `projects`, `datasets`, `workflows`, and `persons`.
 * `query`      - to filter by matching field (e.g., title, keyword, description, etc. as specified below)
 * `type`       - to filter by entity type(s); allowed values: `project`, `dataset`, `workflow`, and `person`; multiple `type` parameters allowed
 * `creator`    - to filter by creator(s); the filter would require creator's name; multiple `creator` parameters allowed
+* `owned`      - to reduce the results to entities where the caller is an owner; this parameter does not require any value
 * `visibility` - to filter by visibility(ies) (restricted vs. public); allowed values: `public`, `internal`, `private`; multiple `visibility` parameters allowed
 * `namespace`  - to filter by namespace(s); there might be multiple values given; for nested namespaces the whole path has be used, e.g. `group/subgroup` 
 * `since`      - to filter by entity's creation date to >= the given date
@@ -328,12 +329,12 @@ When the `query` parameter is given, the match is done on the following fields:
 
 **Response**
 
-| Status                       | Description                                      |
-|------------------------------|--------------------------------------------------|
-| OK (200)                     | If results are found; `[]` if nothing is found   |
-| BAD_REQUEST (400)            | If illegal values for query parameters are given |
-| UNAUTHORIZED (401)           | If given auth header cannot be authenticated     |
-| INTERNAL SERVER ERROR (500)  | Otherwise                                        |
+| Status                       | Description                                                                                    |
+|------------------------------|------------------------------------------------------------------------------------------------|
+| OK (200)                     | If results are found; `[]` if nothing is found                                                 |
+| BAD_REQUEST (400)            | If illegal values for query parameters are given or `owned` specified but no auth user present |
+| UNAUTHORIZED (401)           | If given auth header cannot be authenticated                                                   |
+| INTERNAL SERVER ERROR (500)  | Otherwise                                                                                      |
 
 Response headers:
 

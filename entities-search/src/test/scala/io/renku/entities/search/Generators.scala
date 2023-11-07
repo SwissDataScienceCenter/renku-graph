@@ -30,11 +30,11 @@ import testentities._
 
 object Generators {
 
-  val queryParams:    Gen[Filters.Query]      = nonBlankStrings(minLength = 5).map(v => Filters.Query(v.value))
-  val typeParams:     Gen[Filters.EntityType] = Gen.oneOf(Filters.EntityType.all)
-  val sinceParams:    Gen[Filters.Since]      = localDatesNotInTheFuture.toGeneratorOf(Filters.Since)
-  val untilParams:    Gen[Filters.Until]      = localDatesNotInTheFuture.toGeneratorOf(Filters.Until)
-  val matchingScores: Gen[MatchingScore]      = choose(MatchingScore.min.value, 10f).toGeneratorOf(MatchingScore)
+  val queryParams: Gen[Filters.Query]      = nonBlankStrings(minLength = 5).map(v => Filters.Query(v.value))
+  val typeParams:  Gen[Filters.EntityType] = Gen.oneOf(Filters.EntityType.all)
+  val sinceParams:    Gen[Filters.Since] = localDatesNotInTheFuture.toGeneratorOf(Filters.Since)
+  val untilParams:    Gen[Filters.Until] = localDatesNotInTheFuture.toGeneratorOf(Filters.Until)
+  val matchingScores: Gen[MatchingScore] = choose(MatchingScore.min.value, 10f).toGeneratorOf(MatchingScore)
 
   val modelProjects: Gen[model.Entity.Project] = anyProjectEntities.map(_.to[model.Entity.Project])
   val modelDatasets: Gen[model.Entity.Dataset] =
