@@ -565,7 +565,7 @@ class EntitiesFinderSpec
 
       val results = IOBody {
         provisionTestProjects(soleProject, dsProject, projectEntities(visibilityPublic).generateOne) *>
-          finder.findEntities(Criteria(Filters(maybeOwned = Criteria.Filters.Owned.by(ownerId).some)))
+          finder.findEntities(Criteria(Filters(maybeOwned = Criteria.Filters.Owned(ownerId).some)))
       }
 
       val expected = List(

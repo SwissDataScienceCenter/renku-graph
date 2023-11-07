@@ -398,9 +398,8 @@ class MicroserviceRoutesSpec
 
       val authUser      = authUsers.generateOne
       val maybeAuthUser = MaybeAuthUser(authUser)
-      val ownedParam    = ownedParams(authUser.id).generateOne
-      val criteria      = Criteria(Filters(maybeOwned = ownedParam.some), maybeUser = maybeAuthUser.option)
-      val request       = Request[IO](GET, uri"/knowledge-graph/entities" +? ("owned" -> ownedParam.boolean))
+      val criteria = Criteria(Filters(maybeOwned = Filters.Owned(authUser.id).some), maybeUser = maybeAuthUser.option)
+      val request  = Request[IO](GET, uri"/knowledge-graph/entities" +? "owned")
 
       val responseBody = jsons.generateOne
       (entitiesEndpoint.`GET /entities` _)
@@ -416,10 +415,7 @@ class MicroserviceRoutesSpec
 
     s"return $BadRequest 'owned' query parameter given but no auth user present" in new TestCase {
 
-      val response =
-        routes().call(
-          Request[IO](GET, uri"/knowledge-graph/entities" +? ("owned" -> Gen.oneOf(true, false).generateOne))
-        )
+      val response = routes().call(Request[IO](GET, uri"/knowledge-graph/entities" +? "owned"))
 
       response.status        shouldBe BadRequest
       response.contentType   shouldBe Some(`Content-Type`(application.json))

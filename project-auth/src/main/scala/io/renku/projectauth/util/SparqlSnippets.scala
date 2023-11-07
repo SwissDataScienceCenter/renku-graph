@@ -53,14 +53,6 @@ final class SparqlSnippets(val projectId: VarName) {
          |}
          | """.stripMargin
 
-  def notOwnedProjects(userId: persons.GitLabId): Fragment =
-    fr"""|GRAPH renku:ProjectAuth {
-         |   FILTER NOT EXISTS {
-         |     $projectId renku:memberRole ${ProjectMember(userId, projects.Role.Owner).encoded}.
-         |   }
-         |}
-         | """.stripMargin
-
   def visibleProjects(userId: Option[persons.GitLabId], selectedVisibility: Set[Visibility]): Fragment = {
     val visibilities =
       if (selectedVisibility.isEmpty) Visibility.all

@@ -62,17 +62,10 @@ private case object PersonsQuery extends EntityQuery[model.Entity.Person] {
     }
 
   private lazy val filterOnOwned: Option[Criteria.Filters.Owned] => Fragment = {
-    case Some(Criteria.Filters.Owned(true, userId)) =>
+    case Some(Criteria.Filters.Owned(userId)) =>
       fr"""|?id schema:sameAs ?sameAsId.
            |?sameAsId schema:additionalType ${gitLabSameAsAdditionalType.asTripleObject};
            |          schema:identifier ${userId.asObject}.
-           |""".stripMargin
-    case Some(Criteria.Filters.Owned(false, userId)) =>
-      fr"""|?id schema:sameAs ?sameAsId.
-           |FILTER NOT EXISTS {
-           |  ?sameAsId schema:additionalType ${gitLabSameAsAdditionalType.asTripleObject};
-           |            schema:identifier ${userId.asObject}.
-           |}
            |""".stripMargin
     case None => Fragment.empty
   }

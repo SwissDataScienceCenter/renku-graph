@@ -114,10 +114,8 @@ private case object WorkflowsQuery extends EntityQuery[model.Entity.Workflow] {
 
   private def accessRightsAndVisibility(maybeUser: Option[AuthUser], filters: Criteria.Filters): Fragment =
     filters.maybeOwned match {
-      case Some(Criteria.Filters.Owned(true, ownerId)) =>
+      case Some(Criteria.Filters.Owned(ownerId)) =>
         authSnippets.ownedProjects(ownerId)
-      case Some(Criteria.Filters.Owned(false, ownerId)) =>
-        authSnippets.notOwnedProjects(ownerId)
       case None =>
         authSnippets.visibleProjects(maybeUser.map(_.id), filters.visibilities)
     }

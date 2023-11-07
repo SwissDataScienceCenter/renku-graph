@@ -140,13 +140,9 @@ private case object ProjectsQuery extends EntityQuery[model.Entity.Project] {
 
   private def accessRightsAndVisibility(maybeUser: Option[AuthUser], filters: Criteria.Filters): Fragment =
     filters.maybeOwned match {
-      case Some(Criteria.Filters.Owned(true, ownerId)) =>
+      case Some(Criteria.Filters.Owned(ownerId)) =>
         fr"""|$projectIdVar renku:projectVisibility $visibilityVar .
              |${authSnippets.ownedProjects(ownerId)}
-             |""".stripMargin
-      case Some(Criteria.Filters.Owned(false, ownerId)) =>
-        fr"""|$projectIdVar renku:projectVisibility $visibilityVar .
-             |${authSnippets.notOwnedProjects(ownerId)}
              |""".stripMargin
       case None =>
         fr"""|$projectIdVar renku:projectVisibility $visibilityVar .

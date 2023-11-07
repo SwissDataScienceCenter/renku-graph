@@ -54,11 +54,7 @@ object Criteria {
     final class Query private (val value: String) extends AnyVal with StringTinyType
     object Query                                  extends TinyTypeFactory[Query](new Query(_)) with NonBlank[Query]
 
-    final case class Owned(boolean: Boolean, userId: persons.GitLabId)
-    object Owned {
-      def by(userId:    persons.GitLabId): Owned = Owned(boolean = true, userId)
-      def notBy(userId: persons.GitLabId): Owned = Owned(boolean = false, userId)
-    }
+    final case class Owned(userId: persons.GitLabId)
 
     sealed trait EntityType extends StringTinyType with Product
     object EntityType extends TinyTypeFactory[EntityType](EntityTypeApply) {

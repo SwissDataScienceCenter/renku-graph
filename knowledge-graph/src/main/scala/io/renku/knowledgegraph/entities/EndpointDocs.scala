@@ -90,7 +90,7 @@ private class EndpointDocsImpl()(implicit gitLabUrl: GitLabUrl, renkuApiUrl: ren
   private lazy val owned = Parameter.Query(
     "owned",
     Schema.String,
-    "to reduce the results to entities where the caller is an owner; allowed values: `true` and `false`".some,
+    "to reduce the results to entities where the caller is an owner; this parameter does not require any value".some,
     required = false
   )
   private lazy val visibility = Parameter.Query(

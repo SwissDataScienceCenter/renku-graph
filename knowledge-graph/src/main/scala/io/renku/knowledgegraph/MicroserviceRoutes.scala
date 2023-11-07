@@ -19,7 +19,7 @@
 package io.renku.knowledgegraph
 
 import QueryParamDecoders._
-import cats.data.Validated.{Invalid, Valid}
+import cats.data.Validated.Valid
 import cats.data.{EitherT, Validated, ValidatedNel}
 import cats.effect.{Async, Resource}
 import cats.syntax.all._
@@ -226,7 +226,7 @@ private class MicroserviceRoutes[F[_]: Async](
       maybeQuery:   Option[ValidatedNel[ParseFailure, EntitiesSearchCriteria.Filters.Query]],
       types:        ValidatedNel[ParseFailure, List[EntitiesSearchCriteria.Filters.EntityType]],
       creators:     ValidatedNel[ParseFailure, List[persons.Name]],
-      maybeOwned:   Option[ValidatedNel[ParseFailure, Boolean]],
+      maybeOwned:   Boolean,
       visibilities: ValidatedNel[ParseFailure, List[model.projects.Visibility]],
       namespaces:   ValidatedNel[ParseFailure, List[model.projects.Namespace]],
       maybeSince:   Option[ValidatedNel[ParseFailure, EntitiesSearchCriteria.Filters.Since]],
@@ -244,11 +244,9 @@ private class MicroserviceRoutes[F[_]: Async](
       types.map(_.toSet),
       creators.map(_.toSet),
       maybeOwned -> maybeUser match {
-        case (Some(Valid(boolean)), Some(authUser)) => Owned(boolean, authUser.id).some.validNel[ParseFailure]
-        case (Some(Valid(_)), None) =>
-          ParseFailure("'owned' parameter present but no access token", "").invalidNel[Option[Owned]]
-        case (None, _)             => Option.empty[Owned].validNel[ParseFailure]
-        case (Some(Invalid(e)), _) => e.invalid[Option[Owned]]
+        case (true, Some(authUser)) => Owned(authUser.id).some.validNel[ParseFailure]
+        case (true, None) => ParseFailure("'owned' parameter present but no access token", "").invalidNel[Option[Owned]]
+        case _            => Option.empty[Owned].validNel[ParseFailure]
       },
       visibilities.map(_.toSet),
       namespaces.map(_.toSet),
