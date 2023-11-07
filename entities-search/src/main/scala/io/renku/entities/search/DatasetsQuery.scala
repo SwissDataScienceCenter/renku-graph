@@ -137,6 +137,7 @@ object DatasetsQuery extends EntityQuery[Entity.Dataset] {
     filters.maybeOwned match {
       case Some(Criteria.Filters.Owned(ownerId)) =>
         fr"""|$projIdVar renku:projectVisibility ?visibility .
+             |${visibilitiesPart(filters.visibilities)}
              |${authSnippets.ownedProjects(ownerId)}
              |""".stripMargin
       case None =>
@@ -144,6 +145,11 @@ object DatasetsQuery extends EntityQuery[Entity.Dataset] {
              |${authSnippets.visibleProjects(maybeUser.map(_.id), filters.visibilities)}
              |""".stripMargin
     }
+
+  private lazy val visibilitiesPart: Set[projects.Visibility] => Fragment = {
+    case vis if vis.nonEmpty => fr"""VALUES (?visibility) {${vis.map(_.value)}}."""
+    case _                   => Fragment.empty
+  }
 
   private def resolveProject: Fragment =
     fr"""|    $sameAsVar a renku:DiscoverableDataset;

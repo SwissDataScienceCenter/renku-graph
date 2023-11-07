@@ -96,6 +96,7 @@ private case object WorkflowsQuery extends EntityQuery[model.Entity.Workflow] {
         |                ^renku:hasPlan ?projectId.
         |          ?projectId renku:projectNamespace ?namespace.
         |          ?projectId renku:projectVisibility ?visibility.
+        |          ${maybeFilterOnVisibilities(filters.visibilities)}
         |          BIND (CONCAT(STR(?projectId), STR('::'), STR(?visibility)) AS ?projectIdVisibility)
         |          ${filters.maybeOnNamespace(VarName("namespace"))}
         |          ${filters.maybeOnDateCreated(VarName("date"))}
@@ -119,6 +120,11 @@ private case object WorkflowsQuery extends EntityQuery[model.Entity.Workflow] {
       case None =>
         authSnippets.visibleProjects(maybeUser.map(_.id), filters.visibilities)
     }
+
+  private lazy val maybeFilterOnVisibilities: Set[projects.Visibility] => Fragment = {
+    case vis if vis.nonEmpty => fr"""VALUES (?visibility) {${vis.map(_.value)}}."""
+    case _                   => Fragment.empty
+  }
 
   private def withoutQuerySnippet: Fragment =
     sparql"""

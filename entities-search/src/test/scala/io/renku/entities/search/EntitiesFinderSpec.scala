@@ -568,6 +568,33 @@ class EntitiesFinderSpec
       results.results shouldMatchTo expected
     }
 
+    "return project entities where the given user is an owner - case when filtering on visibility is set" in new TestCase {
+
+      val ownerId = personGitLabIds.generateOne
+      val owner   = Project.Member(personEntities(ownerId.some).generateOne, projects.Role.Owner)
+
+      val publicProject = renkuProjectEntities(visibilityPublic)
+        .modify(replaceMembers(Set(owner)))
+        .generateOne
+      val nonPublicProject = renkuProjectEntities(visibilityNonPublic)
+        .modify(replaceMembers(Set(owner)))
+        .generateOne
+
+      val results = IOBody {
+        provisionTestProjects(publicProject, nonPublicProject) *>
+          finder.findEntities(
+            Criteria(Filters(maybeOwned = Owned(ownerId).some, visibilities = Set(projects.Visibility.Public)))
+          )
+      }
+
+      val expected = List(
+        publicProject.to[model.Entity.Project],
+        owner.person.to[model.Entity.Person]
+      ).sortBy(_.name)(nameOrdering)
+
+      results.results shouldMatchTo expected
+    }
+
     "return dataset entities where the given user is an owner" in new TestCase {
 
       val ownerId = personGitLabIds.generateOne
@@ -595,6 +622,38 @@ class EntitiesFinderSpec
       results.results shouldMatchTo expected
     }
 
+    "return dataset entities where the given user is an owner - case when filtering on visibility is set" in new TestCase {
+
+      val ownerId = personGitLabIds.generateOne
+      val owner   = Project.Member(personEntities(ownerId.some).generateOne, projects.Role.Owner)
+
+      val dsAndPublicProject @ _ -> publicProject = renkuProjectEntities(visibilityPublic)
+        .modify(replaceMembers(Set(owner)))
+        .addDataset(datasetEntities(provenanceNonModified).modify(replaceDSCreators(NonEmptyList.of(owner.person))))
+        .generateOne
+      val dsAndNonPublicProject @ _ -> nonPublicProject = renkuProjectEntities(visibilityNonPublic)
+        .modify(replaceMembers(Set(owner)))
+        .addDataset(datasetEntities(provenanceNonModified).modify(replaceDSCreators(NonEmptyList.of(owner.person))))
+        .generateOne
+
+      val results = IOBody {
+        provisionTestProjects(publicProject, nonPublicProject) *>
+          finder.findEntities(
+            Criteria(
+              Filters(maybeOwned = Criteria.Filters.Owned(ownerId).some, visibilities = Set(projects.Visibility.Public))
+            )
+          )
+      }
+
+      val expected = List(
+        publicProject.to[model.Entity.Project],
+        dsAndPublicProject.to[model.Entity.Dataset],
+        owner.person.to[model.Entity.Person]
+      ).sortBy(_.name)(nameOrdering)
+
+      results.results shouldMatchTo expected
+    }
+
     "return workflow entities where the given user is an owner" in new TestCase {
 
       val ownerId = personGitLabIds.generateOne
@@ -615,6 +674,39 @@ class EntitiesFinderSpec
       val expected = List(
         project.to[model.Entity.Project],
         (project.plans.head -> project).to[model.Entity.Workflow],
+        owner.person.to[model.Entity.Person]
+      ).sortBy(_.name)(nameOrdering)
+
+      results.results shouldMatchTo expected
+    }
+
+    "return workflow entities where the given user is an owner - case when filtering on visibility is set" in new TestCase {
+
+      val ownerId = personGitLabIds.generateOne
+      val owner   = Project.Member(personEntities(ownerId.some).generateOne, projects.Role.Owner)
+
+      val publicProject = renkuProjectEntities(visibilityPublic)
+        .modify(replaceMembers(Set(owner)))
+        .withActivities(activityEntities(stepPlanEntities().map(_.replaceCreators(List(owner.person)))))
+        .generateOne
+
+      val nonPublicProject = renkuProjectEntities(visibilityNonPublic)
+        .modify(replaceMembers(Set(owner)))
+        .withActivities(activityEntities(stepPlanEntities().map(_.replaceCreators(List(owner.person)))))
+        .generateOne
+
+      val results = IOBody {
+        provisionTestProjects(publicProject, nonPublicProject) *>
+          finder.findEntities(
+            Criteria(
+              Filters(maybeOwned = Criteria.Filters.Owned(ownerId).some, visibilities = Set(projects.Visibility.Public))
+            )
+          )
+      }
+
+      val expected = List(
+        publicProject.to[model.Entity.Project],
+        (publicProject.plans.head -> publicProject).to[model.Entity.Workflow],
         owner.person.to[model.Entity.Person]
       ).sortBy(_.name)(nameOrdering)
 

@@ -142,6 +142,7 @@ private case object ProjectsQuery extends EntityQuery[model.Entity.Project] {
     filters.maybeOwned match {
       case Some(Criteria.Filters.Owned(ownerId)) =>
         fr"""|$projectIdVar renku:projectVisibility $visibilityVar .
+             |${visibilitiesPart(filters.visibilities)}
              |${authSnippets.ownedProjects(ownerId)}
              |""".stripMargin
       case None =>
@@ -149,6 +150,11 @@ private case object ProjectsQuery extends EntityQuery[model.Entity.Project] {
              |${authSnippets.visibleProjects(maybeUser.map(_.id), filters.visibilities)}
              |""".stripMargin
     }
+
+  private lazy val visibilitiesPart: Set[projects.Visibility] => Fragment = {
+    case vis if vis.nonEmpty => fr"""VALUES ($visibilityVar) {${vis.map(_.value)}}."""
+    case _                   => Fragment.empty
+  }
 
   private def namespacesPart(ns: Set[projects.Namespace]): Fragment = {
     val matchFrag =
