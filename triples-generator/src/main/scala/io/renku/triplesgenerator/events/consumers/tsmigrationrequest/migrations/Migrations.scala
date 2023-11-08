@@ -33,72 +33,45 @@ private[tsmigrationrequest] object Migrations {
 
   def apply[F[_]: Async: ReProvisioningStatus: Logger: MetricsRegistry: SparqlQueryTimeRecorder](
       config: Config
-  ): F[List[Migration[F]]] = for {
-    datasetsCreator                     <- DatasetsCreator[F]
-    datasetsRemover                     <- DatasetsRemover[F]
-    reProvisioning                      <- ReProvisioning[F](config)
-    removeNotLinkedPersons              <- RemoveNotLinkedPersons[F]
-    fixMultipleProjectCreatedDates      <- FixMultipleProjectCreatedDates[F]
-    addRenkuPlanWhereMissing            <- AddRenkuPlanWhereMissing[F]
-    migrationToV10                      <- v10migration.MigrationToV10[F]
-    v10VersionSetter                    <- V10VersionUpdater[F]
-    projectsDateViewedCreator           <- ProjectsDateViewedCreator[F]
-    projectDateViewedDeduplicator       <- ProjectDateViewedDeduplicator[F]
-    personViewedEntityDeduplicator      <- PersonViewedEntityDeduplicator[F]
-    provisionProjectsGraph              <- projectsgraph.ProvisionProjectsGraph[F]
-    addProjectDateModified              <- datemodified.AddProjectDateModified[F]
-    fixMultipleProjectVersions          <- FixMultipleProjectVersions[F]
-    addProjectSlug                      <- projectslug.AddProjectSlug[F]
-    datasetsGraphPersonRemover          <- DatasetsGraphPersonRemover[F]
-    projectsGraphPersonRemover          <- ProjectsGraphPersonRemover[F]
-    reindexLuceneStdTokenizer           <- lucenereindex.ReindexLucene[F](suffix = "- std tokenizer")
-    projectsDSRecreatorSearchFlattening <- TSDatasetRecreator[F, ProjectsTTL]("- search flattening", ProjectsTTL)
-    projectsGraphKeywordsFlattener      <- ProjectsGraphKeywordsFlattener[F]
-    projectsGraphImagesFlattener        <- ProjectsGraphImagesFlattener[F]
-    datasetsGraphKeywordsFlattener      <- DatasetsGraphKeywordsFlattener[F]
-    datasetsGraphImagesFlattener        <- DatasetsGraphImagesFlattener[F]
-    datasetsGraphCreatorsFlattener      <- DatasetsGraphCreatorsFlattener[F]
-    datasetsGraphSlugsVisibsFlattener   <- DatasetsGraphSlugsVisibilitiesFlattener[F]
-    projectMembersRemover               <- ProjectMembersRemover[F]
-    datasetsGraphKeywordsRemover        <- DatasetsGraphKeywordsRemover[F]
-    datasetsGraphImagesRemover          <- DatasetsGraphImagesRemover[F]
-    projectsGraphKeywordsRemover        <- ProjectsGraphKeywordsRemover[F]
-    projectsGraphImagesRemover          <- ProjectsGraphImagesRemover[F]
-    migrations <- validateNames(
-                    datasetsCreator,
-                    datasetsRemover,
-                    reProvisioning,
-                    removeNotLinkedPersons,
-                    fixMultipleProjectCreatedDates,
-                    addRenkuPlanWhereMissing,
-                    migrationToV10,
-                    v10VersionSetter,
-                    projectsDateViewedCreator,
-                    projectDateViewedDeduplicator,
-                    personViewedEntityDeduplicator,
-                    provisionProjectsGraph,
-                    addProjectDateModified,
-                    fixMultipleProjectVersions,
-                    addProjectSlug,
-                    datasetsGraphPersonRemover,
-                    projectsGraphPersonRemover,
-                    reindexLuceneStdTokenizer,
-                    projectsDSRecreatorSearchFlattening,
-                    projectsGraphKeywordsFlattener,
-                    projectsGraphImagesFlattener,
-                    datasetsGraphKeywordsFlattener,
-                    datasetsGraphImagesFlattener,
-                    datasetsGraphCreatorsFlattener,
-                    datasetsGraphSlugsVisibsFlattener,
-                    projectMembersRemover,
-                    datasetsGraphKeywordsRemover,
-                    datasetsGraphImagesRemover,
-                    projectsGraphKeywordsRemover,
-                    projectsGraphImagesRemover
-                  )
-  } yield migrations
+  ): F[List[Migration[F]]] =
+    List(
+      DatasetsCreator[F],
+      DatasetsRemover[F],
+      ReProvisioning[F](config),
+      RemoveNotLinkedPersons[F],
+      FixMultipleProjectCreatedDates[F],
+      AddRenkuPlanWhereMissing[F],
+      v10migration.MigrationToV10[F],
+      V10VersionUpdater[F],
+      ProjectsDateViewedCreator[F],
+      ProjectDateViewedDeduplicator[F],
+      PersonViewedEntityDeduplicator[F],
+      projectsgraph.ProvisionProjectsGraph[F],
+      datemodified.AddProjectDateModified[F],
+      FixMultipleProjectVersions[F],
+      projectslug.AddProjectSlug[F],
+      DatasetsGraphPersonRemover[F],
+      ProjectsGraphPersonRemover[F],
+      lucenereindex.ReindexLucene[F](suffix = "- std tokenizer"),
+      TSDatasetRecreator[F, ProjectsTTL]("- search flattening", ProjectsTTL),
+      ProjectsGraphKeywordsFlattener[F],
+      ProjectsGraphImagesFlattener[F],
+      DatasetsGraphKeywordsFlattener[F],
+      DatasetsGraphImagesFlattener[F],
+      DatasetsGraphCreatorsFlattener[F],
+      DatasetsGraphSlugsVisibilitiesFlattener[F],
+      ProjectMembersRemover[F],
+      DatasetsGraphKeywordsRemover[F],
+      DatasetsGraphImagesRemover[F],
+      ProjectsGraphKeywordsRemover[F],
+      ProjectsGraphImagesRemover[F],
+      TSDatasetRecreator[F, ProjectsTTL]("- custom tokenizer", ProjectsTTL),
+      lucenereindex.ReindexLucene[F](suffix = "- custom tokenizer")
+    ).sequence.flatMap(validateNames[F](_))
 
-  private[migrations] def validateNames[F[_]: MonadThrow: Logger](migrations: Migration[F]*): F[List[Migration[F]]] = {
+  private[migrations] def validateNames[F[_]: MonadThrow: Logger](
+      migrations: List[Migration[F]]
+  ): F[List[Migration[F]]] = {
     val groupedByName = migrations.groupBy(_.name)
     val problematicMigrations = groupedByName.collect {
       case (name, ms) if ms.size > 1 => name
@@ -107,6 +80,6 @@ private[tsmigrationrequest] object Migrations {
       val error = show"$categoryName: there are multiple migrations with name: ${problematicMigrations.mkString("; ")}"
       Logger[F]
         .error(error) >> new Exception(error).raiseError[F, List[Migration[F]]].map(_ => List.empty[Migration[F]])
-    } else migrations.toList.pure[F]
+    } else migrations.pure[F]
   }
 }
