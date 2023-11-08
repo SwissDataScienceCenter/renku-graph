@@ -65,7 +65,7 @@ private class EntitiesFinderImpl[F[_]: Async: NonEmptyParallel: Logger: SparqlQu
     Prefixes of (prov -> "prov", renku -> "renku", schema -> "schema", text -> "text", xsd -> "xsd"),
     s"""|SELECT ${entityQueries.map(_.selectVariables).combineAll.mkString(" ")}
         |WHERE {
-        |  ${entityQueries.flatMap(_.query(criteria)).mkString(" UNION ")}
+        |  ${entityQueries.flatMap(_.query(criteria)).map(_.sparql).mkString(" UNION ")}
         |}
         |${`ORDER BY`(criteria.sorting)}
         |""".stripMargin

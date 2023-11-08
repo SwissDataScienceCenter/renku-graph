@@ -35,20 +35,20 @@ private case object WorkflowsQuery extends EntityQuery[model.Entity.Workflow] {
 
   override val entityType: EntityType = EntityType.Workflow
 
-  override val selectVariables = Set("?entityType",
-                                     "?matchingScore",
-                                     "?wkId",
-                                     "?name",
-                                     "?date",
-                                     "?maybeDescription",
-                                     "?keywords",
-                                     "?projectIdVisibilities",
-                                     "?workflowTypes"
+  override val selectVariables: Set[String] = Set("?entityType",
+                                                  "?matchingScore",
+                                                  "?wkId",
+                                                  "?name",
+                                                  "?date",
+                                                  "?maybeDescription",
+                                                  "?keywords",
+                                                  "?projectIdVisibilities",
+                                                  "?workflowTypes"
   )
 
   private val authSnippets = SparqlSnippets(VarName("projectId"))
 
-  override def query(criteria: Criteria): Option[String] = (criteria.filters whenRequesting entityType) {
+  override def query(criteria: Criteria): Option[Fragment] = (criteria.filters whenRequesting entityType) {
     import criteria._
     // format: off
     sparql"""|{
@@ -86,7 +86,7 @@ private case object WorkflowsQuery extends EntityQuery[model.Entity.Workflow] {
         |        FILTER (IF (BOUND(?childProjectsIds), !CONTAINS(STR(?childProjectsIds), STR(?projectId)), true))
         |        FILTER (IF (BOUND(?projectsIdsWhereInvalidated), !CONTAINS(STR(?projectsIdsWhereInvalidated), STR(?projectId)), true))
         |
-        |        ${accessRightsAndVisibility(criteria.maybeUser, criteria.filters.visibilities)}
+        |        ${accessRightsAndVisibility(criteria.maybeUser, criteria.filters)}
         |
         |        GRAPH ?projectId {
         |          ?wkId a prov:Plan;
@@ -96,6 +96,7 @@ private case object WorkflowsQuery extends EntityQuery[model.Entity.Workflow] {
         |                ^renku:hasPlan ?projectId.
         |          ?projectId renku:projectNamespace ?namespace.
         |          ?projectId renku:projectVisibility ?visibility.
+        |          ${maybeFilterOnVisibilities(filters.visibilities)}
         |          BIND (CONCAT(STR(?projectId), STR('::'), STR(?visibility)) AS ?projectIdVisibility)
         |          ${filters.maybeOnNamespace(VarName("namespace"))}
         |          ${filters.maybeOnDateCreated(VarName("date"))}
@@ -108,12 +109,22 @@ private case object WorkflowsQuery extends EntityQuery[model.Entity.Workflow] {
         |    BIND ('workflow' AS ?entityType)
         |  }
         |}
-        |""".stripMargin.sparql
+        |""".stripMargin
     // format: on
   }
 
-  private def accessRightsAndVisibility(maybeUser: Option[AuthUser], visibilities: Set[projects.Visibility]): Fragment =
-    authSnippets.visibleProjects(maybeUser.map(_.id), visibilities)
+  private def accessRightsAndVisibility(maybeUser: Option[AuthUser], filters: Criteria.Filters): Fragment =
+    filters.maybeOwned match {
+      case Some(Criteria.Filters.Owned(ownerId)) =>
+        authSnippets.ownedProjects(ownerId)
+      case None =>
+        authSnippets.visibleProjects(maybeUser.map(_.id), filters.visibilities)
+    }
+
+  private lazy val maybeFilterOnVisibilities: Set[projects.Visibility] => Fragment = {
+    case vis if vis.nonEmpty => fr"""VALUES (?visibility) {${vis.map(_.value)}}."""
+    case _                   => Fragment.empty
+  }
 
   private def withoutQuerySnippet: Fragment =
     sparql"""
@@ -186,7 +197,7 @@ private case object WorkflowsQuery extends EntityQuery[model.Entity.Workflow] {
     } yield Entity.Workflow(matchingScore, name, visibility, dateCreated, keywords, maybeDescription, workflowTypes)
   }
 
-  def workflowTypeFromString(str: String): Either[String, WorkflowType] =
+  private def workflowTypeFromString(str: String): Either[String, WorkflowType] =
     str match {
       case _ if str.contains(CompositePlan.Ontology.typeDef.clazz.id.show) =>
         Right(WorkflowType.Composite)

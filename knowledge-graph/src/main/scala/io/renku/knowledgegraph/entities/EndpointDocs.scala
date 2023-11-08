@@ -50,13 +50,13 @@ private class EndpointDocsImpl()(implicit gitLabUrl: GitLabUrl, renkuApiUrl: ren
     GET(
       "Cross-Entity Search",
       "Finds entities by the given criteria",
-      Uri / "entities" :? query & `type` & creator & visibility & namespace & since & until & sort & page & perPage,
+      Uri / "entities" :? query & `type` & creator & owned & visibility & namespace & since & until & sort & page & perPage,
       Status.Ok -> Response("Found entities",
                             Contents(MediaType.`application/json`("Sample response", example)),
                             responseHeaders
       ),
       Status.BadRequest -> Response(
-        "In case of invalid query parameters",
+        "In case of invalid query parameters or `owned` parameter specified but no auth user present",
         Contents(MediaType.`application/json`("Reason", Message.Info("Invalid parameters")))
       ),
       Status.Unauthorized -> Response(
@@ -85,6 +85,12 @@ private class EndpointDocsImpl()(implicit gitLabUrl: GitLabUrl, renkuApiUrl: ren
     "creator",
     Schema.String,
     "to filter by creator(s); the filter would require creator's name; multiple creator parameters allowed".some,
+    required = false
+  )
+  private lazy val owned = Parameter.Query(
+    "owned",
+    Schema.String,
+    "to reduce the results to entities where the caller is an owner; this parameter does not require any value".some,
     required = false
   )
   private lazy val visibility = Parameter.Query(
