@@ -33,7 +33,7 @@
       text:defineAnalyzer :preservingAndLetterAnalyzer ;
       text:analyzer [
         a text:ConfigurableAnalyzer ;
-        text:tokenizer text:StandardTokenizer ;
+        text:tokenizer text:WhitespaceTokenizer ;
         text:filters ( :preservingAndLetterFilter )
       ]
     ]
@@ -45,7 +45,7 @@
         text:params (
           [
             text:paramName "configurationFlags" ;
-            text:paramValue 483
+            text:paramValue 227
           ]
           [
             text:paramName "protWords" ;
