@@ -20,32 +20,21 @@
 
 :text_dataset a  text:TextDataset ;
   text:dataset   :tdb_projects ;
-  text:index     <#indexLucene> ;
+  text:index     :indexLucene ;
 .
 
 :tdb_projects a  tdb2:DatasetTDB2 ;
   tdb2:location  "/fuseki/databases/projects" .
 
-<#indexLucene> a text:TextIndexLucene ;
+:indexLucene a text:TextIndexLucene ;
   text:directory <file:///fuseki/databases/projects/lucene_index> ;
   text:defineAnalyzers (
     [
-      text:defineAnalyzer <#preservingAndLetterAnalyzer> ;
+      text:defineAnalyzer :preservingAndLetterAnalyzer ;
       text:analyzer [
         a text:ConfigurableAnalyzer ;
         text:tokenizer text:StandardTokenizer ;
         text:filters ( :preservingAndLetterFilter )
-      ]
-    ]
-    [
-      text:defineFilter :customFilter ;
-      text:filter [
-        a text:GenericFilter ;
-        text:class "org.apache.lucene.analysis.miscellaneous.ASCIIFoldingFilter" ;
-        text:params (
-          [ text:paramName "preserveOriginal" ;
-            text:paramValue true ]
-        )
       ]
     ]
     [
@@ -67,10 +56,10 @@
       ]
     ]
   ) ;
-  text:entityMap <#entMap>
+  text:entityMap :entMap
 .
 
-<#entMap> a         text:EntityMap ;
+:entMap a         text:EntityMap ;
   text:defaultField "name" ;
   text:entityField  "uri" ;
   text:map (
@@ -79,7 +68,7 @@
       text:predicate schema:name ;
       text:analyzer [
         a text:DefinedAnalyzer ;
-        text:useAnalyzer <#preservingAndLetterAnalyzer>
+        text:useAnalyzer :preservingAndLetterAnalyzer
       ]
     ]
     [
@@ -91,7 +80,7 @@
       text:predicate renku:slug ;
       text:analyzer [
         a text:DefinedAnalyzer ;
-        text:useAnalyzer <#preservingAndLetterAnalyzer>
+        text:useAnalyzer :preservingAndLetterAnalyzer
       ]
     ]
     [
@@ -99,7 +88,7 @@
       text:predicate renku:projectNamespaces ;
       text:analyzer [
         a text:DefinedAnalyzer ;
-        text:useAnalyzer <#preservingAndLetterAnalyzer>
+        text:useAnalyzer :preservingAndLetterAnalyzer
       ]
     ]
     [
@@ -107,7 +96,7 @@
       text:predicate schema:keywords ;
       text:analyzer [
         a text:DefinedAnalyzer ;
-        text:useAnalyzer <#preservingAndLetterAnalyzer>
+        text:useAnalyzer :preservingAndLetterAnalyzer
       ]
     ]
     [
@@ -115,7 +104,7 @@
       text:predicate renku:keywordsConcat ;
       text:analyzer [
         a text:DefinedAnalyzer ;
-        text:useAnalyzer <#preservingAndLetterAnalyzer>
+        text:useAnalyzer :preservingAndLetterAnalyzer
       ]
     ]
     [
