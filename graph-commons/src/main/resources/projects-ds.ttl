@@ -28,18 +28,98 @@
 
 <#indexLucene> a text:TextIndexLucene ;
   text:directory <file:///fuseki/databases/projects/lucene_index> ;
-  text:entityMap <#entMap> ;
+  text:defineAnalyzers (
+    [
+      text:defineAnalyzer <#preservingAndLetterAnalyzer> ;
+      text:analyzer [
+        a text:ConfigurableAnalyzer ;
+        text:tokenizer text:StandardTokenizer ;
+        text:filters ( :preservingAndLetterFilter )
+      ]
+    ]
+    [
+      text:defineFilter :customFilter ;
+      text:filter [
+        a text:GenericFilter ;
+        text:class "org.apache.lucene.analysis.miscellaneous.ASCIIFoldingFilter" ;
+        text:params (
+          [ text:paramName "preserveOriginal" ;
+            text:paramValue true ]
+        )
+      ]
+    ]
+    [
+      text:defineFilter :preservingAndLetterFilter ;
+      text:filter [
+        a text:GenericFilter ;
+        text:class "org.apache.lucene.analysis.miscellaneous.WordDelimiterGraphFilter" ;
+        text:params (
+          [
+            text:paramName "configurationFlags" ;
+            text:paramValue 483
+          ]
+          [
+            text:paramName "protWords" ;
+            text:paramType text:TypeSet ;
+            text:paramValue ()
+          ]
+        )
+      ]
+    ]
+  ) ;
+  text:entityMap <#entMap>
 .
 
 <#entMap> a         text:EntityMap ;
   text:defaultField "name" ;
   text:entityField  "uri" ;
   text:map (
-    [ text:field "name" ;                text:predicate schema:name ]
-    [ text:field "description" ;         text:predicate schema:description ]
-    [ text:field "slug" ;                text:predicate renku:slug ]
-    [ text:field "projectNamespaces" ;   text:predicate renku:projectNamespaces ]
-    [ text:field "keywords" ;            text:predicate schema:keywords ]
-    [ text:field "keywordsConcat" ;      text:predicate renku:keywordsConcat ]
-    [ text:field "creatorsNamesConcat" ; text:predicate renku:creatorsNamesConcat ]
+    [
+      text:field "name" ;
+      text:predicate schema:name ;
+      text:analyzer [
+        a text:DefinedAnalyzer ;
+        text:useAnalyzer <#preservingAndLetterAnalyzer>
+      ]
+    ]
+    [
+      text:field "description" ;
+      text:predicate schema:description
+    ]
+    [
+      text:field "slug" ;
+      text:predicate renku:slug ;
+      text:analyzer [
+        a text:DefinedAnalyzer ;
+        text:useAnalyzer <#preservingAndLetterAnalyzer>
+      ]
+    ]
+    [
+      text:field "projectNamespaces" ;
+      text:predicate renku:projectNamespaces ;
+      text:analyzer [
+        a text:DefinedAnalyzer ;
+        text:useAnalyzer <#preservingAndLetterAnalyzer>
+      ]
+    ]
+    [
+      text:field "keywords" ;
+      text:predicate schema:keywords ;
+      text:analyzer [
+        a text:DefinedAnalyzer ;
+        text:useAnalyzer <#preservingAndLetterAnalyzer>
+      ]
+    ]
+    [
+      text:field "keywordsConcat" ;
+      text:predicate renku:keywordsConcat ;
+      text:analyzer [
+        a text:DefinedAnalyzer ;
+        text:useAnalyzer <#preservingAndLetterAnalyzer>
+      ]
+    ]
+    [
+      text:field "creatorsNamesConcat" ;
+      text:predicate renku:creatorsNamesConcat
+    ]
   ) .
