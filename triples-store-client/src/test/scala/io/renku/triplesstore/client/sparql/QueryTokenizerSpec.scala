@@ -22,8 +22,9 @@ import org.scalatest.flatspec.AnyFlatSpec
 import org.scalatest.matchers.should
 
 class QueryTokenizerSpec extends AnyFlatSpec with should.Matchers {
-  val standard = QueryTokenizer.luceneStandard
-  val letter   = QueryTokenizer.luceneLetters
+  val standard              = QueryTokenizer.luceneStandard
+  val letter                = QueryTokenizer.luceneLetters
+  def preservingWithLetters = QueryTokenizer.lucenePreservingWithLetters
 
   "standard" should "split on whitespace" in {
     val input = "  one two\tthree   four\nfive "
@@ -57,5 +58,25 @@ class QueryTokenizerSpec extends AnyFlatSpec with should.Matchers {
   it should "skip numbers" in {
     val input = "01_test 02 bar"
     letter.split(input) shouldBe List("test", "bar")
+  }
+
+  "preservingWithWhitespace" should "split on whitespaces" in {
+    val text = "  one two\tthree   four\nfive "
+    preservingWithLetters.split(text) shouldBe List("one", "two", "three", "four", "five")
+  }
+
+  it should "split on non-letters and preserve the group" in {
+    val input = "one_two_three"
+    preservingWithLetters.split(input) shouldBe List(input, "one", "two", "three")
+  }
+
+  it should "split on case changes and preserve the group" in {
+    val input = "camelCase"
+    preservingWithLetters.split(input) shouldBe List("camelCase", "camel", "Case")
+  }
+
+  it should "split on whitespaces, preserve the groups and split the groups on non-letters" in {
+    val input = "01_test 02 bar 03-foo"
+    preservingWithLetters.split(input) shouldBe List("01_test", "01", "test", "02", "bar", "03-foo", "03", "foo")
   }
 }

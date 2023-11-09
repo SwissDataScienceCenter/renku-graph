@@ -28,6 +28,7 @@ import io.renku.graph.model._
 import io.renku.graph.model.testentities._
 import io.renku.testtools.IOSpec
 import io.renku.triplesstore.{InMemoryJenaForSpec, ProjectsDataset}
+import org.scalacheck.Gen.alphaLowerChar
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
 
@@ -44,7 +45,7 @@ class PersonsEntitiesFinderSpec
     "return a single person if there are multiple with the same name" in new TestCase {
       // person merging is a temporary solution until we start to return persons ids
 
-      val query = nonBlankStrings(minLength = 3).generateOne
+      val query = nonBlankStrings(minLength = 3, charsGenerator = alphaLowerChar).generateOne
 
       val sharedName      = sentenceContaining(query).generateAs(persons.Name)
       val person1SameName = personEntities.map(_.copy(name = sharedName)).generateOne
