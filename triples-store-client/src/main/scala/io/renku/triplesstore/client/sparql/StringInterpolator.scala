@@ -36,7 +36,7 @@ class StringInterpolator(private val sc: StringContext) {
   }
 
   private lazy val makeValue: ((Any, Int)) => String = {
-    case (a: LuceneQuery, _)         => a.asSparql.sparql
+    case (a: LuceneQuery, _)         => a.asTripleObject.asSparql.sparql
     case (a: String, _)              => a.asTripleObject.asSparql.sparql
     case (a: Char, _)                => a.toString.asTripleObject.asSparql.sparql
     case (a: Float, _)               => a.asTripleObject.asSparql.sparql

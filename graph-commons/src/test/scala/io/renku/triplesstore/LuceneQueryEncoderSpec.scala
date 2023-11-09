@@ -18,15 +18,17 @@
 
 package io.renku.triplesstore
 
-import eu.timepit.refined.api.Refined
 import eu.timepit.refined.auto._
 import io.renku.generators.Generators.Implicits._
-import io.renku.generators.Generators.{NonBlank, nonEmptyStrings, sentenceContaining}
-import io.renku.graph.model.projects
-import io.renku.graph.model.testentities._
+import io.renku.generators.Generators.{NonBlank, nonEmptyStrings}
+import io.renku.generators.jsonld.JsonLDGenerators.entityIds
+import io.renku.graph.model.testentities.{schema, _}
 import io.renku.testtools.IOSpec
 import io.renku.triplesstore.SparqlQuery.Prefixes
+import io.renku.triplesstore.client.model.Quad
 import io.renku.triplesstore.client.sparql.LuceneQuery
+import io.renku.triplesstore.client.syntax._
+import org.scalacheck.Gen
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
 
@@ -37,54 +39,62 @@ class LuceneQueryEncoderSpec
     with ProjectsDataset
     with should.Matchers {
 
+  private val specialChars =
+    List[NonBlank]("\\", "+", "-", "&", "|", "!", "(", ")", "{", "}", "[", "]", "^", "\"", "~", "*", "?", ":", "/")
+
   "queryAsString" should {
 
-    List[NonBlank]("\\",
-                   "+",
-                   "-",
-                   "&",
-                   "|",
-                   "!",
-                   "(",
-                   ")",
-                   "{",
-                   "}",
-                   "[",
-                   "]",
-                   "^",
-                   "\"",
-                   "~",
-                   "*",
-                   "?",
-                   ":",
-                   "/"
-    ) foreach { specialChar =>
+    specialChars foreach { specialChar =>
       s"escape '$specialChar' so it can be used as a string in the Lucene search" in {
 
-        val query = s"$specialChar${nonEmptyStrings(minLength = 3).generateOne}"
-        val name  = sentenceContaining(Refined.unsafeApply(query)).generateAs(projects.Name)
-        val project = renkuProjectEntities(visibilityPublic)
-          .modify(replaceProjectName(name))
-          .generateOne
+        val name = s"$specialChar${nonEmptyStrings(minLength = 3).generateOne}"
+        val quad = Quad(entityIds.generateOne, entityIds.generateOne, schema / "name", name.asTripleObject)
 
-        upload(to = projectsDataset, project)
+        insert(to = projectsDataset, quad)
 
         runSelect(
           on = projectsDataset,
           SparqlQuery.of(
             "lucene test query",
             Prefixes of (schema -> "schema", text -> "text"),
-            s"""SELECT ?name
-            WHERE {
-              GRAPH ?g {
-                ?id text:query (schema:name '${LuceneQuery.escape(query).query}');
-                    schema:name ?name
-              }
-            }
-            """.stripMargin
+            sparql"""|SELECT ?name
+                     |WHERE {
+                     |  GRAPH ?g {
+                     |    ?id text:query (schema:name ${LuceneQuery.escape(name).asTripleObject});
+                     |    schema:name ?name
+                     |  }
+                     |}""".stripMargin
           )
         ).unsafeRunSync() shouldBe List(Map("name" -> name.value))
       }
     }
   }
+
+  "tripleObjectEncoder" should {
+
+    "encode the query as triple object" in {
+
+      val name = s"${specialCharsGen.generateOne}${nonEmptyStrings(minLength = 3).generateOne}"
+      val quad = Quad(entityIds.generateOne, entityIds.generateOne, schema / "name", name.asTripleObject)
+
+      insert(to = projectsDataset, quad)
+
+      runSelect(
+        on = projectsDataset,
+        SparqlQuery.of(
+          "lucene test query",
+          Prefixes of (schema -> "schema", text -> "text"),
+          sparql"""|SELECT ?name
+                   |WHERE {
+                   |  GRAPH ?g {
+                   |    ?id text:query (schema:name ${LuceneQuery.fuzzy(name).asTripleObject});
+                   |    schema:name ?name
+                   |  }
+                   |}""".stripMargin
+        )
+      ).unsafeRunSync() shouldBe List(Map("name" -> name.value))
+    }
+  }
+
+  private lazy val specialCharsGen: Gen[NonBlank] = Gen.oneOf(specialChars)
 }
