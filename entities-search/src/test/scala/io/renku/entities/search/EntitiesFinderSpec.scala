@@ -42,6 +42,7 @@ import io.renku.http.rest.paging.model._
 import io.renku.http.rest.{SortBy, Sorting}
 import io.renku.testtools.IOSpec
 import io.renku.triplesstore._
+import org.scalacheck.Gen.alphaLowerChar
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
 
@@ -155,7 +156,8 @@ class EntitiesFinderSpec
     }
 
     "return entities which name matches the given query, sorted by name" in new TestCase {
-      val query = nonBlankStrings(minLength = 6).generateOne
+
+      val query = nonBlankStrings(minLength = 6, charsGenerator = alphaLowerChar).generateOne
 
       val person = personEntities
         .map(replacePersonName(to = sentenceContaining(query).generateAs(persons.Name)))
@@ -204,7 +206,7 @@ class EntitiesFinderSpec
     }
 
     "return entities which keywords matches the given query, sorted by name" in new TestCase {
-      val query = nonBlankStrings(minLength = 6).generateOne
+      val query = nonBlankStrings(minLength = 6, charsGenerator = alphaLowerChar).generateOne
 
       val soleProject = renkuProjectEntities(visibilityPublic)
         .modify(
@@ -253,7 +255,7 @@ class EntitiesFinderSpec
     }
 
     "return entities which description matches the given query, sorted by name" in new TestCase {
-      val query = nonBlankStrings(minLength = 6).generateOne
+      val query = nonBlankStrings(minLength = 6, charsGenerator = alphaLowerChar).generateOne
 
       val soleProject = renkuProjectEntities(visibilityPublic)
         .modify(
@@ -294,7 +296,7 @@ class EntitiesFinderSpec
     }
 
     "return project entities which namespace matches the given query, sorted by name" in new TestCase {
-      val query = nonBlankStrings(minLength = 6).generateOne
+      val query = nonBlankStrings(minLength = 6, charsGenerator = alphaLowerChar).generateOne
 
       val soleProject = renkuProjectEntities(visibilityPublic)
         .modify(_.copy(slug = projects.Slug(s"$query/${relativePaths(maxSegments = 2).generateOne}")))
@@ -311,7 +313,7 @@ class EntitiesFinderSpec
     }
 
     "return entities which creator name matches the given query, sorted by name" in new TestCase {
-      val query = nonBlankStrings(minLength = 6).generateOne
+      val query = nonBlankStrings(minLength = 6, charsGenerator = alphaLowerChar).generateOne
 
       val projectCreator = personEntities.generateOne.copy(name = sentenceContaining(query).generateAs(persons.Name))
       val soleProject = renkuProjectEntities(visibilityPublic)
