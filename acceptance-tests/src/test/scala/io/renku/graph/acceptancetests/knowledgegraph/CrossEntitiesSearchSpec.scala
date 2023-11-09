@@ -33,6 +33,7 @@ import io.renku.graph.model.projects.Role
 import io.renku.graph.model.testentities._
 import io.renku.http.client.UrlEncoder._
 import org.http4s.Status.Ok
+import org.scalacheck.Gen.alphaLowerChar
 import tooling.{AcceptanceSpec, ApplicationServices}
 
 class CrossEntitiesSearchSpec extends AcceptanceSpec with ApplicationServices with TSProvisioning {
@@ -41,7 +42,7 @@ class CrossEntitiesSearchSpec extends AcceptanceSpec with ApplicationServices wi
 
     val user = authUsers.generateOne
 
-    val commonPhrase = nonBlankStrings(minLength = 5).generateOne
+    val commonPhrase = nonBlankStrings(minLength = 5, charsGenerator = alphaLowerChar).generateOne
     val testProject =
       renkuProjectEntities(visibilityPublic, creatorGen = cliShapedPersons)
         .modify(replaceProjectName(sentenceContaining(commonPhrase).generateAs[projects.Name]))
