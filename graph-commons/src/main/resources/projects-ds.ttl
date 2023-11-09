@@ -45,6 +45,7 @@
         text:params (
           [
             text:paramName "configurationFlags" ;
+            # 227 means setting "preserveOriginal", "1", "stemEnglishPossessive", "0" when the WordDelimiterGraphFilterFactory is used
             text:paramValue 227
           ]
           [
