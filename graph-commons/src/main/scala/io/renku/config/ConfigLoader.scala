@@ -78,10 +78,25 @@ object ConfigLoader {
           .getOrElse(Left(CannotConvert(stringValue, ttApply.getClass.toString, "Not an int value")))
       }
 
-  implicit def base64ByteVectorReader: ConfigReader[ByteVector] =
-    ConfigReader.fromString { str =>
+  def asciiByteVectorReader: ConfigReader[ByteVector] =
+    ConfigReader.fromString { v =>
       ByteVector
-        .fromBase64Descriptive(str)
-        .leftMap(err => new FailureReason { override lazy val description: String = s"Cannot read base64: $err" })
+        .encodeAscii(v)
+        .leftMap(err =>
+          new FailureReason {
+            override lazy val description: String = s"Only ASCII characters allowed: $err"
+          }
+        )
+    }
+
+  def base64ByteVectorReader: ConfigReader[ByteVector] =
+    ConfigReader.fromString { v =>
+      ByteVector
+        .fromBase64Descriptive(v)
+        .leftMap(err =>
+          new FailureReason {
+            override lazy val description: String = s"Not a valid Base64 value: $err"
+          }
+        )
     }
 }
