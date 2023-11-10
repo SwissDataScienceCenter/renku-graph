@@ -46,12 +46,17 @@ final class SparqlSnippets(val projectId: VarName) {
             |}
             | """.stripMargin
 
-  def ownedProjects(userId: persons.GitLabId): Fragment =
-    fr"""|GRAPH renku:ProjectAuth {
-         |   $projectId a schema:Project;
-         |              renku:memberRole ${ProjectMember(userId, projects.Role.Owner).encoded}.
-         |}
-         | """.stripMargin
+  def projectsWithRoles(userId: persons.GitLabId, roles: Set[projects.Role]): Fragment =
+    roles match {
+      case rls if rls.isEmpty => Fragment.empty
+      case rls =>
+        fr"""|GRAPH renku:ProjectAuth {
+             |   $projectId a schema:Project;
+             |              renku:memberRole ?memberRole.
+             |   VALUES (?memberRole) { ${rls.map(ProjectMember(userId, _).encoded)} }
+             |}
+             | """.stripMargin
+    }
 
   def visibleProjects(userId: Option[persons.GitLabId], selectedVisibility: Set[Visibility]): Fragment = {
     val visibilities =

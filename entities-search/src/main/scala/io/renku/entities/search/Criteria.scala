@@ -42,7 +42,7 @@ object Criteria {
   final case class Filters(maybeQuery:   Option[Filters.Query] = None,
                            entityTypes:  Set[Filters.EntityType] = Set.empty,
                            creators:     Set[persons.Name] = Set.empty,
-                           maybeOwned:   Option[Filters.Owned] = None,
+                           roles:        Set[projects.Role] = Set.empty,
                            visibilities: Set[projects.Visibility] = Set.empty,
                            namespaces:   Set[projects.Namespace] = Set.empty,
                            maybeSince:   Option[Filters.Since] = None,
