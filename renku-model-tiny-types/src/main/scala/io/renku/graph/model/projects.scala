@@ -238,7 +238,7 @@ object projects {
 
   object Role extends TinyTypeFactory[Role](RoleInstantiator) {
     case object Owner extends Role {
-      override val value: String = "value"
+      override val value: String = "owner"
 
       override def compare(that: Role): Int =
         if (that == this) 0 else 1
