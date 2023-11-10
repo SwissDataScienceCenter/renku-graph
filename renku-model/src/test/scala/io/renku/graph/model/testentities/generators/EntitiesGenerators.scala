@@ -98,7 +98,7 @@ trait EntitiesGenerators
   ): Gen[GitLabMember] =
     for {
       user <- gitLabUserGen(gitLabIds, maybeEmails)
-      role <- roleGen
+      role <- projectRoles
     } yield GitLabMember(user, Role.toGitLabAccessLevel(role))
 
   def personEntities(
@@ -118,7 +118,7 @@ trait EntitiesGenerators
   ): Gen[Project.Member] =
     for {
       p    <- personEntities(maybeGitLabIds, maybeEmails)
-      role <- roleGen
+      role <- projectRoles
     } yield Project.Member(p, role)
 
   def replacePersonName(to: persons.Name): Person => Person = _.copy(name = to)

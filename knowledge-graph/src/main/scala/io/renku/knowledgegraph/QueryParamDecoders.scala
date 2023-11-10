@@ -24,7 +24,7 @@ import io.renku.entities.search.Criteria.Filters._
 import io.renku.entities.viewings.search.RecentEntitiesFinder
 import io.renku.graph.model._
 import io.renku.http.rest.paging.model.PerPage
-import org.http4s.dsl.io.{FlagQueryParamMatcher, OptionalMultiQueryParamDecoderMatcher, OptionalValidatingQueryParamDecoderMatcher}
+import org.http4s.dsl.io.{OptionalMultiQueryParamDecoderMatcher, OptionalValidatingQueryParamDecoderMatcher}
 import org.http4s.{ParseFailure, QueryParamDecoder, QueryParameterValue}
 
 import java.time.LocalDate
@@ -85,8 +85,15 @@ object QueryParamDecoders {
     val parameterName: String = "creator"
   }
 
-  object owned extends FlagQueryParamMatcher("owned") {
-    val parameterName: String = "owned"
+  private implicit val roleParameterDecoder: QueryParamDecoder[projects.Role] =
+    (value: QueryParameterValue) =>
+      projects.Role
+        .from(value.value)
+        .leftMap(_ => parsingFailure(roles.parameterName))
+        .toValidatedNel
+
+  object roles extends OptionalMultiQueryParamDecoderMatcher[projects.Role]("role") {
+    val parameterName: String = "role"
   }
 
   private implicit val visibilityParameterDecoder: QueryParamDecoder[projects.Visibility] =

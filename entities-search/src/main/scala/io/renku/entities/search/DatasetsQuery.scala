@@ -134,15 +134,15 @@ object DatasetsQuery extends EntityQuery[Entity.Dataset] {
     }
 
   private def accessRightsAndVisibility(maybeUser: Option[AuthUser], filters: Criteria.Filters): Fragment =
-    filters.maybeOwned match {
-      case Some(Criteria.Filters.Owned(ownerId)) =>
+    maybeUser.map(_.id) -> filters.roles match {
+      case Some(userId) -> roles if roles.nonEmpty =>
         fr"""|$projIdVar renku:projectVisibility ?visibility .
              |${visibilitiesPart(filters.visibilities)}
-             |${authSnippets.ownedProjects(ownerId)}
+             |${authSnippets.projectsWithRoles(userId, roles)}
              |""".stripMargin
-      case None =>
+      case maybeUserId -> _ =>
         fr"""|$projIdVar renku:projectVisibility ?visibility .
-             |${authSnippets.visibleProjects(maybeUser.map(_.id), filters.visibilities)}
+             |${authSnippets.visibleProjects(maybeUserId, filters.visibilities)}
              |""".stripMargin
     }
 

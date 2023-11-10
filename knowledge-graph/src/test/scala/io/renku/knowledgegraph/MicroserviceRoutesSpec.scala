@@ -394,12 +394,13 @@ class MicroserviceRoutesSpec
       }
     }
 
-    "read the 'owned' query parameter from the uri and pass it to the endpoint when auth user present" in new TestCase {
+    "read the 'role' query parameter from the uri and pass it to the endpoint when auth user present" in new TestCase {
 
       val authUser      = authUsers.generateOne
       val maybeAuthUser = MaybeAuthUser(authUser)
-      val criteria = Criteria(Filters(maybeOwned = Filters.Owned(authUser.id).some), maybeUser = maybeAuthUser.option)
-      val request  = Request[IO](GET, uri"/knowledge-graph/entities" +? "owned")
+      val role          = projectRoles.generateOne
+      val criteria      = Criteria(Filters(roles = Set(role)), maybeUser = maybeAuthUser.option)
+      val request       = Request[IO](GET, uri"/knowledge-graph/entities" +? ("role" -> role))
 
       val responseBody = jsons.generateOne
       (entitiesEndpoint.`GET /entities` _)
@@ -413,13 +414,34 @@ class MicroserviceRoutesSpec
       response.body[Json]  shouldBe responseBody
     }
 
-    s"return $BadRequest 'owned' query parameter given but no auth user present" in new TestCase {
+    "read multiple 'role' query parameters from the uri and pass it to the endpoint when auth user present" in new TestCase {
 
-      val response = routes().call(Request[IO](GET, uri"/knowledge-graph/entities" +? "owned"))
+      val authUser      = authUsers.generateOne
+      val maybeAuthUser = MaybeAuthUser(authUser)
+      val roles         = projectRoles.generateSet(min = 2)
+      val criteria      = Criteria(Filters(roles = roles), maybeUser = maybeAuthUser.option)
+      val request       = Request[IO](GET, uri"/knowledge-graph/entities" ++? ("role" -> roles.toList.map(_.show)))
+
+      val responseBody = jsons.generateOne
+      (entitiesEndpoint.`GET /entities` _)
+        .expects(criteria, request)
+        .returning(Response[IO](Ok).withEntity(responseBody).pure[IO])
+
+      val response = routes(maybeAuthUser).call(request)
+
+      response.status      shouldBe Ok
+      response.contentType shouldBe Some(`Content-Type`(application.json))
+      response.body[Json]  shouldBe responseBody
+    }
+
+    s"return $BadRequest when the 'role' query parameter given but no auth user present" in new TestCase {
+
+      val response =
+        routes().call(Request[IO](GET, uri"/knowledge-graph/entities" +? ("role" -> projectRoles.generateOne)))
 
       response.status        shouldBe BadRequest
       response.contentType   shouldBe Some(`Content-Type`(application.json))
-      response.body[Message] shouldBe Message.Error("'owned' parameter present but no access token")
+      response.body[Message] shouldBe Message.Error("'role' parameter present but no access token")
     }
 
     s"return $BadRequest for invalid parameter values" in new TestCase {

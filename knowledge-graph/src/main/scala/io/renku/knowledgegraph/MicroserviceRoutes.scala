@@ -135,11 +135,11 @@ private class MicroserviceRoutes[F[_]: Async](
 
     AuthedRoutes.of {
       case req @ GET -> Root / "knowledge-graph" / "entities"
-        :? query(maybeQuery) +& entityTypes(maybeTypes) +& creatorNames(maybeCreators) +& owned(maybeOwned)
+        :? query(maybeQuery) +& entityTypes(maybeTypes) +& creatorNames(maybeCreators) +& roles(maybeRoles)
         +& visibilities(maybeVisibilities) +& namespaces(maybeNamespaces) 
         +& since(maybeSince) +& until(maybeUntil) 
         +& sort(maybeSort) +& page(maybePage) +& perPage(maybePerPage) as maybeUser =>
-        searchForEntities(maybeQuery, maybeTypes, maybeCreators, maybeOwned, maybeVisibilities, maybeNamespaces,
+        searchForEntities(maybeQuery, maybeTypes, maybeCreators, maybeRoles, maybeVisibilities, maybeNamespaces,
           maybeSince, maybeUntil, maybeSort, maybePage, maybePerPage, maybeUser.option, req.req)
     }
   }
@@ -226,7 +226,7 @@ private class MicroserviceRoutes[F[_]: Async](
       maybeQuery:   Option[ValidatedNel[ParseFailure, EntitiesSearchCriteria.Filters.Query]],
       types:        ValidatedNel[ParseFailure, List[EntitiesSearchCriteria.Filters.EntityType]],
       creators:     ValidatedNel[ParseFailure, List[persons.Name]],
-      maybeOwned:   Boolean,
+      roles:        ValidatedNel[ParseFailure, List[model.projects.Role]],
       visibilities: ValidatedNel[ParseFailure, List[model.projects.Visibility]],
       namespaces:   ValidatedNel[ParseFailure, List[model.projects.Namespace]],
       maybeSince:   Option[ValidatedNel[ParseFailure, EntitiesSearchCriteria.Filters.Since]],
@@ -243,10 +243,11 @@ private class MicroserviceRoutes[F[_]: Async](
       maybeQuery.map(_.map(Option.apply)).getOrElse(Validated.validNel(Option.empty[Query])),
       types.map(_.toSet),
       creators.map(_.toSet),
-      maybeOwned -> maybeUser match {
-        case (true, Some(authUser)) => Owned(authUser.id).some.validNel[ParseFailure]
-        case (true, None) => ParseFailure("'owned' parameter present but no access token", "").invalidNel[Option[Owned]]
-        case _            => Option.empty[Owned].validNel[ParseFailure]
+      maybeUser -> roles match {
+        case (Some(_), roles) if roles.isValid && roles.map(_.nonEmpty).getOrElse(false) => roles.map(_.toSet)
+        case (None, roles) if roles.isValid && roles.map(_.nonEmpty).getOrElse(false) =>
+          ParseFailure("'role' parameter present but no access token", "").invalidNel[Set[model.projects.Role]]
+        case (_, roles) => roles.map(_.toSet)
       },
       visibilities.map(_.toSet),
       namespaces.map(_.toSet),
@@ -263,21 +264,10 @@ private class MicroserviceRoutes[F[_]: Async](
         }
         .getOrElse(().validNel[ParseFailure])
     ).mapN {
-      case (maybeQuery,
-            types,
-            creators,
-            maybeOwned,
-            visibilities,
-            namespaces,
-            maybeSince,
-            maybeUntil,
-            sorting,
-            paging,
-            _
-          ) =>
+      case (maybeQuery, types, creators, roles, visibilities, namespaces, maybeSince, maybeUntil, sorting, paging, _) =>
         `GET /entities`(
           EntitiesSearchCriteria(
-            Filters(maybeQuery, types, creators, maybeOwned, visibilities, namespaces, maybeSince, maybeUntil),
+            Filters(maybeQuery, types, creators, roles, visibilities, namespaces, maybeSince, maybeUntil),
             sorting,
             paging,
             maybeUser
