@@ -18,6 +18,7 @@
 
 package io.renku.graph.model
 
+import cats.Show
 import cats.data.{NonEmptyList, Validated}
 import cats.kernel.Order
 import cats.syntax.all._
@@ -271,7 +272,7 @@ object projects {
       fromString(str).fold(sys.error, identity)
 
     /** Translated from here: https://docs.gitlab.com/ee/api/members.html#roles */
-    def fromGitLabAccessLevel(accessLevel: Int) =
+    def fromGitLabAccessLevel(accessLevel: Int): Role =
       accessLevel match {
         case n if n >= 50 => Owner
         case n if n >= 40 => Maintainer
@@ -296,5 +297,8 @@ object projects {
 
     implicit val jsonEncoder: Encoder[Role] =
       Encoder.encodeString.contramap(_.asString)
+
+    implicit def show[R <: Role]: Show[R] =
+      Show.show(_.asString)
   }
 }
