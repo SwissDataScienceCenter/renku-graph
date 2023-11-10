@@ -60,7 +60,7 @@ private case object PersonsQuery extends EntityQuery[model.Entity.Person] {
 
   private def textPart(filters: Criteria.Filters) =
     filters.onQuery(
-      snippet = fr"""(?id ?score) text:query (schema:name ${filters.query.query.asTripleObject}).""",
+      snippet = fr"""(?id ?score) text:query (schema:name ${filters.query}).""",
       matchingScoreVariableName = VarName("score")
     )
 

@@ -29,7 +29,8 @@ class SyntaxTest extends AnyFlatSpec with should.Matchers {
 
   it should "interpolate a lucene query as string" in {
     val query = LuceneQuery.escape("this is a query?")
-    fr"?id text:query (schema:name $query)" shouldBe Fragment(s"?id text:query (schema:name '${query.query}')")
+    fr"?id text:query (schema:name $query)" shouldBe
+      Fragment(s"?id text:query (schema:name ${query.query.asTripleObject.asSparql.sparql})")
   }
 
   it should "interpolate strings" in {
