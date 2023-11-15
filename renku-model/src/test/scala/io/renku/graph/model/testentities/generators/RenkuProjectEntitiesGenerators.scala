@@ -148,7 +148,7 @@ trait RenkuProjectEntitiesGenerators {
     name     <- personNames
     username <- personUsernames
     gitLabId <- personGitLabIds
-    role     <- roleGen
+    role     <- projectRoles
   } yield GitLabMember(name, username, gitLabId, None, Role.toGitLabAccessLevel(role))
 
   implicit lazy val projectMembersWithEmail: Gen[GitLabMember] = for {

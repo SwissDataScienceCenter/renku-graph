@@ -18,7 +18,7 @@
 
 package io.renku.knowledgegraph.entities
 
-import cats.MonadThrow
+import cats.{MonadThrow, Show}
 import cats.implicits._
 import eu.timepit.refined.auto._
 import io.circe.Json
@@ -34,6 +34,7 @@ import io.renku.knowledgegraph.docs
 import io.renku.knowledgegraph.docs.model.Operation.GET
 import io.renku.knowledgegraph.docs.model._
 import io.renku.knowledgegraph.entities.ModelEncoders._
+import io.renku.tinytypes.TinyType
 
 import java.time.Instant
 
@@ -50,13 +51,13 @@ private class EndpointDocsImpl()(implicit gitLabUrl: GitLabUrl, renkuApiUrl: ren
     GET(
       "Cross-Entity Search",
       "Finds entities by the given criteria",
-      Uri / "entities" :? query & `type` & creator & visibility & namespace & since & until & sort & page & perPage,
+      Uri / "entities" :? query & `type` & creator & role & visibility & namespace & since & until & sort & page & perPage,
       Status.Ok -> Response("Found entities",
                             Contents(MediaType.`application/json`("Sample response", example)),
                             responseHeaders
       ),
       Status.BadRequest -> Response(
-        "In case of invalid query parameters",
+        "In case of invalid query parameters or `role` specified but no auth user present",
         Contents(MediaType.`application/json`("Reason", Message.Info("Invalid parameters")))
       ),
       Status.Unauthorized -> Response(
@@ -87,10 +88,16 @@ private class EndpointDocsImpl()(implicit gitLabUrl: GitLabUrl, renkuApiUrl: ren
     "to filter by creator(s); the filter would require creator's name; multiple creator parameters allowed".some,
     required = false
   )
+  private lazy val role = Parameter.Query(
+    "role",
+    Schema.String,
+    s"to filter by the caller role(s) on the entity; allowed values: ${toAllowedOptions(projects.Role.all.toList)}; multiple parameters allowed; an authorization header needs to be passed otherwise a `BAD_REQUEST (400)` status will be returned".some,
+    required = false
+  )
   private lazy val visibility = Parameter.Query(
     "visibility",
     Schema.String,
-    "to filter by visibility(ies) (restricted vs. public); allowed values: 'public', 'internal', 'private'; multiple visibility parameters allowed".some,
+    s"to filter by visibility(ies) (restricted vs. public); allowed values: ${toAllowedOptions(projects.Visibility.all)}; multiple parameters allowed".some,
     required = false
   )
   private lazy val namespace = Parameter.Query(
@@ -129,6 +136,9 @@ private class EndpointDocsImpl()(implicit gitLabUrl: GitLabUrl, renkuApiUrl: ren
     "the per_page query parameter is optional and defaults to 20; max value is 100.".some,
     required = false
   )
+
+  private def toAllowedOptions[TT <: TinyType: Show](options: Iterable[TT]) =
+    options.map(v => show"'$v'").mkString(", ")
 
   private lazy val responseHeaders = Map(
     "Total"       -> Header("The total number of entities".some, Schema.Integer),

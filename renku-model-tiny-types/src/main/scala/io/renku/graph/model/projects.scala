@@ -23,7 +23,7 @@ import cats.kernel.Order
 import cats.syntax.all._
 import eu.timepit.refined.api.Refined
 import eu.timepit.refined.numeric.Positive
-import io.circe.{Decoder, Encoder}
+import io.circe.Decoder
 import io.renku.graph.model.views.{EntityIdJsonLDOps, NonBlankTTJsonLDOps, TinyTypeJsonLDOps, UrlResourceRenderer}
 import io.renku.jsonld.{EntityId, JsonLDDecoder, JsonLDEncoder}
 import io.renku.tinytypes._
@@ -232,20 +232,20 @@ object projects {
     )
   }
 
-  sealed trait Role extends Ordered[Role] {
-    def asString: String
+  sealed trait Role extends StringTinyType with Product with Ordered[Role] {
+    def asString: String = value
   }
 
-  object Role {
+  object Role extends TinyTypeFactory[Role](RoleInstantiator) {
     case object Owner extends Role {
-      val asString = "owner"
+      override val value: String = "owner"
 
       override def compare(that: Role): Int =
         if (that == this) 0 else 1
     }
 
     case object Maintainer extends Role {
-      val asString = "maintainer"
+      override val value: String = "maintainer"
 
       override def compare(that: Role): Int =
         if (that == this) 0
@@ -254,7 +254,7 @@ object projects {
     }
 
     case object Reader extends Role {
-      val asString = "reader"
+      override val value: String = "reader"
 
       override def compare(that: Role): Int =
         if (that == this) 0
@@ -271,7 +271,7 @@ object projects {
       fromString(str).fold(sys.error, identity)
 
     /** Translated from here: https://docs.gitlab.com/ee/api/members.html#roles */
-    def fromGitLabAccessLevel(accessLevel: Int) =
+    def fromGitLabAccessLevel(accessLevel: Int): Role =
       accessLevel match {
         case n if n >= 50 => Owner
         case n if n >= 40 => Maintainer
@@ -293,8 +293,12 @@ object projects {
 
     implicit val jsonDecoder: Decoder[Role] =
       Decoder.decodeString.emap(fromString)
+  }
 
-    implicit val jsonEncoder: Encoder[Role] =
-      Encoder.encodeString.contramap(_.asString)
+  private object RoleInstantiator extends (String => Role) {
+    override def apply(value: String): Role =
+      Role
+        .fromString(value)
+        .getOrElse(throw new IllegalArgumentException(s"'$value' unknown Role"))
   }
 }

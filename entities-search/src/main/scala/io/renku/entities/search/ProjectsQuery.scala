@@ -63,7 +63,7 @@ private case object ProjectsQuery extends EntityQuery[model.Entity.Project] {
       imagesVar
     ).map(_.name)
 
-  override def query(criteria: Criteria): Option[String] = (criteria.filters whenRequesting entityType) {
+  override def query(criteria: Criteria): Option[Fragment] = (criteria.filters whenRequesting entityType) {
     import criteria._
     sparql"""|{
              |  SELECT DISTINCT $entityTypeVar $matchingScoreVar $nameVar $slugVar $visibilityVar
@@ -87,7 +87,7 @@ private case object ProjectsQuery extends EntityQuery[model.Entity.Project] {
              |
              |      ${filters.maybeOnDateCreated(maybeDateCreatedVar)}
              |
-             |      ${accessRightsAndVisibility(criteria.maybeUser, criteria.filters.visibilities)}
+             |      ${accessRightsAndVisibility(criteria.maybeUser, criteria.filters)}
              |
              |      GRAPH $projectIdVar {
              |        ${namespacesPart(criteria.filters.namespaces)}
@@ -107,7 +107,7 @@ private case object ProjectsQuery extends EntityQuery[model.Entity.Project] {
              |    }
              |  }
              |}
-             |""".stripMargin.sparql
+             |""".stripMargin
   }
 
   private def textQueryPart: Option[Criteria.Filters.Query] => Fragment = {
@@ -138,11 +138,23 @@ private case object ProjectsQuery extends EntityQuery[model.Entity.Project] {
            |""".stripMargin
   }
 
-  private def accessRightsAndVisibility(maybeUser: Option[AuthUser], visibilities: Set[projects.Visibility]): Fragment =
-    sparql"""
-            |$projectIdVar renku:projectVisibility $visibilityVar .
-            |${authSnippets.visibleProjects(maybeUser.map(_.id), visibilities)}
-              """.stripMargin
+  private def accessRightsAndVisibility(maybeUser: Option[AuthUser], filters: Criteria.Filters): Fragment =
+    maybeUser.map(_.id) -> filters.roles match {
+      case Some(userId) -> roles if roles.nonEmpty =>
+        fr"""|$projectIdVar renku:projectVisibility $visibilityVar .
+             |${visibilitiesPart(filters.visibilities)}
+             |${authSnippets.projectsWithRoles(userId, roles)}
+             |""".stripMargin
+      case maybeUserId -> _ =>
+        fr"""|$projectIdVar renku:projectVisibility $visibilityVar .
+             |${authSnippets.visibleProjects(maybeUserId, filters.visibilities)}
+             |""".stripMargin
+    }
+
+  private lazy val visibilitiesPart: Set[projects.Visibility] => Fragment = {
+    case vis if vis.nonEmpty => fr"""VALUES ($visibilityVar) {${vis.map(_.value)}}."""
+    case _                   => Fragment.empty
+  }
 
   private def namespacesPart(ns: Set[projects.Namespace]): Fragment = {
     val matchFrag =

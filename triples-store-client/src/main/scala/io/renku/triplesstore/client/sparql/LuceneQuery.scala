@@ -18,6 +18,9 @@
 
 package io.renku.triplesstore.client.sparql
 
+import cats.syntax.all._
+import io.renku.triplesstore.client.model.TripleObjectEncoder
+import io.renku.triplesstore.client.syntax._
 import org.apache.lucene.queryparser.flexible.standard.QueryParserUtil
 
 final class LuceneQuery(val query: String) extends AnyVal {
@@ -41,6 +44,6 @@ object LuceneQuery {
         .mkString(" ")
     )
 
-  implicit val sparqlEncoder: SparqlEncoder[LuceneQuery] =
-    SparqlEncoder.instance(q => Fragment(s"'${q.query}'"))
+  implicit val tripleObjectEncoder: TripleObjectEncoder[LuceneQuery] =
+    TripleObjectEncoder[String].contramap(_.query)
 }

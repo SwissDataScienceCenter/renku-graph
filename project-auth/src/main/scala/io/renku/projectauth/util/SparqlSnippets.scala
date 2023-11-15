@@ -19,9 +19,9 @@
 package io.renku.projectauth.util
 
 import cats.syntax.all._
-import io.renku.graph.model.{persons, projects}
 import io.renku.graph.model.projects.Visibility
-import io.renku.projectauth.ProjectAuth
+import io.renku.graph.model.{persons, projects}
+import io.renku.projectauth.{ProjectAuth, ProjectMember}
 import io.renku.triplesstore.client.sparql.{Fragment, VarName}
 import io.renku.triplesstore.client.syntax._
 
@@ -45,6 +45,18 @@ final class SparqlSnippets(val projectId: VarName) {
             |              renku:memberId ${userId.value}.
             |}
             | """.stripMargin
+
+  def projectsWithRoles(userId: persons.GitLabId, roles: Set[projects.Role]): Fragment =
+    roles match {
+      case rls if rls.isEmpty => Fragment.empty
+      case rls =>
+        fr"""|GRAPH renku:ProjectAuth {
+             |   $projectId a schema:Project;
+             |              renku:memberRole ?memberRole.
+             |   VALUES (?memberRole) { ${rls.map(ProjectMember(userId, _).encoded)} }
+             |}
+             | """.stripMargin
+    }
 
   def visibleProjects(userId: Option[persons.GitLabId], selectedVisibility: Set[Visibility]): Fragment = {
     val visibilities =
@@ -89,6 +101,6 @@ object SparqlSnippets {
   def apply(projectVar: VarName): SparqlSnippets =
     new SparqlSnippets(projectVar)
 
-  val default =
+  val default: SparqlSnippets =
     SparqlSnippets(VarName("projectId"))
 }

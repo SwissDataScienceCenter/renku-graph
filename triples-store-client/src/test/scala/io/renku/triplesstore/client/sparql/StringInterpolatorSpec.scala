@@ -34,7 +34,7 @@ class StringInterpolatorSpec extends AnyWordSpec with should.Matchers {
 
     "encode a LuceneQuery if used" in {
       val value = LuceneQuery(s"{${nonEmptyStrings(minLength = 3).generateOne}")
-      fr"$value" shouldBe value.asSparql
+      fr"$value" shouldBe value.asTripleObject.asSparql
     }
 
     "encode a String if used" in {

@@ -55,6 +55,7 @@ object SparqlClient {
     EmberClientBuilder
       .default[F]
       .withTimeout(timeout)
+      .withIdleConnectionTime(timeout * 1.1)
       .build
       .map(c => new DefaultSparqlClient[F](c, connectionConfig))
 }

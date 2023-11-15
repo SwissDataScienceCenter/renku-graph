@@ -64,12 +64,13 @@ class TSClientImpl[F[_]: Async: Logger: SparqlQueryTimeRecorder](
     maxRetries:         Int Refined NonNegative = MaxRetriesAfterConnectionTimeout,
     timeout:            Duration = 20.minutes,
     printQueries:       Boolean = false
-) extends RestClient(Throttler.noThrottling,
-                     Option(implicitly[SparqlQueryTimeRecorder[F]].instance),
-                     retryInterval,
-                     maxRetries,
-                     timeout.some,
-                     timeout.some
+) extends RestClient(
+      Throttler.noThrottling,
+      Option(implicitly[SparqlQueryTimeRecorder[F]].instance),
+      retryInterval,
+      maxRetries,
+      idleTimeoutOverride = (timeout * 1.1).some,
+      requestTimeoutOverride = timeout.some
     )
     with TSClient[F]
     with RdfMediaTypes {
