@@ -22,16 +22,18 @@ import cats.effect._
 import cats.effect.std.CountDownLatch
 import cats.effect.testing.scalatest.AsyncIOSpec
 import cats.syntax.all._
+import com.dimafeng.testcontainers.PostgreSQLContainer
 import fs2.{Pipe, concurrent}
 import io.renku.interpreters.TestLogger
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AsyncWordSpec
 import org.typelevel.log4cats.Logger
+import skunk._
 import skunk.data._
+import skunk.exception.EofException
+import skunk.implicits._
 import skunk.net.protocol.{Describe, Parse}
 import skunk.util.Typer
-import skunk._
-import skunk.implicits._
 
 import scala.concurrent.duration._
 
@@ -106,22 +108,11 @@ class PostgresLockSpec extends AsyncWordSpec with AsyncIOSpec with should.Matche
       } yield ()
     }
 
-    "log if acquiring fails" in withContainers { cnt =>
+    "log and retry if acquiring fails" in withContainers { cnt =>
       implicit val logger: TestLogger[IO] = TestLogger()
 
-      val exception = new Exception("boom")
-      val makeSession = (Resource.eval(Ref.of[IO, Int](0)), session(cnt)).mapN { (counter, goodSession) =>
-        new PostgresLockSpec.TestSession {
-          override def unique[A, B](query: Query[A, B])(args: A) =
-            counter.getAndUpdate(_ + 1).flatMap {
-              case n if n < 2 => IO.raiseError(exception)
-              case _          => goodSession.unique(query)(args)
-            }
-
-          override def execute[A](command: Command[A])(args: A) =
-            goodSession.execute(command)(args)
-        }
-      }
+      val exception   = new Exception("boom")
+      val makeSession = createFailingSessionThatRecovers(cnt, exception)
 
       val interval = 50.millis
       def lock     = makeSession.map(PostgresLock.exclusive_[IO, String](_, interval))
@@ -134,6 +125,28 @@ class PostgresLockSpec extends AsyncWordSpec with AsyncIOSpec with should.Matche
           )
         )
       }
+    }
+
+    "recreate the lock with a new session once the connection has been closed" in withContainers { cnt =>
+      implicit val logger: TestLogger[IO] = TestLogger()
+
+      val exception       = EofException(bytesRequested = 1, bytesRead = 0)
+      val sessionResource = createFailingSessionThatDoesNotRecover(cnt, exception)
+
+      val interval = 50.millis
+
+      val lock = PostgresLock.exclusive[IO, String](sessionResource, interval)
+
+      for {
+        _   <- session(cnt).use(resetLockTable)
+        res <- lock.run("p1").use(_ => IO.unit).assertNoException
+        _ <- logger.loggedF(
+               TestLogger.Level.Warn(
+                 "Session get closed while acquiring postgres advisory lock! Renewing connection.",
+                 exception
+               )
+             )
+      } yield res
     }
   }
 
@@ -228,6 +241,42 @@ class PostgresLockSpec extends AsyncWordSpec with AsyncIOSpec with should.Matche
                  case _                      => IO.raiseError(new Exception("joining failed"))
                })
         } yield ()
+      }
+    }
+  }
+
+  private def createFailingSessionThatRecovers(cnt:       PostgreSQLContainer,
+                                               exception: Exception
+  ): Resource[IO, Session[IO]] =
+    (Resource.eval(Ref.of[IO, Int](0)), session(cnt))
+      .mapN { (counter, goodSession) =>
+        new PostgresLockSpec.TestSession {
+          override def unique[A, B](query: Query[A, B])(args: A) =
+            counter.getAndUpdate(_ + 1) >>= {
+              case n if n < 2 => IO.raiseError(exception)
+              case _          => goodSession.unique(query)(args)
+            }
+
+          override def execute[A](command: Command[A])(args: A) =
+            goodSession.execute(command)(args)
+        }
+      }
+
+  private def createFailingSessionThatDoesNotRecover(cnt:       PostgreSQLContainer,
+                                                     exception: Exception
+  ): Resource[IO, Session[IO]] = {
+    val counter = Ref.unsafe[IO, Int](0)
+
+    session(cnt).map { goodSession =>
+      new PostgresLockSpec.TestSession {
+        override def unique[A, B](query: Query[A, B])(args: A) =
+          counter.getAndUpdate(_ + 1) >>= {
+            case n if n < 2 => IO.raiseError(exception)
+            case _          => goodSession.unique(query)(args)
+          }
+
+        override def execute[A](command: Command[A])(args: A) =
+          goodSession.execute(command)(args)
       }
     }
   }

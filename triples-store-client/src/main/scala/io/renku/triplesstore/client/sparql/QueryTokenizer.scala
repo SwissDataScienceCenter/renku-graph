@@ -18,10 +18,11 @@
 
 package io.renku.triplesstore.client.sparql
 
-import org.apache.lucene.analysis.Tokenizer
 import org.apache.lucene.analysis.core.LetterTokenizer
+import org.apache.lucene.analysis.custom.CustomAnalyzer
 import org.apache.lucene.analysis.standard.StandardTokenizer
 import org.apache.lucene.analysis.tokenattributes.{CharTermAttribute, CharTermAttributeImpl}
+import org.apache.lucene.analysis.{Analyzer, TokenStream, Tokenizer}
 import org.apache.lucene.util.AttributeFactory
 import org.apache.lucene.util.AttributeFactory.StaticImplementationAttributeFactory
 
@@ -42,13 +43,23 @@ object QueryTokenizer {
   def luceneLetters: QueryTokenizer =
     new LuceneTokenizer(new LetterTokenizer(_))
 
+  def lucenePreservingWithLetters: QueryTokenizer =
+    new LuceneAnalyzer(
+      CustomAnalyzer
+        .builder()
+        .withTokenizer("whitespace")
+        .addTokenFilter("wordDelimiterGraph", "preserveOriginal", "1", "stemEnglishPossessive", "0")
+        .build()
+    )
+
   def splitOn(c: Char): QueryTokenizer =
     (input: String) => input.split(c).toList
 
   def default: QueryTokenizer =
-    luceneStandard
+    lucenePreservingWithLetters
 
   private final class LuceneTokenizer(createDelegate: AttributeFactory => Tokenizer) extends QueryTokenizer {
+
     override def split(input: String): List[String] = {
       val tokenizer = createDelegate(
         new StaticImplementationAttributeFactory[CharTermAttributeImpl](
@@ -59,15 +70,32 @@ object QueryTokenizer {
         }
       )
       tokenizer.setReader(new StringReader(input))
-      tokenizer.reset()
       val attr = tokenizer.addAttribute(classOf[CharTermAttribute])
 
-      @annotation.tailrec
-      def loop(result: List[String]): List[String] =
-        if (tokenizer.incrementToken()) loop(attr.toString :: result)
-        else result
+      tokenizer.reset()
 
-      loop(Nil).reverse
+      collectTokens(tokenizer, attr).reverse
     }
   }
+
+  private final class LuceneAnalyzer(analyzer: Analyzer) extends QueryTokenizer {
+
+    override def split(input: String): List[String] = {
+
+      val tokenStream = analyzer.tokenStream("DUMMY_FIELD", input)
+      val attr        = tokenStream.addAttribute(classOf[CharTermAttribute])
+
+      tokenStream.reset()
+
+      collectTokens(tokenStream, attr).reverse
+    }
+  }
+
+  @annotation.tailrec
+  private def collectTokens(tokenStream: TokenStream,
+                            attr:        CharTermAttribute,
+                            results:     List[String] = Nil
+  ): List[String] =
+    if (tokenStream.incrementToken()) collectTokens(tokenStream, attr, attr.toString :: results)
+    else results
 }

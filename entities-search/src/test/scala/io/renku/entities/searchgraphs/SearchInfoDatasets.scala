@@ -21,7 +21,6 @@ package io.renku.entities.searchgraphs
 import cats.effect.IO
 import cats.syntax.all._
 import io.renku.graph.model.entities.EntityFunctions
-import io.renku.graph.model.projects.Role
 import io.renku.graph.model.{RenkuUrl, datasets, entities, testentities}
 import io.renku.lock.Lock
 import io.renku.logging.{ExecutionTimeRecorder, TestExecutionTimeRecorder}
@@ -70,7 +69,7 @@ trait SearchInfoDatasets {
     implicit val sparqlQueryTimeRecorder: SparqlQueryTimeRecorder[IO] =
       new SparqlQueryTimeRecorder[IO](execTimeRecorder)
     val ps      = ProjectSparqlClient[IO](projectsDSConnectionInfo).map(ProjectAuthService[IO](_, renkuUrl))
-    val members = project.members.flatMap(p => p.person.maybeGitLabId.map(id => ProjectMember(id, Role.Reader)))
+    val members = project.members.flatMap(m => m.person.maybeGitLabId.map(id => ProjectMember(id, m.role)))
     ps.use(_.update(ProjectAuthData(project.slug, members, project.visibility)))
   }
 

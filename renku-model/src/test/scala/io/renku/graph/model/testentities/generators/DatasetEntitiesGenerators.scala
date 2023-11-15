@@ -300,13 +300,13 @@ trait DatasetEntitiesGenerators {
   }
 
   implicit def identificationLens[P <: Dataset.Provenance]: Lens[Dataset[P], Identification] =
-    Lens[Dataset[P], Identification](_.identification)(identification => ds => ds.copy(identification = identification))
+    Lens[Dataset[P], Identification](_.identification)(identification => _.copy(identification = identification))
 
   implicit def provenanceLens[P <: Dataset.Provenance]: Lens[Dataset[P], P] =
-    Lens[Dataset[P], P](_.provenance)(prov => ds => ds.copy(provenance = prov))
+    Lens[Dataset[P], P](_.provenance)(prov => _.copy(provenance = prov))
 
   implicit def additionalInfoLens[P <: Dataset.Provenance]: Lens[Dataset[P], AdditionalInfo] =
-    Lens[Dataset[P], AdditionalInfo](_.additionalInfo)(additionalInfo => ds => ds.copy(additionalInfo = additionalInfo))
+    Lens[Dataset[P], AdditionalInfo](_.additionalInfo)(additionalInfo => _.copy(additionalInfo = additionalInfo))
 
   implicit def creatorsLens[P <: Dataset.Provenance]: Lens[P, NonEmptyList[Person]] =
     Lens[P, NonEmptyList[Person]](_.creators) { crts =>
@@ -318,6 +318,9 @@ trait DatasetEntitiesGenerators {
         case p: Provenance.Modified                         => p.copy(creators = crts.sortBy(_.name)).asInstanceOf[P]
       }
     }
+
+  def replaceDSCreators[P <: Dataset.Provenance](creators: NonEmptyList[Person]): Dataset[P] => Dataset[P] =
+    provenanceLens[P].modify(creatorsLens[P].replace(creators))
 
   def replaceDSName[P <: Dataset.Provenance](to: datasets.Name): Dataset[P] => Dataset[P] =
     identificationLens[P].modify(_.copy(name = to))

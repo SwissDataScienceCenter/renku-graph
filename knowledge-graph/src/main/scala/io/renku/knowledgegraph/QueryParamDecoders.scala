@@ -85,6 +85,17 @@ object QueryParamDecoders {
     val parameterName: String = "creator"
   }
 
+  private implicit val roleParameterDecoder: QueryParamDecoder[projects.Role] =
+    (value: QueryParameterValue) =>
+      projects.Role
+        .from(value.value)
+        .leftMap(_ => parsingFailure(roles.parameterName))
+        .toValidatedNel
+
+  object roles extends OptionalMultiQueryParamDecoderMatcher[projects.Role]("role") {
+    val parameterName: String = "role"
+  }
+
   private implicit val visibilityParameterDecoder: QueryParamDecoder[projects.Visibility] =
     (value: QueryParameterValue) =>
       projects.Visibility

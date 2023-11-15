@@ -20,12 +20,13 @@ package io.renku.crypto
 
 import cats.MonadThrow
 import cats.syntax.all._
-import io.renku.config.ConfigLoader.base64ByteVectorReader
+import io.renku.config.ConfigLoader.{asciiByteVectorReader, base64ByteVectorReader}
 import io.renku.crypto.AesCrypto.Secret
 import pureconfig.ConfigReader
 import pureconfig.error.FailureReason
 import scodec.bits.ByteVector
 
+import java.nio.charset.CharacterCodingException
 import java.nio.charset.StandardCharsets.UTF_8
 import java.util.Base64
 import javax.crypto.Cipher
@@ -63,31 +64,40 @@ abstract class AesCrypto[F[_]: MonadThrow, NONENCRYPTED, ENCRYPTED](secret: Secr
 object AesCrypto {
 
   final class Secret private (val value: ByteVector) extends AnyVal {
-    override def toString: String = "<sensitive>"
-    def toBase64:          String = value.toBase64
+    override def toString: String                                   = "<sensitive>"
+    def decodeAscii:       Either[CharacterCodingException, String] = value.decodeAscii
   }
 
   object Secret {
 
     def apply(value: ByteVector): Either[String, Secret] = {
       val expectedLengths = List(16L, 24L, 32L)
-      if (expectedLengths.contains(value.length)) Right(new Secret(value))
+      if (expectedLengths contains value.length) Right(new Secret(value))
       else Left(s"Expected ${expectedLengths.mkString(" or ")} bytes, but got ${value.length}")
     }
 
     def unsafe(value: ByteVector): Secret = apply(value).fold(sys.error, identity)
 
-    def fromBase64(b64: String): Either[String, Secret] =
+    private def fromBase64(b64: String): Either[String, Secret] =
       ByteVector.fromBase64Descriptive(b64).flatMap(apply)
 
     def unsafeFromBase64(b64: String): Secret =
       fromBase64(b64).fold(sys.error, identity)
 
     implicit def secretReader: ConfigReader[Secret] =
-      base64ByteVectorReader.emap(bv =>
-        Secret(bv.takeWhile(_ != 10)).leftMap(err =>
+      base64SecretReader orElse asciiSecretReader
+
+    private lazy val base64SecretReader =
+      base64ByteVectorReader.emap { bv =>
+        Secret(bv.takeWhile(_ != 10))
+          .leftMap(err => new FailureReason { override lazy val description: String = s"Cannot read AES secret: $err" })
+      }
+
+    private lazy val asciiSecretReader =
+      asciiByteVectorReader.emap { bv =>
+        Secret(bv).leftMap(err =>
           new FailureReason { override lazy val description: String = s"Cannot read AES secret: $err" }
         )
-      )
+      }
   }
 }

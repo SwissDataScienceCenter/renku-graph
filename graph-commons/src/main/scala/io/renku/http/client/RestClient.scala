@@ -117,9 +117,15 @@ abstract class RestClient[F[_]: Async: Logger, ThrottlingTarget](
 
   private def httpClientBuilder: EmberClientBuilder[F] = {
     implicit val network: Network[F] = Network.forAsync(Async[F])
-    val clientBuilder      = EmberClientBuilder.default[F]
-    val updatedIdleTimeout = idleTimeoutOverride map clientBuilder.withIdleConnectionTime getOrElse clientBuilder
-    requestTimeoutOverride map updatedIdleTimeout.withTimeout getOrElse updatedIdleTimeout
+    val clientBuilder       = EmberClientBuilder.default[F]
+    val updatedIdleTimeout  = idleTimeoutOverride map clientBuilder.withIdleConnectionTime getOrElse clientBuilder
+    val updatedBothTimeouts = requestTimeoutOverride map updatedIdleTimeout.withTimeout getOrElse updatedIdleTimeout
+    idleTimeoutOverride -> requestTimeoutOverride match {
+      case None -> None =>
+        // in the case no timeout overrides given, the idle timeout is set at 10% more than the timeout to mute the http4s warning
+        updatedBothTimeouts withIdleConnectionTime updatedBothTimeouts.timeout * 1.1
+      case _ => updatedBothTimeouts
+    }
   }
 
   private def measureExecutionTime[ResultType](block: => F[ResultType], request: HttpRequest[F]): F[ResultType] =

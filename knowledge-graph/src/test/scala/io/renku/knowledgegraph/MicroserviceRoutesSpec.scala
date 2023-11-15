@@ -275,9 +275,7 @@ class MicroserviceRoutesSpec
         "uri"                          -> "criteria",
         uri"/knowledge-graph/entities" -> Criteria(),
         queryParams
-          .map(query =>
-            uri"/knowledge-graph/entities" +? ("query" -> query.value) -> Criteria(Filters(maybeQuery = query.some))
-          )
+          .map(q => uri"/knowledge-graph/entities" +? ("query" -> q.value) -> Criteria(Filters(maybeQuery = q.some)))
           .generateOne,
         typeParams
           .map(t => uri"/knowledge-graph/entities" +? ("type" -> t.value) -> Criteria(Filters(entityTypes = Set(t))))
@@ -380,6 +378,7 @@ class MicroserviceRoutesSpec
       )
     } { (uri, criteria) =>
       s"read the query parameters from $uri, pass them to the endpoint and return received response" in new TestCase {
+
         val request = Request[IO](GET, uri)
 
         val responseBody = jsons.generateOne
@@ -393,6 +392,56 @@ class MicroserviceRoutesSpec
         response.contentType shouldBe Some(`Content-Type`(application.json))
         response.body[Json]  shouldBe responseBody
       }
+    }
+
+    "read the 'role' query parameter from the uri and pass it to the endpoint when auth user present" in new TestCase {
+
+      val authUser      = authUsers.generateOne
+      val maybeAuthUser = MaybeAuthUser(authUser)
+      val role          = projectRoles.generateOne
+      val criteria      = Criteria(Filters(roles = Set(role)), maybeUser = maybeAuthUser.option)
+      val request       = Request[IO](GET, uri"/knowledge-graph/entities" +? ("role" -> role))
+
+      val responseBody = jsons.generateOne
+      (entitiesEndpoint.`GET /entities` _)
+        .expects(criteria, request)
+        .returning(Response[IO](Ok).withEntity(responseBody).pure[IO])
+
+      val response = routes(maybeAuthUser).call(request)
+
+      response.status      shouldBe Ok
+      response.contentType shouldBe Some(`Content-Type`(application.json))
+      response.body[Json]  shouldBe responseBody
+    }
+
+    "read multiple 'role' query parameters from the uri and pass it to the endpoint when auth user present" in new TestCase {
+
+      val authUser      = authUsers.generateOne
+      val maybeAuthUser = MaybeAuthUser(authUser)
+      val roles         = projectRoles.generateSet(min = 2)
+      val criteria      = Criteria(Filters(roles = roles), maybeUser = maybeAuthUser.option)
+      val request       = Request[IO](GET, uri"/knowledge-graph/entities" ++? ("role" -> roles.toList.map(_.show)))
+
+      val responseBody = jsons.generateOne
+      (entitiesEndpoint.`GET /entities` _)
+        .expects(criteria, request)
+        .returning(Response[IO](Ok).withEntity(responseBody).pure[IO])
+
+      val response = routes(maybeAuthUser).call(request)
+
+      response.status      shouldBe Ok
+      response.contentType shouldBe Some(`Content-Type`(application.json))
+      response.body[Json]  shouldBe responseBody
+    }
+
+    s"return $BadRequest when the 'role' query parameter given but no auth user present" in new TestCase {
+
+      val response =
+        routes().call(Request[IO](GET, uri"/knowledge-graph/entities" +? ("role" -> projectRoles.generateOne)))
+
+      response.status        shouldBe BadRequest
+      response.contentType   shouldBe Some(`Content-Type`(application.json))
+      response.body[Message] shouldBe Message.Error("'role' parameter present but no access token")
     }
 
     s"return $BadRequest for invalid parameter values" in new TestCase {
@@ -1115,9 +1164,10 @@ class MicroserviceRoutesSpec
       .expects(identifier, maybeAuthUser)
       .returning(returning)
 
-    def givenDSSameAsAuthorizer(sameAs:        model.datasets.SameAs,
-                                maybeAuthUser: Option[AuthUser],
-                                returning: EitherT[IO, EndpointSecurityException, AuthContext[model.datasets.SameAs]]
+    private def givenDSSameAsAuthorizer(
+        sameAs:        model.datasets.SameAs,
+        maybeAuthUser: Option[AuthUser],
+        returning:     EitherT[IO, EndpointSecurityException, AuthContext[model.datasets.SameAs]]
     ) = (datasetSameAsAuthorizer.authorize _)
       .expects(sameAs, maybeAuthUser)
       .returning(returning)

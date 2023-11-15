@@ -49,8 +49,8 @@ import io.renku.microservices.{MicroserviceBaseUrl, MicroserviceIdentifier}
 import io.renku.triplesstore._
 import org.http4s.Status
 import org.http4s.Status._
+import org.scalacheck.Gen.asciiPrintableChar
 import org.scalacheck.{Arbitrary, Gen}
-import scodec.bits.Bases.Alphabets
 import scodec.bits.ByteVector
 
 import scala.language.implicitConversions
@@ -63,10 +63,10 @@ object CommonGraphGenerators {
       .oneOf(16, 24, 32)
       .flatMap { length =>
         Gen
-          .listOfN(length * 2, Gen.hexChar)
-          .map(_.mkString.toLowerCase)
-          .map(ByteVector.fromValidHex(_, Alphabets.HexLowercase))
-          .retryUntil(_.takeWhile(_ != 10.toByte).length == length) // this is to prevent LF chars to be generated
+          .listOfN(length, asciiPrintableChar)
+          .map(_.mkString)
+          .map(_.getBytes("US-ASCII"))
+          .map(ByteVector(_))
           .map(Secret.unsafe)
       }
 

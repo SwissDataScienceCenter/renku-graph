@@ -49,8 +49,7 @@ object FusekiClient {
     EmberClientBuilder
       .default[F]
       .withTimeout(timeout)
+      .withIdleConnectionTime(timeout * 1.1)
       .build
-      .map { c =>
-        new DefaultFusekiClient[F](c, connectionConfig)
-      }
+      .map(new DefaultFusekiClient[F](_, connectionConfig))
 }
