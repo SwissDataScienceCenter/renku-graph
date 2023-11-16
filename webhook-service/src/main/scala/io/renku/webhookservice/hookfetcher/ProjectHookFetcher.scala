@@ -46,7 +46,7 @@ private[webhookservice] class ProjectHookFetcherImpl[F[_]: Async: GitLabClient: 
   import io.renku.http.tinytypes.TinyTypeURIEncoder._
   import org.http4s.Status.{Forbidden, NotFound, Ok, Unauthorized}
   import org.http4s._
-  import org.http4s.circe._
+  import org.http4s.circe.CirceEntityDecoder._
 
   override def fetchProjectHooks(projectId:   projects.GitLabId,
                                  accessToken: AccessToken
@@ -59,14 +59,10 @@ private[webhookservice] class ProjectHookFetcherImpl[F[_]: Async: GitLabClient: 
     case (Unauthorized | Forbidden, _, _) => Option.empty[List[HookIdAndUrl]].pure[F]
   }
 
-  private implicit lazy val hooksIdsAndUrlsDecoder: EntityDecoder[F, List[HookIdAndUrl]] = {
-    implicit val decoder: Decoder[List[HookIdAndUrl]] = decodeList { cursor =>
-      for {
-        url <- cursor.downField("url").as[String].map(ProjectHookUrl.fromGitlab)
-        id  <- cursor.downField("id").as[Int]
-      } yield HookIdAndUrl(id, url)
-    }
-
-    jsonOf[F, List[HookIdAndUrl]]
+  private implicit val decoder: Decoder[List[HookIdAndUrl]] = decodeList { cursor =>
+    for {
+      url <- cursor.downField("url").as[String].map(ProjectHookUrl.fromGitlab)
+      id  <- cursor.downField("id").as[Int]
+    } yield HookIdAndUrl(id, url)
   }
 }
