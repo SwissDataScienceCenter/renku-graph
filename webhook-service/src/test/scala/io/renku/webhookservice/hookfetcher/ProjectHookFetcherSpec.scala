@@ -31,6 +31,7 @@ import io.renku.generators.Generators._
 import io.renku.graph.model.GraphModelGenerators.projectIds
 import io.renku.http.client.RestClient.ResponseMappingF
 import io.renku.http.client.{AccessToken, GitLabClient}
+import io.renku.http.rest.paging.model.Page
 import io.renku.http.server.EndpointTester.jsonEntityEncoder
 import io.renku.http.tinytypes.TinyTypeURIEncoder._
 import io.renku.interpreters.TestLogger
@@ -53,24 +54,20 @@ class ProjectHookFetcherSpec
     with should.Matchers
     with OptionValues {
 
-  it should "return list of project hooks" in {
+  it should "return list of project hooks from all pages" in {
 
-    val projectId = projectIds.generateOne
-    val uri       = uri"projects" / projectId / "hooks"
-    val endpointName: String Refined NonEmpty = "project-hooks"
-    val accessToken = accessTokens.generateOne
-    val idAndUrls   = hookIdAndUrls.toGeneratorOfNonEmptyList(2).generateOne.toList
+    val projectId    = projectIds.generateOne
+    val uri          = uri"projects" / projectId / "hooks"
+    val accessToken  = accessTokens.generateOne
+    val resultsPage1 = hookIdAndUrls.toGeneratorOfNonEmptyList(2).generateOne.toList
+    val resultsPage2 = hookIdAndUrls.toGeneratorOfNonEmptyList(2).generateOne.toList
 
-    (glClient
-      .get(_: Uri, _: String Refined NonEmpty)(_: ResponseMappingF[IO, Option[List[HookIdAndUrl]]])(
-        _: Option[AccessToken]
-      ))
-      .expects(uri, endpointName, *, accessToken.some)
-      .returning(idAndUrls.some.pure[IO])
+    getProjectHooks(uri.withQueryParam("page", 1), accessToken, returning = resultsPage1, maybeNextPage = Page(2).some)
+    getProjectHooks(uri.withQueryParam("page", 2), accessToken, returning = resultsPage2, maybeNextPage = None)
 
     fetcher
       .fetchProjectHooks(projectId, accessToken)
-      .asserting(_.value should contain theSameElementsAs idAndUrls)
+      .asserting(_.value should contain theSameElementsAs (resultsPage1 ::: resultsPage2))
   }
 
   it should "return the list of hooks if the response is Ok" in {
@@ -78,16 +75,18 @@ class ProjectHookFetcherSpec
     val id  = positiveInts().generateOne.value
     val url = projectHookUrls.generateOne
     mapResponse((Status.Ok, Request(), Response().withEntity(json"""[{"id":$id, "url":${url.value}}]""")))
-      .asserting(_ shouldBe List(HookIdAndUrl(id, url)).some)
+      .asserting(_ shouldBe List(HookIdAndUrl(id, url)).some -> None)
   }
 
   it should "return an empty list of hooks if the project does not exists" in {
-    mapResponse(Status.NotFound, Request(), Response()).asserting(_ shouldBe List.empty[HookIdAndUrl].some)
+    mapResponse(Status.NotFound, Request(), Response())
+      .asserting(_ shouldBe List.empty[HookIdAndUrl].some -> None)
   }
 
   Status.Unauthorized :: Status.Forbidden :: Nil foreach { status =>
     it should show"return None if remote client responds with $status" in {
-      mapResponse(status, Request(), Response()).asserting(_ shouldBe None)
+      mapResponse(status, Request(), Response())
+        .asserting(_ shouldBe None -> None)
     }
   }
 
@@ -102,13 +101,28 @@ class ProjectHookFetcherSpec
       .assertThrowsError[Exception](_.getMessage should include("Could not decode JSON"))
   }
 
-  private implicit val logger:        TestLogger[IO]   = TestLogger[IO]()
-  private implicit lazy val glClient: GitLabClient[IO] = mock[GitLabClient[IO]]
+  private implicit val logger:   TestLogger[IO]   = TestLogger[IO]()
+  private implicit val glClient: GitLabClient[IO] = mock[GitLabClient[IO]]
   private lazy val fetcher = new ProjectHookFetcherImpl[IO]
+
+  private def getProjectHooks(uri:           Uri,
+                              accessToken:   AccessToken,
+                              returning:     List[HookIdAndUrl],
+                              maybeNextPage: Option[Page]
+  ) = {
+    val endpointName: String Refined NonEmpty = "project-hooks"
+
+    (glClient
+      .get(_: Uri, _: String Refined NonEmpty)(_: ResponseMappingF[IO, (Option[List[HookIdAndUrl]], Option[Page])])(
+        _: Option[AccessToken]
+      ))
+      .expects(uri, endpointName, *, accessToken.some)
+      .returning((returning.some -> maybeNextPage).pure[IO])
+  }
 
   private lazy val mapResponse = captureMapping(glClient)(
     fetcher.fetchProjectHooks(projectIds.generateOne, accessTokens.generateOne).unsafeRunSync(),
-    Gen.const(Option.empty[List[HookIdAndUrl]]),
+    Gen.const(Option.empty[List[HookIdAndUrl]] -> Option.empty[Page]),
     underlyingMethod = Get
   )
 }

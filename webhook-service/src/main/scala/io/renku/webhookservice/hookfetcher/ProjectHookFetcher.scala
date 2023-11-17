@@ -24,10 +24,12 @@ import eu.timepit.refined.auto._
 import io.circe.Decoder.decodeList
 import io.renku.graph.model.projects
 import io.renku.http.client.{AccessToken, GitLabClient}
+import io.renku.http.rest.paging.model.Page
 import io.renku.webhookservice.hookfetcher.ProjectHookFetcher.HookIdAndUrl
 import io.renku.webhookservice.model.ProjectHookUrl
 import org.http4s.implicits.http4sLiteralsSyntax
 import org.typelevel.log4cats.Logger
+import org.typelevel.ci._
 
 private[webhookservice] trait ProjectHookFetcher[F[_]] {
   def fetchProjectHooks(projectId: projects.GitLabId, accessToken: AccessToken): F[Option[List[HookIdAndUrl]]]
@@ -43,6 +45,7 @@ private[webhookservice] object ProjectHookFetcher {
 private[webhookservice] class ProjectHookFetcherImpl[F[_]: Async: GitLabClient: Logger] extends ProjectHookFetcher[F] {
 
   import io.circe._
+  import fs2.Stream
   import io.renku.http.tinytypes.TinyTypeURIEncoder._
   import org.http4s.Status.{Forbidden, NotFound, Ok, Unauthorized}
   import org.http4s._
@@ -50,13 +53,38 @@ private[webhookservice] class ProjectHookFetcherImpl[F[_]: Async: GitLabClient: 
 
   override def fetchProjectHooks(projectId:   projects.GitLabId,
                                  accessToken: AccessToken
-  ): F[Option[List[HookIdAndUrl]]] =
-    GitLabClient[F].get(uri"projects" / projectId / "hooks", "project-hooks")(mapResponse)(accessToken.some)
+  ): F[Option[List[HookIdAndUrl]]] = {
+    def fetchHooks(page: Page) =
+      GitLabClient[F].get(uri"projects" / projectId / "hooks" withQueryParam ("page", page), "project-hooks")(
+        mapResponse
+      )(accessToken.some)
 
-  private lazy val mapResponse: PartialFunction[(Status, Request[F], Response[F]), F[Option[List[HookIdAndUrl]]]] = {
-    case (Ok, _, response)                => response.as[List[HookIdAndUrl]].map(_.some)
-    case (NotFound, _, _)                 => List.empty[HookIdAndUrl].some.pure[F]
-    case (Unauthorized | Forbidden, _, _) => Option.empty[List[HookIdAndUrl]].pure[F]
+    def readNextPage
+        : ((Option[List[HookIdAndUrl]], Option[Page])) => Stream[F, (Option[List[HookIdAndUrl]], Option[Page])] = {
+      case (previousHooks, Some(nextPage)) =>
+        Stream
+          .eval(fetchHooks(nextPage))
+          .map { case (currentHooks, maybeNextPage) => (previousHooks |+| currentHooks) -> maybeNextPage }
+          .flatMap(readNextPage)
+      case (previousHooks, None) =>
+        Stream.emit(previousHooks -> None)
+    }
+
+    readNextPage(List.empty[HookIdAndUrl].some -> Page.first.some)
+      .map { case (maybeHooks, _) => maybeHooks }
+      .compile
+      .toList
+      .map(_.sequence.map(_.flatten))
+  }
+
+  private lazy val mapResponse
+      : PartialFunction[(Status, Request[F], Response[F]), F[(Option[List[HookIdAndUrl]], Option[Page])]] = {
+    case (Ok, _, response) =>
+      val maybeNextPage: Option[Page] =
+        response.headers.get(ci"X-Next-Page").flatMap(_.head.value.toIntOption.map(Page(_)))
+      response.as[List[HookIdAndUrl]].map(_.some -> maybeNextPage)
+    case (NotFound, _, _)                 => (List.empty[HookIdAndUrl].some -> Option.empty[Page]).pure[F]
+    case (Unauthorized | Forbidden, _, _) => (Option.empty[List[HookIdAndUrl]] -> Option.empty[Page]).pure[F]
   }
 
   private implicit val decoder: Decoder[List[HookIdAndUrl]] = decodeList { cursor =>
