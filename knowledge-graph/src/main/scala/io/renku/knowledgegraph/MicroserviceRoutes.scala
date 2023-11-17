@@ -312,7 +312,11 @@ private class MicroserviceRoutes[F[_]: Async](
 
       (
         sort.find(request.uri.query).sequence,
-        PagingRequest(page.find(request.uri.query), perPage.find(request.uri.query))
+        PagingRequest(
+          page.find(request.uri.query),
+          // defaulting to PerPage.max is a temporary fix as CLI does not read DS from other pages yet
+          perPage.find(request.uri.query).fold(ifEmpty = PerPage.max.validNel[ParseFailure])(identity).some
+        )
       ).mapN { (maybeSorts, paging) =>
         val sorting: Sorting[Criteria.Sort.type] = Sorting.fromOptionalListOrDefault(maybeSorts, Sort.default)
         projectSlugParts.toProjectSlug
