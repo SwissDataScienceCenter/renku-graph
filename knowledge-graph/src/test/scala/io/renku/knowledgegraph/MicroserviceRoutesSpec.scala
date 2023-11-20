@@ -703,27 +703,35 @@ class MicroserviceRoutesSpec
     val projectSlug = projectSlugs.generateOne
     val projectDsUri = projectSlug.toNamespaces
       .foldLeft(uri"/knowledge-graph/projects")(_ / _.show) / projectSlug.toPath / "datasets"
+    val defaultPerPage = PerPage.max
+    val defaultPaging  = PagingRequest.default.copy(perPage = defaultPerPage)
 
     forAll {
       Table(
         "uri"        -> "criteria",
-        projectDsUri -> Criteria(projectSlug),
+        projectDsUri -> Criteria(projectSlug, paging = defaultPaging),
         sortingDirections
           .map(dir =>
-            projectDsUri +? ("sort" -> s"name:$dir") -> Criteria(projectSlug, sorting = Sorting(Sort.By(ByName, dir)))
+            projectDsUri +? ("sort" -> s"name:$dir") -> Criteria(projectSlug,
+                                                                 sorting = Sorting(Sort.By(ByName, dir)),
+                                                                 paging = defaultPaging
+            )
           )
           .generateOne,
         sortingDirections
           .map(dir =>
             projectDsUri +? ("sort" -> s"dateModified:$dir") -> Criteria(projectSlug,
-                                                                         sorting = Sorting(Sort.By(ByDateModified, dir))
+                                                                         sorting =
+                                                                           Sorting(Sort.By(ByDateModified, dir)),
+                                                                         paging = defaultPaging
             )
           )
           .generateOne,
         pages
           .map(page =>
-            projectDsUri +? ("page" -> page.show) -> Criteria(projectSlug,
-                                                              paging = PagingRequest.default.copy(page = page)
+            projectDsUri +? ("page" -> page.show) -> Criteria(
+              projectSlug,
+              paging = PagingRequest.default.copy(page = page, perPage = defaultPerPage)
             )
           )
           .generateOne,
