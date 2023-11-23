@@ -27,6 +27,7 @@ import scala.concurrent.duration._
 class CacheConfigLoaderSpec extends AnyWordSpec with should.Matchers {
 
   "CacheConfigLoader" should {
+
     "load from given config" in {
       val cfg = ConfigFactory.parseString("""evict-strategy = oldest
                                             |ignore-empty-values = true
@@ -39,7 +40,7 @@ class CacheConfigLoaderSpec extends AnyWordSpec with should.Matchers {
                                             |""".stripMargin)
 
       val cc = CacheConfigLoader.unsafeRead(cfg)
-      cc shouldBe CacheConfig(EvictStrategy.Oldest, true, 5.seconds, Periodic(1000, 10.minutes))
+      cc shouldBe CacheConfig(EvictStrategy.Oldest, ignoreEmptyValues = true, 5.seconds, Periodic(1000, 10.minutes))
     }
   }
 }

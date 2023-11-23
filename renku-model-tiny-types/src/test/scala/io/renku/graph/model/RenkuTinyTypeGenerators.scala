@@ -23,7 +23,6 @@ import io.renku.generators.Generators
 import io.renku.generators.Generators.Implicits._
 import io.renku.generators.Generators._
 import io.renku.graph.model.images.{ImageResourceId, ImageUri}
-import io.renku.graph.model.projects.Role
 import io.renku.graph.model.versions.{CliVersion, SchemaVersion}
 import io.renku.tinytypes.InstantTinyType
 import org.scalacheck.Gen
@@ -34,9 +33,6 @@ import java.time.{Instant, LocalDate, ZoneOffset}
 import scala.util.Random
 
 trait RenkuTinyTypeGenerators {
-
-  val roleGen: Gen[Role] =
-    Gen.oneOf(Role.all.toList)
 
   def associationResourceIdGen: Gen[associations.ResourceId] =
     Generators.validatedUrls.map(_.value).map(associations.ResourceId)
@@ -125,6 +121,7 @@ trait RenkuTinyTypeGenerators {
   implicit val projectDescriptions: Gen[projects.Description] =
     Generators.paragraphs() map (v => projects.Description(v.value))
   implicit val projectVisibilities: Gen[projects.Visibility] = Gen.oneOf(projects.Visibility.all.toList)
+  implicit val projectRoles:        Gen[projects.Role]       = Gen.oneOf(projects.Role.all.toList)
 
   def projectCreatedDates(min: Instant = Instant.EPOCH): Gen[projects.DateCreated] =
     Generators.timestamps(min, max = Instant.now()).toGeneratorOf(projects.DateCreated)

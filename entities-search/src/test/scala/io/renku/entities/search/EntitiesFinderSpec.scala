@@ -29,13 +29,13 @@ import io.renku.entities.search.Generators._
 import io.renku.entities.search.diff.SearchDiffInstances
 import io.renku.entities.search.model.Entity
 import io.renku.entities.searchgraphs.SearchInfoDatasets
-import io.renku.generators.CommonGraphGenerators.sortingDirections
+import io.renku.generators.CommonGraphGenerators.{authUsers, sortingDirections}
 import io.renku.generators.Generators.Implicits._
 import io.renku.generators.Generators._
 import io.renku.graph.model._
 import io.renku.graph.model.projects.Visibility
 import io.renku.graph.model.testentities.generators.EntitiesGenerators
-import io.renku.graph.model.testentities.{Dataset, Project, StepPlan}
+import io.renku.graph.model.testentities.{Dataset, StepPlan}
 import io.renku.graph.model.tools.AdditionalMatchers
 import io.renku.http.rest.paging.PagingRequest
 import io.renku.http.rest.paging.model._
@@ -546,170 +546,216 @@ class EntitiesFinderSpec
     }
   }
 
-  "findEntities - with owned filter" should {
+  "findEntities - with role filter" should {
 
-    "return project entities where the given user is an owner" in new TestCase {
+    "return project entities where the given user has the given role" in new TestCase {
 
-      val ownerId = personGitLabIds.generateOne
-      val owner   = Project.Member(personEntities(ownerId.some).generateOne, projects.Role.Owner)
+      val memberId = personGitLabIds.generateOne
+      val member   = projectMemberEntities(memberId.some).generateOne
 
       val project = renkuProjectEntities(anyVisibility)
-        .modify(replaceMembers(Set(owner)))
+        .modify(replaceMembers(Set(member)))
         .generateOne
 
       val results = IOBody {
         provisionTestProjects(project, projectEntities(visibilityPublic).generateOne) *>
-          finder.findEntities(Criteria(Filters(maybeOwned = Criteria.Filters.Owned(ownerId).some)))
+          finder.findEntities(
+            Criteria(Filters(roles = Set(member.role)), maybeUser = authUsers.generateOne.copy(id = memberId).some)
+          )
       }
 
       val expected = List(
-        project.to[model.Entity.Project],
-        owner.person.to[model.Entity.Person]
-      ).sortBy(_.name)(nameOrdering)
+        project.to[model.Entity.Project].some,
+        Option.when(member.role == projects.Role.Owner)(member.person.to[model.Entity.Person])
+      ).flatten.sortBy(_.name)(nameOrdering)
 
       results.results shouldMatchTo expected
     }
 
-    "return project entities where the given user is an owner - case when filtering on visibility is set" in new TestCase {
+    "return project entities where the given user has the given role - case when filtering on visibility is set" in new TestCase {
 
-      val ownerId = personGitLabIds.generateOne
-      val owner   = Project.Member(personEntities(ownerId.some).generateOne, projects.Role.Owner)
+      val memberId = personGitLabIds.generateOne
+      val member   = projectMemberEntities(memberId.some).generateOne
 
       val publicProject = renkuProjectEntities(visibilityPublic)
-        .modify(replaceMembers(Set(owner)))
+        .modify(replaceMembers(Set(member)))
         .generateOne
       val nonPublicProject = renkuProjectEntities(visibilityNonPublic)
-        .modify(replaceMembers(Set(owner)))
+        .modify(replaceMembers(Set(member)))
         .generateOne
 
       val results = IOBody {
         provisionTestProjects(publicProject, nonPublicProject) *>
           finder.findEntities(
-            Criteria(Filters(maybeOwned = Owned(ownerId).some, visibilities = Set(projects.Visibility.Public)))
+            Criteria(Filters(roles = Set(member.role), visibilities = Set(projects.Visibility.Public)),
+                     maybeUser = authUsers.generateOne.copy(id = memberId).some
+            )
           )
       }
 
       val expected = List(
-        publicProject.to[model.Entity.Project],
-        owner.person.to[model.Entity.Person]
-      ).sortBy(_.name)(nameOrdering)
+        publicProject.to[model.Entity.Project].some,
+        Option.when(member.role == projects.Role.Owner)(member.person.to[model.Entity.Person])
+      ).flatten.sortBy(_.name)(nameOrdering)
 
       results.results shouldMatchTo expected
     }
 
-    "return dataset entities where the given user is an owner" in new TestCase {
+    "return dataset entities where the given user has the given role" in new TestCase {
 
-      val ownerId = personGitLabIds.generateOne
-      val owner   = Project.Member(personEntities(ownerId.some).generateOne, projects.Role.Owner)
+      val memberId = personGitLabIds.generateOne
+      val member   = projectMemberEntities(memberId.some).generateOne
 
       val dsAndProject @ _ -> project = renkuProjectEntities(anyVisibility)
-        .modify(replaceMembers(Set(owner)))
+        .modify(replaceMembers(Set(member)))
         .addDataset(
           datasetEntities(provenanceNonModified)
-            .modify(replaceDSCreators(NonEmptyList.of(personEntities.generateOne, owner.person)))
+            .modify(replaceDSCreators(NonEmptyList.of(personEntities.generateOne, member.person)))
         )
         .generateOne
 
       val results = IOBody {
         provisionTestProjects(project, projectEntities(visibilityPublic).generateOne) *>
-          finder.findEntities(Criteria(Filters(maybeOwned = Criteria.Filters.Owned(ownerId).some)))
+          finder.findEntities(
+            Criteria(Filters(roles = Set(member.role)), maybeUser = authUsers.generateOne.copy(id = memberId).some)
+          )
       }
 
       val expected = List(
-        project.to[model.Entity.Project],
-        dsAndProject.to[model.Entity.Dataset],
-        owner.person.to[model.Entity.Person]
-      ).sortBy(_.name)(nameOrdering)
+        project.to[model.Entity.Project].some,
+        dsAndProject.to[model.Entity.Dataset].some,
+        Option.when(member.role == projects.Role.Owner)(member.person.to[model.Entity.Person])
+      ).flatten.sortBy(_.name)(nameOrdering)
 
       results.results shouldMatchTo expected
     }
 
-    "return dataset entities where the given user is an owner - case when filtering on visibility is set" in new TestCase {
+    "return dataset entities where the given user has the given role - case when filtering on visibility is set" in new TestCase {
 
-      val ownerId = personGitLabIds.generateOne
-      val owner   = Project.Member(personEntities(ownerId.some).generateOne, projects.Role.Owner)
+      val memberId = personGitLabIds.generateOne
+      val member   = projectMemberEntities(memberId.some).generateOne
 
       val dsAndPublicProject @ _ -> publicProject = renkuProjectEntities(visibilityPublic)
-        .modify(replaceMembers(Set(owner)))
-        .addDataset(datasetEntities(provenanceNonModified).modify(replaceDSCreators(NonEmptyList.of(owner.person))))
+        .modify(replaceMembers(Set(member)))
+        .addDataset(datasetEntities(provenanceNonModified).modify(replaceDSCreators(NonEmptyList.of(member.person))))
         .generateOne
       val _ -> nonPublicProject = renkuProjectEntities(visibilityNonPublic)
-        .modify(replaceMembers(Set(owner)))
-        .addDataset(datasetEntities(provenanceNonModified).modify(replaceDSCreators(NonEmptyList.of(owner.person))))
+        .modify(replaceMembers(Set(member)))
+        .addDataset(datasetEntities(provenanceNonModified).modify(replaceDSCreators(NonEmptyList.of(member.person))))
         .generateOne
 
       val results = IOBody {
         provisionTestProjects(publicProject, nonPublicProject) *>
           finder.findEntities(
-            Criteria(
-              Filters(maybeOwned = Criteria.Filters.Owned(ownerId).some, visibilities = Set(projects.Visibility.Public))
+            Criteria(Filters(roles = Set(member.role), visibilities = Set(projects.Visibility.Public)),
+                     maybeUser = authUsers.generateOne.copy(id = memberId).some
             )
           )
       }
 
       val expected = List(
-        publicProject.to[model.Entity.Project],
-        dsAndPublicProject.to[model.Entity.Dataset],
-        owner.person.to[model.Entity.Person]
-      ).sortBy(_.name)(nameOrdering)
+        publicProject.to[model.Entity.Project].some,
+        dsAndPublicProject.to[model.Entity.Dataset].some,
+        Option.when(member.role == projects.Role.Owner)(member.person.to[model.Entity.Person])
+      ).flatten.sortBy(_.name)(nameOrdering)
 
       results.results shouldMatchTo expected
     }
 
-    "return workflow entities where the given user is an owner" in new TestCase {
+    "return workflow entities where the given user has the given role" in new TestCase {
 
-      val ownerId = personGitLabIds.generateOne
-      val owner   = Project.Member(personEntities(ownerId.some).generateOne, projects.Role.Owner)
+      val memberId = personGitLabIds.generateOne
+      val member   = projectMemberEntities(memberId.some).generateOne
 
       val project = renkuProjectEntities(anyVisibility)
-        .modify(replaceMembers(Set(owner)))
+        .modify(replaceMembers(Set(member)))
         .withActivities(
-          activityEntities(stepPlanEntities().map(_.replaceCreators(List(personEntities.generateOne, owner.person))))
+          activityEntities(stepPlanEntities().map(_.replaceCreators(List(personEntities.generateOne, member.person))))
         )
         .generateOne
 
       val results = IOBody {
         provisionTestProjects(project, projectEntities(visibilityPublic).generateOne) *>
-          finder.findEntities(Criteria(Filters(maybeOwned = Criteria.Filters.Owned(ownerId).some)))
+          finder.findEntities(
+            Criteria(Filters(roles = Set(member.role)), maybeUser = authUsers.generateOne.copy(id = memberId).some)
+          )
       }
 
       val expected = List(
-        project.to[model.Entity.Project],
-        (project.plans.head -> project).to[model.Entity.Workflow],
-        owner.person.to[model.Entity.Person]
-      ).sortBy(_.name)(nameOrdering)
+        project.to[model.Entity.Project].some,
+        (project.plans.head -> project).to[model.Entity.Workflow].some,
+        Option.when(member.role == projects.Role.Owner)(member.person.to[model.Entity.Person])
+      ).flatten.sortBy(_.name)(nameOrdering)
 
       results.results shouldMatchTo expected
     }
 
-    "return workflow entities where the given user is an owner - case when filtering on visibility is set" in new TestCase {
+    "return workflow entities where the given user has the given role - case when filtering on visibility is set" in new TestCase {
 
-      val ownerId = personGitLabIds.generateOne
-      val owner   = Project.Member(personEntities(ownerId.some).generateOne, projects.Role.Owner)
+      val memberId = personGitLabIds.generateOne
+      val member   = projectMemberEntities(memberId.some).generateOne
 
       val publicProject = renkuProjectEntities(visibilityPublic)
-        .modify(replaceMembers(Set(owner)))
-        .withActivities(activityEntities(stepPlanEntities().map(_.replaceCreators(List(owner.person)))))
+        .modify(replaceMembers(Set(member)))
+        .withActivities(activityEntities(stepPlanEntities().map(_.replaceCreators(List(member.person)))))
         .generateOne
 
       val nonPublicProject = renkuProjectEntities(visibilityNonPublic)
-        .modify(replaceMembers(Set(owner)))
-        .withActivities(activityEntities(stepPlanEntities().map(_.replaceCreators(List(owner.person)))))
+        .modify(replaceMembers(Set(member)))
+        .withActivities(activityEntities(stepPlanEntities().map(_.replaceCreators(List(member.person)))))
         .generateOne
 
       val results = IOBody {
         provisionTestProjects(publicProject, nonPublicProject) *>
           finder.findEntities(
-            Criteria(
-              Filters(maybeOwned = Criteria.Filters.Owned(ownerId).some, visibilities = Set(projects.Visibility.Public))
+            Criteria(Filters(roles = Set(member.role), visibilities = Set(projects.Visibility.Public)),
+                     maybeUser = authUsers.generateOne.copy(id = memberId).some
             )
           )
       }
 
       val expected = List(
-        publicProject.to[model.Entity.Project],
-        (publicProject.plans.head -> publicProject).to[model.Entity.Workflow],
-        owner.person.to[model.Entity.Person]
+        publicProject.to[model.Entity.Project].some,
+        (publicProject.plans.head -> publicProject).to[model.Entity.Workflow].some,
+        Option.when(member.role == projects.Role.Owner)(member.person.to[model.Entity.Person])
+      ).flatten.sortBy(_.name)(nameOrdering)
+
+      results.results shouldMatchTo expected
+    }
+
+    "return project entities where the given user has one of the given roles" in new TestCase {
+
+      val memberId = personGitLabIds.generateOne
+      val member   = projectMemberEntities(memberId.some).generateOne
+
+      val roleProject1 = projects.Role.Owner
+      val project1 = renkuProjectEntities(visibilityPublic)
+        .modify(replaceMembers(Set(member.copy(role = roleProject1))))
+        .generateOne
+      val roleProject2 = projects.Role.Maintainer
+      val project2 = renkuProjectEntities(visibilityPublic)
+        .modify(replaceMembers(Set(member.copy(role = roleProject2))))
+        .generateOne
+      val roleProject3 = projects.Role.Reader
+      val project3 = renkuProjectEntities(visibilityPublic)
+        .modify(replaceMembers(Set(member.copy(role = roleProject3))))
+        .generateOne
+
+      val results = IOBody {
+        provisionTestProjects(project1, project2, project3) *>
+          finder.findEntities(
+            Criteria(
+              Filters(entityTypes = Set(EntityType.Project),
+                      roles = Set(projects.Role.Maintainer, projects.Role.Reader)
+              ),
+              maybeUser = authUsers.generateOne.copy(id = memberId).some
+            )
+          )
+      }
+
+      val expected = List(
+        project2.to[model.Entity.Project],
+        project3.to[model.Entity.Project]
       ).sortBy(_.name)(nameOrdering)
 
       results.results shouldMatchTo expected

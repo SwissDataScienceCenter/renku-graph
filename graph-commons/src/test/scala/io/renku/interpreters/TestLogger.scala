@@ -57,6 +57,10 @@ class TestLogger[F[_]: Async] extends Logger[F] with should.Matchers {
   def logged(expected: LogEntry*): Assertion =
     invocations should contain allElementsOf expected
 
+  def loggedF(expected: LogEntry*): F[Assertion] = F.delay {
+    invocations should contain allElementsOf expected
+  }
+
   def notLogged(expected: LogEntry): Assertion =
     invocations should not contain expected
 

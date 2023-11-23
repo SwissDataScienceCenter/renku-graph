@@ -114,11 +114,11 @@ private case object WorkflowsQuery extends EntityQuery[model.Entity.Workflow] {
   }
 
   private def accessRightsAndVisibility(maybeUser: Option[AuthUser], filters: Criteria.Filters): Fragment =
-    filters.maybeOwned match {
-      case Some(Criteria.Filters.Owned(ownerId)) =>
-        authSnippets.ownedProjects(ownerId)
-      case None =>
-        authSnippets.visibleProjects(maybeUser.map(_.id), filters.visibilities)
+    maybeUser.map(_.id) -> filters.roles match {
+      case Some(userId) -> roles if roles.nonEmpty =>
+        authSnippets.projectsWithRoles(userId, roles)
+      case maybeUserId -> _ =>
+        authSnippets.visibleProjects(maybeUserId, filters.visibilities)
     }
 
   private lazy val maybeFilterOnVisibilities: Set[projects.Visibility] => Fragment = {

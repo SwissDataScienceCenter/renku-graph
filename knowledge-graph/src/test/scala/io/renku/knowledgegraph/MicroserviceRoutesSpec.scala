@@ -394,12 +394,13 @@ class MicroserviceRoutesSpec
       }
     }
 
-    "read the 'owned' query parameter from the uri and pass it to the endpoint when auth user present" in new TestCase {
+    "read the 'role' query parameter from the uri and pass it to the endpoint when auth user present" in new TestCase {
 
       val authUser      = authUsers.generateOne
       val maybeAuthUser = MaybeAuthUser(authUser)
-      val criteria = Criteria(Filters(maybeOwned = Filters.Owned(authUser.id).some), maybeUser = maybeAuthUser.option)
-      val request  = Request[IO](GET, uri"/knowledge-graph/entities" +? "owned")
+      val role          = projectRoles.generateOne
+      val criteria      = Criteria(Filters(roles = Set(role)), maybeUser = maybeAuthUser.option)
+      val request       = Request[IO](GET, uri"/knowledge-graph/entities" +? ("role" -> role))
 
       val responseBody = jsons.generateOne
       (entitiesEndpoint.`GET /entities` _)
@@ -413,13 +414,34 @@ class MicroserviceRoutesSpec
       response.body[Json]  shouldBe responseBody
     }
 
-    s"return $BadRequest 'owned' query parameter given but no auth user present" in new TestCase {
+    "read multiple 'role' query parameters from the uri and pass it to the endpoint when auth user present" in new TestCase {
 
-      val response = routes().call(Request[IO](GET, uri"/knowledge-graph/entities" +? "owned"))
+      val authUser      = authUsers.generateOne
+      val maybeAuthUser = MaybeAuthUser(authUser)
+      val roles         = projectRoles.generateSet(min = 2)
+      val criteria      = Criteria(Filters(roles = roles), maybeUser = maybeAuthUser.option)
+      val request       = Request[IO](GET, uri"/knowledge-graph/entities" ++? ("role" -> roles.toList.map(_.show)))
+
+      val responseBody = jsons.generateOne
+      (entitiesEndpoint.`GET /entities` _)
+        .expects(criteria, request)
+        .returning(Response[IO](Ok).withEntity(responseBody).pure[IO])
+
+      val response = routes(maybeAuthUser).call(request)
+
+      response.status      shouldBe Ok
+      response.contentType shouldBe Some(`Content-Type`(application.json))
+      response.body[Json]  shouldBe responseBody
+    }
+
+    s"return $BadRequest when the 'role' query parameter given but no auth user present" in new TestCase {
+
+      val response =
+        routes().call(Request[IO](GET, uri"/knowledge-graph/entities" +? ("role" -> projectRoles.generateOne)))
 
       response.status        shouldBe BadRequest
       response.contentType   shouldBe Some(`Content-Type`(application.json))
-      response.body[Message] shouldBe Message.Error("'owned' parameter present but no access token")
+      response.body[Message] shouldBe Message.Error("'role' parameter present but no access token")
     }
 
     s"return $BadRequest for invalid parameter values" in new TestCase {
@@ -681,27 +703,35 @@ class MicroserviceRoutesSpec
     val projectSlug = projectSlugs.generateOne
     val projectDsUri = projectSlug.toNamespaces
       .foldLeft(uri"/knowledge-graph/projects")(_ / _.show) / projectSlug.toPath / "datasets"
+    val defaultPerPage = PerPage.max
+    val defaultPaging  = PagingRequest.default.copy(perPage = defaultPerPage)
 
     forAll {
       Table(
         "uri"        -> "criteria",
-        projectDsUri -> Criteria(projectSlug),
+        projectDsUri -> Criteria(projectSlug, paging = defaultPaging),
         sortingDirections
           .map(dir =>
-            projectDsUri +? ("sort" -> s"name:$dir") -> Criteria(projectSlug, sorting = Sorting(Sort.By(ByName, dir)))
+            projectDsUri +? ("sort" -> s"name:$dir") -> Criteria(projectSlug,
+                                                                 sorting = Sorting(Sort.By(ByName, dir)),
+                                                                 paging = defaultPaging
+            )
           )
           .generateOne,
         sortingDirections
           .map(dir =>
             projectDsUri +? ("sort" -> s"dateModified:$dir") -> Criteria(projectSlug,
-                                                                         sorting = Sorting(Sort.By(ByDateModified, dir))
+                                                                         sorting =
+                                                                           Sorting(Sort.By(ByDateModified, dir)),
+                                                                         paging = defaultPaging
             )
           )
           .generateOne,
         pages
           .map(page =>
-            projectDsUri +? ("page" -> page.show) -> Criteria(projectSlug,
-                                                              paging = PagingRequest.default.copy(page = page)
+            projectDsUri +? ("page" -> page.show) -> Criteria(
+              projectSlug,
+              paging = PagingRequest.default.copy(page = page, perPage = defaultPerPage)
             )
           )
           .generateOne,

@@ -18,13 +18,14 @@
 
 package io.renku.lock
 
-import cats.Applicative
 import cats.data.Kleisli
 import cats.effect._
 import cats.syntax.all._
+import cats.{Applicative, ApplicativeThrow}
 import org.typelevel.log4cats.Logger
 import skunk._
 import skunk.codec.all._
+import skunk.exception.EofException
 import skunk.implicits._
 
 import scala.concurrent.duration._
@@ -42,11 +43,18 @@ object PostgresLock {
     createPolling[F, A](session, interval, tryAdvisoryLockSql, advisoryUnlockSql)
 
   /** Obtains an exclusive lock, retrying periodically via non-blocking waits */
-  def exclusive[F[_]: Temporal: Logger, A: LongKey](
+  def exclusive[F[_]: ApplicativeThrow: Temporal: Logger, A: LongKey](
       session:  Resource[F, Session[F]],
       interval: FiniteDuration = 0.5.seconds
   ): Lock[F, A] =
-    Kleisli(key => session.flatMap(exclusive_[F, A](_, interval).run(key)))
+    Kleisli { key =>
+      def createLock: Resource[F, Unit] =
+        session
+          .flatMap(exclusive_[F, A](_, interval).run(key))
+          .handleErrorWith[Unit, Throwable](_ => Resource.eval(Temporal[F].sleep(interval * 2)) >> createLock)
+
+      createLock
+    }
 
   /** Obtains a shared lock, retrying periodically via non-blocking waits. */
   def shared_[F[_]: Temporal: Logger, A: LongKey](
@@ -74,7 +82,11 @@ object PostgresLock {
         .attempt
         .flatMap {
           case Right(v) => v.pure[F]
-          case Left(ex) => Logger[F].warn(ex)(s"Acquiring postgres advisory lock failed! Retry in $interval.").as(false)
+          case Left(ex) if ex.isInstanceOf[EofException] =>
+            Logger[F].warn(ex)("Session get closed while acquiring postgres advisory lock! Renewing connection.") >>
+              ex.raiseError[F, Boolean]
+          case Left(ex) =>
+            Logger[F].warn(ex)(s"Acquiring postgres advisory lock failed! Retry in $interval.").as(false)
         }
         .flatTap {
           case false =>

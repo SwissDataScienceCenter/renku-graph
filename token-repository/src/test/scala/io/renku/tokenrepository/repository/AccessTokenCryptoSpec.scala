@@ -86,7 +86,7 @@ class AccessTokenCryptoSpec extends AnyWordSpec with should.Matchers with TableD
       val config = ConfigFactory.parseMap(
         Map(
           "projects-tokens" -> Map(
-            "secret" -> aesCryptoSecrets.generateOne.toBase64
+            "secret" -> aesCryptoSecrets.generateOne.decodeAscii.fold(throw _, identity)
           ).asJava
         ).asJava
       )
