@@ -150,6 +150,9 @@ class EventSenderImpl[F[_]: Async: Logger](
       waitAndRetry(retry, exception, context.errorMessage)
     case exception @ (_: ConnectivityException | _: ClientException) =>
       waitAndRetry(retry, exception, context.errorMessage)
+    case exception =>
+      val message = s"${context.errorMessage} - got non-retry-able exception"
+      Logger[F].error(exception)(message) >> new Exception(message, exception).raiseError[F, Status]
   }
 
   private def waitAndRetry(retry: Eval[F[Status]], message: String): F[Status] =
