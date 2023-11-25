@@ -18,9 +18,22 @@
 
 package io.renku.db
 
+import eu.timepit.refined.api.Refined
+import eu.timepit.refined.auto._
+import io.renku.db.DBConfigProvider.DBConfig
+
 import scala.sys.process._
 
 class PostgresServer(module: String) {
+
+  val dbConfig: DBConfigProvider.DBConfig[PostgresServer] = DBConfig[PostgresServer](
+    name = Refined.unsafeApply(s"${module}_test"),
+    host = "localhost",
+    port = 5432,
+    user = Refined.unsafeApply(module),
+    pass = Refined.unsafeApply(module),
+    connectionPool = 1
+  )
 
   // When using a local postgres for development, use this env variable
   // to not start a postgres server via docker for the tests
@@ -28,8 +41,13 @@ class PostgresServer(module: String) {
 
   val containerName = s"$module-test-postgres"
   val image         = "postgres:16.0-alpine"
-  val startCmd =
-    s"docker run --rm --name $containerName -e POSTGRES_PASSWORD=$module -e POSTGRES_USER=$module -e POSTGRES_DB=${module}_test -p 5432:5432 -d $image"
+  val startCmd = s"""|docker run --rm
+                     |--name $containerName
+                     |-e POSTGRES_USER=${dbConfig.user}
+                     |-e POSTGRES_PASSWORD=${dbConfig.pass}
+                     |-e POSTGRES_DB=${dbConfig.name}
+                     |-p 5432:${dbConfig.port}
+                     |-d $image""".stripMargin
   val stopCmd    = s"docker stop -t5 $containerName"
   val isReadyCmd = s"docker exec $containerName pg_isready"
 

@@ -31,8 +31,9 @@ class PostgresLockStatsSpec extends AsyncWordSpec with AsyncIOSpec with should.M
   implicit val logger: Logger[IO] = TestLogger[IO]()
 
   "PostgresLockStats" should {
-    "obtain empty statistics" in withContainers { cnt =>
-      session(cnt).use { s =>
+
+    "obtain empty statistics" in {
+      sessionResource.use { s =>
         for {
           _     <- resetLockTable(s)
           stats <- PostgresLockStats.getStats[IO](s)
@@ -41,8 +42,8 @@ class PostgresLockStatsSpec extends AsyncWordSpec with AsyncIOSpec with should.M
       }
     }
 
-    "show when a lock is held" in withContainers { cnt =>
-      session(cnt).use { s =>
+    "show when a lock is held" in {
+      sessionResource.use { s =>
         for {
           _            <- resetLockTable(s)
           (_, release) <- PostgresLock.exclusive_[IO, Int](s).run(1).allocated
@@ -53,8 +54,8 @@ class PostgresLockStatsSpec extends AsyncWordSpec with AsyncIOSpec with should.M
       }
     }
 
-    "insert waiting info" in withContainers { cnt =>
-      session(cnt).use { s =>
+    "insert waiting info" in {
+      sessionResource.use { s =>
         for {
           _     <- resetLockTable(s)
           _     <- PostgresLockStats.recordWaiting(s)(5L)
@@ -71,8 +72,8 @@ class PostgresLockStatsSpec extends AsyncWordSpec with AsyncIOSpec with should.M
       }
     }
 
-    "waiting info distinguishes sessions" in withContainers { cnt =>
-      (session(cnt), session(cnt)).tupled.use { case (s1, s2) =>
+    "waiting info distinguishes sessions" in {
+      (sessionResource, sessionResource).tupled.use { case (s1, s2) =>
         for {
           _     <- resetLockTable(s1)
           _     <- PostgresLockStats.recordWaiting(s1)(5)
@@ -84,8 +85,8 @@ class PostgresLockStatsSpec extends AsyncWordSpec with AsyncIOSpec with should.M
       }
     }
 
-    "remove waiting info" in withContainers { cnt =>
-      session(cnt).use { s =>
+    "remove waiting info" in {
+      sessionResource.use { s =>
         for {
           _     <- resetLockTable(s)
           _     <- PostgresLockStats.recordWaiting(s)(5L)

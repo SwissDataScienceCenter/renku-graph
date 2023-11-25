@@ -19,17 +19,13 @@
 package io.renku.db
 
 import cats.data.Kleisli
-import cats.effect.{IO, Resource}
+import cats.effect.IO
 import cats.syntax.all._
-import com.dimafeng.testcontainers.{ForAllTestContainer, PostgreSQLContainer}
 import eu.timepit.refined.auto._
-import io.renku.db.TestDbConfig.create
 import io.renku.db.syntax.QueryDef
 import io.renku.metrics.LabeledHistogram
 import io.renku.testtools.CustomAsyncIOSpec
-import natchez.Trace.Implicits.noop
 import org.scalamock.scalatest.AsyncMockFactory
-import org.scalatest.Suite
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AsyncWordSpec
 import skunk._
@@ -40,9 +36,9 @@ import scala.concurrent.duration.FiniteDuration
 
 class DbClientSpec
     extends AsyncWordSpec
+    with CommonsPostgresSpec
     with CustomAsyncIOSpec
     with should.Matchers
-    with ContainerTestDb
     with AsyncMockFactory {
 
   "measureExecutionTime(SqlStatement)" should {
@@ -109,32 +105,13 @@ class DbClientSpec
   private class TestDbClient(maybeHistogram: Option[LabeledHistogram[IO]]) extends DbClient(maybeHistogram) {
 
     def executeQuery(query: SqlStatement[IO, Int]): IO[Int] =
-      sessionPoolResource.use {
-        _.use(session => measureExecutionTime[Int](query)(session))
+      sessionResource.use {
+        measureExecutionTime[Int](query)(_)
       }
 
     def executeQuery(name: String, query: Kleisli[IO, Session[IO], Int]): IO[Int] =
-      sessionPoolResource.use {
-        _.use(session => measureExecutionTime[Int](name, query)(session))
+      sessionResource.use {
+        measureExecutionTime[Int](name, query)(_)
       }
   }
-}
-
-trait ContainerTestDb extends ForAllTestContainer {
-  self: Suite =>
-
-  private trait TestDB
-
-  private val dbConfig: DBConfigProvider.DBConfig[TestDB] = create[TestDB]
-
-  override val container: PostgreSQLContainer = PostgresContainer.container(dbConfig)
-
-  lazy val sessionPoolResource: Resource[IO, Resource[IO, Session[IO]]] = Session.pooled(
-    host = container.host,
-    port = container.container.getMappedPort(dbConfig.port),
-    user = dbConfig.user.value,
-    database = dbConfig.name.value,
-    password = Some(dbConfig.pass),
-    max = dbConfig.connectionPool.value
-  )
 }
