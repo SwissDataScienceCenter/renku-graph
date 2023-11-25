@@ -37,22 +37,25 @@ class PostgresServer(module: String) {
 
   // When using a local postgres for development, use this env variable
   // to not start a postgres server via docker for the tests
-  val skipServer: Boolean = sys.env.contains("NO_POSTGRES")
+  private val skipServer: Boolean = sys.env.contains("NO_POSTGRES")
 
-  val containerName = s"$module-test-postgres"
-  val image         = "postgres:16.0-alpine"
-  val startCmd = s"""|docker run --rm
-                     |--name $containerName
-                     |-e POSTGRES_USER=${dbConfig.user}
-                     |-e POSTGRES_PASSWORD=${dbConfig.pass}
-                     |-e POSTGRES_DB=${dbConfig.name}
-                     |-p 5432:${dbConfig.port}
-                     |-d $image""".stripMargin
-  val stopCmd    = s"docker stop -t5 $containerName"
-  val isReadyCmd = s"docker exec $containerName pg_isready"
+  private val containerName = s"$module-test-postgres"
+  private val image         = "postgres:16.0-alpine"
+  private val startCmd = s"""|docker run --rm
+                             |--name $containerName
+                             |-e POSTGRES_USER=${dbConfig.user}
+                             |-e POSTGRES_PASSWORD=${dbConfig.pass}
+                             |-e POSTGRES_DB=${dbConfig.name}
+                             |-p 5432:${dbConfig.port}
+                             |-d $image""".stripMargin
+  private val isRunningCmd = s"docker container ls --filter 'name=$containerName'"
+  private val stopCmd      = s"docker stop -t5 $containerName"
+  private val isReadyCmd   = s"docker exec $containerName pg_isready"
+  private var wasRunning: Boolean = false
 
   def start(): Unit =
-    if (skipServer) println(s"Not starting postgres via docker")
+    if (skipServer) println("Not starting postgres via docker")
+    else if (checkRunning) ()
     else {
       println(s"Starting PostgreSQL container for module '$module' from '$image' image")
       startCmd.!!
@@ -63,9 +66,20 @@ class PostgresServer(module: String) {
       }
     }
 
+  private def checkRunning: Boolean = {
+    val out = isRunningCmd.lazyLines.toList
+    wasRunning = out.exists(_ contains containerName)
+    wasRunning
+  }
+
   def stop(): Any =
-    if (!skipServer) {
+    if (!skipServer && !wasRunning) {
       println(s"Stopping PostgreSQL container for module '$module'")
       stopCmd.!!
     }
+
+  def forceStop(): Any = {
+    println(s"Stopping PostgreSQL container for module '$module'")
+    stopCmd.!!
+  }
 }

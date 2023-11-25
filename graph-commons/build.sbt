@@ -19,7 +19,7 @@
 name := "graph-commons"
 
 Test / testOptions += Tests.Setup(postgresServer("start"))
-Test / testOptions += Tests.Cleanup(postgresServer("stop"))
+Test / testOptions += Tests.Cleanup(postgresServer("forceStop"))
 
 def postgresServer(methodName: String): ClassLoader => Unit = classLoader => {
   val clazz    = classLoader.loadClass("io.renku.db.CommonsPostgresServer$")
