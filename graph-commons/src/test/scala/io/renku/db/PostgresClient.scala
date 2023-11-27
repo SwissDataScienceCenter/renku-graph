@@ -26,42 +26,39 @@ import io.renku.db.DBConfigProvider.DBConfig
 import natchez.Trace.Implicits.noop
 import org.typelevel.log4cats.Logger
 import org.typelevel.log4cats.slf4j.Slf4jLogger
+import skunk.Session
 import skunk.implicits._
-import skunk.{Session, SqlState}
 
 class PostgresClient[DB](server: PostgresServer, migrations: Session[IO] => IO[Unit]) {
 
-  private[this] implicit val logger: Logger[IO] = Slf4jLogger.getLoggerFromName[IO]("PostgresClient")
+  private[this] implicit val logger: Logger[IO] = Slf4jLogger.getLoggerFromClass[IO](getClass)
 
-  // Connects to a random-named database
-  lazy val sessionResource: Resource[IO, (DBConfig[DB], Session[IO])] =
+  def randomizedDBResource(prefix: String): Resource[IO, DBConfig[DB]] =
     Random
       .scalaUtilRandom[IO]
-      .flatMap(_.nextAlphaNumeric.replicateA(9).map(c => ('d' :: c).mkString))
-      .toResource
-      .flatMap(sessionResource(_))
+      .flatMap(_.nextIntBounded(100))
+      .map(v => s"${prefix}_$v")
+      .toResource >>= dbResource
 
-  def sessionResource(dbName: String): Resource[IO, (DBConfig[DB], Session[IO])] = {
-    val create = for {
-      createDb <-
-        Resource.make(
-          logger.debug(s"Creating test database: $dbName") *>
-            initSession
-              .use(_.execute(sql"""CREATE DATABASE "#$dbName" OWNER #${server.dbConfig.user.value}""".command).void)
-              .recoverWith { case SqlState.DuplicateDatabase(_) => IO.unit }
-              .as(server.dbConfig.copy(name = Refined.unsafeApply(dbName)).asInstanceOf[DBConfig[DB]])
-        )(_ =>
-          logger.debug(s"Drop database $dbName") *> initSession
+  def dbResource(dbName: String): Resource[IO, DBConfig[DB]] =
+    Resource
+      .make(
+        logger.debug(s"Creating test database: $dbName") *>
+          initSession
+            .use(_.execute(sql"""CREATE DATABASE "#$dbName" OWNER #${server.dbConfig.user.value}""".command).void)
+            .as(server.dbConfig.copy(name = Refined.unsafeApply(dbName)).asInstanceOf[DBConfig[DB]])
+      )(_ =>
+        logger.debug(s"Dropping test database $dbName") *>
+          initSession
             .use(_.execute(sql"""DROP DATABASE "#$dbName"""".command).void)
-            .recoverWith { case SqlState.ObjectInUse(_) => IO.unit }
             .void
-        )
-    } yield createDb
-
-    create.flatMap(cfg => makeSession(cfg).evalTap(migrations).tupleLeft(cfg))
-  }
+      )
+      .evalTap(sessionResource(_).use(migrations))
 
   private lazy val initSession: Resource[IO, Session[IO]] = makeSession(server.dbConfig)
+
+  def sessionResource(cfg: DBConfig[DB]): Resource[IO, Session[IO]] =
+    makeSession(cfg)
 
   private def makeSession(cfg: DBConfig[_]): Resource[IO, Session[IO]] =
     Session.single[IO](

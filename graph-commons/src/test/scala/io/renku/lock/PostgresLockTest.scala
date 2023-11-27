@@ -19,7 +19,8 @@
 package io.renku.lock
 
 import cats.effect._
-import io.renku.db.CommonsPostgresSpec
+import io.renku.db.{CommonsPostgresSpec, TestDB}
+import io.renku.db.DBConfigProvider.DBConfig
 import org.scalatest.Suite
 import org.typelevel.log4cats.Logger
 import skunk.Session
@@ -32,11 +33,11 @@ trait PostgresLockTest extends CommonsPostgresSpec { self: Suite =>
   def makeExclusiveLock(s: Session[IO], interval: FiniteDuration = 100.millis)(implicit L: Logger[IO]) =
     PostgresLock.exclusive_[IO, String](s, interval)
 
-  def exclusiveLock(interval: FiniteDuration = 100.millis)(implicit L: Logger[IO]) =
-    PostgresLock.exclusive[IO, String](sessionResource, interval)
+  def exclusiveLock(dbCfg: DBConfig[TestDB], interval: FiniteDuration = 100.millis)(implicit L: Logger[IO]) =
+    PostgresLock.exclusive[IO, String](sessionResource(dbCfg), interval)
 
-  def sharedLock(interval: FiniteDuration = 100.millis)(implicit L: Logger[IO]) =
-    PostgresLock.shared[IO, String](sessionResource, interval)
+  def sharedLock(dbCfg: DBConfig[TestDB], interval: FiniteDuration = 100.millis)(implicit L: Logger[IO]) =
+    PostgresLock.shared[IO, String](sessionResource(dbCfg), interval)
 
   def resetLockTable(s: Session[IO]) =
     PostgresLockStats.ensureStatsTable[IO](s) *>

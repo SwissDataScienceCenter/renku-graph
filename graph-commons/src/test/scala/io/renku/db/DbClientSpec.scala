@@ -105,12 +105,12 @@ class DbClientSpec
   private class TestDbClient(maybeHistogram: Option[LabeledHistogram[IO]]) extends DbClient(maybeHistogram) {
 
     def executeQuery(query: SqlStatement[IO, Int]): IO[Int] =
-      sessionResource.use {
+      (testDBResource >>= sessionResource).use {
         measureExecutionTime[Int](query)(_)
       }
 
     def executeQuery(name: String, query: Kleisli[IO, Session[IO], Int]): IO[Int] =
-      sessionResource.use {
+      (testDBResource >>= sessionResource).use {
         measureExecutionTime[Int](name, query)(_)
       }
   }

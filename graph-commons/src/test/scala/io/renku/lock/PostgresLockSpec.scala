@@ -23,6 +23,8 @@ import cats.effect.std.CountDownLatch
 import cats.effect.testing.scalatest.AsyncIOSpec
 import cats.syntax.all._
 import fs2.{Pipe, concurrent}
+import io.renku.db.DBConfigProvider.DBConfig
+import io.renku.db.TestDB
 import io.renku.interpreters.TestLogger
 import io.renku.interpreters.TestLogger.Level.Warn
 import org.scalatest.matchers.should
@@ -42,10 +44,10 @@ class PostgresLockSpec extends AsyncWordSpec with AsyncIOSpec with should.Matche
   "PostgresLock.exclusive" should {
     val pollInterval = 100.millis
 
-    "sequentially on same key" in {
+    "sequentially on same key" in testDBResource.use { cfg =>
       implicit val logger: Logger[IO] = TestLogger()
 
-      val lock = exclusiveLock(pollInterval)
+      val lock = exclusiveLock(cfg, pollInterval)
 
       for {
         result <- Ref.of[IO, List[FiniteDuration]](Nil)
@@ -64,10 +66,10 @@ class PostgresLockSpec extends AsyncWordSpec with AsyncIOSpec with should.Matche
       } yield ()
     }
 
-    "sequentially on same key using session constructor" in {
+    "sequentially on same key using session constructor" in testDBResource.use { cfg =>
       implicit val logger: Logger[IO] = TestLogger()
 
-      def createLock = sessionResource.map(makeExclusiveLock(_, pollInterval))
+      def createLock = sessionResource(cfg).map(makeExclusiveLock(_, pollInterval))
 
       (createLock, createLock, createLock).tupled.use { case (l1, l2, l3) =>
         for {
@@ -88,10 +90,10 @@ class PostgresLockSpec extends AsyncWordSpec with AsyncIOSpec with should.Matche
       }
     }
 
-    "parallel on different key" in {
+    "parallel on different key" in testDBResource.use { cfg =>
       implicit val logger: Logger[IO] = TestLogger()
 
-      val lock = exclusiveLock()
+      val lock = exclusiveLock(cfg)
 
       for {
         result <- Ref.of[IO, List[FiniteDuration]](Nil)
@@ -110,11 +112,11 @@ class PostgresLockSpec extends AsyncWordSpec with AsyncIOSpec with should.Matche
       } yield ()
     }
 
-    "log and retry if acquiring fails" in {
+    "log and retry if acquiring fails" in testDBResource.use { cfg =>
       implicit val logger: TestLogger[IO] = TestLogger()
 
       val exception   = new Exception("boom")
-      val makeSession = createFailingSessionThatRecovers(exception)
+      val makeSession = createFailingSessionThatRecovers(cfg, exception)
 
       val interval = 50.millis
       def lock     = makeSession.map(PostgresLock.exclusive_[IO, String](_, interval))
@@ -126,18 +128,18 @@ class PostgresLockSpec extends AsyncWordSpec with AsyncIOSpec with should.Matche
       }
     }
 
-    "recreate the lock with a new session once the connection has been closed" in {
+    "recreate the lock with a new session once the connection has been closed" in testDBResource.use { cfg =>
       implicit val logger: TestLogger[IO] = TestLogger()
 
       val exception              = EofException(bytesRequested = 1, bytesRead = 0)
-      val failingSessionResource = createFailingSessionThatDoesNotRecover(exception)
+      val failingSessionResource = createFailingSessionThatDoesNotRecover(cfg, exception)
 
       val interval = 50.millis
 
       val lock = PostgresLock.exclusive[IO, String](failingSessionResource, interval)
 
       for {
-        _   <- sessionResource.use(resetLockTable)
+        _   <- sessionResource(cfg).use(resetLockTable)
         res <- lock.run("p1").use(_ => IO.unit).assertNoException
         _ <- logger.loggedF(
                Warn("Session get closed while acquiring postgres advisory lock! Renewing connection.", exception)
@@ -147,9 +149,9 @@ class PostgresLockSpec extends AsyncWordSpec with AsyncIOSpec with should.Matche
   }
 
   "PostgresLock.shared" should {
-    "allow multiple shared locks" in {
+    "allow multiple shared locks" in testDBResource.use { cfg =>
       implicit val logger: Logger[IO] = TestLogger()
-      val lock = sharedLock()
+      val lock = sharedLock(cfg)
 
       for {
         result <- Ref.of[IO, List[FiniteDuration]](Nil)
@@ -170,25 +172,24 @@ class PostgresLockSpec extends AsyncWordSpec with AsyncIOSpec with should.Matche
   }
 
   "PostgresLock stats" should {
-    "log if writing/removing stats records fail" in {
+    "log if writing/removing stats records fail" in testDBResource.use { cfg =>
       implicit val logger: TestLogger[IO] = TestLogger()
-      sessionResource.use { s =>
+      sessionResource(cfg).use { s =>
         for {
           _            <- s.execute(sql"DROP TABLE IF EXISTS kg_lock_stats".command)
           (_, release) <- makeExclusiveLock(s).run("1").allocated
           _            <- release
 
           key = LongKey[String].asLong("1")
-          _ = logger.getMessages(TestLogger.Level.Error).map(_.message) shouldBe List(
-                s"Failed to remove lock stats record for key=$key"
-              )
+          _ = logger.getMessages(TestLogger.Level.Error).map(_.message) shouldBe
+                List(s"Failed to remove lock stats record for key=$key")
         } yield ()
       }
     }
 
-    "show when a session is waiting for a lock" in {
+    "show when a session is waiting for a lock" in testDBResource.use { cfg =>
       implicit val logger: Logger[IO] = TestLogger()
-      (sessionResource, sessionResource).tupled.use { case (s1, s2) =>
+      (sessionResource(cfg), sessionResource(cfg)).tupled.use { case (s1, s2) =>
         for {
           _            <- resetLockTable(s1)
           (_, release) <- makeExclusiveLock(s1, 1.second).run("1").allocated
@@ -205,10 +206,10 @@ class PostgresLockSpec extends AsyncWordSpec with AsyncIOSpec with should.Matche
       }
     }
 
-    "remove records for the owning session only" in {
+    "remove records for the owning session only" in testDBResource.use { cfg =>
       implicit val logger: Logger[IO] = TestLogger()
 
-      (sessionResource, sessionResource, sessionResource).tupled.use { case (s1, s2, s3) =>
+      (sessionResource(cfg), sessionResource(cfg), sessionResource(cfg)).tupled.use { case (s1, s2, s3) =>
         for {
           _            <- resetLockTable(s1)
           (_, release) <- makeExclusiveLock(s1).run("1").allocated
@@ -242,8 +243,8 @@ class PostgresLockSpec extends AsyncWordSpec with AsyncIOSpec with should.Matche
     }
   }
 
-  private def createFailingSessionThatRecovers(exception: Exception): Resource[IO, Session[IO]] =
-    (Resource.eval(Ref.of[IO, Int](0)), sessionResource)
+  private def createFailingSessionThatRecovers(cfg: DBConfig[TestDB], exception: Exception): Resource[IO, Session[IO]] =
+    (Resource.eval(Ref.of[IO, Int](0)), sessionResource(cfg))
       .mapN { (counter, goodSession) =>
         new PostgresLockSpec.TestSession {
           override def unique[A, B](query: Query[A, B])(args: A) =
@@ -257,10 +258,12 @@ class PostgresLockSpec extends AsyncWordSpec with AsyncIOSpec with should.Matche
         }
       }
 
-  private def createFailingSessionThatDoesNotRecover(exception: Exception): Resource[IO, Session[IO]] = {
+  private def createFailingSessionThatDoesNotRecover(cfg:       DBConfig[TestDB],
+                                                     exception: Exception
+  ): Resource[IO, Session[IO]] = {
     val counter = Ref.unsafe[IO, Int](0)
 
-    sessionResource.map { goodSession =>
+    sessionResource(cfg).map { goodSession =>
       new PostgresLockSpec.TestSession {
         override def unique[A, B](query: Query[A, B])(args: A) =
           counter.getAndUpdate(_ + 1) >>= {

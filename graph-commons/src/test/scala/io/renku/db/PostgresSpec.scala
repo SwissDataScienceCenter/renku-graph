@@ -20,9 +20,6 @@ package io.renku.db
 
 import cats.effect.{IO, Resource}
 import io.renku.db.DBConfigProvider.DBConfig
-import io.renku.generators.Generators.Implicits._
-import io.renku.generators.Generators.nonEmptyStrings
-import org.scalacheck.Gen
 import org.scalatest.{BeforeAndAfterAll, Suite}
 import skunk.Session
 
@@ -33,13 +30,11 @@ trait PostgresSpec[DB] extends BeforeAndAfterAll {
   def migrations:  Session[IO] => IO[Unit]
   lazy val client: PostgresClient[DB] = new PostgresClient[DB](server, migrations)
 
-  private lazy val specDBName = nonEmptyStrings(minLength = 3, charsGenerator = Gen.alphaNumChar).generateOne
+  def testDBResource: Resource[IO, DBConfig[DB]] =
+    client.randomizedDBResource(prefix = getClass.getSimpleName.toLowerCase)
 
-  lazy val configAndSessionResource: Resource[IO, (DBConfig[DB], Session[IO])] =
-    client.sessionResource(specDBName)
-
-  lazy val sessionResource: Resource[IO, Session[IO]] =
-    configAndSessionResource.map { case (_, s) => s }
+  lazy val sessionResource: DBConfig[DB] => Resource[IO, Session[IO]] =
+    client.sessionResource
 
   protected override def beforeAll(): Unit = {
     super.beforeAll()
