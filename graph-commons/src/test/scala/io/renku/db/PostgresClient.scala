@@ -29,7 +29,7 @@ import org.typelevel.log4cats.slf4j.Slf4jLogger
 import skunk.Session
 import skunk.implicits._
 
-class PostgresClient[DB](server: PostgresServer, migrations: Session[IO] => IO[Unit]) {
+class PostgresClient[DB](server: PostgresServer, migrations: SessionResource[IO, DB] => IO[Unit]) {
 
   private[this] implicit val logger: Logger[IO] = Slf4jLogger.getLoggerFromClass[IO](getClass)
 
@@ -53,7 +53,7 @@ class PostgresClient[DB](server: PostgresServer, migrations: Session[IO] => IO[U
             .use(_.execute(sql"""DROP DATABASE "#$dbName"""".command).void)
             .void
       )
-      .evalTap(sessionResource(_).use(migrations))
+      .evalTap(cfg => migrations(SessionResource[IO, DB](sessionResource(cfg))))
 
   private lazy val initSession: Resource[IO, Session[IO]] = makeSession(server.dbConfig)
 

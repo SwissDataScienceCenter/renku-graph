@@ -16,14 +16,10 @@
  * limitations under the License.
  */
 
-package io.renku.db
+package io.renku.tokenrepository.repository.metrics
 
-import cats.effect.IO
-import org.scalatest.Suite
+import cats.MonadThrow
 
-trait TestDB
-
-trait CommonsPostgresSpec extends PostgresSpec[TestDB] { self: Suite =>
-  lazy val server:     PostgresServer                          = CommonsPostgresServer
-  lazy val migrations: SessionResource[IO, TestDB] => IO[Unit] = _ => IO.unit
+object TestQueriesExecutionTimes {
+  def apply[F[_]: MonadThrow]: QueriesExecutionTimes[F] = QueriesExecutionTimes.histogram[F]
 }

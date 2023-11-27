@@ -16,14 +16,8 @@
  * limitations under the License.
  */
 
-package io.renku.db
+package io.renku.tokenrepository.repository
 
-import cats.effect.IO
-import org.scalatest.Suite
+import io.renku.db.PostgresServer
 
-trait TestDB
-
-trait CommonsPostgresSpec extends PostgresSpec[TestDB] { self: Suite =>
-  lazy val server:     PostgresServer                          = CommonsPostgresServer
-  lazy val migrations: SessionResource[IO, TestDB] => IO[Unit] = _ => IO.unit
-}
+object TokenRepositoryPostgresServer extends PostgresServer(module = "token_repository")

@@ -27,7 +27,7 @@ trait PostgresSpec[DB] extends BeforeAndAfterAll {
   self: Suite =>
 
   def server:      PostgresServer
-  def migrations:  Session[IO] => IO[Unit]
+  def migrations:  SessionResource[IO, DB] => IO[Unit]
   lazy val client: PostgresClient[DB] = new PostgresClient[DB](server, migrations)
 
   def testDBResource: Resource[IO, DBConfig[DB]] =

@@ -29,15 +29,16 @@ trait QueriesExecutionTimes[F[_]] extends LabeledHistogram[F]
 
 object QueriesExecutionTimes {
 
-  def apply[F[_]: MonadThrow: MetricsRegistry](): F[QueriesExecutionTimes[F]] = MetricsRegistry[F].register {
-    new LabeledHistogramImpl[F](
-      name = "token_repository_queries_execution_times",
-      help = "Token Repository queries execution times",
-      labelName = "query_id",
-      maybeBuckets = Seq(.05, .075, .1, .5, 1, 2.5, 5).some,
-      maybeThreshold = (750 millis).some
-    ) with QueriesExecutionTimes[F]
-  }.widen
+  private[metrics] def histogram[F[_]: MonadThrow] = new LabeledHistogramImpl[F](
+    name = "token_repository_queries_execution_times",
+    help = "Token Repository queries execution times",
+    labelName = "query_id",
+    maybeBuckets = Seq(.05, .075, .1, .5, 1, 2.5, 5).some,
+    maybeThreshold = (750 millis).some
+  ) with QueriesExecutionTimes[F]
+
+  def apply[F[_]: MonadThrow: MetricsRegistry](): F[QueriesExecutionTimes[F]] =
+    MetricsRegistry[F].register(histogram[F]).widen
 
   def apply[F[_]](implicit ev: QueriesExecutionTimes[F]): QueriesExecutionTimes[F] = ev
 }
