@@ -31,10 +31,11 @@ import io.renku.generators.Generators.Implicits._
 import io.renku.generators.Generators.{nonEmptyStrings, positiveInts}
 import io.renku.graph.config.EventConsumerUrl
 import io.renku.graph.metrics.SentEventsGauge
+import io.renku.http.client.RestClientError.UnexpectedResponseException
 import io.renku.interpreters.TestLogger
 import io.renku.stubbing.ExternalServiceStubbing
 import io.renku.testtools.IOSpec
-import org.http4s.Status.{Accepted, BadGateway, GatewayTimeout, NotFound, ServiceUnavailable, TooManyRequests}
+import org.http4s.Status.{Accepted, BadGateway, GatewayTimeout, InternalServerError, NotFound, ServiceUnavailable, TooManyRequests}
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.OptionValues
 import org.scalatest.matchers.should
@@ -154,6 +155,22 @@ class EventSenderSpec
 
           reset()
         }
+      }
+
+      "fail if remote responds with a status that is not retry-able" in new TestCase {
+
+        val responseStatus = InternalServerError
+        val eventRequest   = post(urlEqualTo(s"/events"))
+        stubFor {
+          eventRequest.willReturn(aResponse().withStatus(responseStatus.code))
+        }
+
+        val exception = intercept[Exception] {
+          callGenerator(eventSender, categoryName).generateOne.unsafeRunSync()
+        }
+
+        exception.getCause shouldBe a[UnexpectedResponseException]
+        exception.getMessage should endWith("- got non-retry-able exception")
       }
 
       "fail when the specified number of retries is exceeded" in new TestCase {
