@@ -18,4 +18,4 @@
 
 package io.renku.db
 
-object CommonsPostgresServer extends PostgresServer(module = "commons")
+object CommonsPostgresServer extends PostgresServer(module = "commons", port = 5430)

@@ -24,12 +24,12 @@ import io.renku.db.DBConfigProvider.DBConfig
 
 import scala.sys.process._
 
-class PostgresServer(module: String) {
+class PostgresServer(module: String, port: Int) {
 
   val dbConfig: DBConfigProvider.DBConfig[PostgresServer] = DBConfig[PostgresServer](
     name = Refined.unsafeApply(s"${module}_test"),
     host = "localhost",
-    port = 5432,
+    port = Refined.unsafeApply(port),
     user = Refined.unsafeApply(module),
     pass = Refined.unsafeApply(module),
     connectionPool = 1

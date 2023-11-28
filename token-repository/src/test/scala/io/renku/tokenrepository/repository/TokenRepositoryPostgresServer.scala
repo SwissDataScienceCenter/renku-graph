@@ -20,4 +20,4 @@ package io.renku.tokenrepository.repository
 
 import io.renku.db.PostgresServer
 
-object TokenRepositoryPostgresServer extends PostgresServer(module = "token_repository")
+object TokenRepositoryPostgresServer extends PostgresServer(module = "token_repository", port = 5432)
