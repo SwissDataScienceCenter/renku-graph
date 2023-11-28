@@ -63,6 +63,7 @@ class PostgresClient[DB](server: PostgresServer, migrations: SessionResource[IO,
   private def makeSession(cfg: DBConfig[_]): Resource[IO, Session[IO]] =
     Session.single[IO](
       host = cfg.host.value,
+      port = cfg.port.value,
       user = cfg.user.value,
       password = cfg.pass.value.some,
       database = cfg.name.value

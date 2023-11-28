@@ -46,7 +46,7 @@ class PostgresServer(module: String, port: Int) {
                              |-e POSTGRES_USER=${dbConfig.user}
                              |-e POSTGRES_PASSWORD=${dbConfig.pass}
                              |-e POSTGRES_DB=${dbConfig.name}
-                             |-p 5432:${dbConfig.port}
+                             |-p ${dbConfig.port}:5432
                              |-d $image""".stripMargin
   private val isRunningCmd = s"docker container ls --filter 'name=$containerName'"
   private val stopCmd      = s"docker stop -t5 $containerName"
