@@ -20,7 +20,6 @@ package io.renku.triplesgenerator.events.consumers
 package tsmigrationrequest
 
 import TSStateChecker.TSState
-import TSStateChecker.TSState.ReProvisioning
 import cats.data.EitherT.{leftT, liftF, rightT}
 import cats.effect.{IO, Ref}
 import cats.syntax.all._
@@ -136,12 +135,13 @@ class EventHandlerSpec extends AnyWordSpec with IOSpec with MockFactory with sho
       }
     }
 
-    "return ServiceUnavailable when TSState is ReProvisioning" in new TestCase {
+    TSState.ReProvisioning :: TSState.Migrating :: Nil foreach { state =>
+      s"return ServiceUnavailable when TSState is $state" in new TestCase {
 
-      givenTsState(returning = ReProvisioning.pure[IO])
+        givenTsState(returning = state.pure[IO])
 
-      handler.createHandlingDefinition().precondition.unsafeRunSync() shouldBe
-        ServiceUnavailable("Re-provisioning running").some
+        handler.createHandlingDefinition().precondition.unsafeRunSync() shouldBe ServiceUnavailable(state.show).some
+      }
     }
 
     "return SchedulingError if TSState check fails" in new TestCase {

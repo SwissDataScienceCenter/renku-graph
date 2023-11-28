@@ -36,6 +36,7 @@ private object TSStateChecker {
   object TSState {
     case object Ready           extends TSState
     case object ReProvisioning  extends TSState
+    case object Migrating       extends TSState
     case object MissingDatasets extends TSState
   }
 
@@ -47,6 +48,7 @@ private object TSStateChecker {
   implicit val show: Show[TSState] = Show.show {
     case TSState.Ready           => "Ready"
     case TSState.ReProvisioning  => "Re-provisioning running"
+    case TSState.Migrating       => "Migration running"
     case TSState.MissingDatasets => "Not all datasets created"
   }
 }
@@ -57,7 +59,7 @@ private class TSStateCheckerImpl[F[_]: MonadThrow](
     reProvisioningStatus: ReProvisioningStatus[F]
 ) extends TSStateChecker[F] {
 
-  import reProvisioningStatus._
+  import reProvisioningStatus.underReProvisioning
 
   override def checkTSState: F[TSState] =
     checkDatasetsExist >>= {

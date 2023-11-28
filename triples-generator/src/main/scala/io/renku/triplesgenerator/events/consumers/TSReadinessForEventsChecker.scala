@@ -24,7 +24,7 @@ import cats.syntax.all._
 import io.renku.events.consumers.EventSchedulingResult
 import io.renku.events.consumers.EventSchedulingResult.{SchedulingError, ServiceUnavailable}
 import tsmigrationrequest.migrations.reprovisioning.ReProvisioningStatus
-import TSStateChecker.TSState.{MissingDatasets, ReProvisioning, Ready}
+import TSStateChecker.TSState._
 import io.renku.triplesstore.SparqlQueryTimeRecorder
 import org.typelevel.log4cats.Logger
 
@@ -43,8 +43,8 @@ private class TSReadinessForEventsCheckerImpl[F[_]: MonadThrow](tsStateChecker: 
   override def verifyTSReady: F[Option[EventSchedulingResult]] =
     tsStateChecker.checkTSState
       .map {
-        case Ready                                      => None
-        case state @ (MissingDatasets | ReProvisioning) => ServiceUnavailable(state.show).widen.some
+        case Ready                                                  => None
+        case state @ (MissingDatasets | ReProvisioning | Migrating) => ServiceUnavailable(state.show).widen.some
       }
       .recover { case exception => SchedulingError(exception).widen.some }
 }
