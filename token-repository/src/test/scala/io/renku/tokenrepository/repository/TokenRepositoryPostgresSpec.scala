@@ -18,19 +18,33 @@
 
 package io.renku.tokenrepository.repository
 
+import AccessTokenCrypto.EncryptedAccessToken
 import cats.effect.IO
 import cats.syntax.all._
+import io.renku.db.DBConfigProvider.DBConfig
 import io.renku.db.{PostgresServer, PostgresSpec, SessionResource}
+import io.renku.generators.Generators.Implicits._
+import io.renku.generators.Generators.localDates
+import io.renku.graph.model.projects.{GitLabId, Slug}
 import io.renku.http.client.GitLabClient
 import io.renku.interpreters.TestLogger
+import io.renku.tokenrepository.repository.creation.TokenDates.ExpiryDate
 import io.renku.tokenrepository.repository.init.DbInitializer
 import io.renku.tokenrepository.repository.metrics.{QueriesExecutionTimes, TestQueriesExecutionTimes}
 import org.scalamock.scalatest.AsyncMockFactory
 import org.scalatest.Suite
+import skunk._
+import skunk.codec.all._
+import skunk.data.Completion
+import skunk.implicits._
 
-trait TokenRepositoryPostgresSpec extends PostgresSpec[ProjectsTokensDB] {
+import java.time.{LocalDate, OffsetDateTime}
+
+trait TokenRepositoryPostgresSpec extends PostgresSpec[ProjectsTokensDB] with TokenRepositoryTypeSerializers {
   self: Suite with AsyncMockFactory =>
+
   lazy val server: PostgresServer = TokenRepositoryPostgresServer
+
   lazy val migrations: SessionResource[IO, ProjectsTokensDB] => IO[Unit] = { sr =>
     implicit lazy val logger:           TestLogger[IO]                       = TestLogger[IO]()
     implicit lazy val glClient:         GitLabClient[IO]                     = mock[GitLabClient[IO]]
@@ -38,4 +52,42 @@ trait TokenRepositoryPostgresSpec extends PostgresSpec[ProjectsTokensDB] {
     implicit val moduleSessionResource: ProjectsTokensDB.SessionResource[IO] = ProjectsTokensDB.SessionResource[IO](sr)
     DbInitializer.migrations[IO].flatMap(_.map(_.run).sequence).void
   }
+
+  implicit def moduleSessionResource(implicit cfg: DBConfig[ProjectsTokensDB]): ProjectsTokensDB.SessionResource[IO] =
+    io.renku.db.SessionResource[IO, ProjectsTokensDB](sessionResource(cfg))
+
+  protected def insert(projectId:      GitLabId,
+                       projectSlug:    Slug,
+                       encryptedToken: EncryptedAccessToken,
+                       expiryDate:     ExpiryDate = localDates(min = LocalDate.now().plusDays(1)).generateAs(ExpiryDate)
+  )(implicit cfg: DBConfig[ProjectsTokensDB]): IO[Unit] =
+    moduleSessionResource(cfg).session.use { session =>
+      val query: Command[Int *: String *: String *: OffsetDateTime *: LocalDate *: EmptyTuple] =
+        sql"""INSERT into projects_tokens (project_id, project_slug, token, created_at, expiry_date)
+              VALUES ($int4, $varchar, $varchar, $timestamptz, $date)
+         """.command
+      session
+        .prepare(query)
+        .flatMap(
+          _.execute(
+            projectId.value *:
+              projectSlug.value *:
+              encryptedToken.value *:
+              OffsetDateTime.now() *:
+              expiryDate.value *:
+              EmptyTuple
+          )
+        )
+        .map {
+          case Completion.Insert(1) => ()
+          case c                    => fail(s"insertion problem: $c")
+        }
+    }
+
+  protected def findToken(projectId: GitLabId)(implicit cfg: DBConfig[ProjectsTokensDB]): IO[Option[String]] =
+    moduleSessionResource(cfg).session
+      .use { session =>
+        val query: Query[Int, String] = sql"select token from projects_tokens where project_id = $int4".query(varchar)
+        session.prepare(query).flatMap(_.option(projectId.value))
+      }
 }

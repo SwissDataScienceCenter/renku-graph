@@ -19,55 +19,44 @@
 package io.renku.tokenrepository.repository.fetching
 
 import cats.effect.IO
+import cats.effect.testing.scalatest.AsyncIOSpec
 import io.renku.generators.Generators.Implicits._
 import io.renku.graph.model.GraphModelGenerators._
-import io.renku.metrics.TestMetricsRegistry
-import io.renku.testtools.IOSpec
-import io.renku.tokenrepository.repository.InMemoryProjectsTokensDbSpec
 import io.renku.tokenrepository.repository.RepositoryGenerators._
-import io.renku.tokenrepository.repository.metrics.QueriesExecutionTimes
-import org.scalamock.scalatest.MockFactory
+import io.renku.tokenrepository.repository.TokenRepositoryPostgresSpec
+import io.renku.tokenrepository.repository.metrics.{QueriesExecutionTimes, TestQueriesExecutionTimes}
+import org.scalamock.scalatest.AsyncMockFactory
+import org.scalatest.flatspec.AsyncFlatSpec
 import org.scalatest.matchers.should
-import org.scalatest.wordspec.AnyWordSpec
 
 class PersistedTokensFinderSpec
-    extends AnyWordSpec
-    with IOSpec
-    with InMemoryProjectsTokensDbSpec
+    extends AsyncFlatSpec
+    with AsyncIOSpec
+    with TokenRepositoryPostgresSpec
     with should.Matchers
-    with MockFactory {
+    with AsyncMockFactory {
 
-  "findStoredToken" should {
+  it should "return token associated with the projectId" in testDBResource.use { implicit cfg =>
+    val projectId      = projectIds.generateOne
+    val projectSlug    = projectSlugs.generateOne
+    val encryptedToken = encryptedAccessTokens.generateOne
 
-    "return token associated with the projectId" in new TestCase {
-
-      val encryptedToken = encryptedAccessTokens.generateOne
-
-      insert(projectId, projectSlug, encryptedToken)
-
-      finder.findStoredToken(projectId).value.unsafeRunSync() shouldBe Some(encryptedToken)
-    }
-
-    "return token associated with the projectSlug" in new TestCase {
-
-      val encryptedToken = encryptedAccessTokens.generateOne
-
-      insert(projectId, projectSlug, encryptedToken)
-
-      finder.findStoredToken(projectSlug).value.unsafeRunSync() shouldBe Some(encryptedToken)
-    }
-
-    "return None if there's no token associated with the projectId" in new TestCase {
-      finder.findStoredToken(projectId).value.unsafeRunSync() shouldBe None
-    }
+    insert(projectId, projectSlug, encryptedToken) >>
+      PersistedTokensFinder[IO].findStoredToken(projectId).value.asserting(_ shouldBe Some(encryptedToken))
   }
 
-  private trait TestCase {
-    val projectId   = projectIds.generateOne
-    val projectSlug = projectSlugs.generateOne
+  it should "return token associated with the projectSlug" in testDBResource.use { implicit cfg =>
+    val projectId      = projectIds.generateOne
+    val projectSlug    = projectSlugs.generateOne
+    val encryptedToken = encryptedAccessTokens.generateOne
 
-    private implicit val metricsRegistry:  TestMetricsRegistry[IO]   = TestMetricsRegistry[IO]
-    private implicit val queriesExecTimes: QueriesExecutionTimes[IO] = QueriesExecutionTimes[IO]().unsafeRunSync()
-    val finder = new PersistedTokensFinderImpl[IO]
+    insert(projectId, projectSlug, encryptedToken) >>
+      PersistedTokensFinder[IO].findStoredToken(projectSlug).value.asserting(_ shouldBe Some(encryptedToken))
   }
+
+  it should "return None if there's no token associated with the projectId" in testDBResource.use { implicit cfg =>
+    PersistedTokensFinder[IO].findStoredToken(projectIds.generateOne).value.asserting(_ shouldBe None)
+  }
+
+  private implicit lazy val qet: QueriesExecutionTimes[IO] = TestQueriesExecutionTimes[IO]
 }

@@ -21,130 +21,130 @@ package creation
 
 import AccessTokenCrypto.EncryptedAccessToken
 import RepositoryGenerators._
-import cats.data.Kleisli
 import cats.effect.IO
+import cats.effect.testing.scalatest.AsyncIOSpec
 import cats.syntax.all._
 import creation.Generators.tokenStoringInfos
 import creation.TokenDates._
+import io.renku.db.DBConfigProvider.DBConfig
 import io.renku.generators.Generators.Implicits._
 import io.renku.graph.model.GraphModelGenerators._
 import io.renku.graph.model.projects
-import io.renku.metrics.TestMetricsRegistry
-import io.renku.testtools.IOSpec
-import io.renku.tokenrepository.repository.metrics.QueriesExecutionTimes
-import org.scalamock.scalatest.MockFactory
+import io.renku.tokenrepository.repository.metrics.{QueriesExecutionTimes, TestQueriesExecutionTimes}
+import org.scalamock.scalatest.AsyncMockFactory
 import org.scalatest.matchers.should
-import org.scalatest.wordspec.AnyWordSpec
+import org.scalatest.wordspec.AsyncWordSpec
 import skunk._
 import skunk.implicits._
 
 class TokensPersisterSpec
-    extends AnyWordSpec
-    with IOSpec
-    with InMemoryProjectsTokensDbSpec
+    extends AsyncWordSpec
+    with AsyncIOSpec
+    with TokenRepositoryPostgresSpec
     with should.Matchers
-    with MockFactory {
+    with AsyncMockFactory {
 
   "persistToken" should {
 
     "insert the association " +
-      "if there's no token for the given project id" in new TestCase {
+      "if there's no token for the given project id" in testDBResource.use { implicit cfg =>
+        val tokenStoringInfo = tokenStoringInfos.generateOne
 
-        persister.persistToken(tokenStoringInfo).unsafeRunSync() shouldBe ()
-
-        findTokenInfo(tokenStoringInfo.project.id) shouldBe tokenStoringInfo.some
+        TokensPersister[IO].persistToken(tokenStoringInfo).assertNoException >>
+          findTokenInfo(tokenStoringInfo.project.id).asserting(_ shouldBe tokenStoringInfo.some)
       }
 
     "update the given token " +
-      "if there's a token for the project slug and id" in new TestCase {
+      "if there's a token for the project slug and id" in testDBResource.use { implicit cfg =>
+        val tokenStoringInfo = tokenStoringInfos.generateOne
 
-        persister.persistToken(tokenStoringInfo).unsafeRunSync() shouldBe ()
+        for {
+          _ <- TokensPersister[IO].persistToken(tokenStoringInfo).assertNoException
+          _ <- findTokenInfo(tokenStoringInfo.project.id).asserting(_ shouldBe tokenStoringInfo.some)
 
-        findTokenInfo(tokenStoringInfo.project.id) shouldBe tokenStoringInfo.some
-
-        val newToken = encryptedAccessTokens.generateOne
-        persister.persistToken(tokenStoringInfo.copy(encryptedToken = newToken)).unsafeRunSync() shouldBe ()
-
-        findTokenInfo(tokenStoringInfo.project.id) shouldBe tokenStoringInfo.copy(encryptedToken = newToken).some
+          newToken = encryptedAccessTokens.generateOne
+          _ <- TokensPersister[IO].persistToken(tokenStoringInfo.copy(encryptedToken = newToken)).assertNoException
+          res <- findTokenInfo(tokenStoringInfo.project.id)
+                   .asserting(_ shouldBe tokenStoringInfo.copy(encryptedToken = newToken).some)
+        } yield res
       }
 
     "update the given token and project id" +
-      "if there's a token for the project slug but with different project id" in new TestCase {
+      "if there's a token for the project slug but with different project id" in testDBResource.use { implicit cfg =>
+        val tokenStoringInfo = tokenStoringInfos.generateOne
 
-        persister.persistToken(tokenStoringInfo).unsafeRunSync() shouldBe ()
+        for {
+          _ <- TokensPersister[IO].persistToken(tokenStoringInfo).assertNoException
+          _ <- findTokenInfo(tokenStoringInfo.project.id).asserting(_ shouldBe tokenStoringInfo.some)
 
-        findTokenInfo(tokenStoringInfo.project.id) shouldBe tokenStoringInfo.some
+          newStoringInfo = tokenStoringInfo.copy(project = tokenStoringInfo.project.copy(id = projectIds.generateOne),
+                                                 encryptedToken = encryptedAccessTokens.generateOne
+                           )
+          _ <- TokensPersister[IO].persistToken(newStoringInfo).assertNoException
 
-        val newStoringInfo =
-          tokenStoringInfo.copy(project = tokenStoringInfo.project.copy(id = projectIds.generateOne),
-                                encryptedToken = encryptedAccessTokens.generateOne
-          )
-        persister.persistToken(newStoringInfo).unsafeRunSync() shouldBe ()
-
-        findTokenInfo(tokenStoringInfo.project.id) shouldBe None
-        findTokenInfo(newStoringInfo.project.id)   shouldBe newStoringInfo.some
+          _   <- findTokenInfo(tokenStoringInfo.project.id).asserting(_ shouldBe None)
+          res <- findTokenInfo(newStoringInfo.project.id).asserting(_ shouldBe newStoringInfo.some)
+        } yield res
       }
 
     "update the given token and project slug" +
-      "if there's a token for the project id but with different project slug" in new TestCase {
+      "if there's a token for the project id but with different project slug" in testDBResource.use { implicit cfg =>
+        val tokenStoringInfo = tokenStoringInfos.generateOne
 
-        persister.persistToken(tokenStoringInfo).unsafeRunSync() shouldBe ()
+        for {
+          _ <- TokensPersister[IO].persistToken(tokenStoringInfo).assertNoException
+          _ <- findTokenInfo(tokenStoringInfo.project.id).asserting(_ shouldBe tokenStoringInfo.some)
 
-        findTokenInfo(tokenStoringInfo.project.id) shouldBe tokenStoringInfo.some
+          newStoringInfo = tokenStoringInfo.copy(project =
+                                                   tokenStoringInfo.project.copy(slug = projectSlugs.generateOne),
+                                                 encryptedToken = encryptedAccessTokens.generateOne
+                           )
+          _ <- TokensPersister[IO].persistToken(newStoringInfo).assertNoException
 
-        val newStoringInfo =
-          tokenStoringInfo.copy(project = tokenStoringInfo.project.copy(slug = projectSlugs.generateOne),
-                                encryptedToken = encryptedAccessTokens.generateOne
-          )
-        persister.persistToken(newStoringInfo).unsafeRunSync() shouldBe ()
-
-        findTokenInfo(tokenStoringInfo.project.id) shouldBe newStoringInfo.some
+          res <- findTokenInfo(tokenStoringInfo.project.id).asserting(_ shouldBe newStoringInfo.some)
+        } yield res
       }
   }
 
   "updateSlug" should {
 
-    "replace the Slug for the given project Id" in new TestCase {
+    "replace the Slug for the given project Id" in testDBResource.use { implicit cfg =>
+      val tokenStoringInfo = tokenStoringInfos.generateOne
 
-      persister.persistToken(tokenStoringInfo).unsafeRunSync() shouldBe ()
+      for {
+        _ <- TokensPersister[IO].persistToken(tokenStoringInfo).assertNoException
+        _ <- findTokenInfo(tokenStoringInfo.project.id).asserting(_ shouldBe tokenStoringInfo.some)
 
-      findTokenInfo(tokenStoringInfo.project.id) shouldBe tokenStoringInfo.some
-
-      val newSlug = projectSlugs.generateOne
-      persister.updateSlug(Project(tokenStoringInfo.project.id, newSlug)).unsafeRunSync() shouldBe ()
-
-      findTokenInfo(tokenStoringInfo.project.id) shouldBe tokenStoringInfo
-        .copy(project = tokenStoringInfo.project.copy(slug = newSlug))
-        .some
+        newSlug = projectSlugs.generateOne
+        _ <- TokensPersister[IO].updateSlug(Project(tokenStoringInfo.project.id, newSlug)).assertNoException
+        res <- findTokenInfo(tokenStoringInfo.project.id).asserting(
+                 _ shouldBe tokenStoringInfo
+                   .copy(project = tokenStoringInfo.project.copy(slug = newSlug))
+                   .some
+               )
+      } yield res
     }
 
-    "do nothing if project Slug not changed" in new TestCase {
+    "do nothing if project Slug not changed" in testDBResource.use { implicit cfg =>
+      val tokenStoringInfo = tokenStoringInfos.generateOne
 
-      persister.persistToken(tokenStoringInfo).unsafeRunSync() shouldBe ()
-
-      persister.updateSlug(tokenStoringInfo.project).unsafeRunSync() shouldBe ()
-
-      findTokenInfo(tokenStoringInfo.project.id) shouldBe tokenStoringInfo.some
+      TokensPersister[IO].persistToken(tokenStoringInfo).assertNoException >>
+        TokensPersister[IO].updateSlug(tokenStoringInfo.project).assertNoException >>
+        findTokenInfo(tokenStoringInfo.project.id).asserting(_ shouldBe tokenStoringInfo.some)
     }
 
-    "do nothing if no project with the given Id" in new TestCase {
+    "do nothing if no project with the given Id" in testDBResource.use { implicit cfg =>
+      val tokenStoringInfo = tokenStoringInfos.generateOne
 
-      persister.updateSlug(tokenStoringInfo.project).unsafeRunSync() shouldBe ()
-
-      findTokenInfo(tokenStoringInfo.project.id) shouldBe None
+      TokensPersister[IO].updateSlug(tokenStoringInfo.project).assertNoException >>
+        findTokenInfo(tokenStoringInfo.project.id).asserting(_ shouldBe None)
     }
   }
 
-  private trait TestCase {
-    val tokenStoringInfo = tokenStoringInfos.generateOne
-
-    private implicit val metricsRegistry:  TestMetricsRegistry[IO]   = TestMetricsRegistry[IO]
-    private implicit val queriesExecTimes: QueriesExecutionTimes[IO] = QueriesExecutionTimes[IO]().unsafeRunSync()
-    val persister = new TokensPersisterImpl[IO]
-  }
-
-  private def findTokenInfo(projectId: projects.GitLabId): Option[TokenStoringInfo] = sessionResource
-    .useK {
+  private def findTokenInfo(
+      projectId: projects.GitLabId
+  )(implicit cfg: DBConfig[ProjectsTokensDB]): IO[Option[TokenStoringInfo]] =
+    moduleSessionResource(cfg).session.use { session =>
       val query: Query[projects.GitLabId, TokenStoringInfo] = sql"""
       SELECT project_id, project_slug, token, created_at, expiry_date
       FROM projects_tokens
@@ -156,7 +156,8 @@ class TokensPersisterSpec
           case (id: projects.GitLabId) ~ (slug: projects.Slug) ~ (token: EncryptedAccessToken) ~ (createdAt: CreatedAt) ~ (expiryDate: ExpiryDate) =>
             TokenStoringInfo(Project(id, slug), token, TokenDates(createdAt, expiryDate))
         }
-      Kleisli(_.prepare(query).flatMap(_.option(projectId)))
+      session.prepare(query).flatMap(_.option(projectId))
     }
-    .unsafeRunSync()
+
+  private implicit lazy val qet: QueriesExecutionTimes[IO] = TestQueriesExecutionTimes[IO]
 }
