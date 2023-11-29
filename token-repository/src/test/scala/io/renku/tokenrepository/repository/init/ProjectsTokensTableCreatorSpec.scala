@@ -19,39 +19,35 @@
 package io.renku.tokenrepository.repository.init
 
 import cats.effect._
+import cats.effect.testing.scalatest.AsyncIOSpec
 import io.renku.interpreters.TestLogger.Level.Info
-import io.renku.testtools.IOSpec
-import org.scalamock.scalatest.MockFactory
+import org.scalamock.scalatest.AsyncMockFactory
+import org.scalatest.Succeeded
+import org.scalatest.flatspec.AsyncFlatSpec
 import org.scalatest.matchers.should
-import org.scalatest.wordspec.AnyWordSpec
 
 class ProjectsTokensTableCreatorSpec
-    extends AnyWordSpec
-    with IOSpec
+    extends AsyncFlatSpec
+    with AsyncIOSpec
     with DbInitSpec
     with should.Matchers
-    with MockFactory {
+    with AsyncMockFactory {
 
-  protected override val migrationsToRun: List[DBMigration[IO]] = List.empty
+  protected override lazy val runMigrationsUpTo: Class[_ <: DBMigration[IO]] =
+    classOf[ProjectsTokensTableCreator[IO]]
 
-  "run" should {
+  it should "create the projects_tokens table if id does not exist" in testDBResource.use { implicit cfg =>
+    for {
+      _ <- tableExists("projects_tokens").asserting(_ shouldBe false)
 
-    "create the projects_tokens table if id does not exist" in new TestCase {
-      tableExists("projects_tokens") shouldBe false
+      _ <- logger.resetF()
+      _ <- ProjectsTokensTableCreator[IO].run.assertNoException
+      _ <- tableExists("projects_tokens").asserting(_ shouldBe true)
+      _ <- logger.loggedOnlyF(Info("'projects_tokens' table created"))
 
-      tableCreator.run.unsafeRunSync() shouldBe ()
-
-      logger.loggedOnly(Info("'projects_tokens' table created"))
-
-      tableExists("projects_tokens") shouldBe true
-
-      tableCreator.run.unsafeRunSync() shouldBe ()
-
-      logger.loggedOnly(Info("'projects_tokens' table created"), Info("'projects_tokens' table existed"))
-    }
-  }
-
-  private trait TestCase {
-    val tableCreator = new ProjectsTokensTableCreator[IO]
+      _ <- logger.resetF()
+      _ <- ProjectsTokensTableCreator[IO].run.assertNoException
+      _ <- logger.loggedOnlyF(Info("'projects_tokens' table existed"))
+    } yield Succeeded
   }
 }

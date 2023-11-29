@@ -93,6 +93,8 @@ class TestLogger[F[_]: Async] extends Logger[F] with should.Matchers {
 
   def reset(): Unit = invocations.clear()
 
+  def resetF(): F[Unit] = F.delay(reset())
+
   def waitFor(expected: LogEntry*): F[Assertion] = {
 
     val interval = 100 millis

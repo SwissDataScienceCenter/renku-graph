@@ -19,49 +19,38 @@
 package io.renku.tokenrepository.repository.init
 
 import cats.effect.IO
+import cats.effect.testing.scalatest.AsyncIOSpec
 import io.renku.interpreters.TestLogger.Level.Info
-import io.renku.testtools.IOSpec
-import org.scalamock.scalatest.MockFactory
+import org.scalamock.scalatest.AsyncMockFactory
+import org.scalatest.Succeeded
+import org.scalatest.flatspec.AsyncFlatSpec
 import org.scalatest.matchers.should
-import org.scalatest.wordspec.AnyWordSpec
 
 class ExpiryAndCreatedDatesNotNullSpec
-    extends AnyWordSpec
-    with IOSpec
+    extends AsyncFlatSpec
+    with AsyncIOSpec
     with DbInitSpec
     with should.Matchers
-    with MockFactory {
+    with AsyncMockFactory {
 
-  protected override lazy val migrationsToRun: List[DBMigration[IO]] = allMigrations.takeWhile {
-    case _: ExpiryAndCreatedDatesNotNull[IO] => false
-    case _ => true
-  }
+  protected override lazy val runMigrationsUpTo: Class[_ <: DBMigration[IO]] =
+    classOf[ExpiryAndCreatedDatesNotNull[IO]]
 
-  "run" should {
+  it should "make the expiry_date and created_at NOT NULL" in testDBResource.use { implicit cfg =>
+    for {
+      _ <- verifyColumnNullable("projects_tokens", "expiry_date").asserting(_ shouldBe true)
+      _ <- verifyColumnNullable("projects_tokens", "created_at").asserting(_ shouldBe true)
 
-    "make the expiry_date and created_at NOT NULL" in new TestCase {
+      _ <- logger.resetF()
+      _ <- ExpiryAndCreatedDatesNotNull[IO].run.assertNoException
+      _ <- verifyColumnNullable("projects_tokens", "expiry_date").asserting(_ shouldBe false)
+      _ <- verifyColumnNullable("projects_tokens", "created_at").asserting(_ shouldBe false)
+      _ <- logger.loggedOnlyF(Info("'expiry_date' column made NOT NULL"), Info("'created_at' column made NOT NULL"))
 
-      verifyColumnNullable("projects_tokens", "expiry_date") shouldBe true
-      verifyColumnNullable("projects_tokens", "created_at")  shouldBe true
-
-      migration.run.unsafeRunSync() shouldBe ()
-
-      verifyColumnNullable("projects_tokens", "expiry_date") shouldBe false
-      verifyColumnNullable("projects_tokens", "created_at")  shouldBe false
-
-      logger.loggedOnly(Info("'expiry_date' column made NOT NULL"), Info("'created_at' column made NOT NULL"))
-
-      logger.reset()
-
-      migration.run.unsafeRunSync() shouldBe ()
-
-      logger.loggedOnly(Info("'expiry_date' column already NOT NULL"), Info("'created_at' column already NOT NULL"))
-    }
-  }
-
-  private trait TestCase {
-    logger.reset()
-
-    val migration = new ExpiryAndCreatedDatesNotNull[IO]
+      _ <- logger.resetF()
+      _ <- ExpiryAndCreatedDatesNotNull[IO].run.assertNoException
+      _ <-
+        logger.loggedOnlyF(Info("'expiry_date' column already NOT NULL"), Info("'created_at' column already NOT NULL"))
+    } yield Succeeded
   }
 }
