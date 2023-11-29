@@ -63,7 +63,7 @@ private object EventHandler {
       config:      Config,
       tsWriteLock: TsWriteLock[F]
   ): F[consumers.EventHandler[F]] = for {
-    tsReadinessChecker <- TSReadinessForEventsChecker[F]
+    tsReadinessChecker <- TSReadinessForEventsChecker[F](config)
     eventProcessor     <- EventProcessor[F](config)
     processExecutor    <- ProcessExecutor.concurrent(1)
   } yield new EventHandler[F](categoryName, tsReadinessChecker, eventProcessor, processExecutor, tsWriteLock)

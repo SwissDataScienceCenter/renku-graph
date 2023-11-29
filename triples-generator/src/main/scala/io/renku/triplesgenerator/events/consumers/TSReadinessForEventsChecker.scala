@@ -18,23 +18,27 @@
 
 package io.renku.triplesgenerator.events.consumers
 
+import TSStateChecker.TSState._
 import cats.MonadThrow
 import cats.effect.Async
 import cats.syntax.all._
+import com.typesafe.config.Config
 import io.renku.events.consumers.EventSchedulingResult
 import io.renku.events.consumers.EventSchedulingResult.{SchedulingError, ServiceUnavailable}
-import tsmigrationrequest.migrations.reprovisioning.ReProvisioningStatus
-import TSStateChecker.TSState._
+import io.renku.metrics.MetricsRegistry
 import io.renku.triplesstore.SparqlQueryTimeRecorder
 import org.typelevel.log4cats.Logger
+import tsmigrationrequest.migrations.reprovisioning.ReProvisioningStatus
 
 private[consumers] trait TSReadinessForEventsChecker[F[_]] {
   def verifyTSReady: F[Option[EventSchedulingResult]]
 }
 
 private object TSReadinessForEventsChecker {
-  def apply[F[_]: Async: ReProvisioningStatus: Logger: SparqlQueryTimeRecorder]: F[TSReadinessForEventsChecker[F]] =
-    TSStateChecker[F].map(new TSReadinessForEventsCheckerImpl(_))
+  def apply[F[_]: Async: ReProvisioningStatus: Logger: MetricsRegistry: SparqlQueryTimeRecorder](
+      config: Config
+  ): F[TSReadinessForEventsChecker[F]] =
+    TSStateChecker[F](config).map(new TSReadinessForEventsCheckerImpl(_))
 }
 
 private class TSReadinessForEventsCheckerImpl[F[_]: MonadThrow](tsStateChecker: TSStateChecker[F])

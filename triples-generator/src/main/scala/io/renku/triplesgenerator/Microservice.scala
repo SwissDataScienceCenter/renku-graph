@@ -105,13 +105,13 @@ object Microservice extends IOMicroservice {
     gitCertificateInstaller        <- GitCertificateInstaller[IO]
     sentryInitializer              <- SentryInitializer[IO]
     cliVersionCompatChecker        <- CliVersionCompatibilityChecker[IO](config)
-    awaitingGenerationSubscription <- awaitinggeneration.SubscriptionFactory[IO]
-    membersSyncSubscription        <- membersync.SubscriptionFactory[IO](tsWriteLock, projectSparqlClient)
+    awaitingGenerationSubscription <- awaitinggeneration.SubscriptionFactory[IO](config)
+    membersSyncSubscription        <- membersync.SubscriptionFactory[IO](tsWriteLock, projectSparqlClient, config)
     triplesGeneratedSubscription <-
-      triplesgenerated.SubscriptionFactory[IO](tsWriteLock, topSameAsLock, projectSparqlClient)
-    cleanUpSubscription <- cleanup.SubscriptionFactory[IO](tsWriteLock, topSameAsLock, projectSparqlClient)
+      triplesgenerated.SubscriptionFactory[IO](tsWriteLock, topSameAsLock, projectSparqlClient, config)
+    cleanUpSubscription <- cleanup.SubscriptionFactory[IO](tsWriteLock, topSameAsLock, projectSparqlClient, config)
     minProjectInfoSubscription <-
-      minprojectinfo.SubscriptionFactory[IO](tsWriteLock, topSameAsLock, projectSparqlClient)
+      minprojectinfo.SubscriptionFactory[IO](tsWriteLock, topSameAsLock, projectSparqlClient, config)
     migrationRequestSubscription   <- tsmigrationrequest.SubscriptionFactory[IO](config)
     syncRepoMetadataSubscription   <- syncrepometadata.SubscriptionFactory[IO](config, tsWriteLock)
     projectActivationsSubscription <- viewings.collector.projects.activated.SubscriptionFactory[IO](projectConnConfig)

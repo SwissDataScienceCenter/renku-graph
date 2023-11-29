@@ -121,6 +121,7 @@ class QueryBasedMigrationSpec extends AnyWordSpec with IOSpec with MockFactory w
       }
     }
     val migration = new QueryBasedMigration[IO](migrationNames.generateOne,
+                                                exclusive = false,
                                                 projectsFinder,
                                                 eventProducer,
                                                 eventSender,

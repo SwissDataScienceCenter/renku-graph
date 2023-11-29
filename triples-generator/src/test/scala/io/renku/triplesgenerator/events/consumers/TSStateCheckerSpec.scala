@@ -22,11 +22,12 @@ import TSStateChecker.TSState
 import cats.syntax.all._
 import io.renku.generators.Generators.Implicits._
 import io.renku.generators.Generators.{exceptions, nonEmptyStrings}
-import io.renku.triplesgenerator.events.consumers.tsmigrationrequest.migrations.reprovisioning.ReProvisioningStatus
 import io.renku.triplesstore.{DatasetName, TSAdminClient}
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
+import tsmigrationrequest.MigrationStatusChecker
+import tsmigrationrequest.migrations.reprovisioning.ReProvisioningStatus
 
 import scala.util.Try
 
@@ -34,15 +35,23 @@ class TSStateCheckerSpec extends AnyWordSpec with should.Matchers with MockFacto
 
   "checkTSState" should {
 
-    "return Ready when all datasets are created and no re-provisioning is running" in new TestCase {
+    "return Ready when all datasets are created and " +
+      "no re-provisioning or migration is running" in new TestCase {
 
-      datasets foreach {
-        (tsAdminClient.checkDatasetExists _).expects(_).returning(true.pure[Try])
+        datasets foreach { (tsAdminClient.checkDatasetExists _).expects(_).returning(true.pure[Try]) }
+        (reProvisioningStatus.underReProvisioning _).expects().returning(false.pure[Try])
+        (() => migrationStatusChecker.underMigration).expects().returning(false.pure[Try])
+
+        stateChecker.checkTSState shouldBe TSState.Ready.pure[Try]
       }
 
-      (reProvisioningStatus.underReProvisioning _).expects().returning(false.pure[Try])
+    "return Migrating when all datasets are created, no ongoing re-provision but some migration is running" in new TestCase {
 
-      stateChecker.checkTSState shouldBe TSState.Ready.pure[Try]
+      datasets foreach { (tsAdminClient.checkDatasetExists _).expects(_).returning(true.pure[Try]) }
+      (reProvisioningStatus.underReProvisioning _).expects().returning(false.pure[Try])
+      (() => migrationStatusChecker.underMigration).expects().returning(true.pure[Try])
+
+      stateChecker.checkTSState shouldBe TSState.Migrating.pure[Try]
     }
 
     "return ReProvisioning when all datasets are created but re-provisioning is running" in new TestCase {
@@ -90,9 +99,11 @@ class TSStateCheckerSpec extends AnyWordSpec with should.Matchers with MockFacto
   }
 
   private trait TestCase {
-    val datasets             = nonEmptyStrings().toGeneratorOf(DatasetName).generateNonEmptyList().toList
-    val tsAdminClient        = mock[TSAdminClient[Try]]
-    val reProvisioningStatus = mock[ReProvisioningStatus[Try]]
-    val stateChecker         = new TSStateCheckerImpl[Try](datasets, tsAdminClient, reProvisioningStatus)
+    val datasets               = nonEmptyStrings().toGeneratorOf(DatasetName).generateNonEmptyList().toList
+    val tsAdminClient          = mock[TSAdminClient[Try]]
+    val reProvisioningStatus   = mock[ReProvisioningStatus[Try]]
+    val migrationStatusChecker = mock[MigrationStatusChecker[Try]]
+    val stateChecker =
+      new TSStateCheckerImpl[Try](datasets, tsAdminClient, reProvisioningStatus, migrationStatusChecker)
   }
 }

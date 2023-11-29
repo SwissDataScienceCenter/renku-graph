@@ -29,8 +29,9 @@ import io.renku.generators.Generators.exceptions
 import io.renku.interpreters.TestLogger
 import io.renku.interpreters.TestLogger.Level.Info
 import io.renku.testtools.IOSpec
-import io.renku.triplesgenerator.errors.ProcessingRecoverableError
 import io.renku.triplesgenerator.errors.ErrorGenerators.processingRecoverableErrors
+import io.renku.triplesgenerator.errors.ProcessingRecoverableError
+import org.scalacheck.Arbitrary
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
 
@@ -128,6 +129,7 @@ class ConditionedMigrationSpec extends AnyWordSpec with IOSpec with should.Match
                         migrationResult:     EitherT[IO, ProcessingRecoverableError, Unit] = rightT(()),
                         postMigrationResult: EitherT[IO, ProcessingRecoverableError, Unit] = rightT(())
     ) = new ConditionedMigration[IO] {
+      override val exclusive: Boolean = Arbitrary.arbBool.arbitrary.generateOne
       override val name     = migrationNames.generateOne
       override val required = rightT(migrationRequired)
 

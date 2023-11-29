@@ -19,13 +19,16 @@
 package io.renku.triplesgenerator.events.consumers
 
 import TSStateChecker.TSState
-import cats.{MonadThrow, Show}
 import cats.effect.Async
 import cats.syntax.all._
+import cats.{MonadThrow, Show}
+import com.typesafe.config.Config
 import io.renku.graph.triplesstore.DatasetTTLs
-import tsmigrationrequest.migrations.reprovisioning.ReProvisioningStatus
+import io.renku.metrics.MetricsRegistry
 import io.renku.triplesstore.{DatasetName, SparqlQueryTimeRecorder, TSAdminClient}
 import org.typelevel.log4cats.Logger
+import tsmigrationrequest.MigrationStatusChecker
+import tsmigrationrequest.migrations.reprovisioning.ReProvisioningStatus
 
 private trait TSStateChecker[F[_]] {
   def checkTSState: F[TSState]
@@ -40,10 +43,17 @@ private object TSStateChecker {
     case object MissingDatasets extends TSState
   }
 
-  def apply[F[_]: Async: ReProvisioningStatus: Logger: SparqlQueryTimeRecorder]: F[TSStateChecker[F]] =
-    TSAdminClient[F].map(
-      new TSStateCheckerImpl(DatasetTTLs.allFactories.map(_.datasetName), _, ReProvisioningStatus[F])
-    )
+  def apply[F[_]: Async: ReProvisioningStatus: Logger: MetricsRegistry: SparqlQueryTimeRecorder](
+      config: Config
+  ): F[TSStateChecker[F]] =
+    (TSAdminClient[F], MigrationStatusChecker[F](config))
+      .mapN((tsClient, statusChecker) =>
+        new TSStateCheckerImpl(DatasetTTLs.allFactories.map(_.datasetName),
+                               tsClient,
+                               ReProvisioningStatus[F],
+                               statusChecker
+        )
+      )
 
   implicit val show: Show[TSState] = Show.show {
     case TSState.Ready           => "Ready"
@@ -54,19 +64,25 @@ private object TSStateChecker {
 }
 
 private class TSStateCheckerImpl[F[_]: MonadThrow](
-    datasets:             List[DatasetName],
-    tsAdminClient:        TSAdminClient[F],
-    reProvisioningStatus: ReProvisioningStatus[F]
+    datasets:               List[DatasetName],
+    tsAdminClient:          TSAdminClient[F],
+    reProvisioningStatus:   ReProvisioningStatus[F],
+    migrationStatusChecker: MigrationStatusChecker[F]
 ) extends TSStateChecker[F] {
 
+  import migrationStatusChecker.underMigration
   import reProvisioningStatus.underReProvisioning
 
   override def checkTSState: F[TSState] =
     checkDatasetsExist >>= {
       case true =>
-        underReProvisioning() map {
-          case true  => TSState.ReProvisioning
-          case false => TSState.Ready
+        underReProvisioning() >>= {
+          case true => TSState.ReProvisioning.pure[F].widen
+          case false =>
+            underMigration map {
+              case true  => TSState.Migrating
+              case false => TSState.Ready
+            }
         }
       case false => TSState.MissingDatasets.pure[F].widen
     }

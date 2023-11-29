@@ -124,7 +124,7 @@ private object EventHandler {
       subscriptionMechanism: SubscriptionMechanism[F],
       config:                Config
   ): F[consumers.EventHandler[F]] = for {
-    tsStateChecker   <- TSStateChecker[F]
+    tsStateChecker   <- TSStateChecker[F](config)
     migrationsRunner <- MigrationsRunner[F](config)
     eventSender      <- EventSender[F](EventLogUrl)
     processExecutor  <- ProcessExecutor.concurrent(processesCount = 1)

@@ -57,6 +57,8 @@ private class TSDatasetRecreatorImpl[F[_]: Async: Logger](
 ) extends RegisteredMigration[F](migrationName, executionRegister, recoveryStrategy)
     with TSDatasetRecreator[F] {
 
+  override val exclusive: Boolean = true
+
   import recoveryStrategy.maybeRecoverableError
 
   protected[migrations] override def migrate(): EitherT[F, ProcessingRecoverableError, Unit] = EitherT {

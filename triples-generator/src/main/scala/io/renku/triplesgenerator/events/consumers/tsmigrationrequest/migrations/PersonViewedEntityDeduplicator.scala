@@ -34,7 +34,7 @@ import org.typelevel.log4cats.Logger
 private object PersonViewedEntityDeduplicator {
 
   def apply[F[_]: Async: Logger: SparqlQueryTimeRecorder: MetricsRegistry]: F[Migration[F]] =
-    UpdateQueryMigration[F](name, query).widen
+    UpdateQueryMigration[F](name, exclusive = false, query).widen
 
   private lazy val name = Migration.Name("Remove Person Viewed Entity duplicates")
 

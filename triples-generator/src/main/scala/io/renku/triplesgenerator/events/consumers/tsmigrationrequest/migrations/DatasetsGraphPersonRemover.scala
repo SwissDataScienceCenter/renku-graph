@@ -34,7 +34,7 @@ import org.typelevel.log4cats.Logger
 private object DatasetsGraphPersonRemover {
 
   def apply[F[_]: Async: Logger: SparqlQueryTimeRecorder: MetricsRegistry]: F[Migration[F]] =
-    RegisteredUpdateQueryMigration[F](name, query).widen
+    RegisteredUpdateQueryMigration[F](name, exclusive = false, query).widen
 
   private lazy val name = Migration.Name("DiscoverableDatasetPerson remover")
 

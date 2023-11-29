@@ -34,6 +34,7 @@ import io.renku.testtools.IOSpec
 import io.renku.triplesgenerator.errors.ProcessingRecoverableError
 import io.renku.triplesgenerator.events.consumers.tsmigrationrequest.ConditionedMigration.MigrationRequired
 import io.renku.triplesgenerator.errors.ErrorGenerators.processingRecoverableErrors
+import org.scalacheck.Arbitrary
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
@@ -102,7 +103,7 @@ class RegisteredMigrationSpec extends AnyWordSpec with IOSpec with should.Matche
       }
     }
     val migration = new RegisteredMigration[IO](migrationNames.generateOne, executionRegister, recoveryStrategy) {
-
+      override val exclusive: Boolean = Arbitrary.arbBool.arbitrary.generateOne
       protected override def migrate(): EitherT[IO, ProcessingRecoverableError, Unit] =
         EitherT.pure[IO, ProcessingRecoverableError](())
     }
