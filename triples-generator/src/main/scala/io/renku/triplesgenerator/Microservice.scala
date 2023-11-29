@@ -105,6 +105,7 @@ object Microservice extends IOMicroservice {
     gitCertificateInstaller        <- GitCertificateInstaller[IO]
     sentryInitializer              <- SentryInitializer[IO]
     cliVersionCompatChecker        <- CliVersionCompatibilityChecker[IO](config)
+    tsReadinessChecker             <- TSReadinessForEventsChecker[IO](config)
     awaitingGenerationSubscription <- awaitinggeneration.SubscriptionFactory[IO](config)
     membersSyncSubscription        <- membersync.SubscriptionFactory[IO](tsWriteLock, projectSparqlClient, config)
     triplesGeneratedSubscription <-
@@ -112,13 +113,16 @@ object Microservice extends IOMicroservice {
     cleanUpSubscription <- cleanup.SubscriptionFactory[IO](tsWriteLock, topSameAsLock, projectSparqlClient, config)
     minProjectInfoSubscription <-
       minprojectinfo.SubscriptionFactory[IO](tsWriteLock, topSameAsLock, projectSparqlClient, config)
-    migrationRequestSubscription   <- tsmigrationrequest.SubscriptionFactory[IO](config)
-    syncRepoMetadataSubscription   <- syncrepometadata.SubscriptionFactory[IO](config, tsWriteLock)
-    projectActivationsSubscription <- viewings.collector.projects.activated.SubscriptionFactory[IO](projectConnConfig)
+    migrationRequestSubscription <- tsmigrationrequest.SubscriptionFactory[IO](config)
+    syncRepoMetadataSubscription <- syncrepometadata.SubscriptionFactory[IO](config, tsWriteLock)
+    projectActivationsSubscription <-
+      viewings.collector.projects.activated.SubscriptionFactory[IO](tsReadinessChecker.verifyTSReady, projectConnConfig)
     projectViewingsSubscription <-
       viewings.collector.projects.viewed.SubscriptionFactory[IO, TgDB](categoryLock, sessionResource, projectConnConfig)
-    datasetViewingsSubscription <- viewings.collector.datasets.SubscriptionFactory[IO](projectConnConfig)
-    viewingDeletionSubscription <- viewings.deletion.projects.SubscriptionFactory[IO](projectConnConfig)
+    datasetViewingsSubscription <-
+      viewings.collector.datasets.SubscriptionFactory[IO](tsReadinessChecker.verifyTSReady, projectConnConfig)
+    viewingDeletionSubscription <-
+      viewings.deletion.projects.SubscriptionFactory[IO](tsReadinessChecker.verifyTSReady, projectConnConfig)
     eventConsumersRegistry <- consumers.EventConsumersRegistry(
                                 awaitingGenerationSubscription,
                                 membersSyncSubscription,

@@ -30,11 +30,11 @@ import io.renku.triplesstore.SparqlQueryTimeRecorder
 import org.typelevel.log4cats.Logger
 import tsmigrationrequest.migrations.reprovisioning.ReProvisioningStatus
 
-private[consumers] trait TSReadinessForEventsChecker[F[_]] {
+trait TSReadinessForEventsChecker[F[_]] {
   def verifyTSReady: F[Option[EventSchedulingResult]]
 }
 
-private object TSReadinessForEventsChecker {
+object TSReadinessForEventsChecker {
   def apply[F[_]: Async: ReProvisioningStatus: Logger: MetricsRegistry: SparqlQueryTimeRecorder](
       config: Config
   ): F[TSReadinessForEventsChecker[F]] =
