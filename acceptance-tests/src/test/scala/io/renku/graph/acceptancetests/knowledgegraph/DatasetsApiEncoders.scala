@@ -57,9 +57,8 @@ trait DatasetsApiEncoders extends ImageApiEncoders {
       "versions": {
         "initial": ${dataset.provenance.originalIdentifier.value}
       },
-      "title":  ${dataset.identification.title.value},
       "name":   ${dataset.identification.name.value},
-      "slug":   ${dataset.identification.name.value},
+      "slug":   ${dataset.identification.slug.value},
       "images": ${dataset.additionalInfo.images -> projectSlug}
     }"""
         .deepMerge(
@@ -67,7 +66,7 @@ trait DatasetsApiEncoders extends ImageApiEncoders {
             Rel("details")         -> Href(renkuApiUrl / "datasets" / dataset.identification.identifier),
             Rel("initial-version") -> Href(renkuApiUrl / "datasets" / dataset.provenance.originalIdentifier),
             Rel("tags") -> Href(
-              renkuApiUrl / "projects" / projectSlug / "datasets" / dataset.identification.name / "tags"
+              renkuApiUrl / "projects" / projectSlug / "datasets" / dataset.identification.slug / "tags"
             )
           )
         )
@@ -110,16 +109,15 @@ trait DatasetsApiEncoders extends ImageApiEncoders {
                                                 actualResults: List[Json]
   ): Json = {
     val actualIdentifier = actualResults
-      .findId(dataset.identification.title)
-      .getOrElse(fail(s"No ${dataset.identification.title} dataset found among the results"))
+      .findId(dataset.identification.name)
+      .getOrElse(fail(s"No ${dataset.identification.name} dataset found among the results"))
 
     dataset.identification.identifier shouldBe actualIdentifier
 
     json"""{
       "identifier":    ${actualIdentifier.value},
-      "title":         ${dataset.identification.title.value},
       "name":          ${dataset.identification.name.value},
-      "slug":          ${dataset.identification.name.value},
+      "slug":          ${dataset.identification.slug.value},
       "published":     ${dataset.provenance.creators -> dataset.provenance.date},
       "date":          ${dataset.provenance.date.instant},
       "projectsCount": $projectsCount,
@@ -153,9 +151,9 @@ trait DatasetsApiEncoders extends ImageApiEncoders {
 
   implicit class JsonsOps(jsons: List[Json]) {
 
-    def findId(title: datasets.Title): Option[datasets.Identifier] =
+    def findId(name: datasets.Name): Option[datasets.Identifier] =
       jsons
-        .find(_.hcursor.downField("title").as[String].fold(throw _, _ == title.toString))
+        .find(_.hcursor.downField("name").as[String].fold(throw _, _ == name.toString))
         .map(_.hcursor.downField("identifier").as[datasets.Identifier].fold(throw _, identity))
   }
 

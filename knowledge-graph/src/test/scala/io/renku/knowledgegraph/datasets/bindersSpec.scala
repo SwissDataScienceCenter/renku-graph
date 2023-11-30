@@ -37,15 +37,15 @@ class bindersSpec extends AnyWordSpec with should.Matchers {
     }
   }
 
-  "DatasetName.unapply" should {
+  "DatasetSlug.unapply" should {
 
-    "convert valid dataset name as string to Name" in {
-      val name = datasetNames.generateOne
-      DatasetName.unapply(name.toString) shouldBe Some(name)
+    "convert valid dataset slug as string to Slug" in {
+      val slug = datasetSlugs.generateOne
+      DatasetSlug.unapply(slug.toString) shouldBe Some(slug)
     }
 
     "return None if string value is blank" in {
-      DatasetName.unapply(" ") shouldBe None
+      DatasetSlug.unapply(" ") shouldBe None
     }
   }
 }

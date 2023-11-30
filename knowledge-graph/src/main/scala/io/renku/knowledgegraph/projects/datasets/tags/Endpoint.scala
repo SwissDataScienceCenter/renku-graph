@@ -35,13 +35,13 @@ import org.http4s.{Request, Response}
 import org.typelevel.log4cats.Logger
 
 trait Endpoint[F[_]] {
-  def `GET /projects/:slug/datasets/:name/tags`(criteria: Criteria)(implicit request: Request[F]): F[Response[F]]
+  def `GET /projects/:slug/datasets/:dsSlug/tags`(criteria: Criteria)(implicit request: Request[F]): F[Response[F]]
 }
 
 object Endpoint {
 
   final case class Criteria(projectSlug: graph.model.projects.Slug,
-                            datasetName: graph.model.datasets.Name,
+                            datasetSlug: graph.model.datasets.Slug,
                             paging:      PagingRequest = PagingRequest.default,
                             maybeUser:   Option[AuthUser] = None
   )
@@ -54,8 +54,8 @@ object Endpoint {
     renkuApiUrl                   <- renku.ApiUrl()
   } yield new EndpointImpl(tagsFinder, renkuUrl, renkuApiUrl)
 
-  def href(renkuApiUrl: renku.ApiUrl, projectSlug: graph.model.projects.Slug, name: datasets.Name): Href =
-    Href(renkuApiUrl / "projects" / projectSlug / "datasets" / name / "tags")
+  def href(renkuApiUrl: renku.ApiUrl, projectSlug: graph.model.projects.Slug, dsSlug: datasets.Slug): Href =
+    Href(renkuApiUrl / "projects" / projectSlug / "datasets" / dsSlug / "tags")
 }
 
 private class EndpointImpl[F[_]: Async: Logger](tagsFinder: TagsFinder[F],
@@ -77,7 +77,7 @@ private class EndpointImpl[F[_]: Async: Logger](tagsFinder: TagsFinder[F],
 
   private implicit val apiUrl: renku.ApiUrl = renkuApiUrl
 
-  override def `GET /projects/:slug/datasets/:name/tags`(criteria: Criteria)(implicit
+  override def `GET /projects/:slug/datasets/:dsSlug/tags`(criteria: Criteria)(implicit
       request: Request[F]
   ): F[Response[F]] = tagsFinder.findTags(criteria) map toHttpResponse(request) recoverWith httpResult
 

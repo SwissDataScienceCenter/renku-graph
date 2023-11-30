@@ -44,6 +44,7 @@ class ModelSearchInfoExtractorSpec extends AnyFlatSpec with should.Matchers {
         ModelDatasetSearchInfo(
           ds.provenance.topmostSameAs,
           ds.identification.name,
+          ds.identification.slug,
           ds.provenance.date,
           maybeDateModified = None,
           ds.provenance.creators.map(Creator.from),
@@ -70,6 +71,7 @@ class ModelSearchInfoExtractorSpec extends AnyFlatSpec with should.Matchers {
       ModelDatasetSearchInfo(
         lastModification.provenance.topmostSameAs,
         lastModification.identification.name,
+        lastModification.identification.slug,
         originalDataset.provenance.date,
         datasets.DateModified(lastModification.provenance.date).some,
         lastModification.provenance.creators.map(Creator.from),

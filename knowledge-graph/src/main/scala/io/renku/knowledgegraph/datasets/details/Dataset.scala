@@ -36,8 +36,8 @@ import io.renku.json.JsonOps._
 
 private sealed trait Dataset extends Product with Serializable {
   val resourceId:         ResourceId
-  val title:              Title
   val name:               Name
+  val slug:               Slug
   val versions:           DatasetVersions
   val maybeInitialTag:    Option[Tag]
   val maybeDescription:   Option[Description]
@@ -56,8 +56,8 @@ private sealed trait Dataset extends Product with Serializable {
 private object Dataset {
 
   final case class NonModifiedDataset(resourceId:         ResourceId,
-                                      title:              Title,
                                       name:               Name,
+                                      slug:               Slug,
                                       sameAs:             SameAs,
                                       versions:           DatasetVersions,
                                       maybeInitialTag:    Option[Tag],
@@ -74,8 +74,8 @@ private object Dataset {
   }
 
   final case class ModifiedDataset(resourceId:         ResourceId,
-                                   title:              Title,
                                    name:               Name,
+                                   slug:               Slug,
                                    derivedFrom:        DerivedFrom,
                                    versions:           DatasetVersions,
                                    maybeInitialTag:    Option[Tag],
@@ -110,8 +110,7 @@ private object Dataset {
         List(
           ("identifier" -> requestedDataset.asJson).some,
           ("name" -> dataset.name.asJson).some,
-          ("slug" -> dataset.name.asJson).some,
-          ("title" -> dataset.title.asJson).some,
+          ("slug" -> dataset.slug.asJson).some,
           ("url" -> dataset.resourceId.asJson).some,
           dataset match {
             case ds: NonModifiedDataset => ("sameAs" -> ds.sameAs.asJson).some
@@ -138,7 +137,7 @@ private object Dataset {
       ) deepMerge _links(
         Rel.Self -> Endpoint.href(renkuApiUrl, requestedDataset),
         Rel("initial-version") -> Endpoint.href(renkuApiUrl, RequestedDataset(dataset.versions.initial.asIdentifier)),
-        Rel("tags") -> projects.datasets.tags.Endpoint.href(renkuApiUrl, dataset.project.slug, dataset.name),
+        Rel("tags") -> projects.datasets.tags.Endpoint.href(renkuApiUrl, dataset.project.slug, dataset.slug),
       )
   }
   // format: on

@@ -19,15 +19,16 @@
 package io.renku.triplesgenerator.events.consumers.tsmigrationrequest
 package migrations
 
-import cats.MonadThrow
 import cats.effect.Async
 import cats.syntax.all._
+import cats.{Applicative, MonadThrow}
 import com.typesafe.config.Config
 import io.renku.graph.triplesstore.DatasetTTLs.ProjectsTTL
 import io.renku.metrics.MetricsRegistry
 import io.renku.triplesstore.SparqlQueryTimeRecorder
 import org.typelevel.log4cats.Logger
 import reprovisioning.{ReProvisioning, ReProvisioningStatus}
+import tooling.RegisteredMigration
 
 private[tsmigrationrequest] object Migrations {
 
@@ -66,20 +67,35 @@ private[tsmigrationrequest] object Migrations {
       ProjectsGraphKeywordsRemover[F],
       ProjectsGraphImagesRemover[F],
       TSDatasetRecreator[F, ProjectsTTL]("- custom tokenizer", ProjectsTTL),
-      lucenereindex.ReindexLucene[F](suffix = "- custom tokenizer")
-    ).sequence.flatMap(validateNames[F](_))
+      lucenereindex.ReindexLucene[F](suffix = "- custom tokenizer"),
+      DatasetSearchTitleMigration[F]
+    ).sequence.flatTap(validateNames[F](_)).flatTap(validateExclusiveFlagUsage(_))
 
   private[migrations] def validateNames[F[_]: MonadThrow: Logger](
       migrations: List[Migration[F]]
-  ): F[List[Migration[F]]] = {
+  ): F[Unit] = {
     val groupedByName = migrations.groupBy(_.name)
     val problematicMigrations = groupedByName.collect {
       case (name, ms) if ms.size > 1 => name
     }
-    if (problematicMigrations.nonEmpty) {
+
+    Applicative[F].whenA(problematicMigrations.nonEmpty) {
       val error = show"$categoryName: there are multiple migrations with name: ${problematicMigrations.mkString("; ")}"
-      Logger[F]
-        .error(error) >> new Exception(error).raiseError[F, List[Migration[F]]].map(_ => List.empty[Migration[F]])
-    } else migrations.pure[F]
+      Logger[F].error(error) >> new Exception(error).raiseError[F, List[Migration[F]]]
+    }
+  }
+
+  private[migrations] def validateExclusiveFlagUsage[F[_]: MonadThrow: Logger](
+      migrations: List[Migration[F]]
+  ): F[Unit] = {
+    val invalidMigrations = migrations.foldLeft(List.empty[Migration.Name]) {
+      case (invalid, m) if m.exclusive & !m.isInstanceOf[RegisteredMigration[F]] => m.name :: invalid
+      case (invalid, _)                                                          => invalid
+    }
+
+    Applicative[F].whenA(invalidMigrations.nonEmpty) {
+      val error = s"$categoryName: not Registered exclusive migrations found: ${invalidMigrations.mkString("; ")}"
+      Logger[F].error(error) >> new Exception(error).raiseError[F, List[Migration[F]]]
+    }
   }
 }

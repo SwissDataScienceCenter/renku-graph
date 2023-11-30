@@ -85,7 +85,7 @@ class MicroserviceRoutesSpec
       (datasetsSearchEndpoint
         .searchForDatasets(_: Option[Phrase], _: Sorting[Sort.type], _: PagingRequest, _: Option[AuthUser]))
         .expects(Phrase(phrase).some,
-                 Sorting(Sort.By(TitleProperty, Direction.Asc)),
+                 Sorting(Sort.By(NameProperty, Direction.Asc)),
                  PagingRequest(Page.first, PerPage.default),
                  maybeAuthUser.option
         )
@@ -103,7 +103,7 @@ class MicroserviceRoutesSpec
       (datasetsSearchEndpoint
         .searchForDatasets(_: Option[Phrase], _: Sorting[Sort.type], _: PagingRequest, _: Option[AuthUser]))
         .expects(Option.empty[Phrase],
-                 Sorting(Sort.By(TitleProperty, Direction.Asc)),
+                 Sorting(Sort.By(NameProperty, Direction.Asc)),
                  PagingRequest(Page.first, PerPage.default),
                  maybeAuthUser.option
         )
@@ -158,7 +158,7 @@ class MicroserviceRoutesSpec
         (datasetsSearchEndpoint
           .searchForDatasets(_: Option[Phrase], _: Sorting[Sort.type], _: PagingRequest, _: Option[AuthUser]))
           .expects(phrase.some,
-                   Sorting(Sort.By(TitleProperty, Direction.Asc)),
+                   Sorting(Sort.By(NameProperty, Direction.Asc)),
                    PagingRequest(page, perPage),
                    maybeAuthUser.option
           )
@@ -795,22 +795,22 @@ class MicroserviceRoutesSpec
     }
   }
 
-  "GET /knowledge-graph/projects/:namespace/../:name/datasets/:dsName/tags" should {
+  "GET /knowledge-graph/projects/:namespace/../:name/datasets/:dsSlug/tags" should {
     import projects.datasets.tags.Endpoint._
 
     val projectSlug = projectSlugs.generateOne
-    val datasetName = datasetNames.generateOne
+    val datasetSlug = datasetSlugs.generateOne
     val projectDsTagsUri = projectSlug.toNamespaces
-      .foldLeft(uri"/knowledge-graph/projects")(_ / _) / projectSlug.toPath / "datasets" / datasetName / "tags"
+      .foldLeft(uri"/knowledge-graph/projects")(_ / _) / projectSlug.toPath / "datasets" / datasetSlug / "tags"
 
     forAll {
       Table(
         "uri"            -> "criteria",
-        projectDsTagsUri -> Criteria(projectSlug, datasetName),
+        projectDsTagsUri -> Criteria(projectSlug, datasetSlug),
         pages
           .map(page =>
             projectDsTagsUri +? ("page" -> page.show) -> Criteria(projectSlug,
-                                                                  datasetName,
+                                                                  datasetSlug,
                                                                   PagingRequest.default.copy(page = page)
             )
           )
@@ -818,7 +818,7 @@ class MicroserviceRoutesSpec
         perPages
           .map(perPage =>
             projectDsTagsUri +? ("per_page" -> perPage.show) -> Criteria(projectSlug,
-                                                                         datasetName,
+                                                                         datasetSlug,
                                                                          PagingRequest.default.copy(perPage = perPage)
             )
           )
@@ -834,7 +834,7 @@ class MicroserviceRoutesSpec
 
         val responseBody = jsons.generateOne
         (projectDatasetTagsEndpoint
-          .`GET /projects/:slug/datasets/:name/tags`(_: Criteria)(_: Request[IO]))
+          .`GET /projects/:slug/datasets/:dsSlug/tags`(_: Criteria)(_: Request[IO]))
           .expects(criteria, request)
           .returning(Response[IO](Ok).withEntity(responseBody).pure[IO])
 
@@ -870,8 +870,8 @@ class MicroserviceRoutesSpec
 
       val responseBody = jsons.generateOne
       (projectDatasetTagsEndpoint
-        .`GET /projects/:slug/datasets/:name/tags`(_: Criteria)(_: Request[IO]))
-        .expects(Criteria(projectSlug, datasetName, maybeUser = maybeAuthUser.option), request)
+        .`GET /projects/:slug/datasets/:dsSlug/tags`(_: Criteria)(_: Request[IO]))
+        .expects(Criteria(projectSlug, datasetSlug, maybeUser = maybeAuthUser.option), request)
         .returning(Response[IO](Ok).withEntity(responseBody).pure[IO])
 
       routes(maybeAuthUser).call(request).status shouldBe Ok

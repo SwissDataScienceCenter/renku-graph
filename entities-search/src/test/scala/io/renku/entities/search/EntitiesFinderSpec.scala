@@ -141,16 +141,16 @@ class EntitiesFinderSpec
         Ordering.by {
           case d: Entity.Dataset =>
             val date = d.dateModified.getOrElse(d.date).toString
-            s"$date, ${d.name}"
+            s"$date, ${d.name}".toLowerCase
           case p: Entity.Project =>
             val date = p.dateModified.toString
-            s"$date, ${p.name}"
+            s"$date, ${p.name}".toLowerCase
           case e =>
             val date = e.date.toString
-            s"$date, ${e.name}"
+            s"$date, ${e.name}".toLowerCase
         }
 
-      val expected = allEntitiesFrom(project).filter(_.name.value.contains("hello")).sorted
+      val expected = allEntitiesFrom(project).filter(nameOrSlugContains("hello")).sorted
 
       results shouldMatchTo expected
     }
@@ -1262,10 +1262,20 @@ class EntitiesFinderSpec
 
       val ds -> project = renkuProjectEntities(visibilityPublic)
         .modify(replaceProjectName(to = projects.Name(query.value)))
-        .withActivities(activityEntities(stepPlanEntities().map(_.replacePlanName(to = plans.Name(s"smth $query")))))
+        .withActivities(
+          activityEntities(
+            stepPlanEntities().map(
+              _.replacePlanName(to = plans.Name(s"smth $query"))
+                .replacePlanKeywords(to = Nil)
+                .replacePlanDesc(to = None)
+            )
+          )
+        )
         .addDataset(
           datasetEntities(provenanceNonModified)
-            .modify(replaceDSName(to = sentenceContaining(query).generateAs(datasets.Name)))
+            .modify(replaceDSSlug(to = sentenceContaining(query).generateAs(datasets.Slug)))
+            .modify(replaceDSKeywords(to = Nil))
+            .modify(replaceDSDesc(to = None))
         )
         .generateOne
       val plan :: Nil = project.plans
@@ -1460,4 +1470,10 @@ class EntitiesFinderSpec
       results.results shouldBe expected
     }
   }
+
+  private def nameOrSlugContains(word: String)(entity: Entity): Boolean =
+    entity.name.value.contains(word) || (entity match {
+      case e: Entity.Dataset => e.slug.value.contains(word)
+      case _ => false
+    })
 }

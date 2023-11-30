@@ -28,7 +28,7 @@ import io.renku.graph.http.server.security.Authorizer.AuthContext
 import io.renku.graph.model._
 import io.renku.graph.model.datasets.{Identifier, Keyword, SameAs}
 import io.renku.graph.model.images.ImageUri
-import io.renku.graph.model.projects.{Slug, Visibility}
+import io.renku.graph.model.projects.Visibility
 import io.renku.http.server.security.model.AuthUser
 import io.renku.jsonld.syntax._
 import io.renku.knowledgegraph.datasets.details.Dataset.Tag
@@ -254,8 +254,8 @@ private object BaseDetailsFinderImpl {
 
   private lazy val createDataset: (RequestedDataset,
                                    ResourceId,
-                                   Title,
                                    Name,
+                                   datasets.Slug,
                                    Option[DerivedFrom],
                                    SameAs,
                                    OriginalIdentifier,
@@ -264,11 +264,11 @@ private object BaseDetailsFinderImpl {
                                    Option[Description],
                                    DatasetProject
   ) => Result[Dataset] = {
-    case (_, resourceId, title, name, Some(derived), _, initialVersion, date, Some(dateModified), maybeDesc, project) =>
+    case (_, resourceId, name, slug, Some(derived), _, initialVersion, date, Some(dateModified), maybeDesc, project) =>
       ModifiedDataset(
         resourceId,
-        title,
         name,
+        slug,
         derived,
         DatasetVersions(initialVersion),
         maybeInitialTag = None,
@@ -282,11 +282,11 @@ private object BaseDetailsFinderImpl {
         keywords = List.empty,
         images = List.empty
       ).asRight[DecodingFailure]
-    case (_, resourceId, title, name, None, sameAs, initialVersion, date, _, maybeDescription, project) =>
+    case (_, resourceId, name, slug, None, sameAs, initialVersion, date, _, maybeDescription, project) =>
       NonModifiedDataset(
         resourceId,
-        title,
         name,
+        slug,
         sameAs,
         DatasetVersions(initialVersion),
         maybeInitialTag = None,
@@ -299,9 +299,9 @@ private object BaseDetailsFinderImpl {
         keywords = List.empty,
         images = List.empty
       ).asRight[DecodingFailure]
-    case (requestedDS, _, title, _, _, _, _, _, _, _, _) =>
+    case (requestedDS, _, name, _, _, _, _, _, _, _, _) =>
       DecodingFailure(
-        show"'$title' dataset with id '$requestedDS' does not meet validation for modified nor non-modified dataset",
+        show"'$name' dataset with id '$requestedDS' does not meet validation for modified nor non-modified dataset",
         Nil
       ).asLeft[Dataset]
   }
@@ -310,8 +310,8 @@ private object BaseDetailsFinderImpl {
     ResultsDecoder[Option, Dataset] { implicit cursor =>
       for {
         resourceId         <- extract[ResourceId]("datasetId")
-        title              <- extract[Title]("name")
-        name               <- extract[Name]("slug")
+        name               <- extract[Name]("name")
+        slug               <- extract[Slug]("slug")
         maybeDerivedFrom   <- extract[Option[DerivedFrom]]("maybeDerivedFrom")
         sameAs             <- extract[SameAs]("topmostSameAs")
         initialVersion     <- extract[OriginalIdentifier]("initialVersion")
@@ -339,8 +339,8 @@ private object BaseDetailsFinderImpl {
 
         dataset <- createDataset(requestedDataset,
                                  resourceId,
-                                 title,
                                  name,
+                                 slug,
                                  maybeDerivedFrom,
                                  sameAs,
                                  initialVersion,

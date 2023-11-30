@@ -121,6 +121,7 @@ class CalculatorInfoSetSpec
         .value shouldBe DatasetSearchInfo(
         modelInfo.topmostSameAs,
         modelInfo.name,
+        modelInfo.slug,
         modelInfo.createdOrPublished,
         modelInfo.maybeDateModified,
         modelInfo.creators,
@@ -214,6 +215,7 @@ class CalculatorInfoSetSpec
   private def searchIntoToString(info: ModelDatasetSearchInfo) = List(
     show"topmostSameAs = ${info.topmostSameAs}",
     show"name = ${info.name}",
+    show"slug = ${info.slug}",
     show"visibility = ${info.link.visibility}",
     show"link = ${info.link}"
   ).mkString(", ")

@@ -35,9 +35,10 @@ class MigrationsSpec extends AnyWordSpec with should.Matchers with IOSpec with M
 
   "apply" should {
 
-    "not raise an error if there are migrations with unique names" in {
-      Migrations[IO](ConfigFactory.load()).unsafeRunSync().isEmpty shouldBe false
-    }
+    "not raise an error if there are migrations with unique names " +
+      "and all exclusive migrations are Registered Migrations" in {
+        Migrations[IO](ConfigFactory.load()).unsafeRunSync().isEmpty shouldBe false
+      }
   }
 
   private implicit lazy val reProvisioningStatus: ReProvisioningStatus[IO] = mock[ReProvisioningStatus[IO]]

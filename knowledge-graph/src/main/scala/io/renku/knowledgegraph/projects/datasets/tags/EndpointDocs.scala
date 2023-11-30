@@ -43,7 +43,7 @@ private class EndpointDocsImpl()(implicit renkuApiUrl: renku.ApiUrl) extends doc
     GET(
       "Project Dataset Tags",
       "Returns tags of the Dataset with the given name on the project with given slug",
-      Uri / "projects" / namespace / projectName / "datasets" / dsName / "tags" :? page & perPage,
+      Uri / "projects" / namespace / projectName / "datasets" / dsSlug / "tags" :? page & perPage,
       Status.Ok -> Response("Found tags",
                             Contents(MediaType.`application/json`("Sample response", example)),
                             responseHeaders
@@ -71,7 +71,7 @@ private class EndpointDocsImpl()(implicit renkuApiUrl: renku.ApiUrl) extends doc
 
   private lazy val projectName = Parameter.Path("projectName", Schema.String, "Project name".some)
 
-  private lazy val dsName = Parameter.Path("dsName", Schema.String, "Dataset name".some)
+  private lazy val dsSlug = Parameter.Path("dsSlug", Schema.String, "Dataset slug".some)
 
   private lazy val page = Parameter.Query(
     "page",

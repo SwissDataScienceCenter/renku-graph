@@ -41,15 +41,14 @@ class ProjectDatasetSpec extends AnyFlatSpec with should.Matchers with ScalaChec
   }
 
   private lazy val toJson: ProjectDataset => Json = {
-    case ProjectDataset(id, originalId, title, name, createdOrPublished, _, Left(sameAs), images) =>
+    case ProjectDataset(id, originalId, name, slug, createdOrPublished, _, Left(sameAs), images) =>
       json"""{
         "identifier": $id,
         "versions": {
           "initial": $originalId
         },
-        "title":         $title,
         "name":          $name,
-        "slug":          $name,
+        "slug":          $slug,
         "dateCreated":   ${createdOrPublished.fold(_.asJson, _ => Json.Null)},
         "datePublished": ${createdOrPublished.fold(_ => Json.Null, _.asJson)},
         "sameAs":        $sameAs,
@@ -62,13 +61,13 @@ class ProjectDatasetSpec extends AnyFlatSpec with should.Matchers with ScalaChec
           "href": ${renkuApiUrl / "datasets" / originalId}
         }, {
           "rel":  "tags",
-          "href": ${renkuApiUrl / "projects" / projectSlug / "datasets" / name / "tags"}
+          "href": ${renkuApiUrl / "projects" / projectSlug / "datasets" / slug / "tags"}
         }]
       }""".deepDropNullValues
     case ProjectDataset(id,
                         originalId,
-                        title,
                         name,
+                        slug,
                         createdOrPublished,
                         Some(dateModified),
                         Right(derivedFrom),
@@ -79,9 +78,8 @@ class ProjectDatasetSpec extends AnyFlatSpec with should.Matchers with ScalaChec
         "versions" : {
           "initial": $originalId
         },
-        "title":         $title,
         "name":          $name,
-        "slug":          $name,
+        "slug":          $slug,
         "dateCreated":   ${createdOrPublished.fold(_.asJson, _ => Json.Null)},
         "datePublished": ${createdOrPublished.fold(_ => Json.Null, _.asJson)},
         "dateModified":  $dateModified,
@@ -95,7 +93,7 @@ class ProjectDatasetSpec extends AnyFlatSpec with should.Matchers with ScalaChec
           "href": ${renkuApiUrl / "datasets" / originalId}
         }, {
           "rel":  "tags",
-          "href": ${renkuApiUrl / "projects" / projectSlug / "datasets" / name / "tags"}
+          "href": ${renkuApiUrl / "projects" / projectSlug / "datasets" / slug / "tags"}
         }]
       }""".deepDropNullValues
     case other => fail(s"Invalid ProjectDataset $other")

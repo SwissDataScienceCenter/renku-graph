@@ -31,8 +31,8 @@ package object details {
                                              project: RenkuProject
   )(implicit renkuUrl: RenkuUrl): NonModifiedDataset = NonModifiedDataset(
     ResourceId(dataset.asEntityId.show),
-    dataset.identification.title,
     dataset.identification.name,
+    dataset.identification.slug,
     SameAs(dataset.entityId),
     DatasetVersions(dataset.provenance.originalIdentifier),
     maybeInitialTag = None,
@@ -50,8 +50,8 @@ package object details {
                                                      project: RenkuProject
   )(implicit renkuUrl: RenkuUrl): NonModifiedDataset = NonModifiedDataset(
     ResourceId(dataset.asEntityId.show),
-    dataset.identification.title,
     dataset.identification.name,
+    dataset.identification.slug,
     dataset.provenance.sameAs,
     DatasetVersions(dataset.provenance.originalIdentifier),
     maybeInitialTag = None,
@@ -69,8 +69,8 @@ package object details {
                                                      project: RenkuProject
   )(implicit renkuUrl: RenkuUrl): NonModifiedDataset = NonModifiedDataset(
     ResourceId(dataset.asEntityId.show),
-    dataset.identification.title,
     dataset.identification.name,
+    dataset.identification.slug,
     dataset.provenance.sameAs,
     DatasetVersions(dataset.provenance.originalIdentifier),
     maybeInitialTag = None,
@@ -89,8 +89,8 @@ package object details {
                                           project:            RenkuProject
   )(implicit renkuUrl: RenkuUrl): ModifiedDataset = ModifiedDataset(
     ResourceId(dataset.asEntityId.show),
-    dataset.identification.title,
     dataset.identification.name,
+    dataset.identification.slug,
     dataset.provenance.derivedFrom,
     DatasetVersions(dataset.provenance.originalIdentifier),
     maybeInitialTag = None,

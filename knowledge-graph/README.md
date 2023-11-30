@@ -29,13 +29,13 @@ The following routes may be slightly different when accessed via the main Renku 
 
 #### GET /knowledge-graph/datasets
 
-Finds datasets which `title`, `description`, `keywords`, or creator `name` matches the given `phrase` or returns all the
+Finds datasets which `name`, `description`, `keywords`, or creator `name` matches the given `phrase` or returns all the
 datasets if no `query` parameter is given.
 
 **NOTES:**
 
 * the `query` query parameter has to be url-encoded and it cannot be blank.
-* the `sort` query parameter is optional and defaults to `title:asc`. Allowed property names are: `title`,
+* the `sort` query parameter is optional and defaults to `name:asc`. Allowed property names are: `name`,
   `datePublished`, `date` and `projectsCount`.
 * the `page` query parameter is optional and defaults to `1`.
 * the `per_page` query parameter is optional and defaults to `20`.
@@ -79,7 +79,6 @@ Response body example:
 [
    {  
       "identifier": "9f94add6-6d68-4cf4-91d9-4ba9e6b7dc4c",
-      "title":"rmDaYfpehl",
       "name": "mniouUnmal",
       "slug": "mniouUnmal",      
       "description": "vbnqyyjmbiBQpubavGpxlconuqj",  // optional property
@@ -191,7 +190,6 @@ Response body example:
       "description": "some tag"                  //optional
     }
   },
-  "title":       "dataset title",
   "name":        "dataset-name",
   "slug":        "dataset-name",
   "url":         "http://host/url1",             // optional property
@@ -297,7 +295,7 @@ Response body example:
 Allows finding `projects`, `datasets`, `workflows`, and `persons`.
 
 **Filtering:**
-* `query`      - to filter by matching field (e.g., title, keyword, description, etc. as specified below)
+* `query`      - to filter by matching field (e.g., name, keyword, description, etc. as specified below)
 * `type`       - to filter by entity type(s); allowed values: `project`, `dataset`, `workflow`, and `person`; multiple `type` parameters allowed
 * `creator`    - to filter by creator(s); the filter would require creator's name; multiple `creator` parameters allowed
 * `role`       - to filter by the caller role(s) on the entity; allowed values: `owner`, `maintainer` and `reader`; multiple parameters allowed; an authorization header needs to be passed otherwise a `BAD_REQUEST (400)` status will be returned 
@@ -309,7 +307,7 @@ Allows finding `projects`, `datasets`, `workflows`, and `persons`.
 **NOTE:** all query parameters have to be url-encoded.
 
 When the `query` parameter is given, the match is done on the following fields:
-* name/title
+* name/slug
 * namespace (for the project entity)
 * creator (note: workflows has no creator for now)
 * keyword
@@ -1023,7 +1021,6 @@ Response body example:
       "versions": {
         "initial": "11111111-1111-1111-1111-111111111111"
       },
-      "title":         "rmDaYfpehl",
       "name":          "mniouUnmal",
       "slug":          "mniouUnmal",
       "datePublished": "1990-07-16",              // optional, if not exists dateCreated is present

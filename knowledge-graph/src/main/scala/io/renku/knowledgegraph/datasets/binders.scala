@@ -24,6 +24,6 @@ object DatasetId {
   def unapply(value: String): Option[datasets.Identifier] = datasets.Identifier.from(value).toOption
 }
 
-object DatasetName {
-  def unapply(value: String): Option[datasets.Name] = datasets.Name.from(value).toOption
+object DatasetSlug {
+  def unapply(value: String): Option[datasets.Slug] = datasets.Slug.from(value).toOption
 }

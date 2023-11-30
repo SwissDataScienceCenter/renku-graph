@@ -36,7 +36,7 @@ import org.scalatestplus.scalacheck.ScalaCheckPropertyChecks
 
 class EncodersSpec extends AnyWordSpec with should.Matchers with ScalaCheckPropertyChecks {
 
-  import io.renku.entities.searchgraphs.datasets.commands.Encoders._
+  import Encoders._
 
   "linkEncoder" should {
 
@@ -71,7 +71,8 @@ class EncodersSpec extends AnyWordSpec with should.Matchers with ScalaCheckPrope
       forAll(datasetSearchInfoObjects) { searchInfo =>
         searchInfo.asQuads shouldBe Set(
           DatasetsQuad(searchInfo.topmostSameAs, rdf / "type", renku / "DiscoverableDataset"),
-          DatasetsQuad(searchInfo.topmostSameAs, slugProperty.id, searchInfo.name.asObject),
+          DatasetsQuad(searchInfo.topmostSameAs, nameProperty.id, searchInfo.name.asObject),
+          DatasetsQuad(searchInfo.topmostSameAs, slugProperty.id, searchInfo.slug.asObject),
           DatasetsQuad(searchInfo.topmostSameAs, visibilityProperty.id, searchInfo.visibility.asObject),
           createdOrPublishedToQuad(searchInfo.topmostSameAs)(searchInfo.createdOrPublished),
           DatasetsQuad(searchInfo.topmostSameAs, creatorsNamesConcatProperty.id, creatorsNamesConcat(searchInfo)),
