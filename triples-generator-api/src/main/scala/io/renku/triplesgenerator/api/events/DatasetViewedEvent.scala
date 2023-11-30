@@ -20,9 +20,9 @@ package io.renku.triplesgenerator.api.events
 
 import cats.Show
 import cats.syntax.all._
-import io.circe.{Decoder, DecodingFailure, Encoder}
-import io.circe.literal._
 import io.circe.DecodingFailure.Reason.CustomReason
+import io.circe.literal._
+import io.circe.{Decoder, DecodingFailure, Encoder}
 import io.renku.events.CategoryName
 import io.renku.graph.model.{datasets, persons}
 import io.renku.json.JsonOps._
@@ -66,8 +66,15 @@ object DatasetViewedEvent {
     for {
       _           <- validateCategory
       identifier  <- cursor.downField("dataset").downField("identifier").as[datasets.Identifier]
-      date        <- cursor.downField("date").as[datasets.DateViewed]
       maybeUserId <- cursor.downField("user").downField("id").as[Option[persons.GitLabId]]
+      date <- cursor
+                .downField("date")
+                .as[Instant]
+                .map {
+                  case i if (i compareTo Instant.now()) > 0 => Instant.now()
+                  case i                                    => i
+                }
+                .map(datasets.DateViewed)
     } yield DatasetViewedEvent(identifier, date, maybeUserId)
   }
 

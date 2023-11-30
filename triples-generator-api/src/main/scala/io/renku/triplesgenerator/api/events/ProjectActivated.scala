@@ -61,7 +61,14 @@ object ProjectActivated {
     for {
       _    <- validateCategory
       slug <- cursor.downField("project").downField("slug").as[projects.Slug]
-      date <- cursor.downField("date").as[DateActivated]
+      date <- cursor
+                .downField("date")
+                .as[Instant]
+                .map {
+                  case i if (i compareTo Instant.now()) > 0 => Instant.now()
+                  case i                                    => i
+                }
+                .map(DateActivated)
     } yield ProjectActivated(slug, date)
   }
 
