@@ -41,7 +41,7 @@ private class DatasetsRemoverImpl[F[_]: MonadThrow: Logger](
     recoveryStrategy: RecoverableErrorsRecovery = RecoverableErrorsRecovery
 ) extends DatasetsCreator[F] {
 
-  override val exclusive: Boolean        = true
+  override val exclusive: Boolean        = false
   override lazy val name: Migration.Name = Migration.Name("Datasets remover")
 
   import recoveryStrategy._

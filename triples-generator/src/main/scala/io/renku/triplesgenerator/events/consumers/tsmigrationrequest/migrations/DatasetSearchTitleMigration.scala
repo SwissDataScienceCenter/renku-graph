@@ -28,11 +28,11 @@ import io.renku.triplesstore.SparqlQuery.Prefixes
 import io.renku.triplesstore.client.syntax._
 import io.renku.triplesstore.{SparqlQuery, SparqlQueryTimeRecorder}
 import org.typelevel.log4cats.Logger
-import tooling.UpdateQueryMigration
+import tooling.RegisteredUpdateQueryMigration
 
 private object DatasetSearchTitleMigration {
   def apply[F[_]: Async: Logger: SparqlQueryTimeRecorder: MetricsRegistry]: F[Migration[F]] =
-    UpdateQueryMigration[F](name, exclusive = true, query).widen
+    RegisteredUpdateQueryMigration[F](name, exclusive = true, query).widen
 
   private lazy val name = Migration.Name("Insert dataset name into the dataset search graph")
 
