@@ -126,7 +126,7 @@ class EventHandlerSpec extends AnyWordSpec with IOSpec with MockFactory with sho
 
   "handlingDefinition.precondition" should {
 
-    TSState.Ready :: TSState.MissingDatasets :: Nil foreach { state =>
+    TSState.Ready :: TSState.MissingDatasets :: TSState.Migrating :: Nil foreach { state =>
       s"return None when TSState is $state" in new TestCase {
 
         givenTsState(returning = state.pure[IO])
@@ -135,13 +135,12 @@ class EventHandlerSpec extends AnyWordSpec with IOSpec with MockFactory with sho
       }
     }
 
-    TSState.ReProvisioning :: TSState.Migrating :: Nil foreach { state =>
-      s"return ServiceUnavailable when TSState is $state" in new TestCase {
+    s"return ServiceUnavailable when TSState is ${TSState.ReProvisioning}" in new TestCase {
 
-        givenTsState(returning = state.pure[IO])
+      givenTsState(returning = TSState.ReProvisioning.pure[IO])
 
-        handler.createHandlingDefinition().precondition.unsafeRunSync() shouldBe ServiceUnavailable(state.show).some
-      }
+      handler.createHandlingDefinition().precondition.unsafeRunSync() shouldBe
+        ServiceUnavailable(TSState.ReProvisioning.widen.show).some
     }
 
     "return SchedulingError if TSState check fails" in new TestCase {

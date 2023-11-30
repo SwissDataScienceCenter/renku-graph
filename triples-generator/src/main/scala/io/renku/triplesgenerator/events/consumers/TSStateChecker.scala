@@ -36,7 +36,9 @@ trait TSStateChecker[F[_]] {
 }
 
 object TSStateChecker {
-  sealed trait TSState extends Product with Serializable
+  sealed trait TSState extends Product {
+    lazy val widen: TSState = this
+  }
   object TSState {
     case object Ready           extends TSState
     case object ReProvisioning  extends TSState
