@@ -32,6 +32,7 @@ import scala.concurrent.duration._
 
 object SubscriptionFactory {
   def apply[F[_]: Async: Logger: SparqlQueryTimeRecorder, DB](
+      tsReadyCheck:    F[Boolean],
       categoryLock:    Lock[F, CategoryName],
       sessionResource: SessionResource[F, DB],
       connConfig:      ProjectsConnectionConfig
@@ -41,25 +42,49 @@ object SubscriptionFactory {
       eventsQueue    <- EventsQueue[F, DB](categoryLock).pure[F]
       handler        <- EventHandler[F](eventsQueue)
       eventProcessor <- EventProcessor[F](connConfig, eventsQueue)
-      _              <- kickOffEventsDequeueing[F](eventsQueue, eventProcessor)
+      _              <- kickOffEventsDequeueing[F](tsReadyCheck, eventsQueue, eventProcessor)
     } yield handler -> SubscriptionMechanism.noOpSubscriptionMechanism(categoryName)
   }
 
-  private[viewed] def kickOffEventsDequeueing[F[_]: Async: Logger](eventsQueue: EventsQueue[F],
-                                                                   processor:   EventProcessor[F]
+  private[viewed] def kickOffEventsDequeueing[F[_]: Async: Logger](tsReadyCheck:     F[Boolean],
+                                                                   eventsQueue:      EventsQueue[F],
+                                                                   processor:        EventProcessor[F],
+                                                                   onErrorWait:      Duration = 2 seconds,
+                                                                   onTSNotReadyWait: Duration = 10 seconds
   ) = Async[F].start {
-    startDequeueingEvents(eventsQueue, processor)
+    startDequeueingEvents(tsReadyCheck, eventsQueue, processor, onErrorWait, onTSNotReadyWait)
   }.void
 
-  private def startDequeueingEvents[F[_]: Async: Logger](eventsQueue: EventsQueue[F],
-                                                         processor:   EventProcessor[F]
-  ): F[Unit] =
-    Logger[F].info(show"Starting events dequeueing for $categoryName") >>
-      hookToTheEventsStream(eventsQueue, processor)
-        .handleErrorWith {
-          Logger[F].error(_)(show"An error in the $categoryName processing pipe; restarting") >>
-            Temporal[F].delayBy(startDequeueingEvents(eventsQueue, processor), 2 seconds)
-        }
+  private def startDequeueingEvents[F[_]: Async: Logger](tsReadyCheck:     F[Boolean],
+                                                         eventsQueue:      EventsQueue[F],
+                                                         processor:        EventProcessor[F],
+                                                         onErrorWait:      Duration,
+                                                         onTSNotReadyWait: Duration
+  ): F[Unit] = tsReadyCheck
+    .flatMap {
+      case true =>
+        Logger[F].info(show"Starting events dequeueing for $categoryName") >>
+          hookToTheEventsStream(eventsQueue, processor)
+      case false =>
+        Logger[F].info(show"TS not ready for writing; dequeueing for $categoryName on hold") >>
+          Temporal[F].delayBy(
+            startDequeueingEvents(tsReadyCheck, eventsQueue, processor, onErrorWait, onTSNotReadyWait),
+            onTSNotReadyWait
+          )
+    }
+    .handleErrorWith(waitAndRetry(tsReadyCheck, eventsQueue, processor, onErrorWait, onTSNotReadyWait))
+
+  private def waitAndRetry[F[_]: Async: Logger](tsReadyCheck:     F[Boolean],
+                                                eventsQueue:      EventsQueue[F],
+                                                processor:        EventProcessor[F],
+                                                onErrorWait:      Duration,
+                                                onTSNotReadyWait: Duration
+  ): Throwable => F[Unit] =
+    Logger[F].error(_)(show"An error in the $categoryName processing pipe; restarting") >>
+      Temporal[F].delayBy(
+        startDequeueingEvents(tsReadyCheck, eventsQueue, processor, onErrorWait, onTSNotReadyWait),
+        onErrorWait
+      )
 
   private def hookToTheEventsStream[F[_]: Async](eventsQueue: EventsQueue[F], processor: EventProcessor[F]) =
     eventsQueue.acquireEventsStream(categoryName).through(processor).compile.drain

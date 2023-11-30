@@ -35,6 +35,10 @@ trait TSReadinessForEventsChecker[F[_]] {
 }
 
 object TSReadinessForEventsChecker {
+
+  def apply[F[_]: Async](stateChecker: TSStateChecker[F]): TSReadinessForEventsChecker[F] =
+    new TSReadinessForEventsCheckerImpl(stateChecker)
+
   def apply[F[_]: Async: ReProvisioningStatus: Logger: MetricsRegistry: SparqlQueryTimeRecorder](
       config: Config
   ): F[TSReadinessForEventsChecker[F]] =

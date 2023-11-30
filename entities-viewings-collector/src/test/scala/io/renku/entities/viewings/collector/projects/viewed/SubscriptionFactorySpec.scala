@@ -19,8 +19,9 @@
 package io.renku.entities.viewings.collector.projects.viewed
 
 import cats.effect.testing.scalatest.AsyncIOSpec
-import cats.effect.{IO, Temporal}
+import cats.effect.{IO, Ref, Temporal}
 import fs2.concurrent.SignallingRef
+import cats.syntax.all._
 import fs2.{Chunk, Stream}
 import io.renku.events.CategoryName
 import io.renku.eventsqueue.Generators.dequeuedEvents
@@ -39,17 +40,34 @@ class SubscriptionFactorySpec extends AsyncWordSpec with AsyncIOSpec with should
 
   "kickOffEventsDequeueing" should {
 
-    "hook the processor into the stream acquired from the dequeuer" in {
+    "wait with hooking the processor into the stream from the dequeuer until the TS state is not ready" in {
 
-      val chunk1 = dequeuedEvents.generateList()
-      val chunk2 = dequeuedEvents.generateList()
-      givenStreamAcquiring(returning = Stream(Chunk.from(chunk1), Chunk.from(chunk2)))
+      val tsReadyResponses: Ref[IO, List[Boolean]] = Ref.unsafe(List(false, false, true))
+      val tsReadyCheck: IO[Boolean] = tsReadyResponses.modify(resps => resps.tail -> resps.headOption.getOrElse(true))
 
-      val eventProcessor = new AccumulatingHandler
+      val chunk = dequeuedEvents.generateList(min = 1)
+      givenStreamAcquiring(returning = Stream(Chunk.from(chunk)))
 
       for {
-        _ <- SubscriptionFactory.kickOffEventsDequeueing[IO](eventsQueue, eventProcessor).assertNoException
-        _ <- eventProcessor.handledEvents.waitUntil(_ == chunk1 ::: chunk2)
+        processor <- newAccumulatingHandler()
+        _ <- SubscriptionFactory
+               .kickOffEventsDequeueing[IO](tsReadyCheck, eventsQueue, processor, onTSNotReadyWait = 100 millis)
+               .assertNoException
+        _   <- processor.handledEvents.waitUntil(_ == chunk)
+        res <- tsReadyResponses.get.asserting(_.isEmpty shouldBe true)
+      } yield res
+    }
+
+    "hook the processor into the stream acquired from the dequeuer" in {
+
+      val chunk1 = dequeuedEvents.generateList(min = 1)
+      val chunk2 = dequeuedEvents.generateList(min = 1)
+      givenStreamAcquiring(returning = Stream(Chunk.from(chunk1), Chunk.from(chunk2)))
+
+      for {
+        processor <- newAccumulatingHandler()
+        _         <- SubscriptionFactory.kickOffEventsDequeueing[IO](IO(true), eventsQueue, processor).assertNoException
+        _         <- processor.handledEvents.waitUntil(_ == chunk1 ::: chunk2)
       } yield Succeeded
     }
 
@@ -60,15 +78,36 @@ class SubscriptionFactorySpec extends AsyncWordSpec with AsyncIOSpec with should
       val chunk2 = dequeuedEvents.generateList(min = 1)
       givenStreamAcquiring(returning = Stream.emit(Chunk.from(chunk2)))
 
-      val eventProcessor = new AccumulatingHandler(maybeEventToFail = chunk1.headOption)
-
       for {
-        _ <- SubscriptionFactory.kickOffEventsDequeueing[IO](eventsQueue, eventProcessor).assertNoException
+        processor <- newAccumulatingHandler(maybeEventToFail = chunk1.headOption)
+        _ <- SubscriptionFactory
+               .kickOffEventsDequeueing[IO](IO(true), eventsQueue, processor, onErrorWait = 100 millis)
+               .assertNoException
         _ <- IO.race(
-               eventProcessor.handledEvents.waitUntil(_ == chunk2),
-               Temporal[IO].delayBy(IO(fail("Events dequeuer process doesn't work")), 5 seconds)
+               processor.handledEvents.waitUntil(_ == chunk2),
+               Temporal[IO].delayBy(IO(fail("Events dequeuer process doesn't work")), 1 second)
              )
       } yield Succeeded
+    }
+
+    "handle failures happening while checking the TS state" in {
+
+      val tsReadyResponses: Ref[IO, List[IO[Boolean]]] =
+        Ref.unsafe(List(exceptions.generateOne.raiseError[IO, Boolean], true.pure[IO]))
+      val tsReadyCheck: IO[Boolean] =
+        tsReadyResponses.modify(resps => resps.tail -> resps.headOption.getOrElse(true.pure[IO])).flatten
+
+      val chunk = dequeuedEvents.generateList(min = 1)
+      givenStreamAcquiring(returning = Stream(Chunk.from(chunk)))
+
+      for {
+        processor <- newAccumulatingHandler()
+        _ <- SubscriptionFactory
+               .kickOffEventsDequeueing[IO](tsReadyCheck, eventsQueue, processor, onErrorWait = 100 millis)
+               .assertNoException
+        _   <- processor.handledEvents.waitUntil(_ == chunk)
+        res <- tsReadyResponses.get.asserting(_.isEmpty shouldBe true)
+      } yield res
     }
   }
 
@@ -81,9 +120,12 @@ class SubscriptionFactorySpec extends AsyncWordSpec with AsyncIOSpec with should
       .expects(categoryName)
       .returning(returning)
 
-  private class AccumulatingHandler(maybeEventToFail: Option[DequeuedEvent] = None) extends EventProcessor[IO] {
+  private def newAccumulatingHandler(maybeEventToFail: Option[DequeuedEvent] = None): IO[AccumulatingHandler] =
+    SignallingRef[IO, List[DequeuedEvent]](Nil).map(new AccumulatingHandler(maybeEventToFail, _))
 
-    val handledEvents = SignallingRef[IO, List[DequeuedEvent]](Nil).unsafeRunSync()
+  private class AccumulatingHandler(maybeEventToFail:  Option[DequeuedEvent],
+                                    val handledEvents: SignallingRef[IO, List[DequeuedEvent]]
+  ) extends EventProcessor[IO] {
 
     override def apply(stream: Stream[IO, Chunk[DequeuedEvent]]): Stream[IO, Unit] =
       stream.evalMap {

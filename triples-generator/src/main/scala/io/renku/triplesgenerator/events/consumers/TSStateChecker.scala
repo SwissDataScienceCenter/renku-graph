@@ -30,11 +30,12 @@ import org.typelevel.log4cats.Logger
 import tsmigrationrequest.MigrationStatusChecker
 import tsmigrationrequest.migrations.reprovisioning.ReProvisioningStatus
 
-private trait TSStateChecker[F[_]] {
+trait TSStateChecker[F[_]] {
   def checkTSState: F[TSState]
+  def checkTSReady: F[Boolean]
 }
 
-private object TSStateChecker {
+object TSStateChecker {
   sealed trait TSState extends Product with Serializable
   object TSState {
     case object Ready           extends TSState
@@ -92,4 +93,9 @@ private class TSStateCheckerImpl[F[_]: MonadThrow](
       .map(tsAdminClient.checkDatasetExists)
       .sequence
       .map(_.reduce(_ && _))
+
+  override def checkTSReady: F[Boolean] = checkTSState.map {
+    case TSState.Ready => true
+    case _             => false
+  }
 }
