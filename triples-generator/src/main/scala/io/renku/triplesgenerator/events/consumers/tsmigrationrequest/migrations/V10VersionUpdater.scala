@@ -41,6 +41,8 @@ private class V10VersionUpdater[F[_]: MonadThrow: Logger](
     recoveryStrategy:        RecoverableErrorsRecovery = RecoverableErrorsRecovery
 ) extends RegisteredMigration[F](V10VersionUpdater.name, executionRegister, recoveryStrategy) {
 
+  override val exclusive: Boolean = true
+
   import recoveryStrategy._
 
   protected[migrations] override def migrate(): EitherT[F, ProcessingRecoverableError, Unit] = EitherT {

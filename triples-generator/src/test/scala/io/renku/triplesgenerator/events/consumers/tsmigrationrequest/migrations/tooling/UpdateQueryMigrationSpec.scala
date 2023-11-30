@@ -62,6 +62,7 @@ class UpdateQueryMigrationSpec extends AnyWordSpec with MockFactory with should.
         recoverableError.asLeft[OUT].pure[F]
       }
     }
-    val migration = new UpdateQueryMigration[Try](migrationNames.generateOne, query, queryRunner, recoveryStrategy)
+    val migration =
+      new UpdateQueryMigration[Try](migrationNames.generateOne, exclusive = false, query, queryRunner, recoveryStrategy)
   }
 }

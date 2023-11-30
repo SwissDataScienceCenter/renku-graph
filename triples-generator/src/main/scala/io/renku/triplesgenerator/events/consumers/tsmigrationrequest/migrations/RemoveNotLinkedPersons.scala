@@ -25,15 +25,15 @@ import eu.timepit.refined.auto._
 import io.renku.graph.model.GraphClass
 import io.renku.graph.model.Schemas.schema
 import io.renku.metrics.MetricsRegistry
-import io.renku.triplesstore.{SparqlQuery, SparqlQueryTimeRecorder}
 import io.renku.triplesstore.SparqlQuery.Prefixes
+import io.renku.triplesstore.{SparqlQuery, SparqlQueryTimeRecorder}
 import org.typelevel.log4cats.Logger
 import tooling.UpdateQueryMigration
 
 private object RemoveNotLinkedPersons {
 
   def apply[F[_]: Async: Logger: SparqlQueryTimeRecorder: MetricsRegistry]: F[Migration[F]] =
-    UpdateQueryMigration[F](name, query).widen
+    UpdateQueryMigration[F](name, exclusive = false, query).widen
 
   private lazy val name = Migration.Name("removed not linked persons")
   private[migrations] lazy val query = SparqlQuery.of(

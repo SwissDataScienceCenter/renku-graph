@@ -20,6 +20,7 @@ package io.renku.triplesgenerator.events.consumers.awaitinggeneration
 
 import cats.effect.Async
 import cats.syntax.all._
+import com.typesafe.config.Config
 import io.renku.events.Subscription.SubscriberCapacity
 import io.renku.events.consumers
 import io.renku.events.consumers.subscriptions.SubscriptionMechanism
@@ -35,8 +36,9 @@ import org.typelevel.log4cats.Logger
 object SubscriptionFactory {
   def apply[F[
       _
-  ]: Async: ReProvisioningStatus: GitLabClient: AccessTokenFinder: Logger: MetricsRegistry: SparqlQueryTimeRecorder]
-      : F[(consumers.EventHandler[F], SubscriptionMechanism[F])] = for {
+  ]: Async: ReProvisioningStatus: GitLabClient: AccessTokenFinder: Logger: MetricsRegistry: SparqlQueryTimeRecorder](
+      config: Config
+  ): F[(consumers.EventHandler[F], SubscriptionMechanism[F])] = for {
     generationProcessesNumber <- GenerationProcessesNumber[F]()
     subscriptionMechanism <-
       SubscriptionMechanism(
@@ -47,6 +49,6 @@ object SubscriptionFactory {
         )
       )
     _       <- ReProvisioningStatus[F].registerForNotification(subscriptionMechanism)
-    handler <- EventHandler(subscriptionMechanism, generationProcessesNumber)
+    handler <- EventHandler(subscriptionMechanism, generationProcessesNumber, config)
   } yield handler -> subscriptionMechanism
 }

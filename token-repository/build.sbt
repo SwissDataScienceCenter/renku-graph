@@ -18,6 +18,14 @@
 
 name := "token-repository"
 
-Test / fork := true
+Test / testOptions += Tests.Setup(postgresServer("start"))
+Test / testOptions += Tests.Cleanup(postgresServer("forceStop"))
 
-libraryDependencies += "ch.qos.logback" % "logback-classic" % "1.4.12"
+def postgresServer(methodName: String): ClassLoader => Unit = classLoader => {
+  val clazz    = classLoader.loadClass("io.renku.tokenrepository.repository.TokenRepositoryPostgresServer$")
+  val method   = clazz.getMethod(methodName)
+  val instance = clazz.getField("MODULE$").get(null)
+  method.invoke(instance)
+}
+
+libraryDependencies += "ch.qos.logback" % "logback-classic" % "1.4.13"

@@ -22,7 +22,8 @@ import cats.effect.IO
 import cats.syntax.all._
 import io.circe.syntax._
 import io.renku.events.EventRequestContent
-import io.renku.events.consumers.ProcessExecutor
+import io.renku.events.consumers.ConsumersModelGenerators.eventSchedulingResults
+import io.renku.events.consumers.{EventSchedulingResult, ProcessExecutor}
 import io.renku.generators.Generators.Implicits._
 import io.renku.interpreters.TestLogger
 import io.renku.testtools.IOSpec
@@ -56,8 +57,8 @@ class EventHandlerSpec extends AnyWordSpec with should.Matchers with IOSpec with
 
   "handlingDefinition.precondition" should {
 
-    "be not defined" in new TestCase {
-      handler.createHandlingDefinition().precondition.unsafeRunSync() shouldBe None
+    "be the given precondition" in new TestCase {
+      handler.createHandlingDefinition().precondition shouldBe precondition
     }
   }
 
@@ -72,8 +73,9 @@ class EventHandlerSpec extends AnyWordSpec with should.Matchers with IOSpec with
 
     val event = projectActivatedEvents.generateOne
 
-    implicit val logger: TestLogger[IO] = TestLogger[IO]()
+    implicit val logger: TestLogger[IO]                    = TestLogger[IO]()
+    val precondition:    IO[Option[EventSchedulingResult]] = eventSchedulingResults.generateSome.pure[IO]
     val tsPersister = mock[EventPersister[IO]]
-    val handler     = new EventHandler[IO](tsPersister, mock[ProcessExecutor[IO]])
+    val handler     = new EventHandler[IO](precondition, tsPersister, mock[ProcessExecutor[IO]])
   }
 }

@@ -16,23 +16,23 @@
  * limitations under the License.
  */
 
-package io.renku.triplesgenerator.events.consumers.tsmigrationrequest.migrations
+package io.renku.triplesgenerator.events.consumers.tsmigrationrequest
+package migrations
 
 import cats.effect._
 import cats.syntax.all._
 import eu.timepit.refined.auto._
 import io.renku.graph.model.{GraphClass, Schemas}
 import io.renku.metrics.MetricsRegistry
-import io.renku.triplesgenerator.events.consumers.tsmigrationrequest.Migration
-import io.renku.triplesgenerator.events.consumers.tsmigrationrequest.migrations.tooling.UpdateQueryMigration
 import io.renku.triplesstore.SparqlQuery.Prefixes
 import io.renku.triplesstore.client.syntax._
 import io.renku.triplesstore.{SparqlQuery, SparqlQueryTimeRecorder}
 import org.typelevel.log4cats.Logger
+import tooling.UpdateQueryMigration
 
 private object DatasetSearchTitleMigration {
   def apply[F[_]: Async: Logger: SparqlQueryTimeRecorder: MetricsRegistry]: F[Migration[F]] =
-    UpdateQueryMigration[F](name, query).widen
+    UpdateQueryMigration[F](name, exclusive = true, query).widen
 
   private lazy val name = Migration.Name("Insert dataset name into the dataset search graph")
 

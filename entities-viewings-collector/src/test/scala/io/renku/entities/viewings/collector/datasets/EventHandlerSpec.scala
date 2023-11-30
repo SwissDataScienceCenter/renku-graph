@@ -22,7 +22,8 @@ import cats.effect.IO
 import cats.syntax.all._
 import io.circe.syntax._
 import io.renku.events.EventRequestContent
-import io.renku.events.consumers.ProcessExecutor
+import io.renku.events.consumers.ConsumersModelGenerators.eventSchedulingResults
+import io.renku.events.consumers.{EventSchedulingResult, ProcessExecutor}
 import io.renku.generators.Generators.Implicits._
 import io.renku.interpreters.TestLogger
 import io.renku.testtools.IOSpec
@@ -54,11 +55,17 @@ class EventHandlerSpec extends AnyWordSpec with should.Matchers with IOSpec with
     }
   }
 
-  "handlingDefinition.precondition and onRelease" should {
+  "handlingDefinition.precondition" should {
+
+    "be the given precondition" in new TestCase {
+      handler.createHandlingDefinition().precondition shouldBe precondition
+    }
+  }
+
+  "handlingDefinition.onRelease" should {
 
     "be not defined" in new TestCase {
-      handler.createHandlingDefinition().precondition.unsafeRunSync() shouldBe None
-      handler.createHandlingDefinition().onRelease                    shouldBe None
+      handler.createHandlingDefinition().onRelease shouldBe None
     }
   }
 
@@ -66,8 +73,9 @@ class EventHandlerSpec extends AnyWordSpec with should.Matchers with IOSpec with
 
     val event = datasetViewedEvents.generateOne
 
-    implicit val logger: TestLogger[IO] = TestLogger[IO]()
+    implicit val logger: TestLogger[IO]                    = TestLogger[IO]()
+    val precondition:    IO[Option[EventSchedulingResult]] = eventSchedulingResults.generateSome.pure[IO]
     val eventUploader = mock[EventUploader[IO]]
-    val handler       = new EventHandler[IO](eventUploader, mock[ProcessExecutor[IO]])
+    val handler       = new EventHandler[IO](precondition, eventUploader, mock[ProcessExecutor[IO]])
   }
 }

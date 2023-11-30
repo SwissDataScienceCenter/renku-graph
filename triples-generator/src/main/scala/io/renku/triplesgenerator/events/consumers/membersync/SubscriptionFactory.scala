@@ -20,12 +20,14 @@ package io.renku.triplesgenerator.events.consumers.membersync
 
 import cats.effect.Async
 import cats.syntax.all._
+import com.typesafe.config.Config
 import fs2.io.net.Network
 import io.renku.events.consumers
 import io.renku.events.consumers.subscriptions.SubscriptionMechanism
 import io.renku.events.consumers.subscriptions.SubscriptionPayloadComposer.defaultSubscriptionPayloadComposerFactory
 import io.renku.graph.tokenrepository.AccessTokenFinder
 import io.renku.http.client.GitLabClient
+import io.renku.metrics.MetricsRegistry
 import io.renku.triplesgenerator.Microservice
 import io.renku.triplesgenerator.TgDB.TsWriteLock
 import io.renku.triplesgenerator.events.consumers.tsmigrationrequest.migrations.reprovisioning.ReProvisioningStatus
@@ -36,9 +38,10 @@ object SubscriptionFactory {
 
   def apply[F[
       _
-  ]: Async: Network: Logger: ReProvisioningStatus: GitLabClient: AccessTokenFinder: SparqlQueryTimeRecorder](
+  ]: Async: Network: Logger: ReProvisioningStatus: GitLabClient: AccessTokenFinder: MetricsRegistry: SparqlQueryTimeRecorder](
       tsWriteLock:         TsWriteLock[F],
-      projectSparqlClient: ProjectSparqlClient[F]
+      projectSparqlClient: ProjectSparqlClient[F],
+      config:              Config
   ): F[(consumers.EventHandler[F], SubscriptionMechanism[F])] = for {
     subscriptionMechanism <-
       SubscriptionMechanism(
@@ -46,6 +49,6 @@ object SubscriptionFactory {
         defaultSubscriptionPayloadComposerFactory(Microservice.ServicePort, Microservice.Identifier)
       )
     _       <- ReProvisioningStatus[F].registerForNotification(subscriptionMechanism)
-    handler <- EventHandler[F](subscriptionMechanism, tsWriteLock, projectSparqlClient)
+    handler <- EventHandler[F](subscriptionMechanism, tsWriteLock, projectSparqlClient, config)
   } yield handler -> subscriptionMechanism
 }

@@ -19,43 +19,37 @@
 package io.renku.tokenrepository.repository.init
 
 import cats.effect.IO
+import cats.effect.testing.scalatest.AsyncIOSpec
 import io.renku.interpreters.TestLogger.Level.Info
-import io.renku.testtools.IOSpec
-import org.scalamock.scalatest.MockFactory
-import org.scalatest.concurrent.{Eventually, IntegrationPatience}
-import org.scalatest.flatspec.AnyFlatSpec
+import org.scalamock.scalatest.AsyncMockFactory
+import org.scalatest.Succeeded
+import org.scalatest.flatspec.AsyncFlatSpec
 import org.scalatest.matchers.should
 
 class ProjectPathAdderSpec
-    extends AnyFlatSpec
-    with IOSpec
+    extends AsyncFlatSpec
+    with AsyncIOSpec
     with DbInitSpec
-    with Eventually
-    with IntegrationPatience
     with should.Matchers
-    with MockFactory {
+    with AsyncMockFactory {
 
-  protected override lazy val migrationsToRun: List[DBMigration[IO]] = allMigrations.takeWhile {
-    case _: ProjectPathAdder[IO] => false
-    case _ => true
+  protected override lazy val runMigrationsUpTo: Class[_ <: DBMigration[IO]] =
+    classOf[ProjectPathAdder[IO]]
+
+  it should "add the 'project_path' column if neither 'project_path' nor 'project_slug' exist" in testDBResource.use {
+    implicit cfg =>
+      for {
+        _ <- verifyColumnExists("projects_tokens", "project_path").asserting(_ shouldBe false)
+
+        _ <- logger.resetF()
+        _ <- ProjectPathAdder[IO].run.assertNoException
+        _ <- verifyColumnExists("projects_tokens", "project_path").asserting(_ shouldBe true)
+        _ <- logger.loggedOnlyF(Info("'project_path' column added"))
+
+        _ <- logger.resetF()
+        _ <- ProjectPathAdder[IO].run.assertNoException
+        _ <- verifyIndexExists("projects_tokens", "idx_project_path").asserting(_ shouldBe true)
+        _ <- logger.loggedOnlyF(Info("'project_path' column existed"))
+      } yield Succeeded
   }
-
-  it should "add the 'project_path' column if neither 'project_path' nor 'project_slug' exist" in {
-
-    verifyColumnExists("projects_tokens", "project_path") shouldBe false
-
-    projectPathAdder.run.unsafeRunSync() shouldBe ()
-
-    verifyColumnExists("projects_tokens", "project_path") shouldBe true
-    logger.loggedOnly(Info("'project_path' column added"))
-    logger.reset()
-
-    projectPathAdder.run.unsafeRunSync() shouldBe ()
-
-    logger.loggedOnly(Info("'project_path' column existed"))
-
-    verifyIndexExists("projects_tokens", "idx_project_path")
-  }
-
-  private lazy val projectPathAdder = new ProjectPathAdder[IO]
 }

@@ -20,14 +20,15 @@ package io.renku.triplesgenerator.events.consumers.cleanup
 
 import cats.effect.{Async, MonadCancelThrow}
 import cats.syntax.all._
+import com.typesafe.config.Config
 import eu.timepit.refined.auto._
 import io.renku.events.consumers.ProcessExecutor
 import io.renku.events.consumers.subscriptions.SubscriptionMechanism
 import io.renku.events.{CategoryName, consumers}
 import io.renku.graph.model.{RenkuUrl, datasets}
 import io.renku.lock.Lock
-import io.renku.metrics.MetricsRegistry
 import io.renku.lock.syntax._
+import io.renku.metrics.MetricsRegistry
 import io.renku.triplesgenerator.TgDB.TsWriteLock
 import io.renku.triplesgenerator.api.events.CleanUpEvent
 import io.renku.triplesgenerator.events.consumers.TSReadinessForEventsChecker
@@ -61,9 +62,10 @@ private object EventHandler {
       subscriptionMechanism: SubscriptionMechanism[F],
       tsWriteLock:           TsWriteLock[F],
       topSameAsLock:         Lock[F, datasets.TopmostSameAs],
-      projectSparqlClient:   ProjectSparqlClient[F]
+      projectSparqlClient:   ProjectSparqlClient[F],
+      config:                Config
   )(implicit renkuUrl: RenkuUrl): F[consumers.EventHandler[F]] = for {
-    tsReadinessChecker <- TSReadinessForEventsChecker[F]
+    tsReadinessChecker <- TSReadinessForEventsChecker[F](config)
     eventProcessor     <- EventProcessor[F](topSameAsLock, projectSparqlClient)
     processExecutor    <- ProcessExecutor.concurrent(processesCount = 1)
   } yield new EventHandler[F](

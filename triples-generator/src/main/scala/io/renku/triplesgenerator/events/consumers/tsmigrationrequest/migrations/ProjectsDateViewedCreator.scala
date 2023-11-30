@@ -47,8 +47,10 @@ private class ProjectsDateViewedCreator[F[_]: Async: Logger](
     recoveryStrategy:  RecoverableErrorsRecovery = RecoverableErrorsRecovery
 ) extends RegisteredMigration[F](ProjectsDateViewedCreator.name, executionRegister, recoveryStrategy) {
 
-  import recoveryStrategy._
+  override val exclusive: Boolean = false
   private val pageSize = 20
+
+  import recoveryStrategy._
 
   protected[migrations] override def migrate(): EitherT[F, ProcessingRecoverableError, Unit] = EitherT {
     Stream

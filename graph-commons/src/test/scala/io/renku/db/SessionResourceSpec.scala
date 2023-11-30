@@ -16,24 +16,30 @@
  * limitations under the License.
  */
 
-package io.renku.tokenrepository.repository.init
+package io.renku.db
 
 import cats.effect.IO
-import io.renku.http.client.GitLabClient
-import io.renku.interpreters.TestLogger
-import io.renku.metrics.TestMetricsRegistry
 import io.renku.testtools.IOSpec
-import io.renku.tokenrepository.repository.InMemoryProjectsTokensDb
-import io.renku.tokenrepository.repository.metrics.QueriesExecutionTimes
+import natchez.Trace.Implicits.noop
 import org.scalamock.scalatest.MockFactory
+import org.scalatest.matchers.should
+import org.scalatest.wordspec.AnyWordSpec
 
-trait DbMigrations {
-  self: InMemoryProjectsTokensDb with IOSpec with MockFactory =>
+class SessionResourceSpec extends AnyWordSpec with IOSpec with MockFactory with should.Matchers {
 
-  implicit lazy val logger:      TestLogger[IO]            = TestLogger[IO]()
-  implicit lazy val glClient:    GitLabClient[IO]          = mock[GitLabClient[IO]]
-  implicit val metricsRegistry:  TestMetricsRegistry[IO]   = TestMetricsRegistry[IO]
-  implicit val queriesExecTimes: QueriesExecutionTimes[IO] = QueriesExecutionTimes[IO]().unsafeRunSync()
+  "use" should {
 
-  protected lazy val allMigrations: List[DBMigration[IO]] = DbInitializer.migrations[IO].unsafeRunSync()
+    "pass the sessionResource built with the DBConfig to the given block" in new TestCase {
+
+      transactedBlock.expects(*).returning(IO.unit)
+
+      sessionResource.use(transactedBlock).unsafeRunSync() shouldBe ()
+    }
+  }
+
+  private trait TestCase {
+    trait TestDB
+    val transactedBlock = mockFunction[SessionResource[IO, TestDB], IO[Unit]]
+    val sessionResource = SessionPoolResource[IO, TestDB](TestDbConfig.create[TestDB])
+  }
 }

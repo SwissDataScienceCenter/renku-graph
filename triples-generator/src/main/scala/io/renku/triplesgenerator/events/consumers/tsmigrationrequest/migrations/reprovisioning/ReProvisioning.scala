@@ -54,7 +54,8 @@ private class ReProvisioningImpl[F[_]: Temporal: Logger](
     retryDelay:            FiniteDuration
 ) extends ConditionedMigration[F] {
 
-  override val name: Migration.Name = migrationName
+  override val exclusive: Boolean        = true
+  override val name:      Migration.Name = migrationName
 
   import eventSender._
   import executionTimeRecorder._

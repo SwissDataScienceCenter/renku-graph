@@ -33,7 +33,7 @@ import io.renku.graph.config.EventLogUrl
 import io.renku.metrics.MetricsRegistry
 import io.renku.microservices.MicroserviceIdentifier
 import io.renku.triplesgenerator.events.consumers.TSStateChecker
-import io.renku.triplesgenerator.events.consumers.TSStateChecker.TSState.{MissingDatasets, ReProvisioning, Ready}
+import io.renku.triplesgenerator.events.consumers.TSStateChecker.TSState.{Migrating, MissingDatasets, ReProvisioning, Ready}
 import io.renku.triplesstore.SparqlQueryTimeRecorder
 import migrations.reprovisioning.ReProvisioningStatus
 import org.typelevel.log4cats.Logger
@@ -108,8 +108,8 @@ private class EventHandler[F[_]: MonadCancelThrow: Logger](
   private def verifyTSState: F[Option[EventSchedulingResult]] =
     checkTSState
       .map {
-        case Ready | MissingDatasets => None
-        case ReProvisioning          => ServiceUnavailable("Re-provisioning running").widen.some
+        case Ready | MissingDatasets              => None
+        case state @ (ReProvisioning | Migrating) => ServiceUnavailable(state.show).widen.some
       }
       .recover { case NonFatal(exception) => SchedulingError(exception).widen.some }
 }
@@ -124,7 +124,7 @@ private object EventHandler {
       subscriptionMechanism: SubscriptionMechanism[F],
       config:                Config
   ): F[consumers.EventHandler[F]] = for {
-    tsStateChecker   <- TSStateChecker[F]
+    tsStateChecker   <- TSStateChecker[F](config)
     migrationsRunner <- MigrationsRunner[F](config)
     eventSender      <- EventSender[F](EventLogUrl)
     processExecutor  <- ProcessExecutor.concurrent(processesCount = 1)
