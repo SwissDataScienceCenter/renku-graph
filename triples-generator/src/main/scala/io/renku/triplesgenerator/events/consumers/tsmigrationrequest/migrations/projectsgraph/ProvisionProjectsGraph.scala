@@ -42,6 +42,9 @@ private class ProvisionProjectsGraph[F[_]: Async: Logger](
     recoveryStrategy:         RecoverableErrorsRecovery = RecoverableErrorsRecovery
 ) extends ConditionedMigration[F] {
 
+  override val exclusive: Boolean        = false
+  override val name:      Migration.Name = ProvisionProjectsGraph.name
+
   import executionRegister._
   import fs2._
   import progressFinder._
@@ -50,8 +53,6 @@ private class ProvisionProjectsGraph[F[_]: Async: Logger](
   import projectsFinder._
   import projectsGraphProvisioner.provisionProjectsGraph
   import recoveryStrategy._
-
-  override val name: Migration.Name = ProvisionProjectsGraph.name
 
   protected[projectsgraph] override def required
       : EitherT[F, ProcessingRecoverableError, ConditionedMigration.MigrationRequired] = EitherT {

@@ -39,7 +39,7 @@ private object FixMultipleProjectVersions {
     VersionCompatibilityConfig
       .fromConfigF[F](ConfigFactory.load())
       .map(_.asVersionPair.schemaVersion)
-      .flatMap(version => UpdateQueryMigration[F](name, query(version)).widen)
+      .flatMap(version => UpdateQueryMigration[F](name, exclusive = false, query(version)).widen)
       .widen
 
   private lazy val name = Migration.Name("Remove multiple values for project version")

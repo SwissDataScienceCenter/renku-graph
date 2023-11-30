@@ -80,6 +80,7 @@ class RegisteredUpdateQueryMigrationSpec
   }
   private implicit lazy val logger: Logger[IO] = TestLogger[IO]()
   private lazy val migration = new RegisteredUpdateQueryMigration[IO](migrationNames.generateOne,
+                                                                      exclusive = false,
                                                                       query,
                                                                       executionRegister,
                                                                       queryRunner,

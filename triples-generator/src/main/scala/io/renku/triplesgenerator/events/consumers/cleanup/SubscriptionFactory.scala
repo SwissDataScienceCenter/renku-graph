@@ -20,6 +20,7 @@ package io.renku.triplesgenerator.events.consumers.cleanup
 
 import cats.effect.Async
 import cats.syntax.all._
+import com.typesafe.config.Config
 import io.renku.events.consumers
 import io.renku.events.consumers.subscriptions.SubscriptionMechanism
 import io.renku.events.consumers.subscriptions.SubscriptionPayloadComposer.defaultSubscriptionPayloadComposerFactory
@@ -36,7 +37,8 @@ object SubscriptionFactory {
   def apply[F[_]: Async: ReProvisioningStatus: Logger: MetricsRegistry: SparqlQueryTimeRecorder](
       tsWriteLock:         TsWriteLock[F],
       topSameAsLock:       Lock[F, datasets.TopmostSameAs],
-      projectSparqlClient: ProjectSparqlClient[F]
+      projectSparqlClient: ProjectSparqlClient[F],
+      config:              Config
   )(implicit renkuUrl: RenkuUrl): F[(consumers.EventHandler[F], SubscriptionMechanism[F])] = for {
     subscriptionMechanism <-
       SubscriptionMechanism(
@@ -44,6 +46,6 @@ object SubscriptionFactory {
         defaultSubscriptionPayloadComposerFactory(Microservice.ServicePort, Microservice.Identifier)
       )
     _       <- ReProvisioningStatus[F].registerForNotification(subscriptionMechanism)
-    handler <- EventHandler(subscriptionMechanism, tsWriteLock, topSameAsLock, projectSparqlClient)
+    handler <- EventHandler(subscriptionMechanism, tsWriteLock, topSameAsLock, projectSparqlClient, config)
   } yield handler -> subscriptionMechanism
 }

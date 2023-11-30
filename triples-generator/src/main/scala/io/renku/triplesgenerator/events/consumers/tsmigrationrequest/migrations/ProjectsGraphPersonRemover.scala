@@ -25,16 +25,16 @@ import eu.timepit.refined.auto._
 import io.renku.graph.model.GraphClass
 import io.renku.graph.model.Schemas.schema
 import io.renku.metrics.MetricsRegistry
-import migrations.tooling.RegisteredUpdateQueryMigration
 import io.renku.triplesstore.SparqlQuery.Prefixes
 import io.renku.triplesstore.client.syntax._
 import io.renku.triplesstore.{SparqlQuery, SparqlQueryTimeRecorder}
+import migrations.tooling.RegisteredUpdateQueryMigration
 import org.typelevel.log4cats.Logger
 
 private object ProjectsGraphPersonRemover {
 
   def apply[F[_]: Async: Logger: SparqlQueryTimeRecorder: MetricsRegistry]: F[Migration[F]] =
-    RegisteredUpdateQueryMigration[F](name, query).widen
+    RegisteredUpdateQueryMigration[F](name, exclusive = false, query).widen
 
   private lazy val name = Migration.Name("Projects graph Person remover")
 

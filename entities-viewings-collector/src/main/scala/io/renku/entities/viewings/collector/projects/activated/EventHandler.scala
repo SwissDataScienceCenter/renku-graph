@@ -23,12 +23,13 @@ import cats.syntax.all._
 import eu.timepit.refined.auto._
 import io.renku.events.{CategoryName, EventRequestContent, consumers}
 import io.renku.events.consumers.EventDecodingTools.JsonOps
-import io.renku.events.consumers.ProcessExecutor
+import io.renku.events.consumers.{EventSchedulingResult, ProcessExecutor}
 import io.renku.triplesgenerator.api.events.ProjectActivated
 import io.renku.triplesstore.{ProjectsConnectionConfig, SparqlQueryTimeRecorder}
 import org.typelevel.log4cats.Logger
 
 private class EventHandler[F[_]: MonadCancelThrow: Logger](
+    precondition:              F[Option[EventSchedulingResult]],
     eventPersister:            EventPersister[F],
     processExecutor:           ProcessExecutor[F],
     override val categoryName: CategoryName = categoryName
@@ -39,7 +40,8 @@ private class EventHandler[F[_]: MonadCancelThrow: Logger](
   override def createHandlingDefinition(): EventHandlingDefinition =
     EventHandlingDefinition(
       decode,
-      process
+      process,
+      precondition
     )
 
   private lazy val decode: EventRequestContent => Either[Exception, ProjectActivated] = { req =>
@@ -55,8 +57,9 @@ private class EventHandler[F[_]: MonadCancelThrow: Logger](
 
 private object EventHandler {
   def apply[F[_]: Async: Logger: SparqlQueryTimeRecorder](
-      connConfig: ProjectsConnectionConfig
+      precondition: F[Option[EventSchedulingResult]],
+      connConfig:   ProjectsConnectionConfig
   ): F[consumers.EventHandler[F]] =
     (EventPersister[F](connConfig), ProcessExecutor.concurrent(processesCount = 100))
-      .mapN(new EventHandler[F](_, _))
+      .mapN(new EventHandler[F](precondition, _, _))
 }

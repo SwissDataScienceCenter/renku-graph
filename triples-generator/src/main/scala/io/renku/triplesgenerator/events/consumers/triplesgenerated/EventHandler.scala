@@ -21,6 +21,7 @@ package io.renku.triplesgenerator.events.consumers.triplesgenerated
 import cats.effect._
 import cats.syntax.all._
 import cats.{NonEmptyParallel, Parallel}
+import com.typesafe.config.Config
 import io.renku.events.consumers.ProcessExecutor
 import io.renku.events.consumers.subscriptions.SubscriptionMechanism
 import io.renku.events.{CategoryName, consumers}
@@ -66,9 +67,10 @@ private object EventHandler {
       concurrentProcessesNumber: ConcurrentProcessesNumber,
       tsWriteLock:               TsWriteLock[F],
       topSameAsLock:             Lock[F, datasets.TopmostSameAs],
-      projectSparqlClient:       ProjectSparqlClient[F]
+      projectSparqlClient:       ProjectSparqlClient[F],
+      config:                    Config
   )(implicit renkuUrl: RenkuUrl): F[consumers.EventHandler[F]] = for {
-    tsReadinessChecker <- TSReadinessForEventsChecker[F]
+    tsReadinessChecker <- TSReadinessForEventsChecker[F](config)
     eventProcessor     <- EventProcessor[F](topSameAsLock, projectSparqlClient)
     processExecutor    <- ProcessExecutor.concurrent(concurrentProcessesNumber.asRefined)
   } yield new EventHandler[F](
