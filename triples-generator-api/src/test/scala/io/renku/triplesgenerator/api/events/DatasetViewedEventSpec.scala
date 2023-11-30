@@ -18,21 +18,23 @@
 
 package io.renku.triplesgenerator.api.events
 
-import cats.syntax.all._
-import io.renku.generators.Generators.Implicits._
-import org.scalatest.matchers.should
-import org.scalatest.wordspec.AnyWordSpec
 import Generators._
+import cats.syntax.all._
 import io.circe.literal._
 import io.circe.syntax._
+import io.renku.generators.Generators.Implicits._
 import io.renku.generators.Generators.nonEmptyStrings
-import io.renku.graph.model.{datasets, persons}
 import io.renku.graph.model.RenkuTinyTypeGenerators.{datasetIdentifiers, datasetViewedDates, personGitLabIds}
+import io.renku.graph.model.{datasets, persons}
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.EitherValues
+import org.scalatest.matchers.should
+import org.scalatest.wordspec.AnyWordSpec
 import org.scalatestplus.scalacheck.ScalaCheckPropertyChecks
 
 import java.time.Instant
+import java.time.Instant.now
+import java.time.temporal.ChronoUnit.MINUTES
 
 class DatasetViewedEventSpec
     extends AnyWordSpec
@@ -96,6 +98,19 @@ class DatasetViewedEventSpec
       }""".hcursor.as[DatasetViewedEvent]
 
       result.left.value.getMessage() should include(s"Expected DATASET_VIEWED but got $otherCategory")
+    }
+
+    "decode to now if date in the payload is in the future" in {
+
+      val result = json"""{
+        "categoryName": "DATASET_VIEWED",
+        "dataset": {
+          "identifier": "12345"
+        },
+        "date": ${now.plus(1, MINUTES)}
+      }""".hcursor.as[DatasetViewedEvent]
+
+      result.isRight shouldBe true
     }
   }
 

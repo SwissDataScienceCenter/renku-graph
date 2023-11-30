@@ -20,9 +20,9 @@ package io.renku.triplesgenerator.api.events
 
 import cats.Show
 import cats.syntax.all._
-import io.circe.{Decoder, DecodingFailure, Encoder}
-import io.circe.literal._
 import io.circe.DecodingFailure.Reason.CustomReason
+import io.circe.literal._
+import io.circe.{Decoder, DecodingFailure, Encoder}
 import io.renku.events.CategoryName
 import io.renku.graph.model.{persons, projects}
 import io.renku.json.JsonOps._
@@ -72,8 +72,15 @@ object ProjectViewedEvent {
     for {
       _           <- validateCategory
       slug        <- cursor.downField("project").downField("slug").as[projects.Slug]
-      date        <- cursor.downField("date").as[projects.DateViewed]
       maybeUserId <- cursor.downField("user").as[Option[UserId]]
+      date <- cursor
+                .downField("date")
+                .as[Instant]
+                .map {
+                  case i if (i compareTo Instant.now()) > 0 => Instant.now()
+                  case i                                    => i
+                }
+                .map(projects.DateViewed)
     } yield ProjectViewedEvent(slug, date, maybeUserId)
   }
 
