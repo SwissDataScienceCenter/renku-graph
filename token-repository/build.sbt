@@ -28,4 +28,4 @@ def postgresServer(methodName: String): ClassLoader => Unit = classLoader => {
   method.invoke(instance)
 }
 
-libraryDependencies += "ch.qos.logback" % "logback-classic" % "1.4.13"
+libraryDependencies += "ch.qos.logback" % "logback-classic" % "1.4.14"
