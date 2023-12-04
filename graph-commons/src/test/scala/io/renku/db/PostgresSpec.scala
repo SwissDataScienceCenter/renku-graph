@@ -33,7 +33,7 @@ trait PostgresSpec[DB] extends BeforeAndAfterAll {
   def testDBResource: Resource[IO, DBConfig[DB]] =
     client.randomizedDBResource(prefix = getClass.getSimpleName.toLowerCase)
 
-  lazy val sessionResource: DBConfig[DB] => Resource[IO, Session[IO]] =
+  def sessionResource: DBConfig[DB] => Resource[IO, Session[IO]] =
     client.sessionResource
 
   protected override def beforeAll(): Unit = {

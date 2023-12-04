@@ -36,7 +36,7 @@ class PostgresClient[DB](server: PostgresServer, migrations: SessionResource[IO,
   def randomizedDBResource(prefix: String): Resource[IO, DBConfig[DB]] =
     Random
       .scalaUtilRandom[IO]
-      .flatMap(_.nextIntBounded(100))
+      .flatMap(_.nextIntBounded(1000))
       .map(v => s"${prefix}_$v")
       .toResource >>= dbResource
 
