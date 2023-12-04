@@ -103,6 +103,7 @@ private object CalculatorInfoSet {
     lazy val toDatasetSearchInfo: DatasetSearchInfo = DatasetSearchInfo(
       modelInfo.topmostSameAs,
       modelInfo.name,
+      modelInfo.slug,
       modelInfo.createdOrPublished,
       modelInfo.maybeDateModified,
       modelInfo.creators,
@@ -125,6 +126,7 @@ private object CalculatorInfoSet {
   private def toString(info: ModelDatasetSearchInfo) = List(
     show"topmostSameAs = ${info.topmostSameAs}",
     show"name = ${info.name}",
+    show"slug = ${info.slug}",
     show"visibility = ${info.link.visibility}",
     show"link = ${info.link}"
   ).mkString(", ")

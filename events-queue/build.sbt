@@ -18,3 +18,13 @@
 
 organization := "io.renku"
 name := "events-queue"
+
+Test / testOptions += Tests.Setup(postgresServer("start"))
+Test / testOptions += Tests.Cleanup(postgresServer("forceStop"))
+
+def postgresServer(methodName: String): ClassLoader => Unit = classLoader => {
+  val clazz    = classLoader.loadClass("io.renku.eventsqueue.EventsQueuePostgresServer$")
+  val method   = clazz.getMethod(methodName)
+  val instance = clazz.getField("MODULE$").get(null)
+  method.invoke(instance)
+}

@@ -21,6 +21,7 @@ package io.renku.triplesgenerator.events.consumers.triplesgenerated
 import cats.effect.Async
 import cats.syntax.all._
 import cats.{NonEmptyParallel, Parallel}
+import com.typesafe.config.Config
 import io.renku.events.Subscription.SubscriberCapacity
 import io.renku.events.consumers
 import io.renku.events.consumers.subscriptions.SubscriptionMechanism
@@ -42,7 +43,8 @@ object SubscriptionFactory {
   ]: Async: NonEmptyParallel: Parallel: ReProvisioningStatus: GitLabClient: AccessTokenFinder: Logger: MetricsRegistry: SparqlQueryTimeRecorder](
       tsWriteLock:         TsWriteLock[F],
       topSameAsLock:       Lock[F, datasets.TopmostSameAs],
-      projectSparqlClient: ProjectSparqlClient[F]
+      projectSparqlClient: ProjectSparqlClient[F],
+      config:              Config
   )(implicit renkuUrl: RenkuUrl): F[(consumers.EventHandler[F], SubscriptionMechanism[F])] = for {
     concurrentProcessesNumber <- ConcurrentProcessesNumber[F]()
     subscriptionMechanism <-
@@ -54,7 +56,12 @@ object SubscriptionFactory {
         )
       )
     _ <- ReProvisioningStatus[F].registerForNotification(subscriptionMechanism)
-    handler <-
-      EventHandler(subscriptionMechanism, concurrentProcessesNumber, tsWriteLock, topSameAsLock, projectSparqlClient)
+    handler <- EventHandler(subscriptionMechanism,
+                            concurrentProcessesNumber,
+                            tsWriteLock,
+                            topSameAsLock,
+                            projectSparqlClient,
+                            config
+               )
   } yield handler -> subscriptionMechanism
 }

@@ -32,8 +32,8 @@ import io.renku.knowledgegraph.projects.images.ImageUrisEncoder
 
 private final case class ProjectDataset(identifier:          Identifier,
                                         originalIdentifier:  OriginalIdentifier,
-                                        title:               Title,
                                         name:                Name,
+                                        slug:                Slug,
                                         createdOrPublished:  CreatedOrPublished,
                                         maybeDateModified:   Option[DateModified],
                                         sameAsOrDerivedFrom: ProjectDataset.SameAsOrDerived,
@@ -65,23 +65,22 @@ private object ProjectDataset extends ImageUrisEncoder {
     Encoder.instance[ProjectDataset] {
       case ProjectDataset(id,
                           originalId,
-                          title,
                           name,
+                          dsSlug,
                           createdOrPublished,
                           maybeDateModified,
                           sameAsOrDerived,
                           images
           ) =>
         json"""{
-        "identifier": $id,
-        "versions": {
-          "initial": $originalId
-        },
-        "title":  $title,
-        "name":   $name,
-        "slug":   $name,
-        "images": ${images -> projectSlug}
-      }"""
+          "identifier": $id,
+          "versions": {
+            "initial": $originalId
+          },
+          "name":   $name,
+          "slug":   $dsSlug,
+          "images": ${images -> projectSlug}
+        }"""
           .deepMerge(sameAsOrDerived.asJson)
           .deepMerge(createdOrPublished.asJson)
           .deepMerge((sameAsOrDerived -> maybeDateModified).asJson)
@@ -90,7 +89,7 @@ private object ProjectDataset extends ImageUrisEncoder {
               Rel("details") -> knowledgegraph.datasets.details.Endpoint.href(renkuApiUrl, RequestedDataset(id)),
               Rel("initial-version") ->
                 knowledgegraph.datasets.details.Endpoint.href(renkuApiUrl, RequestedDataset(originalId.asIdentifier)),
-              Rel("tags") -> knowledgegraph.projects.datasets.tags.Endpoint.href(renkuApiUrl, projectSlug, name)
+              Rel("tags") -> knowledgegraph.projects.datasets.tags.Endpoint.href(renkuApiUrl, projectSlug, dsSlug)
             )
           )
           .deepDropNullValues

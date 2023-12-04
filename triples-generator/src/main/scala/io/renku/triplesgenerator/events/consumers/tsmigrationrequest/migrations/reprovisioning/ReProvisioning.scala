@@ -54,7 +54,11 @@ private class ReProvisioningImpl[F[_]: Temporal: Logger](
     retryDelay:            FiniteDuration
 ) extends ConditionedMigration[F] {
 
-  override val name: Migration.Name = migrationName
+  // In fact this is an exclusive migration but not Registered
+  // Hence, the flag has to be set to false to satisfy Migrations validation
+  // TSStateChecker returns a special state if it's ongoing
+  override val exclusive: Boolean        = false
+  override val name:      Migration.Name = migrationName
 
   import eventSender._
   import executionTimeRecorder._

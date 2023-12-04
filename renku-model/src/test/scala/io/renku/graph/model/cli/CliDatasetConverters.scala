@@ -22,8 +22,8 @@ import cats.syntax.all._
 import io.renku.cli.model._
 import io.renku.graph.model.testentities.Dataset.DatasetImagesOps
 import io.renku.graph.model.testentities.HavingInvalidationTime
-import io.renku.jsonld.syntax._
 import io.renku.graph.model.{RenkuUrl, datasets, publicationEvents, testentities}
+import io.renku.jsonld.syntax._
 
 trait CliDatasetConverters extends CliCommonConverters {
 
@@ -32,8 +32,8 @@ trait CliDatasetConverters extends CliCommonConverters {
     CliDataset(
       resourceId = id,
       identifier = dataset.identification.identifier,
-      title = dataset.identification.title,
       name = dataset.identification.name,
+      slug = dataset.identification.slug,
       createdOrPublished = dataset.provenance.date,
       dateModified = datasets.DateModified(dataset.provenance.date),
       creators = dataset.provenance.creators.map(from),

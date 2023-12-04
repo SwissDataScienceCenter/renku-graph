@@ -18,7 +18,15 @@
 
 name := "graph-commons"
 
-Test / fork := true
+Test / testOptions += Tests.Setup(postgresServer("start"))
+Test / testOptions += Tests.Cleanup(postgresServer("forceStop"))
+
+def postgresServer(methodName: String): ClassLoader => Unit = classLoader => {
+  val clazz    = classLoader.loadClass("io.renku.db.CommonsPostgresServer$")
+  val method   = clazz.getMethod(methodName)
+  val instance = clazz.getField("MODULE$").get(null)
+  method.invoke(instance)
+}
 
 libraryDependencies ++=
   Dependencies.pureconfig ++

@@ -60,6 +60,7 @@ private object ModelSearchInfoExtractor {
   ) = ModelDatasetSearchInfo(
     ds.provenance.topmostSameAs,
     ds.identification.name,
+    ds.identification.slug,
     createdOrPublished,
     maybeDateModified,
     ds.provenance.creators.map(Creator.from),

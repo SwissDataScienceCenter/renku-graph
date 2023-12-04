@@ -33,6 +33,7 @@ class ModelDatasetSearchInfoSpec extends AnyWordSpec with should.Matchers with S
       forAll(modelDatasetSearchInfoObjects) {
         case info @ ModelDatasetSearchInfo(topSameAs,
                                            name,
+                                           slug,
                                            createdOrPublished,
                                            maybeDateModified,
                                            creators,
@@ -44,6 +45,7 @@ class ModelDatasetSearchInfoSpec extends AnyWordSpec with should.Matchers with S
           info.show shouldBe List(
             show"topmostSameAs = $topSameAs".some,
             show"name = $name".some,
+            show"slug = $slug".some,
             show"visibility = ${link.visibility}".some,
             createdOrPublished match {
               case d: datasets.DateCreated   => show"dateCreated = $d".some

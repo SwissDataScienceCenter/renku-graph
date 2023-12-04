@@ -45,6 +45,7 @@ private object EntityConverters {
     Entity.Dataset(
       MatchingScore.min,
       dataset.provenance.topmostSameAs,
+      dataset.identification.slug,
       dataset.identification.name,
       project.visibility,
       dataset.provenance.date,

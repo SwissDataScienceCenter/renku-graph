@@ -16,15 +16,15 @@
  * limitations under the License.
  */
 
-package io.renku.triplesgenerator.events.consumers.tsmigrationrequest.migrations
+package io.renku.triplesgenerator.events.consumers.tsmigrationrequest
+package migrations
 package tooling
 
+import ConditionedMigration.MigrationRequired
 import cats.MonadThrow
 import cats.data.EitherT
 import cats.syntax.all._
 import io.renku.triplesgenerator.errors.ProcessingRecoverableError
-import io.renku.triplesgenerator.events.consumers.tsmigrationrequest.ConditionedMigration.MigrationRequired
-import io.renku.triplesgenerator.events.consumers.tsmigrationrequest.{ConditionedMigration, Migration}
 import org.typelevel.log4cats.Logger
 
 private[migrations] abstract class RegisteredMigration[F[_]: MonadThrow: Logger](

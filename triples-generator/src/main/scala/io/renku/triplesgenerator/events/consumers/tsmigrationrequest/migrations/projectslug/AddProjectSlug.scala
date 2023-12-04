@@ -41,6 +41,9 @@ private class AddProjectSlug[F[_]: Async: Logger](
     recoveryStrategy:     RecoverableErrorsRecovery = RecoverableErrorsRecovery
 ) extends ConditionedMigration[F] {
 
+  override val exclusive: Boolean        = false
+  override val name:      Migration.Name = AddProjectSlug.name
+
   import executionRegister._
   import fs2._
   import progressFinder._
@@ -49,8 +52,6 @@ private class AddProjectSlug[F[_]: Async: Logger](
   import projectsFinder._
   import recoveryStrategy._
   import slugPersister.persistSlug
-
-  override val name: Migration.Name = AddProjectSlug.name
 
   protected[projectslug] override def required
       : EitherT[F, ProcessingRecoverableError, ConditionedMigration.MigrationRequired] = EitherT {

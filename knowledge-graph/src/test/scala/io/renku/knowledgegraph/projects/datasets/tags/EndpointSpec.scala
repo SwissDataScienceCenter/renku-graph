@@ -28,7 +28,7 @@ import io.renku.data.Message
 import io.renku.generators.CommonGraphGenerators.{authUsers, pagingRequests, pagingResponses}
 import io.renku.generators.Generators.Implicits._
 import io.renku.generators.Generators._
-import io.renku.graph.model.GraphModelGenerators.{datasetNames, projectSlugs, renkuUrls}
+import io.renku.graph.model.GraphModelGenerators.{datasetSlugs, projectSlugs, renkuUrls}
 import io.renku.graph.model.publicationEvents
 import io.renku.http.rest.paging.{PagingHeaders, PagingRequest, PagingResponse}
 import io.renku.http.server.EndpointTester._
@@ -48,13 +48,13 @@ import org.scalatestplus.scalacheck.ScalaCheckPropertyChecks
 
 class EndpointSpec extends AnyWordSpec with should.Matchers with MockFactory with ScalaCheckPropertyChecks with IOSpec {
 
-  "GET /projects/:slug/datasets/:name/tags" should {
+  "GET /projects/:slug/datasets/:dsSlug/tags" should {
 
     "respond with OK and the found tags" in new TestCase {
       forAll(pagingResponses(modelTags)) { results =>
         (finder.findTags _).expects(criteria).returning(results.pure[IO])
 
-        val response = endpoint.`GET /projects/:slug/datasets/:name/tags`(criteria).unsafeRunSync()
+        val response = endpoint.`GET /projects/:slug/datasets/:dsSlug/tags`(criteria).unsafeRunSync()
 
         response.status        shouldBe Ok
         response.contentType   shouldBe Some(`Content-Type`(application.json))
@@ -69,7 +69,7 @@ class EndpointSpec extends AnyWordSpec with should.Matchers with MockFactory wit
       val results = PagingResponse.empty[model.Tag](pagingRequests.generateOne)
       (finder.findTags _).expects(criteria).returning(results.pure[IO])
 
-      val response = endpoint.`GET /projects/:slug/datasets/:name/tags`(criteria).unsafeRunSync()
+      val response = endpoint.`GET /projects/:slug/datasets/:dsSlug/tags`(criteria).unsafeRunSync()
 
       response.status        shouldBe Ok
       response.contentType   shouldBe Some(`Content-Type`(application.json))
@@ -83,7 +83,7 @@ class EndpointSpec extends AnyWordSpec with should.Matchers with MockFactory wit
       val exception = exceptions.generateOne
       (finder.findTags _).expects(criteria).returning(exception.raiseError[IO, PagingResponse[model.Tag]])
 
-      val response = endpoint.`GET /projects/:slug/datasets/:name/tags`(criteria).unsafeRunSync()
+      val response = endpoint.`GET /projects/:slug/datasets/:dsSlug/tags`(criteria).unsafeRunSync()
 
       response.status      shouldBe InternalServerError
       response.contentType shouldBe Some(`Content-Type`(application.json))
@@ -111,9 +111,9 @@ class EndpointSpec extends AnyWordSpec with should.Matchers with MockFactory wit
 
   private lazy val criterias = for {
     projectSlug <- projectSlugs
-    datasetName <- datasetNames
+    datasetSlug <- datasetSlugs
     maybeUser   <- authUsers.toGeneratorOfOptions
-  } yield Criteria(projectSlug, datasetName, PagingRequest.default, maybeUser)
+  } yield Criteria(projectSlug, datasetSlug, PagingRequest.default, maybeUser)
 
   private def tagsDecoder(possibleTags: List[model.Tag]): Decoder[model.Tag] = Decoder.instance { cursor =>
     import io.renku.tinytypes.json.TinyTypeDecoders._

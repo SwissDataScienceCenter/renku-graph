@@ -25,6 +25,7 @@ import fs2.concurrent.SignallingRef
 import fs2.{Chunk, Pipe, Stream}
 import io.circe.Json
 import io.circe.syntax._
+import io.renku.db.DBConfigProvider.DBConfig
 import io.renku.db.syntax._
 import io.renku.events.CategoryName
 import io.renku.events.Generators.categoryNames
@@ -37,7 +38,7 @@ import org.scalatest.wordspec.AsyncWordSpec
 class EventsQueueSpec
     extends AsyncWordSpec
     with AsyncIOSpec
-    with EventsQueueDBSpec
+    with EventsQueuePostgresSpec
     with should.Matchers
     with AsyncMockFactory {
 
@@ -45,8 +46,7 @@ class EventsQueueSpec
 
     "encode the payload, " +
       "persist it in the DB and " +
-      "send a notification over the Channel" in {
-
+      "send a notification over the Channel" in testDBResource.use { implicit cfg =>
         val repository = createRepository()
         val event      = events.generateOne
 
@@ -64,52 +64,51 @@ class EventsQueueSpec
     "obtain an infinite Stream of chunks of events from the repository " +
       "which status is already updated before passing to the handler " +
       "and deleted afterwards " +
-      "- case when there are chunks of events in the queue before any notification is received" in {
+      "- case when there are chunks of events in the queue before any notification is received" in testDBResource.use {
+        implicit cfg =>
+          val initialEvents1 = dequeuedEvents.generateList(min = 1)
+          val initialEvents2 = dequeuedEvents.generateList(min = 1)
+          val repository     = createRepository(initialEvents1, initialEvents2)
 
-        val initialEvents1 = dequeuedEvents.generateList(min = 1)
-        val initialEvents2 = dequeuedEvents.generateList(min = 1)
-        val repository     = createRepository(initialEvents1, initialEvents2)
+          val handler = new AccumulatingHandler
+
+          val allEvents = initialEvents1 ::: initialEvents2
+
+          for {
+            deqFiber <- queue(repository).acquireEventsStream(category).through(handler).compile.drain.start
+            _        <- handler.handledEvents.waitUntil(_ == allEvents)
+            _        <- deqFiber.cancel
+            _        <- repository.processed.get.asserting(_ shouldBe allEvents.map(_.id))
+            res      <- repository.deleted.get.asserting(_ shouldBe allEvents.map(_.id))
+          } yield res
+      }
+
+    "continue receiving subsequent chunks of events on every notification received from the channel" in testDBResource
+      .use { implicit cfg =>
+        val initialEvents = dequeuedEvents.generateList(min = 1)
+        val repository    = createRepository(initialEvents)
 
         val handler = new AccumulatingHandler
 
-        val allEvents = initialEvents1 ::: initialEvents2
+        val onNotifEvents = dequeuedEvents.generateList(min = 1)
+        val allEvents     = initialEvents ::: onNotifEvents
 
         for {
           deqFiber <- queue(repository).acquireEventsStream(category).through(handler).compile.drain.start
+          _        <- handler.handledEvents.waitUntil(_ == initialEvents)
+          _        <- repository.addEventBatch(onNotifEvents)
+          _        <- notify(category)
           _        <- handler.handledEvents.waitUntil(_ == allEvents)
           _        <- deqFiber.cancel
           _        <- repository.processed.get.asserting(_ shouldBe allEvents.map(_.id))
           res      <- repository.deleted.get.asserting(_ shouldBe allEvents.map(_.id))
         } yield res
       }
-
-    "continue receiving subsequent chunks of events on every notification received from the channel" in {
-
-      val initialEvents = dequeuedEvents.generateList(min = 1)
-      val repository    = createRepository(initialEvents)
-
-      val handler = new AccumulatingHandler
-
-      val onNotifEvents = dequeuedEvents.generateList(min = 1)
-      val allEvents     = initialEvents ::: onNotifEvents
-
-      for {
-        deqFiber <- queue(repository).acquireEventsStream(category).through(handler).compile.drain.start
-        _        <- handler.handledEvents.waitUntil(_ == initialEvents)
-        _        <- repository.addEventBatch(onNotifEvents)
-        _        <- notify(category)
-        _        <- handler.handledEvents.waitUntil(_ == allEvents)
-        _        <- deqFiber.cancel
-        _        <- repository.processed.get.asserting(_ shouldBe allEvents.map(_.id))
-        res      <- repository.deleted.get.asserting(_ shouldBe allEvents.map(_.id))
-      } yield res
-    }
   }
 
   "returnToQueue" should {
 
-    "change status of the given event to New" in {
-
+    "change status of the given event to New" in testDBResource.use { implicit cfg =>
       val event = dequeuedEvents.generateOne
 
       val repository = createRepository()
@@ -122,7 +121,8 @@ class EventsQueueSpec
   private lazy val category = categoryNames.generateOne
 
   private val categoryLock: Lock[IO, CategoryName] = Lock.none[IO, CategoryName]
-  private def queue(repository: Repository) = new EventsQueueImpl[IO, TestDB](repository, categoryLock)
+  private def queue(repository: Repository)(implicit cfg: DBConfig[TestDB]) =
+    new EventsQueueImpl[IO, TestDB](repository, categoryLock)
 
   private def createRepository(eventBatches: List[DequeuedEvent]*) =
     new Repository(eventBatches.toList)

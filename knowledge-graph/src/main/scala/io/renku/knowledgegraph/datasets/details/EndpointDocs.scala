@@ -75,8 +75,8 @@ private class EndpointDocsImpl(implicit gitLabUrl: GitLabUrl, renkuApiUrl: renku
     Dataset
       .NonModifiedDataset(
         datasets.ResourceId((renkuUrl / "datasets" / "123444").show),
-        datasets.Title("title"),
         datasets.Name("name"),
+        datasets.Slug("slug"),
         sameAs,
         DatasetVersions(datasets.OriginalIdentifier("12333")),
         Tag(publicationEvents.Name("2.0"), publicationEvents.Description("Tag Dataset was imported from").some).some,

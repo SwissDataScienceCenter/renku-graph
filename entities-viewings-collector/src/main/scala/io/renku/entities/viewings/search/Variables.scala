@@ -38,6 +38,7 @@ object Variables {
     val matchingScore     = VarName("matchingScore")
     val entityType        = VarName("entityType")
     val datasetName       = VarName("datasetName")
+    val datasetSlug       = VarName("datasetSlug")
     val datasetSameAs     = VarName("datasetSameAs")
     val dateCreated       = VarName("dateCreated")
     val datePublished     = VarName("datePublished")
@@ -55,6 +56,7 @@ object Variables {
       matchingScore,
       entityType,
       datasetName,
+      datasetSlug,
       datasetSameAs,
       dateCreated,
       datePublished,
@@ -73,8 +75,9 @@ object Variables {
       for {
         matchingScore      <- read[MatchingScore](matchingScore)
         name               <- read[datasets.Name](datasetName)
+        slug               <- read[datasets.Slug](datasetSlug)
         sameAs             <- read[datasets.TopmostSameAs](datasetSameAs)
-        slug               <- read[projects.Slug](projectSlug)
+        projectSlug        <- read[projects.Slug](projectSlug)
         visibility         <- read[projects.Visibility](projectVisibility)
         maybeDateCreated   <- read[Option[datasets.DateCreated]](dateCreated)
         maybeDatePublished <- read[Option[datasets.DatePublished]](datePublished)
@@ -91,6 +94,7 @@ object Variables {
       } yield SearchEntity.Dataset(
         matchingScore,
         sameAs,
+        slug,
         name,
         visibility,
         date,
@@ -99,7 +103,7 @@ object Variables {
         keywords,
         maybeDesc,
         images,
-        slug
+        projectSlug
       )
     }
   }

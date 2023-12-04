@@ -91,7 +91,7 @@ object LineageExemplarData {
 
       rawDataset.copy(
         identification =
-          rawDataset.identification.copy(title = datasets.Title("zhbikes"), name = datasets.Name("zhbikes")),
+          rawDataset.identification.copy(name = datasets.Name("zhbikes"), slug = datasets.Slug("zhbikes")),
         parts = List(datasetPart(velo2018), datasetPart(velo2019))
       )
     }

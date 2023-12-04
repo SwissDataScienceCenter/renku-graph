@@ -19,48 +19,40 @@
 package io.renku.tokenrepository.repository.init
 
 import cats.effect.IO
+import cats.effect.testing.scalatest.AsyncIOSpec
 import io.renku.interpreters.TestLogger.Level.Info
-import io.renku.testtools.IOSpec
-import org.scalamock.scalatest.MockFactory
-import org.scalatest.concurrent.{Eventually, IntegrationPatience}
-import org.scalatest.flatspec.AnyFlatSpec
+import org.scalamock.scalatest.AsyncMockFactory
+import org.scalatest.Succeeded
+import org.scalatest.flatspec.AsyncFlatSpec
 import org.scalatest.matchers.should
 
 class ProjectPathToSlugSpec
-    extends AnyFlatSpec
-    with IOSpec
+    extends AsyncFlatSpec
+    with AsyncIOSpec
     with DbInitSpec
-    with Eventually
-    with IntegrationPatience
     with should.Matchers
-    with MockFactory {
+    with AsyncMockFactory {
 
-  protected override lazy val migrationsToRun: List[DBMigration[IO]] = allMigrations.takeWhile {
-    case _: ProjectPathToSlug[IO] => false
-    case _ => true
-  }
+  protected override lazy val runMigrationsUpTo: Class[_ <: DBMigration[IO]] =
+    classOf[ProjectPathToSlug[IO]]
 
   it should "rename the 'project_path' column to 'project_slug' " +
-    "as well as rename the 'idx_project_path' index" in {
+    "as well as rename the 'idx_project_path' index" in testDBResource.use { implicit cfg =>
+      for {
+        _ <- verifyColumnExists("projects_tokens", "project_path").asserting(_ shouldBe true)
+        _ <- verifyColumnExists("projects_tokens", "project_slug").asserting(_ shouldBe false)
 
-      verifyColumnExists("projects_tokens", "project_path") shouldBe true
-      verifyColumnExists("projects_tokens", "project_slug") shouldBe false
+        _ <- logger.resetF()
+        _ <- ProjectPathToSlug[IO].run.assertNoException
+        _ <- verifyColumnExists("projects_tokens", "project_path").asserting(_ shouldBe false)
+        _ <- verifyColumnExists("projects_tokens", "project_slug").asserting(_ shouldBe true)
+        _ <- logger.loggedOnlyF(Info("column 'project_path' renamed to 'project_slug'"))
 
-      projectPathToSlug.run.unsafeRunSync()
-
-      logger.loggedOnly(Info("column 'project_path' renamed to 'project_slug'"))
-      logger.reset()
-
-      verifyColumnExists("projects_tokens", "project_path") shouldBe false
-      verifyColumnExists("projects_tokens", "project_slug") shouldBe true
-
-      projectPathToSlug.run.unsafeRunSync()
-
-      logger.loggedOnly(Info("'project_slug' column existed"))
-
-      verifyIndexExists("projects_tokens", "idx_project_path") shouldBe false
-      verifyIndexExists("projects_tokens", "idx_project_slug") shouldBe true
+        _ <- logger.resetF()
+        _ <- ProjectPathToSlug[IO].run.assertNoException
+        _ <- verifyIndexExists("projects_tokens", "idx_project_path").asserting(_ shouldBe false)
+        _ <- verifyIndexExists("projects_tokens", "idx_project_slug").asserting(_ shouldBe true)
+        _ <- logger.loggedOnlyF(Info("'project_slug' column existed"))
+      } yield Succeeded
     }
-
-  private lazy val projectPathToSlug = new ProjectPathToSlug[IO]
 }

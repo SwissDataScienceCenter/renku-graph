@@ -18,70 +18,124 @@
 
 package io.renku.tokenrepository.repository.init
 
-import cats.data.Kleisli
 import cats.effect.IO
 import cats.syntax.all._
+import io.renku.db.DBConfigProvider.DBConfig
+import io.renku.db.SessionResource
 import io.renku.graph.model.projects.{GitLabId, Slug}
-import io.renku.testtools.IOSpec
-import io.renku.tokenrepository.repository.InMemoryProjectsTokensDb
+import io.renku.http.client.GitLabClient
+import io.renku.interpreters.TestLogger
 import io.renku.tokenrepository.repository.creation.TokenDates.ExpiryDate
-import org.scalamock.scalatest.MockFactory
+import io.renku.tokenrepository.repository.metrics.{QueriesExecutionTimes, TestQueriesExecutionTimes}
+import io.renku.tokenrepository.repository.{ProjectsTokensDB, TokenRepositoryPostgresSpec}
+import org.scalamock.scalatest.AsyncMockFactory
 import org.scalatest.{BeforeAndAfter, Suite}
+import skunk._
 import skunk.codec.all._
 import skunk.data.Completion
 import skunk.implicits._
-import skunk.{Query, Void}
 
 import java.time.LocalDate
 
-trait DbInitSpec extends InMemoryProjectsTokensDb with DbMigrations with BeforeAndAfter {
-  self: Suite with IOSpec with MockFactory =>
+trait DbInitSpec extends TokenRepositoryPostgresSpec with BeforeAndAfter {
+  self: Suite with AsyncMockFactory =>
 
-  protected val migrationsToRun: List[DBMigration[IO]]
-
+  implicit lazy val logger: TestLogger[IO] = TestLogger()
   before {
-    findAllTables() foreach dropTable
-    migrationsToRun.map(_.run).sequence.unsafeRunSync()
     logger.reset()
   }
 
-  private def findAllTables(): List[String] = execute {
-    Kleisli { session =>
-      val query: Query[Void, String] = sql"""
-          SELECT DISTINCT tablename FROM pg_tables
-          WHERE schemaname != 'pg_catalog'
-            AND schemaname != 'information_schema'""".query(name)
-      session.execute(query)
-    }
+  protected val runMigrationsUpTo: Class[_ <: DBMigration[IO]]
+
+  override lazy val migrations: SessionResource[IO, ProjectsTokensDB] => IO[Unit] = { sr =>
+    implicit val gl:  GitLabClient[IO]                     = mock[GitLabClient[IO]]
+    implicit val qet: QueriesExecutionTimes[IO]            = TestQueriesExecutionTimes[IO]
+    implicit val msr: ProjectsTokensDB.SessionResource[IO] = ProjectsTokensDB.SessionResource[IO](sr)
+    DbInitializer
+      .migrations[IO]
+      .flatMap {
+        _.takeWhile(_.getClass != runMigrationsUpTo)
+          .map(_.run)
+          .sequence
+      }
+      .void
   }
 
-  protected def findToken(projectId: GitLabId): Option[String] = sessionResource
-    .useK {
-      val query: Query[Int, String] = sql"select token from projects_tokens where project_id = $int4"
-        .query(varchar)
-      Kleisli(_.prepare(query).flatMap(_.option(projectId.value)))
+  protected def findToken(projectSlug: Slug)(implicit cfg: DBConfig[ProjectsTokensDB]): IO[Option[String]] =
+    sessionResource(cfg).use { session =>
+      val query: Query[String, String] =
+        sql"select token from projects_tokens where project_path = $varchar".query(varchar)
+      session.prepare(query).flatMap(_.option(projectSlug.value))
     }
-    .unsafeRunSync()
 
-  protected def findToken(projectSlug: Slug): Option[String] = sessionResource
-    .useK {
-      val query: Query[String, String] = sql"select token from projects_tokens where project_path = $varchar"
-        .query(varchar)
-      Kleisli(_.prepare(query).flatMap(_.option(projectSlug.value)))
-    }
-    .unsafeRunSync()
-
-  protected def findExpiryDate(projectId: GitLabId): Option[ExpiryDate] = sessionResource
-    .useK {
+  protected def findExpiryDate(projectId: GitLabId)(implicit cfg: DBConfig[ProjectsTokensDB]): IO[Option[ExpiryDate]] =
+    sessionResource(cfg).use { session =>
       val query: Query[Int, ExpiryDate] = sql"SELECT expiry_date FROM projects_tokens WHERE project_id = $int4"
         .query(date)
         .map { case expiryDate: LocalDate => ExpiryDate(expiryDate) }
-      Kleisli(_.prepare(query).flatMap(_.option(projectId.value)))
+      session.prepare(query).flatMap(_.option(projectId.value))
     }
-    .unsafeRunSync()
 
   protected lazy val assureInserted: Completion => Unit = {
     case Completion.Insert(1) => ()
     case _                    => fail("insertion problem")
   }
+
+  protected def tableExists(tableName: String)(implicit cfg: DBConfig[ProjectsTokensDB]): IO[Boolean] =
+    sessionResource(cfg).use { session =>
+      val query: Query[String, Boolean] =
+        sql"SELECT EXISTS (SELECT 1 FROM pg_tables WHERE tablename = $varchar)".query(bool)
+      session.prepare(query).flatMap(_.unique(tableName)).recover { case _ => false }
+    }
+
+  protected def verifyColumnExists(table: String, column: String)(implicit
+      cfg: DBConfig[ProjectsTokensDB]
+  ): IO[Boolean] =
+    sessionResource(cfg).use { session =>
+      val query: Query[String *: String *: EmptyTuple, Boolean] =
+        sql"""SELECT EXISTS (
+              SELECT *
+              FROM information_schema.columns
+              WHERE table_name = $varchar AND column_name = $varchar
+            )""".query(bool)
+      session
+        .prepare(query)
+        .flatMap(_.unique(table *: column *: EmptyTuple))
+        .recover { case _ => false }
+    }
+
+  protected def verifyColumnNullable(table: String, column: String)(implicit
+      cfg: DBConfig[ProjectsTokensDB]
+  ): IO[Boolean] =
+    sessionResource(cfg).use { session =>
+      val query: Query[String *: String *: EmptyTuple, Boolean] =
+        sql""" SELECT DISTINCT is_nullable
+               FROM INFORMATION_SCHEMA.COLUMNS
+               WHERE table_name = $varchar AND column_name = $varchar"""
+          .query(varchar(3))
+          .map {
+            case "YES" => true
+            case "NO"  => false
+            case other => throw new Exception(s"is_nullable for $table.$column has value $other")
+          }
+      session
+        .prepare(query)
+        .flatMap(_.unique(table *: column *: EmptyTuple))
+    }
+
+  def verifyIndexExists(table: String, indexName: String)(implicit
+      cfg: DBConfig[ProjectsTokensDB]
+  ): IO[Boolean] =
+    sessionResource(cfg).use { session =>
+      val query: Query[String *: String *: EmptyTuple, Boolean] =
+        sql"""SELECT EXISTS (
+                SELECT *
+                FROM pg_indexes
+                WHERE tablename = $varchar AND indexname = $varchar
+              )""".query(bool)
+      session
+        .prepare(query)
+        .flatMap(_.unique(table *: indexName *: EmptyTuple))
+        .recover { case _ => false }
+    }
 }

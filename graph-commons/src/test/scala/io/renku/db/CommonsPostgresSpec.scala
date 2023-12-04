@@ -19,28 +19,11 @@
 package io.renku.db
 
 import cats.effect.IO
-import io.renku.testtools.IOSpec
-import org.scalamock.scalatest.MockFactory
-import org.scalatest.matchers.should
-import org.scalatest.wordspec.AnyWordSpec
+import org.scalatest.Suite
 
-class SessionResourceResourceSpec extends AnyWordSpec with IOSpec with MockFactory with should.Matchers {
+trait TestDB
 
-  "use" should {
-
-    "pass the sessionResource built with the DBConfig to the given block" in new TestCase {
-
-      transactedBlock.expects(*).returning(IO.unit)
-
-      ssessionResource.use(transactedBlock).unsafeRunSync() shouldBe ()
-    }
-  }
-
-  private trait TestCase {
-    import natchez.Trace.Implicits.noop
-    trait TestDB
-    val transactedBlock  = mockFunction[SessionResource[IO, TestDB], IO[Unit]]
-    val dbConfig         = TestDbConfig.create[TestDB]
-    val ssessionResource = SessionPoolResource[IO, TestDB](dbConfig)
-  }
+trait CommonsPostgresSpec extends PostgresSpec[TestDB] { self: Suite =>
+  lazy val server:     PostgresServer                          = CommonsPostgresServer
+  lazy val migrations: SessionResource[IO, TestDB] => IO[Unit] = _ => IO.unit
 }

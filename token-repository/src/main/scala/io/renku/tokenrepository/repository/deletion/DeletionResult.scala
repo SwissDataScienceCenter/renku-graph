@@ -18,11 +18,15 @@
 
 package io.renku.tokenrepository.repository.deletion
 
-sealed trait DeletionResult {
+import cats.Show
+
+sealed trait DeletionResult extends Product {
   lazy val widen: DeletionResult = this
 }
 
 object DeletionResult {
   case object Deleted    extends DeletionResult
   case object NotExisted extends DeletionResult
+
+  implicit def show[R <: DeletionResult]: Show[R] = Show.show(_.productPrefix)
 }

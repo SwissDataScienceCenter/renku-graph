@@ -28,10 +28,11 @@ import io.renku.triplesstore.{SparqlQuery, SparqlQueryTimeRecorder}
 import org.typelevel.log4cats.Logger
 
 private[migrations] class UpdateQueryMigration[F[_]: MonadThrow](
-    val name:          Migration.Name,
-    updateQuery:       SparqlQuery,
-    updateQueryRunner: UpdateQueryRunner[F],
-    recoveryStrategy:  RecoverableErrorsRecovery = RecoverableErrorsRecovery
+    override val name:      Migration.Name,
+    override val exclusive: Boolean,
+    updateQuery:            SparqlQuery,
+    updateQueryRunner:      UpdateQueryRunner[F],
+    recoveryStrategy:       RecoverableErrorsRecovery = RecoverableErrorsRecovery
 ) extends Migration[F] {
   import recoveryStrategy._
 
@@ -47,7 +48,8 @@ private[migrations] object UpdateQueryMigration {
 
   def apply[F[_]: Async: Logger: SparqlQueryTimeRecorder](
       name:        Migration.Name,
+      exclusive:   Boolean,
       updateQuery: SparqlQuery
   ): F[UpdateQueryMigration[F]] =
-    UpdateQueryRunner[F].map(new UpdateQueryMigration[F](name, updateQuery, _))
+    UpdateQueryRunner[F].map(new UpdateQueryMigration[F](name, exclusive, updateQuery, _))
 }

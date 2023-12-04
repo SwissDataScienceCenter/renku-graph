@@ -45,6 +45,8 @@ private class ReindexLucene[F[_]: Async: Logger](
     recoveryStrategy:     RecoverableErrorsRecovery = RecoverableErrorsRecovery
 ) extends RegisteredMigration[F](migrationName, executionRegister, recoveryStrategy) {
 
+  override val exclusive: Boolean = false
+
   private val applicative = Applicative[F]
   import applicative.whenA
   import envReadinessChecker._

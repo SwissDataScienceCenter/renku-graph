@@ -35,8 +35,9 @@ import io.renku.triplesgenerator.errors.ProcessingRecoverableError
 import org.typelevel.log4cats.Logger
 
 private trait Migration[F[_]] {
-  def name:  Name
-  def run(): EitherT[F, ProcessingRecoverableError, Unit]
+  def name:      Name
+  def exclusive: Boolean
+  def run():     EitherT[F, ProcessingRecoverableError, Unit]
 }
 
 private object Migration {

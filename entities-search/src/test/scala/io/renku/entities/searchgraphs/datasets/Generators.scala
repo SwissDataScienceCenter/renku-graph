@@ -33,6 +33,7 @@ private object Generators {
   implicit lazy val datasetSearchInfoObjects: Gen[DatasetSearchInfo] = for {
     topmostSameAs      <- datasetTopmostSameAs
     name               <- datasetNames
+    slug               <- datasetSlugs
     createdOrPublished <- datasetCreatedOrPublished
     maybeDateModified  <- datasetModifiedDates(notYoungerThan = createdOrPublished).toGeneratorOfOptions
     creators           <- creators.toGeneratorOfNonEmptyList(max = 2)
@@ -42,6 +43,7 @@ private object Generators {
     links              <- linkObjectsGen(topmostSameAs).toGeneratorOfNonEmptyList()
   } yield DatasetSearchInfo(topmostSameAs,
                             name,
+                            slug,
                             createdOrPublished,
                             maybeDateModified,
                             creators,
@@ -61,6 +63,7 @@ private object Generators {
   implicit lazy val modelDatasetSearchInfoObjects: Gen[ModelDatasetSearchInfo] = for {
     topmostSameAs      <- datasetTopmostSameAs
     name               <- datasetNames
+    slug               <- datasetSlugs
     createdOrPublished <- datasetCreatedOrPublished
     maybeDateModified  <- datasetModifiedDates(notYoungerThan = createdOrPublished).toGeneratorOfOptions
     creators           <- creators.toGeneratorOfNonEmptyList(max = 2)
@@ -70,6 +73,7 @@ private object Generators {
     link               <- linkObjectsGen(topmostSameAs)
   } yield ModelDatasetSearchInfo(topmostSameAs,
                                  name,
+                                 slug,
                                  createdOrPublished,
                                  maybeDateModified,
                                  creators,

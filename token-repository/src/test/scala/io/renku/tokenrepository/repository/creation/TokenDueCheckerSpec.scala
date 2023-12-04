@@ -19,68 +19,58 @@
 package io.renku.tokenrepository.repository.creation
 
 import cats.effect.IO
+import cats.effect.testing.scalatest.AsyncIOSpec
+import io.renku.db.DBConfigProvider.DBConfig
 import io.renku.generators.Generators.Implicits._
 import io.renku.generators.Generators.localDates
 import io.renku.graph.model.GraphModelGenerators.{projectIds, projectSlugs}
 import io.renku.graph.model.projects
-import io.renku.metrics.TestMetricsRegistry
-import io.renku.testtools.IOSpec
-import io.renku.tokenrepository.repository.InMemoryProjectsTokensDbSpec
 import io.renku.tokenrepository.repository.RepositoryGenerators.encryptedAccessTokens
 import io.renku.tokenrepository.repository.creation.TokenDates.ExpiryDate
-import io.renku.tokenrepository.repository.metrics.QueriesExecutionTimes
-import org.scalamock.scalatest.MockFactory
+import io.renku.tokenrepository.repository.metrics.{QueriesExecutionTimes, TestQueriesExecutionTimes}
+import io.renku.tokenrepository.repository.{ProjectsTokensDB, TokenRepositoryPostgresSpec}
+import org.scalamock.scalatest.AsyncMockFactory
+import org.scalatest.flatspec.AsyncFlatSpec
 import org.scalatest.matchers.should
-import org.scalatest.wordspec.AnyWordSpec
 
 import java.time.{LocalDate, Period}
 
 class TokenDueCheckerSpec
-    extends AnyWordSpec
-    with IOSpec
-    with InMemoryProjectsTokensDbSpec
+    extends AsyncFlatSpec
+    with AsyncIOSpec
+    with TokenRepositoryPostgresSpec
     with should.Matchers
-    with MockFactory {
+    with AsyncMockFactory {
 
-  "checkTokenDue" should {
+  it should "return true if token expires in tokenDuePeriod" in testDBResource.use { implicit cfg =>
+    val projectId = projectIds.generateOne
 
-    "return true if token expires in tokenDuePeriod" in new TestCase {
-
-      val projectId = projectIds.generateOne
-      insertToken(projectId, LocalDate.now() plus tokenDuePeriod)
-
-      dueChecker.checkTokenDue(projectId).unsafeRunSync() shouldBe true
-    }
-
-    "return true if token expires in less than tokenDuePeriod" in new TestCase {
-
-      val projectId = projectIds.generateOne
-      insertToken(projectId, localDates(max = LocalDate.now() plus tokenDuePeriod minusDays 1).generateOne)
-
-      dueChecker.checkTokenDue(projectId).unsafeRunSync() shouldBe true
-    }
-
-    "return false if token expires in more than tokenDuePeriod" in new TestCase {
-
-      val projectId = projectIds.generateOne
-      insertToken(projectId, localDates(min = LocalDate.now() plus tokenDuePeriod plusDays 1).generateOne)
-
-      dueChecker.checkTokenDue(projectId).unsafeRunSync() shouldBe false
-    }
-
-    "return false if there's not token for the projectId" in new TestCase {
-      dueChecker.checkTokenDue(projectIds.generateOne).unsafeRunSync() shouldBe false
-    }
+    insertToken(projectId, LocalDate.now() plus tokenDuePeriod) >>
+      new TokenDueCheckerImpl[IO](tokenDuePeriod).checkTokenDue(projectId).asserting(_ shouldBe true)
   }
 
-  private trait TestCase {
+  it should "return true if token expires in less than tokenDuePeriod" in testDBResource.use { implicit cfg =>
+    val projectId = projectIds.generateOne
 
-    private implicit val metricsRegistry:  TestMetricsRegistry[IO]   = TestMetricsRegistry[IO]
-    private implicit val queriesExecTimes: QueriesExecutionTimes[IO] = QueriesExecutionTimes[IO]().unsafeRunSync()
-    val tokenDuePeriod = Period.ofDays(5)
-    val dueChecker     = new TokenDueCheckerImpl[IO](tokenDuePeriod)
+    insertToken(projectId, localDates(max = LocalDate.now() plus tokenDuePeriod minusDays 1).generateOne) >>
+      new TokenDueCheckerImpl[IO](tokenDuePeriod).checkTokenDue(projectId).asserting(_ shouldBe true)
   }
 
-  private def insertToken(projectId: projects.GitLabId, expiryDate: ExpiryDate): Unit =
-    insert(projectId, projectSlugs.generateOne, encryptedAccessTokens.generateOne, expiryDate)
+  it should "return false if token expires in more than tokenDuePeriod" in testDBResource.use { implicit cfg =>
+    val projectId = projectIds.generateOne
+
+    insertToken(projectId, localDates(min = LocalDate.now() plus tokenDuePeriod plusDays 1).generateOne) >>
+      new TokenDueCheckerImpl[IO](tokenDuePeriod).checkTokenDue(projectId).asserting(_ shouldBe false)
+  }
+
+  it should "return false if there's not token for the projectId" in testDBResource.use { implicit cfg =>
+    new TokenDueCheckerImpl[IO](tokenDuePeriod).checkTokenDue(projectIds.generateOne).asserting(_ shouldBe false)
+  }
+
+  private def insertToken(projectId: projects.GitLabId, expiryDate: ExpiryDate)(implicit
+      cfg: DBConfig[ProjectsTokensDB]
+  ) = insert(projectId, projectSlugs.generateOne, encryptedAccessTokens.generateOne, expiryDate)
+
+  private lazy val tokenDuePeriod = Period.ofDays(5)
+  private implicit lazy val qet: QueriesExecutionTimes[IO] = TestQueriesExecutionTimes[IO]
 }

@@ -21,6 +21,7 @@ package membersync
 
 import cats.effect.{Async, MonadCancelThrow}
 import cats.syntax.all._
+import com.typesafe.config.Config
 import fs2.io.net.Network
 import io.renku.events.consumers.ProcessExecutor
 import io.renku.events.consumers.subscriptions.SubscriptionMechanism
@@ -30,6 +31,7 @@ import io.renku.graph.tokenrepository.AccessTokenFinder
 import io.renku.http.client.GitLabClient
 import io.renku.lock.Lock
 import io.renku.lock.syntax._
+import io.renku.metrics.MetricsRegistry
 import io.renku.triplesgenerator.TgDB.TsWriteLock
 import io.renku.triplesstore.{ProjectSparqlClient, SparqlQueryTimeRecorder}
 import org.typelevel.log4cats.Logger
@@ -65,12 +67,13 @@ private object EventHandler {
 
   def apply[F[
       _
-  ]: Async: Network: ReProvisioningStatus: GitLabClient: AccessTokenFinder: SparqlQueryTimeRecorder: Logger](
+  ]: Async: Network: ReProvisioningStatus: GitLabClient: AccessTokenFinder: MetricsRegistry: SparqlQueryTimeRecorder: Logger](
       subscriptionMechanism: SubscriptionMechanism[F],
       tsWriteLock:           TsWriteLock[F],
-      projectSparqlClient:   ProjectSparqlClient[F]
+      projectSparqlClient:   ProjectSparqlClient[F],
+      config:                Config
   ): F[consumers.EventHandler[F]] = for {
-    tsReadinessChecker  <- TSReadinessForEventsChecker[F]
+    tsReadinessChecker  <- TSReadinessForEventsChecker[F](config)
     membersSynchronizer <- MembersSynchronizer[F](projectSparqlClient)
     processExecutor     <- ProcessExecutor.concurrent(processesCount = 1)
   } yield new EventHandler[F](

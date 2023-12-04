@@ -22,7 +22,7 @@ import Endpoint.Criteria
 import cats.NonEmptyParallel
 import cats.effect.Async
 import cats.syntax.all._
-import io.renku.graph.model.datasets.{DateCreated, DateModified, DatePublished, DerivedFrom, Identifier, Name, OriginalIdentifier, SameAs, Title}
+import io.renku.graph.model.datasets.{DateCreated, DateModified, DatePublished, DerivedFrom, Identifier, Name, OriginalIdentifier, SameAs, Slug}
 import io.renku.graph.model.images.ImageUri
 import io.renku.graph.model.{RenkuUrl, projects}
 import io.renku.http.rest.Sorting
@@ -167,8 +167,8 @@ private class ProjectDatasetsFinderImpl[F[_]: Async: NonEmptyParallel: Logger: S
 
     for {
       id                    <- extract[Identifier]("identifier")
-      title                 <- extract[Title]("name")
-      name                  <- extract[Name]("slug")
+      name                  <- extract[Name]("name")
+      slug                  <- extract[Slug]("slug")
       maybeDateModified     <- extract[Option[DateModified]]("maybeDateModified")
       maybeDateCreated      <- extract[Option[DateCreated]]("maybeDateCreated")
       maybeDatePublished    <- extract[Option[DatePublished]]("maybeDatePublished")
@@ -180,8 +180,8 @@ private class ProjectDatasetsFinderImpl[F[_]: Async: NonEmptyParallel: Logger: S
       dateModifiedValidated <- toValidatedDateModified(maybeDerivedFrom, maybeDateModified, id)
     } yield ProjectDataset(id,
                            originalId,
-                           title,
                            name,
+                           slug,
                            createdOrPublished,
                            dateModifiedValidated,
                            sameAsOrDerived(from = sameAs, and = maybeDerivedFrom),

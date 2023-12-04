@@ -19,49 +19,40 @@
 package io.renku.tokenrepository.repository.init
 
 import cats.effect.IO
+import cats.effect.testing.scalatest.AsyncIOSpec
 import io.renku.interpreters.TestLogger.Level.Info
-import io.renku.testtools.IOSpec
-import org.scalamock.scalatest.MockFactory
+import org.scalamock.scalatest.AsyncMockFactory
+import org.scalatest.Succeeded
+import org.scalatest.flatspec.AsyncFlatSpec
 import org.scalatest.matchers.should
-import org.scalatest.wordspec.AnyWordSpec
 
 class ExpiryAndCreatedDatesAdderSpec
-    extends AnyWordSpec
-    with IOSpec
+    extends AsyncFlatSpec
+    with AsyncIOSpec
     with DbInitSpec
     with should.Matchers
-    with MockFactory {
+    with AsyncMockFactory {
 
-  protected override lazy val migrationsToRun: List[DBMigration[IO]] = allMigrations.takeWhile {
-    case _: ExpiryAndCreatedDatesAdder[IO] => false
-    case _ => true
-  }
+  protected override lazy val runMigrationsUpTo: Class[_ <: DBMigration[IO]] =
+    classOf[ExpiryAndCreatedDatesAdder[IO]]
 
-  "run" should {
+  it should "create 'expiry_date' and 'created_at' columns; do nothing if they already exist" in testDBResource.use {
+    implicit cfg =>
+      for {
+        _ <- verifyColumnExists("projects_tokens", "expiry_date").asserting(_ shouldBe false)
+        _ <- verifyColumnExists("projects_tokens", "created_at").asserting(_ shouldBe false)
 
-    "create 'expiry_date' and 'created_at' columns; do nothing if they already exist" in new TestCase {
-      logger.reset()
+        _ <- logger.resetF()
+        _ <- ExpiryAndCreatedDatesAdder[IO].run.assertNoException
+        _ <- verifyColumnExists("projects_tokens", "expiry_date").asserting(_ shouldBe true)
+        _ <- verifyColumnExists("projects_tokens", "created_at").asserting(_ shouldBe true)
+        _ <- verifyIndexExists("projects_tokens", "idx_expiry_date").asserting(_ shouldBe true)
+        _ <- verifyIndexExists("projects_tokens", "idx_created_at").asserting(_ shouldBe true)
+        _ <- logger.loggedOnlyF(Info("'expiry_date' column added"), Info("'created_at' column added"))
 
-      verifyColumnExists("projects_tokens", "expiry_date") shouldBe false
-      verifyColumnExists("projects_tokens", "created_at")  shouldBe false
-
-      datesAdder.run.unsafeRunSync() shouldBe ()
-
-      verifyColumnExists("projects_tokens", "expiry_date")    shouldBe true
-      verifyColumnExists("projects_tokens", "created_at")     shouldBe true
-      verifyIndexExists("projects_tokens", "idx_expiry_date") shouldBe true
-      verifyIndexExists("projects_tokens", "idx_created_at")  shouldBe true
-
-      logger.loggedOnly(Info("'expiry_date' column added"), Info("'created_at' column added"))
-      logger.reset()
-
-      datesAdder.run.unsafeRunSync() shouldBe ()
-
-      logger.loggedOnly(Info("'expiry_date' column existed"), Info("'created_at' column existed"))
-    }
-  }
-
-  private trait TestCase {
-    val datesAdder = new ExpiryAndCreatedDatesAdder[IO]
+        _ <- logger.resetF()
+        _ <- ExpiryAndCreatedDatesAdder[IO].run.assertNoException
+        _ <- logger.loggedOnlyF(Info("'expiry_date' column existed"), Info("'created_at' column existed"))
+      } yield Succeeded
   }
 }

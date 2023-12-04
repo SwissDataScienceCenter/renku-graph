@@ -26,7 +26,7 @@ import io.circe.DecodingFailure
 import io.circe.literal._
 import io.renku.graph.config.RenkuUrlLoader
 import io.renku.graph.model.Schemas._
-import io.renku.graph.model.datasets.{DateCreated, DatePublished, Description, Identifier, Keyword, Name, Title}
+import io.renku.graph.model.datasets.{DateCreated, DatePublished, Description, Identifier, Keyword, Name, Slug}
 import io.renku.graph.model.images.ImageUri
 import io.renku.graph.model.projects.Visibility
 import io.renku.graph.model.{GraphClass, RenkuUrl, projects}
@@ -178,7 +178,7 @@ private class DatasetsFinderImpl[F[_]: Parallel: Async: Logger: SparqlQueryTimeR
 
   private def `ORDER BY`(sort: Sorting[Endpoint.Sort.type])(implicit encoder: SparqlEncoder[OrderBy]): String = {
     def mapPropertyName(property: Sort.SearchProperty) = property match {
-      case Sort.TitleProperty         => OrderBy.Property("?name")
+      case Sort.NameProperty          => OrderBy.Property("?name")
       case Sort.DateProperty          => OrderBy.Property("?date")
       case Sort.DatePublishedProperty => OrderBy.Property("?maybeDatePublished")
       case Sort.ProjectsCountProperty => OrderBy.Property("?projectsCount")
@@ -225,8 +225,8 @@ private object DatasetsFinderImpl {
 
     for {
       id                  <- cursor.downField("identifier").downField("value").as[Identifier]
-      title               <- cursor.downField("name").downField("value").as[Title]
-      name                <- cursor.downField("slug").downField("value").as[Name]
+      name                <- cursor.downField("name").downField("value").as[Name]
+      slug                <- cursor.downField("slug").downField("value").as[Slug]
       maybeDateCreated    <- cursor.downField("maybeDateCreated").downField("value").as[Option[DateCreated]]
       maybePublishedDate  <- cursor.downField("maybeDatePublished").downField("value").as[Option[DatePublished]]
       projectsCount       <- cursor.downField("projectsCount").downField("value").as[ProjectsCount]
@@ -240,8 +240,8 @@ private object DatasetsFinderImpl {
                 .getOrElse(DecodingFailure("No dateCreated or datePublished found", Nil).asLeft)
     } yield DatasetSearchResult(
       id,
-      title,
       name,
+      slug,
       maybeDescription,
       List.empty[DatasetCreator],
       date,

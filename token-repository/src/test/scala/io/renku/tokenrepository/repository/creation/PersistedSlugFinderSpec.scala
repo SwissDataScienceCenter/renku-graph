@@ -19,35 +19,36 @@
 package io.renku.tokenrepository.repository.creation
 
 import cats.effect.IO
+import cats.effect.testing.scalatest.AsyncIOSpec
 import io.renku.generators.Generators.Implicits._
 import io.renku.graph.model.GraphModelGenerators._
-import io.renku.testtools.IOSpec
-import io.renku.tokenrepository.repository.InMemoryProjectsTokensDbSpec
 import io.renku.tokenrepository.repository.RepositoryGenerators.encryptedAccessTokens
-import org.scalamock.scalatest.MockFactory
-import org.scalatest.flatspec.AnyFlatSpec
+import io.renku.tokenrepository.repository.TokenRepositoryPostgresSpec
+import io.renku.tokenrepository.repository.metrics.{QueriesExecutionTimes, TestQueriesExecutionTimes}
+import org.scalamock.scalatest.AsyncMockFactory
+import org.scalatest.flatspec.AsyncFlatSpec
 import org.scalatest.matchers.should
 
 class PersistedSlugFinderSpec
-    extends AnyFlatSpec
-    with IOSpec
-    with InMemoryProjectsTokensDbSpec
+    extends AsyncFlatSpec
+    with AsyncIOSpec
+    with TokenRepositoryPostgresSpec
     with should.Matchers
-    with MockFactory {
+    with AsyncMockFactory {
 
-  it should "return Slug for the given project Id" in {
-
+  it should "return Slug for the given project Id" in testDBResource.use { implicit cfg =>
     val projectId   = projectIds.generateOne
     val projectSlug = projectSlugs.generateOne
 
-    insert(projectId, projectSlug, encryptedAccessTokens.generateOne)
-
-    (finder findPersistedProjectSlug projectId).unsafeRunSync() shouldBe Some(projectSlug)
+    insert(projectId, projectSlug, encryptedAccessTokens.generateOne) >>
+      new PersistedSlugFinderImpl[IO].findPersistedProjectSlug(projectId).asserting(_ shouldBe Some(projectSlug))
   }
 
-  it should "return None if there's no Slug with the given Id" in {
-    (finder findPersistedProjectSlug projectIds.generateOne).unsafeRunSync() shouldBe None
+  it should "return None if there's no Slug with the given Id" in testDBResource.use { implicit cfg =>
+    new PersistedSlugFinderImpl[IO]
+      .findPersistedProjectSlug(projectIds.generateOne)
+      .asserting(_ shouldBe None)
   }
 
-  private lazy val finder = new PersistedSlugFinderImpl[IO]
+  private implicit lazy val qet: QueriesExecutionTimes[IO] = TestQueriesExecutionTimes[IO]
 }
