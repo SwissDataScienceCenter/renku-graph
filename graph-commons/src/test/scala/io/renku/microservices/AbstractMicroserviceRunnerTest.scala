@@ -20,8 +20,9 @@ package io.renku.microservices
 
 import cats.effect.{ExitCode, IO}
 import fs2.concurrent.{Signal, SignallingRef}
-import scala.language.reflectiveCalls
+
 import scala.concurrent.duration._
+import scala.language.reflectiveCalls
 
 trait AbstractMicroserviceRunnerTest {
 
