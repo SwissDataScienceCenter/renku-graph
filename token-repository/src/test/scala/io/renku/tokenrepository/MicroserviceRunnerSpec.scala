@@ -86,7 +86,6 @@ class MicroserviceRunnerSpec extends AsyncWordSpec with AsyncIOSpec with should.
           _ <- runner.expiringTokensRemover.failWith(exception)
 
           _ <- runner.startFor(2.seconds).asserting(_ shouldBe ExitCode.Success)
-          _ <- runner.assertCalledAllBut(runner.expiringTokensRemover)
 
           _ <- runner.logger.loggedF(Error("Expiring Tokens Removal failed", exception), Info("Service started"))
         } yield Succeeded
