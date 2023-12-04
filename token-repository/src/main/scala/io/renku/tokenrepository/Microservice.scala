@@ -29,12 +29,15 @@ import io.renku.http.server.HttpServer
 import io.renku.logging.ApplicationLogger
 import io.renku.metrics.MetricsRegistry
 import io.renku.microservices.{IOMicroservice, ResourceUse}
+import io.renku.tokenrepository.repository.cleanup.ExpiringTokensRemover
 import io.renku.tokenrepository.repository.init.DbInitializer
 import io.renku.tokenrepository.repository.metrics.QueriesExecutionTimes
 import io.renku.tokenrepository.repository.{ProjectsTokensDB, ProjectsTokensDbConfigProvider}
 import natchez.Trace.Implicits.noop
 import org.http4s.server.Server
 import org.typelevel.log4cats.Logger
+
+import scala.concurrent.duration._
 
 object Microservice extends IOMicroservice {
 
@@ -46,7 +49,7 @@ object Microservice extends IOMicroservice {
   } yield exitCode
 
   private def runMicroservice(sessionPoolResource: Resource[IO, SessionResource[IO, ProjectsTokensDB]]) =
-    sessionPoolResource.use { implicit sessionResource =>
+    sessionPoolResource.use { implicit sr =>
       for {
         implicit0(mr: MetricsRegistry[IO])        <- MetricsRegistry[IO]()
         implicit0(qet: QueriesExecutionTimes[IO]) <- QueriesExecutionTimes[IO]()
@@ -54,6 +57,7 @@ object Microservice extends IOMicroservice {
         certificateLoader                         <- CertificateLoader[IO]
         sentryInitializer                         <- SentryInitializer[IO]
         dbInitializer                             <- DbInitializer[IO]
+        expiringTokensRemover                     <- ExpiringTokensRemover[IO]
         microserviceRoutes                        <- MicroserviceRoutes[IO]
         termSignal                                <- SignallingRef.of[IO, Boolean](false)
         exitCode <- microserviceRoutes.routes.use { routes =>
@@ -61,6 +65,7 @@ object Microservice extends IOMicroservice {
                         certificateLoader,
                         sentryInitializer,
                         dbInitializer,
+                        expiringTokensRemover,
                         HttpServer[IO](serverPort = port"9003", routes),
                         microserviceRoutes
                       ).run(termSignal)
@@ -70,27 +75,41 @@ object Microservice extends IOMicroservice {
 }
 
 private class MicroserviceRunner(
-    certificateLoader:  CertificateLoader[IO],
-    sentryInitializer:  SentryInitializer[IO],
-    dbInitializer:      DbInitializer[IO],
-    httpServer:         HttpServer[IO],
-    microserviceRoutes: MicroserviceRoutes[IO]
+    certificateLoader:     CertificateLoader[IO],
+    sentryInitializer:     SentryInitializer[IO],
+    dbInitializer:         DbInitializer[IO],
+    expiringTokensRemover: ExpiringTokensRemover[IO],
+    httpServer:            HttpServer[IO],
+    microserviceRoutes:    MicroserviceRoutes[IO]
 )(implicit L: Logger[IO]) {
 
   def run(signal: Signal[IO, Boolean]): IO[ExitCode] =
     Ref.of[IO, ExitCode](ExitCode.Success).flatMap(rc => ResourceUse(createServer).useUntil(signal, rc))
 
-  def createServer: Resource[IO, Server] = for {
-    _      <- Resource.eval(certificateLoader.run)
-    _      <- Resource.eval(sentryInitializer.run)
-    _      <- Resource.eval(kickOffDBInit())
-    server <- httpServer.createServer
-    _      <- Resource.eval(Logger[IO].info("Service started"))
+  private def createServer: Resource[IO, Server] = for {
+    _       <- Resource.eval(certificateLoader.run)
+    _       <- Resource.eval(sentryInitializer.run)
+    dbReady <- Resource.eval(Deferred[IO, Unit])
+    _       <- Resource.eval(kickOffDBInit(dbReady))
+    _       <- Resource.eval(kickOffExpiringTokensRemoval(dbReady))
+    server  <- httpServer.createServer
+    _       <- Resource.eval(Logger[IO].info("Service started"))
   } yield server
 
-  private def kickOffDBInit() = Spawn[IO].start(
-    (dbInitializer.run >> microserviceRoutes.notifyDBReady()).recoverWith { case ex =>
-      Logger[IO].error(ex)("DB initialization failed")
-    }.void
-  )
+  private def kickOffDBInit(dbReady: Deferred[IO, Unit]) = Spawn[IO].start {
+    (dbInitializer.run >> microserviceRoutes.notifyDBReady() >> dbReady.complete(()).void).handleErrorWith {
+      Logger[IO].error(_)("DB initialization failed")
+    }
+  }
+
+  private def kickOffExpiringTokensRemoval(dbReady: Deferred[IO, Unit]) = Spawn[IO].start {
+    def kickOffProcess: IO[Unit] =
+      expiringTokensRemover
+        .removeExpiringTokens()
+        .handleErrorWith(
+          Logger[IO].error(_)("Expiring Tokens Removal failed") >> Temporal[IO].delayBy(kickOffProcess, 1.minute)
+        )
+
+    (dbReady.get >> kickOffProcess >> Temporal[IO].sleep(24.hours)).foreverM
+  }
 }

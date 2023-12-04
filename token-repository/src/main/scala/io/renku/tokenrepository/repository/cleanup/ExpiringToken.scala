@@ -16,17 +16,18 @@
  * limitations under the License.
  */
 
-package io.renku.tokenrepository.repository.deletion
+package io.renku.tokenrepository.repository.cleanup
 
-import cats.Show
+import io.renku.graph.model.projects
+import io.renku.http.client.AccessToken
+import io.renku.tokenrepository.repository.AccessTokenCrypto.EncryptedAccessToken
 
-sealed trait DeletionResult extends Product {
-  lazy val widen: DeletionResult = this
+private trait ExpiringToken {
+  val projectId: projects.GitLabId
+  lazy val widen: ExpiringToken = this
 }
 
-object DeletionResult {
-  case object Deleted    extends DeletionResult
-  case object NotExisted extends DeletionResult
-
-  implicit def show[R <: DeletionResult]: Show[R] = Show.show(_.productPrefix)
+private object ExpiringToken {
+  final case class Decryptable(projectId: projects.GitLabId, token: AccessToken)             extends ExpiringToken
+  final case class NonDecryptable(projectId: projects.GitLabId, token: EncryptedAccessToken) extends ExpiringToken
 }
