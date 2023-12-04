@@ -54,7 +54,7 @@ trait TokenRepositoryPostgresSpec extends PostgresSpec[ProjectsTokensDB] with To
   }
 
   implicit def moduleSessionResource(implicit cfg: DBConfig[ProjectsTokensDB]): ProjectsTokensDB.SessionResource[IO] =
-    io.renku.db.SessionResource[IO, ProjectsTokensDB](sessionResource(cfg))
+    io.renku.db.SessionResource[IO, ProjectsTokensDB](sessionResource(cfg), cfg)
 
   protected def insert(projectId:      GitLabId,
                        projectSlug:    Slug,

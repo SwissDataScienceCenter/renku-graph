@@ -53,7 +53,7 @@ class PostgresClient[DB](server: PostgresServer, migrations: SessionResource[IO,
             .use(_.execute(sql"""DROP DATABASE "#$dbName"""".command).void)
             .void
       )
-      .evalTap(cfg => migrations(SessionResource[IO, DB](sessionResource(cfg))))
+      .evalTap(cfg => migrations(SessionResource[IO, DB](sessionResource(cfg), cfg)))
 
   private lazy val initSession: Resource[IO, Session[IO]] = makeSession(server.dbConfig)
 

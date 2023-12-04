@@ -55,7 +55,7 @@ trait EventsQueuePostgresSpec extends PostgresSpec[TestDB] { self: Suite =>
   }
 
   implicit def moduleSessionResource(implicit cfg: DBConfig[TestDB]): TestDB.SessionResource[IO] =
-    io.renku.db.SessionResource[IO, TestDB](sessionResource(cfg))
+    io.renku.db.SessionResource[IO, TestDB](sessionResource(cfg), cfg)
 
   def notify(category: CategoryName)(implicit cfg: DBConfig[TestDB]): IO[Unit] =
     notify(category.asChannelId, category.value)

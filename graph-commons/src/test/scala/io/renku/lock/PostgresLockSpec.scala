@@ -195,10 +195,10 @@ class PostgresLockSpec extends AsyncWordSpec with AsyncIOSpec with should.Matche
           (_, release) <- makeExclusiveLock(s1, 1.second).run("1").allocated
           fiber        <- Async[IO].start(makeExclusiveLock(s2).run("1").allocated)
           _            <- IO.sleep(100.millis)
-          stats        <- PostgresLockStats.getStats(s1)
+          stats        <- PostgresLockStats.getStats(cfg.name, s1)
           _            <- release
           _            <- fiber.join
-          stats2       <- PostgresLockStats.getStats(s1)
+          stats2       <- PostgresLockStats.getStats(cfg.name, s1)
 
           _ = stats.waiting.size shouldBe 1
           _ = stats2.waiting     shouldBe Nil
@@ -219,7 +219,7 @@ class PostgresLockSpec extends AsyncWordSpec with AsyncIOSpec with should.Matche
           _  <- IO.sleep(100.millis)
 
           // there must be two records waiting for the same lock
-          stats <- PostgresLockStats.getStats(s1)
+          stats <- PostgresLockStats.getStats(cfg.name, s1)
           _ = stats.currentLocks                       shouldBe 1
           _ = stats.waiting.size                       shouldBe 2
           _ = stats.waiting.map(_.objectId).toSet.size shouldBe 1
@@ -230,7 +230,7 @@ class PostgresLockSpec extends AsyncWordSpec with AsyncIOSpec with should.Matche
           _ <- release
           _ <- IO.sleep(200.millis)
 
-          stats2 <- PostgresLockStats.getStats(s1)
+          stats2 <- PostgresLockStats.getStats(cfg.name, s1)
           _ = stats2.waiting.size shouldBe 1
           _ = stats2.currentLocks shouldBe 1
 

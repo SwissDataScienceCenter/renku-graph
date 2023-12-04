@@ -36,7 +36,7 @@ class PostgresLockStatsSpec extends AsyncWordSpec with AsyncIOSpec with should.M
       sessionResource(cfg).use { s =>
         for {
           _     <- resetLockTable(s)
-          stats <- PostgresLockStats.getStats[IO](s)
+          stats <- PostgresLockStats.getStats[IO](cfg.name, s)
           _ = stats shouldBe Stats(0, Nil)
         } yield ()
       }
@@ -47,7 +47,7 @@ class PostgresLockStatsSpec extends AsyncWordSpec with AsyncIOSpec with should.M
         for {
           _            <- resetLockTable(s)
           (_, release) <- PostgresLock.exclusive_[IO, Int](s).run(1).allocated
-          stats        <- PostgresLockStats.getStats(s)
+          stats        <- PostgresLockStats.getStats(cfg.name, s)
           _            <- release
           _ = stats shouldBe Stats(1, Nil)
         } yield ()
@@ -59,12 +59,12 @@ class PostgresLockStatsSpec extends AsyncWordSpec with AsyncIOSpec with should.M
         for {
           _     <- resetLockTable(s)
           _     <- PostgresLockStats.recordWaiting(s)(5L)
-          stats <- PostgresLockStats.getStats(s)
+          stats <- PostgresLockStats.getStats(cfg.name, s)
           _ = stats.currentLocks shouldBe 0
           _ = stats.waiting.size shouldBe 1
 
           _      <- PostgresLockStats.recordWaiting(s)(5L)
-          stats2 <- PostgresLockStats.getStats(s)
+          stats2 <- PostgresLockStats.getStats(cfg.name, s)
           _ = stats shouldBe stats2.copy(waiting =
                 stats2.waiting.map(_.copy(waitDuration = stats.waiting.head.waitDuration))
               )
@@ -78,7 +78,7 @@ class PostgresLockStatsSpec extends AsyncWordSpec with AsyncIOSpec with should.M
           _     <- resetLockTable(s1)
           _     <- PostgresLockStats.recordWaiting(s1)(5)
           _     <- PostgresLockStats.recordWaiting(s2)(5)
-          stats <- PostgresLockStats.getStats(s1)
+          stats <- PostgresLockStats.getStats(cfg.name, s1)
           _ = stats.waiting.size                  shouldBe 2
           _ = stats.waiting.map(_.pid).toSet.size shouldBe 2
         } yield ()
@@ -91,7 +91,7 @@ class PostgresLockStatsSpec extends AsyncWordSpec with AsyncIOSpec with should.M
           _     <- resetLockTable(s)
           _     <- PostgresLockStats.recordWaiting(s)(5L)
           _     <- PostgresLockStats.removeWaiting(s)(5L)
-          stats <- PostgresLockStats.getStats(s)
+          stats <- PostgresLockStats.getStats(cfg.name, s)
           _ = stats shouldBe Stats(0, Nil)
         } yield ()
       }

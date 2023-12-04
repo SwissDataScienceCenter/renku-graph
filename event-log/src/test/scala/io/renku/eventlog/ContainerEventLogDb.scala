@@ -55,6 +55,7 @@ trait ContainerEventLogDb extends ForAllTestContainer { self: Suite =>
       user = dbConfig.user,
       database = dbConfig.name,
       password = Some(dbConfig.pass)
-    )
+    ),
+    dbConfig
   )
 }
