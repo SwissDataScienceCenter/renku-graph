@@ -102,8 +102,8 @@ object PostgresDB {
         max = dbConfig.connectionPool.value
       )
 
-  def sessionPoolResource[A](dbCfg: DBConfig[_]): Resource[IO, SessionResource[IO, A]] =
-    sessionPool(dbCfg).map(SessionResource[IO, A](_))
+  def sessionPoolResource[A](dbCfg: DBConfig[A]): Resource[IO, SessionResource[IO, A]] =
+    sessionPool(dbCfg).map(SessionResource[IO, A](_, dbCfg))
 
   def initializeDatabase(cfg: DBConfig[_]): IO[Unit] = {
     val session = Session.single[IO](

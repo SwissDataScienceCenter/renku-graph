@@ -38,11 +38,12 @@ package io.renku.triplesgenerator.events.consumers.membersync
 
 import Generators._
 import cats.effect.IO
+import cats.effect.testing.scalatest.AsyncIOSpec
 import cats.syntax.all._
 import eu.timepit.refined.api.Refined
 import eu.timepit.refined.auto._
 import eu.timepit.refined.collection.NonEmpty
-import io.circe.Encoder
+import io.circe.{Encoder, Json}
 import io.circe.literal._
 import io.circe.syntax._
 import io.renku.generators.CommonGraphGenerators.accessTokens
@@ -55,148 +56,155 @@ import io.renku.http.server.EndpointTester.jsonEntityEncoder
 import io.renku.http.tinytypes.TinyTypeURIEncoder._
 import io.renku.interpreters.TestLogger
 import io.renku.stubbing.ExternalServiceStubbing
-import io.renku.testtools.{GitLabClientTools, IOSpec}
+import io.renku.testtools.GitLabClientTools
 import org.http4s.Status.{Forbidden, Unauthorized}
-import org.http4s.implicits.http4sLiteralsSyntax
+import org.http4s.implicits._
 import org.http4s.{Header, Headers, Request, Response, Status, Uri}
 import org.scalacheck.Gen
-import org.scalamock.scalatest.MockFactory
+import org.scalamock.scalatest.AsyncMockFactory
+import org.scalatest.flatspec.AsyncFlatSpec
 import org.scalatest.matchers.should
-import org.scalatest.wordspec.AnyWordSpec
 import org.scalatestplus.scalacheck.ScalaCheckPropertyChecks
 import org.typelevel.ci._
 
 class GLProjectMembersFinderSpec
-    extends AnyWordSpec
-    with IOSpec
+    extends AsyncFlatSpec
+    with AsyncIOSpec
     with ExternalServiceStubbing
-    with MockFactory
+    with AsyncMockFactory
     with ScalaCheckPropertyChecks
     with should.Matchers
     with GitLabClientTools[IO] {
 
-  "findProjectMembers" should {
+  private implicit val maybeAccessToken: Option[AccessToken] = accessTokens.generateOption
 
-    "return a set of all project members" in new TestCase {
-      forAll { gitLabProjectMembers: Set[GitLabProjectMember] =>
-        setGitLabClientExpectation(slug, None, returning = (gitLabProjectMembers, None))
+  it should "return a set of all project members" in {
 
-        finder.findProjectMembers(slug).unsafeRunSync() shouldBe gitLabProjectMembers
-      }
+    val slug           = projectSlugs.generateOne
+    val projectMembers = gitLabProjectMembers.generateSet()
+
+    setGitLabClientExpectation(slug, None, returning = (projectMembers, None))
+
+    finder.findProjectMembers(slug).asserting(_ shouldBe projectMembers)
+  }
+
+  it should "collect members from all pages of results" in {
+
+    val slug           = projectSlugs.generateOne
+    val projectMembers = gitLabProjectMembers.generateNonEmptyList(min = 2).toList.toSet
+
+    setGitLabClientExpectation(slug, None, returning = (Set(projectMembers.head), 2.some))
+    setGitLabClientExpectation(slug, 2.some, returning = (projectMembers.tail, None))
+
+    finder.findProjectMembers(slug).asserting(_ shouldBe projectMembers)
+  }
+
+  it should "parse results and request next page" in {
+
+    val members = gitLabProjectMembers.generateNonEmptyList(min = 2).toList.toSet
+
+    val nextPage   = 2
+    val totalPages = 2
+    val headers = Headers(
+      List(Header.Raw(ci"X-Next-Page", nextPage.toString), Header.Raw(ci"X-Total-Pages", totalPages.toString))
+    )
+
+    mapResponse(Status.Ok, Request(), Response().withEntity(members.asJson).withHeaders(headers))
+      .asserting(_ shouldBe (members, Some(2)))
+  }
+
+  it should "skip items without an id or/and name" in {
+
+    val members = gitLabProjectMembers.generateNonEmptyList().toList.toSet
+
+    val memberWithoutIdAndName = json"""{"access_level": 40}"""
+
+    mapResponse(Status.Ok,
+                Request(),
+                Response().withEntity(Json.arr(memberWithoutIdAndName :: members.map(_.asJson).toList: _*))
+    ).asserting(_ shouldBe (members, None))
+  }
+
+  it should "return an empty set when service responds with NOT_FOUND" in {
+    mapResponse(Status.NotFound, Request(), Response())
+      .asserting(_ shouldBe (Set.empty[GitLabProjectMember], None))
+  }
+
+  Forbidden +: Unauthorized +: Nil foreach { status =>
+    it should s"try without an access token when service responds with $status" in {
+
+      val mat     = accessTokens.generateSome
+      val slug    = projectSlugs.generateOne
+      val members = gitLabProjectMembers.generateNonEmptyList().toList.toSet
+
+      val mapResponse =
+        captureMapping(gitLabClient)(
+          finder.findProjectMembers(slug)(mat).unsafeRunSync(),
+          Gen.const((Set.empty[GitLabProjectMember], Option.empty[Int])),
+          underlyingMethod = Get
+        )
+
+      setGitLabClientExpectation(slug, maybePage = None, maybeAccessTokenOverride = None, returning = (members, None))
+
+      mapResponse(status, Request(), Response()).asserting(_ shouldBe (members, None))
     }
 
-    "collect members from all pages of results" in new TestCase {
+    it should s"return an empty set when service responds with $status without access token" in {
 
-      val projectMembers = gitLabProjectMembers.generateNonEmptyList(min = 2).toList.toSet
+      val mat  = Option.empty[AccessToken]
+      val slug = projectSlugs.generateOne
 
-      setGitLabClientExpectation(slug, None, returning = (Set(projectMembers.head), 2.some))
-      setGitLabClientExpectation(slug, 2.some, returning = (projectMembers.tail, None))
+      val mapResponse =
+        captureMapping(gitLabClient)(
+          finder.findProjectMembers(slug)(mat).unsafeRunSync(),
+          Gen.const((Set.empty[GitLabProjectMember], Option.empty[Int])),
+          underlyingMethod = Get
+        )
 
-      finder.findProjectMembers(slug).unsafeRunSync() shouldBe projectMembers
-    }
-
-    "parse results and request next page" in new TestCase {
-
-      val members = gitLabProjectMembers.generateNonEmptyList(min = 2).toList.toSet
-
-      val nextPage   = 2
-      val totalPages = 2
-      val headers = Headers(
-        List(Header.Raw(ci"X-Next-Page", nextPage.toString), Header.Raw(ci"X-Total-Pages", totalPages.toString))
-      )
-
-      mapResponse(Status.Ok, Request(), Response().withEntity(members.asJson).withHeaders(headers))
-        .unsafeRunSync() shouldBe (members, Some(2))
-    }
-
-    "return an empty set when service responds with NOT_FOUND" in new TestCase {
-      mapResponse(Status.NotFound, Request(), Response()).unsafeRunSync() shouldBe (Set
-        .empty[GitLabProjectMember], None)
-    }
-
-    Forbidden +: Unauthorized +: Nil foreach { status =>
-      s"try without an access token when service responds with $status" in new TestCase {
-
-        val members = gitLabProjectMembers.generateNonEmptyList().toList.toSet
-
-        implicit override val maybeAccessToken: Option[AccessToken] = accessTokens.generateSome
-
-        override val mapResponse =
-          captureMapping(gitLabClient)(
-            finder.findProjectMembers(slug)(maybeAccessToken).unsafeRunSync(),
-            Gen.const((Set.empty[GitLabProjectMember], Option.empty[Int])),
-            underlyingMethod = Get
-          )
-
-        setGitLabClientExpectation(slug, maybePage = None, maybeAccessTokenOverride = None, returning = (members, None))
-
-        mapResponse(status, Request(), Response()).unsafeRunSync() shouldBe (members, None)
-      }
-
-      s"return an empty set when service responds with $status without access token" in new TestCase {
-
-        implicit override val maybeAccessToken: Option[AccessToken] = Option.empty[AccessToken]
-
-        override val mapResponse =
-          captureMapping(gitLabClient)(
-            finder.findProjectMembers(slug)(maybeAccessToken).unsafeRunSync(),
-            Gen.const((Set.empty[GitLabProjectMember], Option.empty[Int])),
-            underlyingMethod = Get
-          )
-
-        val actual   = mapResponse(status, Request(), Response()).unsafeRunSync()
-        val expected = (Set.empty[GitLabProjectMember], None)
-        actual shouldBe expected
-      }
+      mapResponse(status, Request(), Response()).asserting(_ shouldBe (Set.empty[GitLabProjectMember], None))
     }
   }
 
-  private trait TestCase {
+  private implicit val logger:    TestLogger[IO]   = TestLogger[IO]()
+  implicit lazy val gitLabClient: GitLabClient[IO] = mock[GitLabClient[IO]]
+  private lazy val finder = new GLProjectMembersFinderImpl[IO]
 
-    val slug = projectSlugs.generateOne
-    implicit val maybeAccessToken: Option[AccessToken] = accessTokens.generateOption
+  private def setGitLabClientExpectation(projectSlug:              projects.Slug,
+                                         maybePage:                Option[Int] = None,
+                                         maybeAccessTokenOverride: Option[AccessToken] = maybeAccessToken,
+                                         returning:                (Set[GitLabProjectMember], Option[Int])
+  ) = {
+    val endpointName: String Refined NonEmpty = "project-members"
 
-    private implicit val logger: TestLogger[IO]   = TestLogger[IO]()
-    implicit val gitLabClient:   GitLabClient[IO] = mock[GitLabClient[IO]]
-    val finder = new GLProjectMembersFinderImpl[IO]
-
-    def setGitLabClientExpectation(projectSlug:              projects.Slug,
-                                   maybePage:                Option[Int] = None,
-                                   maybeAccessTokenOverride: Option[AccessToken] = maybeAccessToken,
-                                   returning:                (Set[GitLabProjectMember], Option[Int])
-    ) = {
-      val endpointName: String Refined NonEmpty = "project-members"
-
-      val uri = {
-        val uri = uri"projects" / projectSlug / "members" / "all"
-        maybePage match {
-          case Some(page) => uri withQueryParam ("page", page.toString)
-          case None       => uri
-        }
+    val uri = {
+      val uri = uri"projects" / projectSlug / "members" / "all"
+      maybePage match {
+        case Some(page) => uri withQueryParam ("page", page.toString)
+        case None       => uri
       }
-
-      (gitLabClient
-        .get(_: Uri, _: String Refined NonEmpty)(
-          _: ResponseMappingF[IO, (Set[GitLabProjectMember], Option[Int])]
-        )(_: Option[AccessToken]))
-        .expects(uri, endpointName, *, maybeAccessTokenOverride)
-        .returning(returning.pure[IO])
     }
 
-    val mapResponse =
-      captureMapping(gitLabClient)(
-        finder.findProjectMembers(slug)(maybeAccessToken).unsafeRunSync(),
-        Gen.const((Set.empty[GitLabProjectMember], Option.empty[Int])),
-        underlyingMethod = Get
-      )
+    (gitLabClient
+      .get(_: Uri, _: String Refined NonEmpty)(
+        _: ResponseMappingF[IO, (Set[GitLabProjectMember], Option[Int])]
+      )(_: Option[AccessToken]))
+      .expects(uri, endpointName, *, maybeAccessTokenOverride)
+      .returning(returning.pure[IO])
   }
+
+  private lazy val mapResponse =
+    captureMapping(gitLabClient)(
+      finder.findProjectMembers(projectSlugs.generateOne)(maybeAccessToken).unsafeRunSync(),
+      Gen.const((Set.empty[GitLabProjectMember], Option.empty[Int])),
+      underlyingMethod = Get
+    )
 
   private implicit val projectMemberEncoder: Encoder[GitLabProjectMember] = Encoder.instance[GitLabProjectMember] {
     member =>
       json"""{
-        "id":       ${member.gitLabId.value},
-        "username": ${member.name.value},
-        "name":     ${member.name.value},
+        "id":           ${member.gitLabId.value},
+        "username":     ${member.name.value},
+        "name":         ${member.name.value},
         "access_level": ${member.accessLevel}
       }"""
   }

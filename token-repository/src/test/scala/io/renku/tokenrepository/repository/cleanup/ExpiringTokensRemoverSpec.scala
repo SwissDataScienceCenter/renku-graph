@@ -22,10 +22,12 @@ import cats.effect.IO
 import cats.effect.testing.scalatest.AsyncIOSpec
 import cats.syntax.all._
 import fs2.Stream
+import io.renku.eventlog
+import io.renku.eventlog.api.events.CommitSyncRequest
+import io.renku.events.consumers.ConsumersModelGenerators.consumerProjects
 import io.renku.generators.CommonGraphGenerators.accessTokens
 import io.renku.generators.Generators.Implicits._
 import io.renku.generators.Generators.exceptions
-import io.renku.graph.model.RenkuTinyTypeGenerators.projectIds
 import io.renku.interpreters.TestLogger
 import io.renku.tokenrepository.repository.RepositoryGenerators.{deletionResults, encryptedAccessTokens}
 import io.renku.tokenrepository.repository.deletion.{DeletionResult, PersistedTokenRemover, TokenRemover}
@@ -42,7 +44,10 @@ class ExpiringTokensRemoverSpec extends AsyncFlatSpec with AsyncIOSpec with shou
 
     val tokens = expiringTokens.generateList(min = 1)
     givenTokensFinding(returning = Stream.emits(tokens))
-    tokens.foreach(givenTokenRemoval(_, returning = deletionResults.generateOne.pure[IO]))
+    tokens foreach { et =>
+      givenTokenRemoval(et, returning = deletionResults.generateOne.pure[IO])
+      givenCommitSyncRequestSending(et, returning = ().pure[IO])
+    }
 
     remover.removeExpiringTokens().assertNoException
   }
@@ -54,12 +59,15 @@ class ExpiringTokensRemoverSpec extends AsyncFlatSpec with AsyncIOSpec with shou
     val token3 = expiringTokens.generateOne
     givenTokensFinding(returning = Stream(token1, token2, token3))
     givenTokenRemoval(token1, returning = deletionResults.generateOne.pure[IO])
+    givenCommitSyncRequestSending(token1, returning = ().pure[IO])
     val exception = exceptions.generateOne
     givenTokenRemoval(token2, returning = exception.raiseError[IO, Nothing])
 
     givenTokensFinding(returning = Stream(token2, token3))
     givenTokenRemoval(token2, returning = deletionResults.generateOne.pure[IO])
+    givenCommitSyncRequestSending(token2, returning = ().pure[IO])
     givenTokenRemoval(token3, returning = deletionResults.generateOne.pure[IO])
+    givenCommitSyncRequestSending(token3, returning = ().pure[IO])
 
     remover.removeExpiringTokens().assertNoException
   }
@@ -68,8 +76,13 @@ class ExpiringTokensRemoverSpec extends AsyncFlatSpec with AsyncIOSpec with shou
   private val tokensFinder   = mock[ExpiringTokensFinder[IO]]
   private val tokenRemover   = mock[TokenRemover[IO]]
   private val dbTokenRemover = mock[PersistedTokenRemover[IO]]
-  private lazy val remover =
-    new ExpiringTokensRemoverImpl[IO](tokensFinder, tokenRemover, dbTokenRemover, retryDelayOnError = 100 millis)
+  private val elClient       = mock[eventlog.api.events.Client[IO]]
+  private lazy val remover = new ExpiringTokensRemoverImpl[IO](tokensFinder,
+                                                               tokenRemover,
+                                                               dbTokenRemover,
+                                                               elClient,
+                                                               retryDelayOnError = 100 millis
+  )
 
   private def givenTokensFinding(returning: Stream[IO, ExpiringToken]) =
     (() => tokensFinder.findExpiringTokens)
@@ -78,19 +91,25 @@ class ExpiringTokensRemoverSpec extends AsyncFlatSpec with AsyncIOSpec with shou
 
   private def givenTokenRemoval(expiringToken: ExpiringToken, returning: IO[DeletionResult]) =
     expiringToken match {
-      case ExpiringToken.Decryptable(projectId, token) =>
+      case ExpiringToken.Decryptable(project, token) =>
         (tokenRemover.delete _)
-          .expects(projectId, token.some)
+          .expects(project.id, token.some)
           .returning(returning)
-      case ExpiringToken.NonDecryptable(projectId, _) =>
+      case ExpiringToken.NonDecryptable(project, _) =>
         (dbTokenRemover.delete _)
-          .expects(projectId)
+          .expects(project.id)
           .returning(returning)
     }
 
+  private def givenCommitSyncRequestSending(expiringToken: ExpiringToken, returning: IO[Unit]) =
+    (elClient
+      .send(_: CommitSyncRequest))
+      .expects(CommitSyncRequest(expiringToken.project))
+      .returning(returning)
+
   private lazy val expiringTokens: Gen[ExpiringToken] =
     Gen.oneOf(
-      (projectIds, accessTokens).mapN(ExpiringToken.Decryptable.apply),
-      (projectIds, encryptedAccessTokens).mapN(ExpiringToken.NonDecryptable.apply)
+      (consumerProjects, accessTokens).mapN(ExpiringToken.Decryptable.apply),
+      (consumerProjects, encryptedAccessTokens).mapN(ExpiringToken.NonDecryptable.apply)
     )
 }

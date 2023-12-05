@@ -21,6 +21,7 @@ package io.renku.lock
 import cats._
 import cats.effect._
 import cats.syntax.all._
+import io.renku.db.DBConfigProvider.DBConfig
 import skunk._
 import skunk.codec.all._
 import skunk.implicits._
@@ -41,9 +42,9 @@ object PostgresLockStats {
       waiting:      List[Waiting]
   )
 
-  def getStats[F[_]: Monad](session: Session[F]): F[Stats] =
+  def getStats[F[_]: Monad](dbName: DBConfig.DbName, session: Session[F]): F[Stats] =
     for {
-      n <- session.unique(countCurrentLocks)
+      n <- session.unique(countCurrentLocks)(dbName.value)
       w <- session.execute(queryWaiting)
     } yield Stats(n, w)
 
@@ -56,13 +57,13 @@ object PostgresLockStats {
   def removeWaiting[F[_]: MonadCancelThrow](session: Session[F])(key: Long): F[Unit] =
     session.execute(deleteWaiting)(key).void
 
-  private val countCurrentLocks: Query[Void, Long] =
+  private val countCurrentLocks: Query[String, Long] =
     sql"""
        SELECT COUNT(objid)
-       FROM pg_locks
+       FROM pg_locks l
+       JOIN pg_database db ON db.oid = l.database AND db.datname = $text
        WHERE locktype = 'advisory' and granted = true;
-    """
-      .query(int8)
+    """.query(int8)
 
   private val queryWaiting: Query[Void, Waiting] =
     sql"""

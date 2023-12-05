@@ -32,72 +32,67 @@ import io.renku.tokenrepository.MicroserviceRunnerSpec.CountEffect
 import io.renku.tokenrepository.repository.cleanup.ExpiringTokensRemover
 import io.renku.tokenrepository.repository.init.DbInitializer
 import org.http4s.HttpRoutes
+import org.scalatest.flatspec.AsyncFlatSpec
 import org.scalatest.matchers.should
-import org.scalatest.wordspec.AsyncWordSpec
 import org.scalatest.{Assertion, Succeeded}
 
 import scala.concurrent.duration._
 
-class MicroserviceRunnerSpec extends AsyncWordSpec with AsyncIOSpec with should.Matchers {
+class MicroserviceRunnerSpec extends AsyncFlatSpec with AsyncIOSpec with should.Matchers {
 
-  "run" should {
+  it should "initialise Sentry, load certificate, initialise DB, kick off token removal and start HTTP server" in runnerTest {
+    runner =>
+      for {
+        _ <- runner.startFor(1.second).asserting(_ shouldBe ExitCode.Success)
 
-    "initialise Sentry, load certificate, initialise DB, kick off token removal and start HTTP server" in runnerTest {
-      runner =>
-        for {
-          _ <- runner.startFor(1.second).asserting(_ shouldBe ExitCode.Success)
+        _ <- runner.logger.loggedOnlyF(Info("Service started"))
 
-          _ <- runner.logger.loggedOnlyF(Info("Service started"))
+        res <- runner.assertCalledAll.assertNoException
+      } yield res
+  }
 
-          res <- runner.assertCalledAll.assertNoException
-        } yield res
-    }
+  it should "fail if Certificate loading fails" in runnerTest { runner =>
+    val exception = exceptions.generateOne
+    runner.certificateLoader.failWith(exception) >>
+      runner.startRunnerForever.assertThrowsError[Exception](_ shouldBe exception)
+  }
 
-    "fail if Certificate loading fails" in runnerTest { runner =>
+  it should "fail if Sentry initialization fails" in runnerTest { runner =>
+    val exception = exceptions.generateOne
+    runner.sentryInitializer.failWith(exception) >>
+      runner.startRunnerForever.assertThrowsError[Exception](_ shouldBe exception)
+  }
+
+  it should "return Success ExitCode even if DB initialisation fails as the process is run in another thread" in runnerTest {
+    runner =>
       val exception = exceptions.generateOne
-      runner.certificateLoader.failWith(exception) >>
-        runner.startRunnerForever.assertThrowsError[Exception](_ shouldBe exception)
-    }
+      for {
+        _ <- runner.dbInitializer.failWith(exception)
 
-    "fail if Sentry initialization fails" in runnerTest { runner =>
+        _ <- runner.startFor(1.second).asserting(_ shouldBe ExitCode.Success)
+        _ <- runner.assertCalledAllBut(runner.dbInitializer, runner.expiringTokensRemover, runner.microserviceRoutes)
+        _ <- runner.assertNotCalled(runner.expiringTokensRemover, runner.microserviceRoutes)
+
+        _ <- runner.logger.loggedF(Error("DB initialization failed", exception), Info("Service started"))
+      } yield Succeeded
+  }
+
+  it should "return Success ExitCode even if Expiring tokens removal fails as the process is run in another thread" in runnerTest {
+    runner =>
       val exception = exceptions.generateOne
-      runner.sentryInitializer.failWith(exception) >>
-        runner.startRunnerForever.assertThrowsError[Exception](_ shouldBe exception)
-    }
+      for {
+        _ <- runner.expiringTokensRemover.failWith(exception)
+        _ <- runner.startFor(2.seconds).asserting(_ shouldBe ExitCode.Success)
+        _ <- runner.logger.loggedF(Error("Expiring Tokens Removal failed", exception), Info("Service started"))
+      } yield Succeeded
+  }
 
-    "return Success ExitCode even if DB initialisation fails as the process is run in another thread" in runnerTest {
-      runner =>
-        val exception = exceptions.generateOne
-        for {
-          _ <- runner.dbInitializer.failWith(exception)
-
-          _ <- runner.startFor(1.second).asserting(_ shouldBe ExitCode.Success)
-          _ <- runner.assertCalledAllBut(runner.dbInitializer, runner.expiringTokensRemover, runner.microserviceRoutes)
-          _ <- runner.assertNotCalled(runner.expiringTokensRemover, runner.microserviceRoutes)
-
-          _ <- runner.logger.loggedF(Error("DB initialization failed", exception), Info("Service started"))
-        } yield Succeeded
-    }
-
-    "return Success ExitCode even if Expiring tokens removal fails as the process is run in another thread" in runnerTest {
-      runner =>
-        val exception = exceptions.generateOne
-        for {
-          _ <- runner.expiringTokensRemover.failWith(exception)
-
-          _ <- runner.startFor(1.second).asserting(_ shouldBe ExitCode.Success)
-          _ <- runner.assertCalledAllBut(runner.expiringTokensRemover)
-
-          _ <- runner.logger.loggedF(Error("Expiring Tokens Removal failed", exception), Info("Service started"))
-        } yield Succeeded
-    }
-
-    "fail if starting the http server fails" in runnerTest { runner =>
-      val exception = exceptions.generateOne
-      runner.httpServer.failWith(exception) >>
-        runner.startRunnerForever.assertThrowsError[Exception](_ shouldBe exception) >>
-        runner.assertCalledAllBut(runner.httpServer).assertNoException
-    }
+  it should "fail if starting the http server fails" in runnerTest { runner =>
+    val exception = exceptions.generateOne
+    for {
+      _ <- runner.httpServer.failWith(exception)
+      _ <- runner.startRunnerForever.assertThrowsError[Exception](_ shouldBe exception)
+    } yield Succeeded
   }
 
   private class RunnerTest extends AbstractMicroserviceRunnerTest {

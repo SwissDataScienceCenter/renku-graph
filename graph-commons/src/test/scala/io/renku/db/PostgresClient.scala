@@ -36,7 +36,7 @@ class PostgresClient[DB](server: PostgresServer, migrations: SessionResource[IO,
   def randomizedDBResource(prefix: String): Resource[IO, DBConfig[DB]] =
     Random
       .scalaUtilRandom[IO]
-      .flatMap(_.nextIntBounded(100))
+      .flatMap(_.nextIntBounded(1000))
       .map(v => s"${prefix}_$v")
       .toResource >>= dbResource
 
@@ -53,7 +53,7 @@ class PostgresClient[DB](server: PostgresServer, migrations: SessionResource[IO,
             .use(_.execute(sql"""DROP DATABASE "#$dbName"""".command).void)
             .void
       )
-      .evalTap(cfg => migrations(SessionResource[IO, DB](sessionResource(cfg))))
+      .evalTap(cfg => migrations(SessionResource[IO, DB](sessionResource(cfg), cfg)))
 
   private lazy val initSession: Resource[IO, Session[IO]] = makeSession(server.dbConfig)
 

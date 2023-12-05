@@ -57,8 +57,8 @@ class ExpiringTokensFinderSpec
                                     expiryDate = ExpiryDate(now().plus(beforeExpiration.plusDays(1)))
              )
         res <- finder.findExpiringTokens
-                 .evalTap(pt => PersistedTokenRemover[IO].delete(pt.projectId))
-                 .map(_.projectId)
+                 .evalTap(pt => PersistedTokenRemover[IO].delete(pt.project.id))
+                 .map(_.project.id)
                  .compile
                  .toList
                  .asserting(_ shouldBe List(proj1, proj2))
@@ -74,8 +74,8 @@ class ExpiringTokensFinderSpec
                                     expiryDate = ExpiryDate(now().plus(beforeExpiration.plusDays(1)))
              )
         res <- finder.findExpiringTokens
-                 .evalTap(pt => PersistedTokenRemover[IO].delete(pt.projectId))
-                 .map(_.projectId)
+                 .evalTap(pt => PersistedTokenRemover[IO].delete(pt.project.id))
+                 .map(_.project.id)
                  .compile
                  .toList
                  .asserting(_ shouldBe List(proj1, proj2))
