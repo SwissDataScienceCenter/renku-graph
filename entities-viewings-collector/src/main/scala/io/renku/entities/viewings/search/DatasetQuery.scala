@@ -73,7 +73,8 @@ object DatasetQuery extends (Criteria => Option[SparqlQuery]) {
                |  GRAPH ${GraphClass.Datasets.id} {
                |    ${v.datasetSameAs} a renku:DiscoverableDataset;
                |                       renku:creatorsNamesConcat ${v.creatorNames};
-               |                       renku:slug ${v.datasetName}.
+               |                       schema:name ${v.datasetName};
+               |                       renku:slug ${v.datasetSlug}.
                |
                |    OPTIONAL { ${v.datasetSameAs} renku:imagesConcat ${v.images} }
                |    OPTIONAL { ${v.datasetSameAs} renku:keywordsConcat ${v.keywords} }

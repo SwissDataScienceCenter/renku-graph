@@ -121,7 +121,8 @@ class StatusChangeEventsQueueSpec
           user = Generators.nonEmptyStrings().generateOne,
           database = Generators.nonEmptyStrings().generateOne,
           password = Some(Generators.nonEmptyStrings().generateOne)
-        )
+        ),
+        dbConfig
       )
       implicit val logger:           TestLogger[IO]            = TestLogger[IO]()
       implicit val metricsRegistry:  TestMetricsRegistry[IO]   = TestMetricsRegistry[IO]

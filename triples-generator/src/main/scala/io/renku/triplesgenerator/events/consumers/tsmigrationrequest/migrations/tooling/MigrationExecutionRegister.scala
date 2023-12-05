@@ -33,12 +33,12 @@ import io.renku.triplesstore._
 import io.renku.triplesstore.SparqlQuery.Prefixes
 import org.typelevel.log4cats.Logger
 
-private[migrations] trait MigrationExecutionRegister[F[_]] {
+private[tsmigrationrequest] trait MigrationExecutionRegister[F[_]] {
   def registerExecution(migrationName: Migration.Name): F[Unit]
   def findExecution(migrationName:     Migration.Name): F[Option[ServiceVersion]]
 }
 
-private[migrations] class MigrationExecutionRegisterImpl[F[_]: Async: Logger: SparqlQueryTimeRecorder](
+private class MigrationExecutionRegisterImpl[F[_]: Async: Logger: SparqlQueryTimeRecorder](
     serviceVersion: ServiceVersion,
     storeConfig:    MigrationsConnectionConfig
 )(implicit renkuUrl: RenkuUrl)
@@ -71,7 +71,7 @@ private[migrations] class MigrationExecutionRegisterImpl[F[_]: Async: Logger: Sp
     }
 }
 
-private[migrations] object MigrationExecutionRegister {
+private[tsmigrationrequest] object MigrationExecutionRegister {
 
   def apply[F[_]: Async: Logger: SparqlQueryTimeRecorder]: F[MigrationExecutionRegister[F]] = for {
     implicit0(renkuUrl: RenkuUrl) <- RenkuUrlLoader[F]()

@@ -61,6 +61,7 @@ object model {
     final case class Dataset(
         matchingScore:       MatchingScore,
         sameAs:              datasets.TopmostSameAs,
+        slug:                datasets.Slug,
         name:                datasets.Name,
         visibility:          projects.Visibility,
         date:                datasets.CreatedOrPublished,

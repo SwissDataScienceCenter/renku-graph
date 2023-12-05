@@ -70,7 +70,7 @@ class ModelEncoderSpec extends AnyFlatSpec with should.Matchers with DiffInstanc
     )
     val result = ModelEncoders.projectEncoder.apply(project)
     val expected = JsonProject(
-      List(Href("details", s"${renkuApiUrl}/projects/${project.slug.value}")),
+      List(Href("details", s"$renkuApiUrl/projects/${project.slug.value}")),
       project.maybeDescription,
       project.maybeCreator,
       project.matchingScore,
@@ -93,7 +93,8 @@ class ModelEncoderSpec extends AnyFlatSpec with should.Matchers with DiffInstanc
     val dataset = Entity.Dataset(
       MatchingScore(0.65f),
       datasets.TopmostSameAs(s"$renkuApiUrl/datasets/123"),
-      datasets.Name("my-dataset"),
+      datasets.Slug("my-dataset-slug"),
+      datasets.Name("my-dataset name"),
       Visibility.Public,
       datasets.DateCreated(Instant.parse("2013-03-31T13:03:45Z")),
       None,
@@ -109,7 +110,7 @@ class ModelEncoderSpec extends AnyFlatSpec with should.Matchers with DiffInstanc
     val expected = JsonDataset(
       List(Href("details", detailsUri.renderString)),
       dataset.matchingScore,
-      dataset.name,
+      dataset.slug,
       dataset.name,
       dataset.visibility,
       dataset.date,
@@ -196,8 +197,8 @@ object ModelEncoderSpec {
   case class JsonDataset(
       _links:        List[Href],
       matchingScore: MatchingScore,
+      slug:          datasets.Slug,
       name:          datasets.Name,
-      slug:          datasets.Name,
       visibility:    Visibility,
       date:          datasets.CreatedOrPublished,
       dateModified:  Option[datasets.DateModified],

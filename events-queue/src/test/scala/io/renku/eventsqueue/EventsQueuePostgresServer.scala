@@ -16,11 +16,8 @@
  * limitations under the License.
  */
 
-package io.renku.interpreters
+package io.renku.eventsqueue
 
-import cats.effect.{IO, Resource}
-import io.renku.db.SessionResourceImpl
-import skunk.Session
+import io.renku.db.PostgresServer
 
-class TestSessionResource[TargetDB](sessionResource: Resource[IO, Session[IO]])
-    extends SessionResourceImpl[IO, TargetDB](sessionResource)
+object EventsQueuePostgresServer extends PostgresServer(module = "events_queue", port = 5431)

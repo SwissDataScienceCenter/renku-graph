@@ -34,12 +34,13 @@ import io.renku.triplesstore.{SparqlQuery, SparqlQueryTimeRecorder}
 import org.typelevel.log4cats.Logger
 
 private[migrations] class QueryBasedMigration[F[_]: MonadThrow: Logger](
-    override val name: Migration.Name,
-    projectsFinder:    ProjectsFinder[F],
-    eventProducer:     projects.Slug => EventData,
-    eventSender:       EventSender[F],
-    executionRegister: MigrationExecutionRegister[F],
-    recoveryStrategy:  RecoverableErrorsRecovery = RecoverableErrorsRecovery
+    override val name:      Migration.Name,
+    override val exclusive: Boolean,
+    projectsFinder:         ProjectsFinder[F],
+    eventProducer:          projects.Slug => EventData,
+    eventSender:            EventSender[F],
+    executionRegister:      MigrationExecutionRegister[F],
+    recoveryStrategy:       RecoverableErrorsRecovery = RecoverableErrorsRecovery
 ) extends RegisteredMigration[F](name, executionRegister, recoveryStrategy) {
 
   import projectsFinder._
@@ -67,11 +68,12 @@ private[migrations] object QueryBasedMigration {
 
   def apply[F[_]: Async: Logger: SparqlQueryTimeRecorder: MetricsRegistry](
       name:          Migration.Name,
+      exclusive:     Boolean,
       query:         SparqlQuery,
       eventProducer: projects.Slug => EventData
   ): F[QueryBasedMigration[F]] = for {
     projectsFinder    <- ProjectsFinder[F](query)
     eventSender       <- EventSender[F](EventLogUrl)
     executionRegister <- MigrationExecutionRegister[F]
-  } yield new QueryBasedMigration[F](name, projectsFinder, eventProducer, eventSender, executionRegister)
+  } yield new QueryBasedMigration[F](name, exclusive, projectsFinder, eventProducer, eventSender, executionRegister)
 }

@@ -22,7 +22,8 @@ import DBInfra.QueueTable
 import cats.data.Kleisli
 import cats.effect.IO
 import cats.effect.testing.scalatest.AsyncIOSpec
-import io.renku.interpreters.TestLogger
+import io.renku.db.DBConfigProvider.DBConfig
+import io.renku.db.SessionResource
 import org.scalatest.flatspec.AsyncFlatSpec
 import org.scalatest.matchers.should
 import org.scalatest.{Outcome, Succeeded}
@@ -30,9 +31,15 @@ import skunk._
 import skunk.codec.all.{bool, varchar}
 import skunk.implicits._
 
-class EventsQueueDBCreatorSpec extends AsyncFlatSpec with AsyncIOSpec with should.Matchers with ContainerDB {
+class EventsQueueDBCreatorSpec
+    extends AsyncFlatSpec
+    with AsyncIOSpec
+    with should.Matchers
+    with EventsQueuePostgresSpec {
 
-  it should "create an 'enqueued-event' table if not exists" in {
+  override lazy val migrations: SessionResource[IO, TestDB] => IO[Unit] = _ => IO.unit
+
+  it should "create an 'enqueued-event' table if not exists" in testDBResource.use { implicit cfg =>
     for {
       _ <- checkTableExists(QueueTable.name).asserting(_ shouldBe false)
 
@@ -47,16 +54,15 @@ class EventsQueueDBCreatorSpec extends AsyncFlatSpec with AsyncIOSpec with shoul
     } yield Succeeded
   }
 
-  private implicit lazy val logger: TestLogger[IO] = TestLogger()
   private lazy val dbInfraCreator = new EventsQueueDBCreatorImpl[IO]
 
-  private def checkTableExists(table: String): IO[Boolean] = execute[Boolean] {
+  private def checkTableExists(table: String)(implicit cfg: DBConfig[TestDB]): IO[Boolean] = execute[Boolean] {
     val query: Query[String, Boolean] =
       sql"SELECT EXISTS (SELECT 1 FROM pg_tables WHERE tablename = $varchar)".query(bool)
     Kleisli(_.prepare(query).flatMap(_.unique(table)).recover { case _ => false })
   }
 
-  def verifyIndexExists(table: String, index: String) = execute[Outcome] {
+  def verifyIndexExists(table: String, index: String)(implicit cfg: DBConfig[TestDB]) = execute[Outcome] {
     val query: Query[String *: String *: EmptyTuple, Boolean] =
       sql"""SELECT EXISTS (
               SELECT 1

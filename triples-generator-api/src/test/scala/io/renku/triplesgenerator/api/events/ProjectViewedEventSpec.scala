@@ -18,21 +18,23 @@
 
 package io.renku.triplesgenerator.api.events
 
-import cats.syntax.all._
-import io.renku.generators.Generators.Implicits._
-import org.scalatest.matchers.should
-import org.scalatest.wordspec.AnyWordSpec
 import Generators._
+import cats.syntax.all._
 import io.circe.literal._
 import io.circe.syntax._
+import io.renku.generators.Generators.Implicits._
 import io.renku.generators.Generators.nonEmptyStrings
-import io.renku.graph.model.{persons, projects}
 import io.renku.graph.model.RenkuTinyTypeGenerators.{personEmails, personGitLabIds, projectSlugs, projectViewedDates}
+import io.renku.graph.model.{persons, projects}
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.EitherValues
+import org.scalatest.matchers.should
+import org.scalatest.wordspec.AnyWordSpec
 import org.scalatestplus.scalacheck.ScalaCheckPropertyChecks
 
 import java.time.Instant
+import java.time.Instant.now
+import java.time.temporal.ChronoUnit.MINUTES
 
 class ProjectViewedEventSpec
     extends AnyWordSpec
@@ -142,6 +144,19 @@ class ProjectViewedEventSpec
       }""".hcursor.as[ProjectViewedEvent]
 
       result.left.value.getMessage() should include(s"Expected PROJECT_VIEWED but got $otherCategory")
+    }
+
+    "decode to now if date in the payload is in the future" in {
+
+      val result = json"""{
+        "categoryName": "PROJECT_VIEWED",
+        "project": {
+          "slug": "project/path"
+        },
+        "date": ${now.plus(1, MINUTES)}
+      }""".hcursor.as[ProjectViewedEvent]
+
+      result.isRight shouldBe true
     }
   }
 

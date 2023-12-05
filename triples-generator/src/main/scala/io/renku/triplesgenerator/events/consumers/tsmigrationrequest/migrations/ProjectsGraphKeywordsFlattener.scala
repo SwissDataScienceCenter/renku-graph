@@ -37,7 +37,7 @@ private object ProjectsGraphKeywordsFlattener {
   private lazy val name = Migration.Name("Flatten Projects graph keywords")
 
   def apply[F[_]: Async: Logger: SparqlQueryTimeRecorder: MetricsRegistry]: F[Migration[F]] =
-    RegisteredUpdateQueryMigration[F](name, query).widen
+    RegisteredUpdateQueryMigration[F](name, exclusive = false, query).widen
 
   private[migrations] lazy val query = SparqlQuery.of(
     name.asRefined,

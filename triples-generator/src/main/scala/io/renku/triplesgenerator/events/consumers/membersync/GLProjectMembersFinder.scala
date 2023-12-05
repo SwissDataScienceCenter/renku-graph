@@ -23,7 +23,7 @@ import cats.syntax.all._
 import eu.timepit.refined.api.Refined
 import eu.timepit.refined.auto._
 import eu.timepit.refined.collection.NonEmpty
-import io.circe.Decoder
+import io.circe.{Decoder, DecodingFailure}
 import io.renku.graph.model.persons.{GitLabId, Name}
 import io.renku.graph.model.projects.Slug
 import io.renku.http.client.{AccessToken, GitLabClient}
@@ -68,8 +68,8 @@ private class GLProjectMembersFinderImpl[F[_]: Async: GitLabClient: Logger] exte
   ): PartialFunction[(Status, Request[F], Response[F]), F[(Set[GitLabProjectMember], Option[Int])]] = {
     case (Ok, _, response) =>
       response
-        .as[List[GitLabProjectMember]]
-        .map(members => members.toSet -> maybeNextPage(response))
+        .as[List[Option[GitLabProjectMember]]]
+        .map(members => members.flatten.toSet -> maybeNextPage(response))
     case (NotFound, _, _) =>
       (Set.empty[GitLabProjectMember] -> Option.empty[Int]).pure[F]
     case (Unauthorized | Forbidden, _, _) =>
@@ -92,8 +92,11 @@ private class GLProjectMembersFinderImpl[F[_]: Async: GitLabClient: Logger] exte
   private def maybeNextPage(response: Response[F]): Option[Int] =
     response.headers.get(ci"X-Next-Page").flatMap(_.head.value.toIntOption)
 
-  private implicit val memberDecoder: Decoder[GitLabProjectMember] =
-    Decoder.forProduct3("id", "name", "access_level")(GitLabProjectMember.apply)
+  private implicit val memberDecoder: Decoder[Option[GitLabProjectMember]] = cur =>
+    (cur.downField("id").success, cur.downField("name").success)
+      .mapN((_, _) => Decoder.forProduct3("id", "name", "access_level")(GitLabProjectMember.apply).map(_.some)(cur))
+      .getOrElse(Option.empty[GitLabProjectMember].asRight[DecodingFailure])
+
 }
 
 private object GLProjectMembersFinder {

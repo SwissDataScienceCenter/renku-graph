@@ -35,7 +35,7 @@ private object ProjectMembersRemover {
   private lazy val name = Migration.Name("Project members remover")
 
   def apply[F[_]: Async: Logger: SparqlQueryTimeRecorder: MetricsRegistry]: F[Migration[F]] =
-    RegisteredUpdateQueryMigration[F](name, query).widen
+    RegisteredUpdateQueryMigration[F](name, exclusive = false, query).widen
 
   private[migrations] lazy val query = SparqlQuery.of(
     name.asRefined,

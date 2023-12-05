@@ -18,21 +18,23 @@
 
 package io.renku.triplesgenerator.api.events
 
-import cats.syntax.all._
-import io.renku.generators.Generators.Implicits._
-import org.scalatest.matchers.should
-import org.scalatest.wordspec.AnyWordSpec
 import Generators._
+import cats.syntax.all._
 import io.circe.literal._
 import io.circe.syntax._
+import io.renku.generators.Generators.Implicits._
 import io.renku.generators.Generators.{nonEmptyStrings, timestampsNotInTheFuture}
-import io.renku.graph.model.projects
 import io.renku.graph.model.RenkuTinyTypeGenerators.projectSlugs
+import io.renku.graph.model.projects
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.EitherValues
+import org.scalatest.matchers.should
+import org.scalatest.wordspec.AnyWordSpec
 import org.scalatestplus.scalacheck.ScalaCheckPropertyChecks
 
 import java.time.Instant
+import java.time.Instant.now
+import java.time.temporal.ChronoUnit.MINUTES
 
 class ProjectActivatedSpec
     extends AnyWordSpec
@@ -89,6 +91,19 @@ class ProjectActivatedSpec
       }""".hcursor.as[ProjectActivated]
 
       result.left.value.getMessage() should include(s"Expected PROJECT_ACTIVATED but got $otherCategory")
+    }
+
+    "decode to now if date in the payload is in the future" in {
+
+      val result = json"""{
+        "categoryName": "PROJECT_ACTIVATED",
+        "project": {
+          "slug": ${projectSlugs.generateOne}
+        },
+        "date": ${now.plus(1, MINUTES)}
+      }""".hcursor.as[ProjectActivated]
+
+      result.isRight shouldBe true
     }
   }
 

@@ -25,9 +25,9 @@ import io.renku.triplesgenerator.errors.ProcessingRecoverableError
 import io.renku.triplesgenerator.errors.ProcessingRecoverableError.LogWorthyRecoverableError
 import org.http4s.Status.{Forbidden, InternalServerError, Unauthorized}
 
-private[migrations] object RecoverableErrorsRecovery extends RecoverableErrorsRecovery
+private[tsmigrationrequest] object RecoverableErrorsRecovery extends RecoverableErrorsRecovery
 
-private[migrations] trait RecoverableErrorsRecovery {
+private[tsmigrationrequest] trait RecoverableErrorsRecovery {
 
   type RecoveryStrategy[F[_], OUT] = PartialFunction[Throwable, F[Either[ProcessingRecoverableError, OUT]]]
 

@@ -67,7 +67,7 @@ private class TagsFinderImpl[F[_]: Async: NonEmptyParallel: Logger: SparqlQueryT
         |  BIND (${ResourceId(criteria.projectSlug).showAs[RdfResource]} AS ?projId)
         |  Graph ?projId {
         |    ?projId renku:hasDataset ?dsId.
-        |    ?dsId renku:slug '${criteria.datasetName}';
+        |    ?dsId renku:slug '${criteria.datasetSlug}';
         |          schema:identifier ?dsIdentifier.
         |    ?eventId schema:about/schema:url ?dsId;
         |             schema:name ?name;

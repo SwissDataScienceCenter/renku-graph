@@ -24,7 +24,7 @@ import cats.syntax.all._
 import io.circe.literal._
 import io.circe.{Encoder, Json}
 import io.renku.config
-import io.renku.graph.model.datasets.{CreatedOrPublished, DatePublished, Description, Identifier, Keyword, Name, Title}
+import io.renku.graph.model.datasets.{CreatedOrPublished, DatePublished, Description, Identifier, Keyword, Name, Slug}
 import io.renku.graph.model.images.ImageUri
 import io.renku.graph.model.{projects, GitLabUrl}
 import io.renku.http.rest.Links.{_links, Href, Link, Rel}
@@ -35,8 +35,8 @@ import io.renku.tinytypes.{IntTinyType, TinyTypeFactory}
 
 final case class DatasetSearchResult(
     id:                 Identifier,
-    title:              Title,
     name:               Name,
+    slug:               Slug,
     maybeDescription:   Option[Description],
     creators:           List[DatasetCreator],
     createdOrPublished: CreatedOrPublished,
@@ -53,8 +53,8 @@ object DatasetSearchResult {
   implicit def encoder(implicit gitLabUrl: GitLabUrl, renkuApiUrl: config.renku.ApiUrl): Encoder[DatasetSearchResult] =
     Encoder.instance[DatasetSearchResult] {
       case DatasetSearchResult(id,
-                               title,
                                name,
+                               slug,
                                maybeDescription,
                                creators,
                                date,
@@ -65,9 +65,8 @@ object DatasetSearchResult {
           ) =>
         json"""{
         "identifier":    $id,
-        "title":         $title,
         "name":          $name,
-        "slug":          $name,
+        "slug":          $slug,
         "published":     ${creators -> date},
         "date":          ${date.instant},
         "projectsCount": $projectsCount,
@@ -80,18 +79,18 @@ object DatasetSearchResult {
 
   private implicit lazy val publishingEncoder: Encoder[(List[DatasetCreator], CreatedOrPublished)] = Encoder.instance {
     case (creators, DatePublished(date)) => json"""{
-    "creator":       $creators,
-    "datePublished": $date
-  }"""
+      "creator":       $creators,
+      "datePublished": $date
+    }"""
     case (creators, _) => json"""{
-    "creator": $creators
-  }"""
+      "creator": $creators
+    }"""
   }
 
   private implicit lazy val creatorEncoder: Encoder[DatasetCreator] = Encoder.instance[DatasetCreator] {
     case DatasetCreator(maybeEmail, name, _) => json"""{
-    "name": $name
-  }""" addIfDefined ("email" -> maybeEmail)
+      "name": $name
+    }""" addIfDefined ("email" -> maybeEmail)
   }
 
   private implicit def imagesEncoder(implicit gitLabUrl: GitLabUrl): Encoder[(List[ImageUri], ExemplarProject)] =
@@ -99,14 +98,14 @@ object DatasetSearchResult {
       Json.arr(imageUris.map {
         case uri: ImageUri.Relative =>
           json"""{
-          "location": $uri
-        }""" deepMerge _links(
+            "location": $uri
+          }""" deepMerge _links(
             Link(Rel("view") -> Href(gitLabUrl / projectSlug / "raw" / "master" / uri))
           )
         case uri: ImageUri.Absolute =>
           json"""{
-          "location": $uri  
-        }""" deepMerge _links(
+            "location": $uri
+          }""" deepMerge _links(
             Link(Rel("view") -> Href(uri.show))
           )
       }: _*)

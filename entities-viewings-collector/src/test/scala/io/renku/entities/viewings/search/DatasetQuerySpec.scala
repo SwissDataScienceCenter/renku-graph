@@ -18,10 +18,10 @@
 
 package io.renku.entities.viewings.search
 
-import io.renku.graph.model.entities
 import io.renku.entities.search.model.{MatchingScore, Entity => SearchEntity}
 import io.renku.entities.viewings.search.RecentEntitiesFinder.Criteria
 import io.renku.generators.Generators.Implicits._
+import io.renku.graph.model.entities
 import io.renku.http.server.security.model.AuthUser
 import org.scalatest.OptionValues
 
@@ -80,8 +80,9 @@ class DatasetQuerySpec extends SearchTestBase with OptionValues {
     val decoded = tsClient.queryExpecting[List[SearchEntity.Dataset]](query)(datasetDecoder).unsafeRunSync()
     decoded.head shouldMatchTo
       SearchEntity.Dataset(
-        sameAs = dataset.provenance.topmostSameAs,
         matchingScore = MatchingScore(1f),
+        sameAs = dataset.provenance.topmostSameAs,
+        slug = dataset.identification.slug,
         name = dataset.identification.name,
         visibility = project.visibility,
         date = dataset.provenance.date,
@@ -120,8 +121,9 @@ class DatasetQuerySpec extends SearchTestBase with OptionValues {
     val decoded = tsClient.queryExpecting[List[SearchEntity.Dataset]](query)(datasetDecoder).unsafeRunSync()
     decoded.head shouldMatchTo
       SearchEntity.Dataset(
-        sameAs = dataset1.provenance.topmostSameAs,
         matchingScore = MatchingScore(1f),
+        sameAs = dataset1.provenance.topmostSameAs,
+        slug = dataset1.identification.slug,
         name = dataset1.identification.name,
         visibility = project1.visibility,
         date = dataset1.provenance.date,

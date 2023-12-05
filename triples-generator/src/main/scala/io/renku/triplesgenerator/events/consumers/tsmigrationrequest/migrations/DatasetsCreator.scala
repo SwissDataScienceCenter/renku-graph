@@ -46,7 +46,11 @@ private class DatasetsCreatorImpl[F[_]: MonadThrow: Logger](
     recoveryStrategy: RecoverableErrorsRecovery = RecoverableErrorsRecovery
 ) extends DatasetsCreator[F] {
 
-  override lazy val name = Migration.Name("Datasets creation")
+  // In fact this is an exclusive migration but not Registered
+  // Hence, the flag has to be set to false to satisfy Migrations validation
+  // TSStateChecker returns a special state if it's ongoing or not run
+  override val exclusive: Boolean        = false
+  override val name:      Migration.Name = Migration.Name("Datasets creation")
 
   import recoveryStrategy._
   import tsAdminClient._

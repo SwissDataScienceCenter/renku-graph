@@ -104,7 +104,8 @@ private[datasets] object Encoders {
 
     Set(
       searchInfoQuad(rdf / "type", typeDef.clazz.id).some,
-      searchInfoQuad(slugProperty.id, info.name.asObject).some,
+      searchInfoQuad(nameProperty.id, info.name.asObject).some,
+      searchInfoQuad(slugProperty.id, info.slug.asObject).some,
       searchInfoQuad(visibilityProperty.id, info.visibility.asObject).some,
       createdOrPublishedQuad.some,
       maybeDateModifiedQuad,

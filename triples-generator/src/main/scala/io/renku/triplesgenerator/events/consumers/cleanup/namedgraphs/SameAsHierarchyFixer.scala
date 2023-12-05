@@ -359,20 +359,18 @@ private class SameAsHierarchyFixer[F[_]: Async: Logger: SparqlQueryTimeRecorder]
   private def fixTopmostSameAsOnAllDescendants(dsInfo: DSInfo) =
     collectDescendantsThroughTopmost(dsInfo).map { descendant =>
       for {
-        _          <- cleanUpTopmostSameAs(descendant)
-        newTopmost <- findTopmostSameAsOnDsWith(descendant)
-        _          <- insertNewTopmostSameAs(descendant, newTopmost)
+        _               <- cleanUpTopmostSameAs(descendant)
+        maybeNewTopmost <- findTopmostSameAsOnDsWith(descendant)
+        _               <- maybeNewTopmost.fold(ifEmpty = ().pure[F])(insertNewTopmostSameAs(descendant, _))
       } yield ()
     }.sequence
 
-  private def findTopmostSameAsOnDsWith(descendant: DescendantInfo): F[TopmostSameAs] = {
+  private def findTopmostSameAsOnDsWith(descendant: DescendantInfo): F[Option[TopmostSameAs]] = {
     val (graphId, _, sameAs) = descendant
-    val decoder: Decoder[TopmostSameAs] = ResultsDecoder.singleWithErrors(
-      onEmpty = show"No topmostSameAs on DS with sameAs $sameAs",
-      onMultiple = show"Multiple topmostSameAs on DS with sameAs $sameAs"
-    )(implicit cursor => extract[TopmostSameAs]("topmostSameAs"))
+    val decoder: Decoder[Option[TopmostSameAs]] =
+      ResultsDecoder[Option, TopmostSameAs](implicit cursor => extract[TopmostSameAs]("topmostSameAs"))
 
-    queryExpecting[TopmostSameAs] {
+    queryExpecting[Option[TopmostSameAs]] {
       SparqlQuery.of(
         name = "find TopmostSameAs by SameAs",
         Prefixes of (renku -> "renku", schema -> "schema"),

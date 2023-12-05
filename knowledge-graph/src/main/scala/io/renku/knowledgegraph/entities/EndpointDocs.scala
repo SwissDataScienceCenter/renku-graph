@@ -73,7 +73,7 @@ private class EndpointDocsImpl()(implicit gitLabUrl: GitLabUrl, renkuApiUrl: ren
   private lazy val query = Parameter.Query(
     "query",
     Schema.String,
-    "to filter by matching value in name/title, namespace, creator, keyword and description".some,
+    "to filter by matching value in name/slug, namespace, creator, keyword and description".some,
     required = false
   )
   private lazy val `type` = Parameter.Query(
@@ -166,6 +166,7 @@ private class EndpointDocsImpl()(implicit gitLabUrl: GitLabUrl, renkuApiUrl: ren
     Dataset(
       MatchingScore(1),
       datasets.TopmostSameAs("http://localhost/123444"),
+      datasets.Slug("slug"),
       datasets.Name("name"),
       projects.Visibility.Public,
       datasets.DateCreated(Instant.parse("2012-11-15T10:00:00.000Z")),

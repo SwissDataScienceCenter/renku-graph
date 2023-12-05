@@ -26,9 +26,9 @@ import cats.syntax.all._
 import com.typesafe.config.Config
 import io.renku.metrics.MetricsRegistry
 import io.renku.triplesgenerator.errors.ProcessingRecoverableError
-import io.renku.triplesgenerator.events.consumers.tsmigrationrequest.migrations.Migrations
-import io.renku.triplesgenerator.events.consumers.tsmigrationrequest.migrations.reprovisioning.ReProvisioningStatus
 import io.renku.triplesstore.SparqlQueryTimeRecorder
+import migrations.Migrations
+import migrations.reprovisioning.ReProvisioningStatus
 import org.typelevel.log4cats.Logger
 
 import scala.util.control.NonFatal

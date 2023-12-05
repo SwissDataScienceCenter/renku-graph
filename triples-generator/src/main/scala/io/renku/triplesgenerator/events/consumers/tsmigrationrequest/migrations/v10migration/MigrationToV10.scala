@@ -46,6 +46,11 @@ private class MigrationToV10[F[_]: Async: Logger](
     recoveryStrategy:     RecoverableErrorsRecovery = RecoverableErrorsRecovery
 ) extends ConditionedMigration[F] {
 
+  // In fact this is an exclusive migration but not Registered
+  // Hence, the flag has to be set to false to satisfy Migrations validation
+  override val exclusive: Boolean        = false
+  override val name:      Migration.Name = MigrationToV10.name
+
   import envReadinessChecker._
   import eventsSender._
   import executionRegister._
@@ -54,8 +59,6 @@ private class MigrationToV10[F[_]: Async: Logger](
   import projectDonePersister._
   import projectsFinder._
   import recoveryStrategy._
-
-  override val name: Migration.Name = MigrationToV10.name
 
   protected[v10migration] override def required
       : EitherT[F, ProcessingRecoverableError, ConditionedMigration.MigrationRequired] = EitherT {

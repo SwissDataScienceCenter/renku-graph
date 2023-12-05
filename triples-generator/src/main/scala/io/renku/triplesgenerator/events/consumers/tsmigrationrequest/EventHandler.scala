@@ -32,12 +32,12 @@ import io.renku.events.{CategoryName, EventRequestContent, consumers}
 import io.renku.graph.config.EventLogUrl
 import io.renku.metrics.MetricsRegistry
 import io.renku.microservices.MicroserviceIdentifier
+import io.renku.triplesgenerator.errors.ProcessingRecoverableError
 import io.renku.triplesgenerator.events.consumers.TSStateChecker
-import io.renku.triplesgenerator.events.consumers.TSStateChecker.TSState.{MissingDatasets, ReProvisioning, Ready}
+import io.renku.triplesgenerator.events.consumers.TSStateChecker.TSState.{Migrating, MissingDatasets, Ready}
 import io.renku.triplesstore.SparqlQueryTimeRecorder
 import migrations.reprovisioning.ReProvisioningStatus
 import org.typelevel.log4cats.Logger
-import io.renku.triplesgenerator.errors.ProcessingRecoverableError
 
 import scala.util.control.NonFatal
 
@@ -59,7 +59,6 @@ private class EventHandler[F[_]: MonadCancelThrow: Logger](
   import eventSender._
   import io.circe.literal._
   import io.renku.events.consumers.EventDecodingTools._
-  import tsStateChecker._
 
   override def createHandlingDefinition(): EventHandlingDefinition =
     EventHandlingDefinition(
@@ -106,10 +105,11 @@ private class EventHandler[F[_]: MonadCancelThrow: Logger](
   }
 
   private def verifyTSState: F[Option[EventSchedulingResult]] =
-    checkTSState
+    tsStateChecker.checkTSState
       .map {
-        case Ready | MissingDatasets => None
-        case ReProvisioning          => ServiceUnavailable("Re-provisioning running").widen.some
+        // 'Migrating' here means requiring migration
+        case Ready | MissingDatasets | Migrating => None
+        case state                               => ServiceUnavailable(state.show).widen.some
       }
       .recover { case NonFatal(exception) => SchedulingError(exception).widen.some }
 }
@@ -124,7 +124,7 @@ private object EventHandler {
       subscriptionMechanism: SubscriptionMechanism[F],
       config:                Config
   ): F[consumers.EventHandler[F]] = for {
-    tsStateChecker   <- TSStateChecker[F]
+    tsStateChecker   <- TSStateChecker[F](config)
     migrationsRunner <- MigrationsRunner[F](config)
     eventSender      <- EventSender[F](EventLogUrl)
     processExecutor  <- ProcessExecutor.concurrent(processesCount = 1)

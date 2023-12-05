@@ -118,8 +118,8 @@ private class EndpointDocsImpl()(implicit gitLabUrl: GitLabUrl, renkuApiUrl: ren
       ProjectDataset(
         datasets.Identifier("123"),
         datasets.OriginalIdentifier("123"),
-        datasets.Title("dataset"),
-        datasets.Name("dataset"),
+        datasets.Name("name"),
+        datasets.Slug("slug"),
         datasets.DateCreated(Instant.now().minus(Duration.ofDays(20))),
         maybeDateModified = None,
         datasets.SameAs("http://datasets-repo/abcd").asLeft[datasets.DerivedFrom],
@@ -128,8 +128,8 @@ private class EndpointDocsImpl()(implicit gitLabUrl: GitLabUrl, renkuApiUrl: ren
       ProjectDataset(
         datasets.Identifier("123"),
         datasets.OriginalIdentifier("123"),
-        datasets.Title("dataset"),
-        datasets.Name("dataset"),
+        datasets.Name("name"),
+        datasets.Slug("slug"),
         datasets.DatePublished(LocalDate.now().minusDays(20)),
         datasets.DateModified(Instant.now()).some,
         datasets.DerivedFrom("http://datasets-repo/abcd").asRight[datasets.SameAs],

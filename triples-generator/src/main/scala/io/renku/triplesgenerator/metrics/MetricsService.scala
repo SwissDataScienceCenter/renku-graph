@@ -63,7 +63,7 @@ private class MetricsServiceImpl[F[_]: Async](lockGauge: PostgresLockGauge[F],
   override def collect: F[Unit] =
     updateLocksStats() >> updateCategoryEventCounts()
 
-  private val getPostgresLocksStats = dbPool.useK(Kleisli(PostgresLockStats.getStats[F]))
+  private val getPostgresLocksStats = dbPool.useK(Kleisli(PostgresLockStats.getStats[F](dbPool.dbName, _)))
 
   private def updateLocksStats() =
     getPostgresLocksStats >>= { stats =>

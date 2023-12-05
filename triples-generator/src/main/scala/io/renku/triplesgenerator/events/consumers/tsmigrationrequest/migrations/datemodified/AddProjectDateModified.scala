@@ -41,6 +41,9 @@ private class AddProjectDateModified[F[_]: Async: Logger](
     recoveryStrategy:     RecoverableErrorsRecovery = RecoverableErrorsRecovery
 ) extends ConditionedMigration[F] {
 
+  override val exclusive: Boolean        = false
+  override val name:      Migration.Name = AddProjectDateModified.name
+
   import datePersister.persistDateModified
   import executionRegister._
   import fs2._
@@ -49,8 +52,6 @@ private class AddProjectDateModified[F[_]: Async: Logger](
   import projectFetcher.fetchProject
   import projectsFinder._
   import recoveryStrategy._
-
-  override val name: Migration.Name = AddProjectDateModified.name
 
   protected[datemodified] override def required
       : EitherT[F, ProcessingRecoverableError, ConditionedMigration.MigrationRequired] = EitherT {

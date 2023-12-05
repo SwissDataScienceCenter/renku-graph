@@ -45,6 +45,7 @@ trait ExternalEventLogDb { self: IOSpec =>
       user = dbConfig.user,
       database = dbConfig.name,
       password = Some(dbConfig.pass)
-    )
+    ),
+    dbConfig
   )
 }
