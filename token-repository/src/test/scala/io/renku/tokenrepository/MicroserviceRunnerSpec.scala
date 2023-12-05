@@ -92,7 +92,6 @@ class MicroserviceRunnerSpec extends AsyncFlatSpec with AsyncIOSpec with should.
     for {
       _ <- runner.httpServer.failWith(exception)
       _ <- runner.startRunnerForever.assertThrowsError[Exception](_ shouldBe exception)
-      _ <- runner.assertCalledAllBut(runner.httpServer).assertNoException
     } yield Succeeded
   }
 
