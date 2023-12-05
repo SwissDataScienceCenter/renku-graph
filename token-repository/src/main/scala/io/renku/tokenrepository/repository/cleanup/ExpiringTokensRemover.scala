@@ -21,7 +21,10 @@ package io.renku.tokenrepository.repository.cleanup
 import cats.effect.{Async, Temporal}
 import cats.syntax.all._
 import fs2.Stream
+import io.renku.eventlog
+import io.renku.eventlog.api.events.CommitSyncRequest
 import io.renku.http.client.GitLabClient
+import io.renku.metrics.MetricsRegistry
 import io.renku.tokenrepository.repository.ProjectsTokensDB.SessionResource
 import io.renku.tokenrepository.repository.deletion.{DeletionResult, PersistedTokenRemover, TokenRemover}
 import io.renku.tokenrepository.repository.metrics.QueriesExecutionTimes
@@ -34,14 +37,16 @@ trait ExpiringTokensRemover[F[_]] {
 }
 
 object ExpiringTokensRemover {
-  def apply[F[_]: Async: GitLabClient: SessionResource: Logger: QueriesExecutionTimes]: F[ExpiringTokensRemover[F]] =
-    (ExpiringTokensFinder[F], TokenRemover[F])
-      .mapN(new ExpiringTokensRemoverImpl(_, _, PersistedTokenRemover[F], 1 minute))
+  def apply[F[_]: Async: GitLabClient: SessionResource: Logger: QueriesExecutionTimes: MetricsRegistry]
+      : F[ExpiringTokensRemover[F]] =
+    (ExpiringTokensFinder[F], TokenRemover[F], eventlog.api.events.Client[F])
+      .mapN(new ExpiringTokensRemoverImpl(_, _, PersistedTokenRemover[F], _, 1 minute))
 }
 
 private class ExpiringTokensRemoverImpl[F[_]: Async: Logger](tokensFinder: ExpiringTokensFinder[F],
                                                              tokenRemover:      TokenRemover[F],
                                                              dbTokenRemover:    PersistedTokenRemover[F],
+                                                             elClient:          eventlog.api.events.Client[F],
                                                              retryDelayOnError: Duration
 ) extends ExpiringTokensRemover[F] {
 
@@ -50,15 +55,25 @@ private class ExpiringTokensRemoverImpl[F[_]: Async: Logger](tokensFinder: Expir
       .flatMap(tkns => Logger[F].info(s"Processed ${tkns.length} expired tokens"))
       .handleErrorWith(waitAndRetry)
 
-  private def findAndRemoveTokens =
+  private def findAndRemoveTokens: Stream[F, (ExpiringToken, DeletionResult)] =
     tokensFinder.findExpiringTokens
       .evalMap(et => removeToken(et).tupleLeft(et))
-      .evalTap { case (et, result) => Logger[F].info(show"Expiring token for ${et.projectId} $result") }
+      .evalTap { case (et, _) => sendCommitSyncRequest(et) }
+      .evalTap { case (et, result) => Logger[F].info(show"Expiring token for ${et.project.id} $result") }
 
   private lazy val removeToken: ExpiringToken => F[DeletionResult] = {
-    case ExpiringToken.Decryptable(projectId, token) => tokenRemover.delete(projectId, token.some)
-    case ExpiringToken.NonDecryptable(projectId, _)  => dbTokenRemover.delete(projectId)
+    case ExpiringToken.Decryptable(project, token) => tokenRemover.delete(project.id, token.some)
+    case ExpiringToken.NonDecryptable(project, _)  => dbTokenRemover.delete(project.id)
   }
+
+  private def sendCommitSyncRequest(et: ExpiringToken): F[Unit] =
+    elClient
+      .send(CommitSyncRequest(et.project))
+      .handleErrorWith(
+        Logger[F].error(_)(
+          show"Failed to send ${CommitSyncRequest.categoryName} event for ${et.project.id} after expiring token removal"
+        )
+      )
 
   private lazy val waitAndRetry: Throwable => F[Unit] =
     Logger[F].error(_)("Expiring tokens clean-up process failed. Retrying") >>

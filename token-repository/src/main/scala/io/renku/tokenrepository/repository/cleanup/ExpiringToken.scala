@@ -18,16 +18,16 @@
 
 package io.renku.tokenrepository.repository.cleanup
 
-import io.renku.graph.model.projects
+import io.renku.events.consumers.Project
 import io.renku.http.client.AccessToken
 import io.renku.tokenrepository.repository.AccessTokenCrypto.EncryptedAccessToken
 
 private trait ExpiringToken {
-  val projectId: projects.GitLabId
+  val project: Project
   lazy val widen: ExpiringToken = this
 }
 
 private object ExpiringToken {
-  final case class Decryptable(projectId: projects.GitLabId, token: AccessToken)             extends ExpiringToken
-  final case class NonDecryptable(projectId: projects.GitLabId, token: EncryptedAccessToken) extends ExpiringToken
+  final case class Decryptable(project: Project, token: AccessToken)             extends ExpiringToken
+  final case class NonDecryptable(project: Project, token: EncryptedAccessToken) extends ExpiringToken
 }

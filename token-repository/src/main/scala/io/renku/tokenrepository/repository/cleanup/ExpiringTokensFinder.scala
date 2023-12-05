@@ -25,6 +25,7 @@ import cats.syntax.all._
 import fs2.Stream
 import io.renku.db.implicits._
 import io.renku.db.{DbClient, SqlStatement}
+import io.renku.events.consumers.Project
 import io.renku.graph.model.projects
 import io.renku.tokenrepository.repository.AccessTokenCrypto.EncryptedAccessToken
 import metrics.QueriesExecutionTimes
@@ -66,22 +67,24 @@ private class ExpiringTokensFinderImpl[F[_]: Async: SessionResource: QueriesExec
   private lazy val query =
     SqlStatement
       .named("find expiring tokens")
-      .select[LocalDate, (projects.GitLabId, EncryptedAccessToken)](
-        sql"""SELECT project_id, token
+      .select[LocalDate, (Project, EncryptedAccessToken)](
+        sql"""SELECT project_id, project_slug, token
               FROM projects_tokens
               WHERE expiry_date <= $date
               LIMIT #${chunkSize.toString}"""
-          .query(projectIdDecoder ~ encryptedAccessTokenDecoder)
-          .map { case (id: projects.GitLabId) ~ (token: EncryptedAccessToken) => id -> token }
+          .query(projectIdDecoder ~ projectSlugDecoder ~ encryptedAccessTokenDecoder)
+          .map { case (id: projects.GitLabId) ~ (slug: projects.Slug) ~ (token: EncryptedAccessToken) =>
+            Project(id, slug) -> token
+          }
       )
       .arguments(LocalDate.now() plus periodBeforeExpiration)
       .build(_.toList)
       .flatMapResult {
-        _.map { case (id, encToken) =>
+        _.map { case (project, encToken) =>
           accessTokenCrypto
             .decrypt(encToken)
-            .map(t => ExpiringToken.Decryptable(id, t).widen)
-            .handleError(_ => ExpiringToken.NonDecryptable(id, encToken).widen)
+            .map(t => ExpiringToken.Decryptable(project, t).widen)
+            .handleError(_ => ExpiringToken.NonDecryptable(project, encToken).widen)
         }.sequence
       }
 }
