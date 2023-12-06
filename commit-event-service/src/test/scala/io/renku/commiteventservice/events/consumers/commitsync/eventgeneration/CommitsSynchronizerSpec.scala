@@ -595,11 +595,6 @@ class CommitsSynchronizerSpec
                                                                          clock
   )
 
-  protected override def beforeEach(): Unit = {
-    super.beforeEach()
-    logger.reset()
-  }
-
   private def givenAccessTokenIsFound(projectId: GitLabId): AccessToken = {
     val at = accessTokens.generateOne
     (accessTokenFinder
@@ -671,4 +666,9 @@ class CommitsSynchronizerSpec
     s"$categoryName: id = $commitId, projectId = ${project.id}, projectSlug = ${project.slug} -> $message in ${elapsedTime}ms",
     exception
   )
+
+  protected override def beforeEach(): Unit = {
+    super.beforeEach()
+    logger.reset()
+  }
 }
