@@ -20,15 +20,15 @@ package io.renku.commiteventservice.events.consumers.globalcommitsync
 package eventgeneration
 
 import Generators.{commitsInfos, globalCommitSyncEvents}
+import GlobalCommitSyncEvent.CommitsInfo
 import cats.effect.IO
 import cats.effect.testing.scalatest.AsyncIOSpec
 import cats.syntax.all._
+import eventgeneration.gitlab.{GitLabCommitFetcher, GitLabCommitStatFetcher}
 import io.renku.commiteventservice.events.consumers.common.SynchronizationSummary
 import io.renku.commiteventservice.events.consumers.common.UpdateResult._
-import io.renku.commiteventservice.events.consumers.globalcommitsync.GlobalCommitSyncEvent.CommitsInfo
-import io.renku.commiteventservice.events.consumers.globalcommitsync.eventgeneration.gitlab.{GitLabCommitFetcher, GitLabCommitStatFetcher}
 import io.renku.events.consumers.Project
-import io.renku.generators.CommonGraphGenerators.personalAccessTokens
+import io.renku.generators.CommonGraphGenerators.accessTokens
 import io.renku.generators.Generators.Implicits._
 import io.renku.generators.Generators._
 import io.renku.graph.model.EventsGenerators.commitIds
@@ -61,12 +61,12 @@ class CommitsSynchronizerSpec
     with ScalaCheckPropertyChecks
     with BeforeAndAfterEach {
 
-  it should "do not traverse commits history " +
-    "if commits count and the latest commit id are the same between EL and GitLab" in {
+  it should "do not traverse the commits history " +
+    "if commits count and the latest commit id are the same between EL and GL" in {
 
       val event = globalCommitSyncEvents().generateOne
 
-      givenAccessTokenFound(event.project.id)
+      implicit val at: AccessToken = givenAccessTokenFound(event.project.id)
       givenCommitStatsInGL(event.project.id, event.commits)
 
       commitsSynchronizer.synchronizeEvents(event).assertNoException >>
@@ -81,7 +81,7 @@ class CommitsSynchronizerSpec
 
       val event = globalCommitSyncEvents().generateOne
 
-      givenAccessTokenFound(event.project.id)
+      implicit val at: AccessToken = givenAccessTokenFound(event.project.id)
       givenCommitStatsInGL(event.project.id, commitsInfos.generateOne)
 
       val commonIds = commitIds.generateList()
@@ -114,7 +114,7 @@ class CommitsSynchronizerSpec
       val elOnlyIds: List[CommitId] = commitIds.generateList()
       val event = globalCommitSyncEvents().generateOne
 
-      givenAccessTokenFound(event.project.id)
+      implicit val at: AccessToken = givenAccessTokenFound(event.project.id)
       givenCommitStatsInGL(event.project.id, commitsInfos.generateOne)
 
       givenCommitsInGL(event.project.id, untilNow, (commonIds ::: glOnlyIds).shuffle.toPages(ofSize = 2):   _*)
@@ -148,7 +148,7 @@ class CommitsSynchronizerSpec
 
       val event = globalCommitSyncEvents().generateOne
 
-      givenAccessTokenFound(event.project.id)
+      implicit val at: AccessToken = givenAccessTokenFound(event.project.id)
       givenCommitStatsInGL(event.project.id, commitsInfos.generateOne)
 
       givenCommitsInGL(event.project.id, untilNow, (commonIds ::: glOnlyIds).shuffle.toPages(ofSize = 2):   _*)
@@ -188,11 +188,11 @@ class CommitsSynchronizerSpec
       logger.loggedF(Error(show"$categoryName: failed to sync commits for project ${event.project}", exception))
   }
 
-  it should "delete all commits in EL if the project in GL is removed" in {
+  it should "delete all commits in EL if the project is removed from GL" in {
 
     val event = globalCommitSyncEvents().generateOne
 
-    givenAccessTokenFound(event.project.id)
+    implicit val at: AccessToken = givenAccessTokenFound(event.project.id)
     givenProjectDoesntExistInGL(event.project.id)
 
     givenCommitsInGL(event.project.id, untilNow)
@@ -215,10 +215,30 @@ class CommitsSynchronizerSpec
       )
   }
 
-  private val maybeAccessToken = personalAccessTokens.generateOption
-  private val now              = Instant.now()
-  private lazy val untilNow    = DateCondition.Until(now)
-  private lazy val sinceNow    = DateCondition.Since(now)
+  it should "delete all commits in EL if no access token is available for the project" in {
+
+    val event = globalCommitSyncEvents().generateOne
+
+    givenAccessTokenFinding(event.project.id, returning = None.pure[IO])
+
+    val elOnlyIds = commitIds.generateList()
+    givenCommitsInEL(event.project.slug, untilNow, elOnlyIds.toPages(2): _*)
+
+    expectEventsToBeDeleted(event.project, elOnlyIds)
+
+    commitsSynchronizer.synchronizeEvents(event).assertNoException >>
+      logger.loggedF(
+        logSummary(
+          event.project,
+          SynchronizationSummary(Deleted.name -> elOnlyIds.size),
+          executionTimeRecorder.elapsedTime.some
+        )
+      )
+  }
+
+  private val now           = Instant.now()
+  private lazy val untilNow = DateCondition.Until(now)
+  private lazy val sinceNow = DateCondition.Since(now)
 
   private implicit lazy val logger:                TestLogger[IO]                = TestLogger()
   private implicit lazy val executionTimeRecorder: TestExecutionTimeRecorder[IO] = TestExecutionTimeRecorder[IO]()
@@ -236,10 +256,14 @@ class CommitsSynchronizerSpec
                                                                          () => now
   )
 
-  private def givenAccessTokenFound(projectId: GitLabId) = (accessTokenFinder
-    .findAccessToken(_: GitLabId)(_: GitLabId => String))
-    .expects(projectId, projectIdToPath)
-    .returning(maybeAccessToken.pure[IO])
+  private def givenAccessTokenFound(projectId: GitLabId) = {
+    val at = accessTokens.generateOne
+    (accessTokenFinder
+      .findAccessToken(_: GitLabId)(_: GitLabId => String))
+      .expects(projectId, projectIdToPath)
+      .returning(at.some.pure[IO])
+    at
+  }
 
   private def givenAccessTokenFinding(projectId: GitLabId, returning: IO[Option[AccessToken]]) =
     (accessTokenFinder
@@ -247,19 +271,21 @@ class CommitsSynchronizerSpec
       .expects(projectId, projectIdToPath)
       .returning(returning)
 
-  private def givenProjectDoesntExistInGL(projectId: GitLabId) =
+  private def givenProjectDoesntExistInGL(projectId: GitLabId)(implicit at: AccessToken) =
     (gitLabCommitStatFetcher
       .fetchCommitStats(_: projects.GitLabId)(_: Option[AccessToken]))
-      .expects(projectId, maybeAccessToken)
+      .expects(projectId, at.some)
       .returning(None.pure[IO])
 
-  private def givenCommitStatsInGL(projectId: GitLabId, commitsInfo: CommitsInfo) =
+  private def givenCommitStatsInGL(projectId: GitLabId, commitsInfo: CommitsInfo)(implicit at: AccessToken) =
     (gitLabCommitStatFetcher
       .fetchCommitStats(_: projects.GitLabId)(_: Option[AccessToken]))
-      .expects(projectId, maybeAccessToken)
+      .expects(projectId, at.some)
       .returning(Some(ProjectCommitStats(Some(commitsInfo.latest), commitsInfo.count)).pure[IO])
 
-  private def givenCommitsInGL(projectId: GitLabId, condition: DateCondition, pageResults: PageResult*) = {
+  private def givenCommitsInGL(projectId: GitLabId, condition: DateCondition, pageResults: PageResult*)(implicit
+      at: AccessToken
+  ) = {
     val lastPage =
       if (pageResults.isEmpty) Page.first
       else pageResults.reverse.tail.headOption.flatMap(_.maybeNextPage).getOrElse(Page(pageResults.size))
@@ -267,14 +293,14 @@ class CommitsSynchronizerSpec
     if (pageResults.isEmpty)
       (gitLabCommitFetcher
         .fetchGitLabCommits(_: projects.GitLabId, _: DateCondition, _: PagingRequest)(_: Option[AccessToken]))
-        .expects(projectId, condition, pageRequest(Page.first), maybeAccessToken)
+        .expects(projectId, condition, pageRequest(Page.first), at.some)
         .returning(PageResult.empty.pure[IO])
     else
       pageResults foreach { pageResult =>
         val previousPage = pageResult.maybeNextPage.map(p => Page(p.value - 1)).getOrElse(lastPage)
         (gitLabCommitFetcher
           .fetchGitLabCommits(_: projects.GitLabId, _: DateCondition, _: PagingRequest)(_: Option[AccessToken]))
-          .expects(projectId, condition, pageRequest(previousPage), maybeAccessToken)
+          .expects(projectId, condition, pageRequest(previousPage), at.some)
           .returning(pageResult.pure[IO])
       }
   }
@@ -301,17 +327,15 @@ class CommitsSynchronizerSpec
 
   private def expectEventsToBeDeleted(project: Project, commits: List[CommitId]) =
     (commitEventDeleter
-      .deleteCommits(_: Project, _: List[CommitId])(_: Option[AccessToken]))
-      .expects(where { (p: Project, c: List[CommitId], at: Option[AccessToken]) =>
-        (p == project) && (c.toSet == commits.toSet) && (at == maybeAccessToken)
-      })
+      .deleteCommits(_: Project, _: List[CommitId]))
+      .expects(where((p: Project, c: List[CommitId]) => (p == project) && (c.toSet == commits.toSet)))
       .returning(SynchronizationSummary().updated(Deleted, commits.length).pure[IO])
 
-  private def expectEventsToBeCreated(project: Project, commits: List[CommitId]) =
+  private def expectEventsToBeCreated(project: Project, commits: List[CommitId])(implicit at: AccessToken) =
     (missingCommitEventCreator
       .createCommits(_: Project, _: List[CommitId])(_: Option[AccessToken]))
-      .expects(where { (p: Project, c: List[CommitId], at: Option[AccessToken]) =>
-        (p == project) && (c.toSet == commits.toSet) && (at == maybeAccessToken)
+      .expects(where { (p: Project, c: List[CommitId], mat: Option[AccessToken]) =>
+        (p == project) && (c.toSet == commits.toSet) && (mat == at.some)
       })
       .returning(SynchronizationSummary().updated(Created, commits.length).pure[IO])
 
