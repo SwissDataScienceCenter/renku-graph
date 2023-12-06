@@ -18,6 +18,14 @@
 
 name := "event-log"
 
-Test / fork := true
+Test / testOptions += Tests.Setup(postgresServer("start"))
+Test / testOptions += Tests.Cleanup(postgresServer("forceStop"))
+
+def postgresServer(methodName: String): ClassLoader => Unit = classLoader => {
+  val clazz    = classLoader.loadClass("io.renku.eventlog.EventLogPostgresServer$")
+  val method   = clazz.getMethod(methodName)
+  val instance = clazz.getField("MODULE$").get(null)
+  method.invoke(instance)
+}
 
 libraryDependencies ++= Dependencies.logbackClassic ++ Dependencies.circeGenericExtras

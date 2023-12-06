@@ -16,8 +16,10 @@
  * limitations under the License.
  */
 
-package io.renku.tokenrepository.repository
+package io.renku.eventlog.metrics
 
-import io.renku.db.PostgresServer
+import cats.MonadThrow
 
-object TokenRepositoryPostgresServer extends PostgresServer(module = "token_repository", port = 5402)
+object TestQueriesExecutionTimes {
+  def apply[F[_]: MonadThrow]: QueriesExecutionTimes[F] = QueriesExecutionTimes.histogram[F]
+}
