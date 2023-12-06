@@ -22,7 +22,7 @@ import eu.timepit.refined.api.Refined
 import eu.timepit.refined.auto._
 import eu.timepit.refined.numeric.Positive
 import io.circe.Json
-import io.renku.generators.CommonGraphGenerators.authUsers
+import io.renku.generators.CommonGraphGenerators.{accessTokens, authUsers}
 import io.renku.generators.Generators.Implicits._
 import io.renku.graph.acceptancetests.data.Project.Statistics.CommitsCount
 import io.renku.graph.acceptancetests.data._
@@ -55,7 +55,7 @@ class ProjectStatusResourceSpec
                    CommitsCount(numberOfEvents.value)
       ).map(addMemberWithId(memberUser.id, Role.Owner)).generateOne
 
-    Scenario("Call be a user who is not a member of the project") {
+    Scenario("Call by a user who is not a member of the project") {
 
       gitLabStub.addProject(project)
 
@@ -76,6 +76,7 @@ class ProjectStatusResourceSpec
       gitLabStub.addAuthenticated(memberUser)
       val commitId = commitIds.generateOne
       gitLabStub.replaceCommits(project.id, commitId)
+      givenAccessTokenPresentFor(project, accessTokens.generateOne)
       // making the triples generation be happy and not throwing exceptions to the logs
       `GET <triples-generator>/projects/:id/commits/:id returning OK with some triples`(project, commitId)
 
@@ -90,7 +91,7 @@ class ProjectStatusResourceSpec
       }
     }
 
-    Scenario("Call be a user who is a member of the project") {
+    Scenario("Call by a user who is a member of the project") {
 
       When("there's no webhook for a given project in GitLab")
       gitLabStub.addProject(project)
