@@ -81,9 +81,10 @@ trait JsonEncoders {
     }
 
   implicit val personalAccessTokenCreationEncoder: Encoder[ProjectAccessTokenInfo] =
-    Encoder.instance { case ProjectAccessTokenInfo(tokenId, name, token, expiryDate) =>
+    Encoder.instance { case ProjectAccessTokenInfo(tokenId, userId, name, token, expiryDate) =>
       json"""{
         "id":         $tokenId,
+        "user_id":    $userId,
         "name":       $name,
         "token":      ${token.value},
         "created_at": ${Instant.now()},
@@ -113,7 +114,7 @@ trait JsonEncoders {
   implicit def authUserEncoder[AR <: AuthedReq]: Encoder[AR] =
     Encoder.encodeMap[String, Json].contramap {
       case AuthedUser(userId, _)       => Map("id" -> userId.asJson)
-      case AuthedProject(projectId, _) => Map("id" -> projectId.asJson)
+      case AuthedProject(_, userId, _) => Map("id" -> userId.asJson)
     }
 
   implicit val projectStatisticsEncoder: Encoder[Statistics] =

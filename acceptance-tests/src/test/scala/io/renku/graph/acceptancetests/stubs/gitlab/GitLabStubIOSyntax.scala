@@ -30,8 +30,13 @@ import io.renku.testtools.IOSpec
 import org.http4s.Uri
 
 /** Convenience syntax for test cases to update the [[GitLabApiStub]] state. */
-trait GitLabStubIOSyntax { self: IOSpec =>
+object GitLabStubIOSyntax {
   val webhookUri: Uri = Uri.unsafeFromString("http://localhost:9001/webhooks/events")
+}
+
+trait GitLabStubIOSyntax { self: IOSpec =>
+
+  import GitLabStubIOSyntax.webhookUri
 
   final implicit class StubOps(self: GitLabApiStub[IO]) {
 
@@ -52,7 +57,7 @@ trait GitLabStubIOSyntax { self: IOSpec =>
     /** Adds a gitlab project. The project will be available, but no integration hooks are created. See
      * `setupProject`.
      */
-    def addProject(project: Project): Unit =
+    def addProject(project: Project)(implicit renkuUrl: RenkuUrl): Unit =
       self.update(GitLabStateUpdates.addProject(project)).unsafeRunSync()
 
     /** Adds a webhook to a gitlab project. The assumption is the project is already added to GitLab
@@ -67,7 +72,7 @@ trait GitLabStubIOSyntax { self: IOSpec =>
       self.update(GitLabStateUpdates.setupProject(project, webhookUri, commits: _*)).unsafeRunSync()
 
     /** Adds the given project and removes any existing project with the same id. */
-    def replaceProject(project: Project): Unit =
+    def replaceProject(project: Project)(implicit renkuUrl: RenkuUrl): Unit =
       addProject(project)
 
     /** Removes all existing commits of the project with `id` and associates the given commits. */

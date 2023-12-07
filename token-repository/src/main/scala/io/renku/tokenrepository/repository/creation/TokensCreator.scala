@@ -80,10 +80,12 @@ private class TokensCreatorImpl[F[_]: MonadThrow: Logger](
   private def removeWhenInvalid(projectId: projects.GitLabId,
                                 userToken: AccessToken
   ): Option[AccessToken] => F[Option[AccessToken]] = {
-    case None => Option.empty[AccessToken].pure[F]
+    case None =>
+      Option.empty[AccessToken].pure[F]
     case Some(storedToken) =>
       checkValid(projectId, storedToken) >>= {
-        case true => storedToken.some.pure[F]
+        case true =>
+          storedToken.some.pure[F]
         case false =>
           deleteAndLogSuccess(projectId, userToken, show"token removed for $projectId as got invalidated in GL")
             .as(Option.empty)
@@ -126,7 +128,8 @@ private class TokensCreatorImpl[F[_]: MonadThrow: Logger](
 
   private def createNew(projectId: projects.GitLabId, userToken: AccessToken) =
     tokenValidator.checkValid(projectId, userToken) >>= {
-      case false => ().pure[F]
+      case false =>
+        ().pure[F]
       case true =>
         (findProjectSlug(projectId, userToken) >>= createNewToken(userToken))
           .semiflatMap(encrypt >=> persist >=> logSuccess >=> tryRevokingOldTokens(userToken))

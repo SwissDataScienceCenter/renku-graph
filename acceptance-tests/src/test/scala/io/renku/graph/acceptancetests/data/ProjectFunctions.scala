@@ -22,10 +22,10 @@ import cats.syntax.all._
 import io.renku.cli.model.CliProject
 import io.renku.generators.Generators.Implicits._
 import io.renku.graph.model.RenkuTinyTypeGenerators._
-import io.renku.graph.model.testentities.generators.EntitiesGenerators.replaceProjectCreator
 import io.renku.graph.model._
 import io.renku.graph.model.gitlab.GitLabMember
 import io.renku.graph.model.projects.Role
+import io.renku.graph.model.testentities.generators.EntitiesGenerators.replaceProjectCreator
 import io.renku.jsonld.JsonLD
 import io.renku.jsonld.syntax._
 
@@ -39,18 +39,26 @@ trait ProjectFunctions {
 
   def addMemberWithId(gitLabId: persons.GitLabId, role: Role): Project => Project =
     p =>
-      p.copy(members =
-        p.members :+ GitLabMember(
-          personNames.generateOne,
-          personUsernames.generateOne,
-          gitLabId,
-          None,
-          Role.toGitLabAccessLevel(role)
-        )
+      p.copy(
+        members =
+          if (p.members.exists(_.user.gitLabId == gitLabId)) p.members
+          else
+            p.members :+ GitLabMember(
+              personNames.generateOne,
+              personUsernames.generateOne,
+              gitLabId,
+              None,
+              Role.toGitLabAccessLevel(role)
+            )
       )
 
   def addMemberFrom(person: testentities.Person, gitLabId: persons.GitLabId, role: Role): Project => Project =
-    p => p.copy(members = p.members :+ toProjectMember(person, gitLabId, role))
+    p =>
+      p.copy(
+        members =
+          if (p.members.exists(_.user.gitLabId == gitLabId)) p.members
+          else p.members :+ toProjectMember(person, gitLabId, role)
+      )
 
   def toPayloadJsonLD(p: Project)(implicit renkuUrl: RenkuUrl): JsonLD =
     toPayloadJsonLD(p.entitiesProject)

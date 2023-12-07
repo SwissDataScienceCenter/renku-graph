@@ -57,12 +57,12 @@ class ProjectStatusResourceSpec
 
     Scenario("Call by a user who is not a member of the project") {
 
+      Given("there's no webhook for a given project in GitLab")
       gitLabStub.addProject(project)
 
-      When("there's no webhook for a given project in GitLab")
       And("project hasn't been activated (no trace of it in the EL)")
 
-      Given("the user is authenticated")
+      And("the user is authenticated")
       val someAuthUser = authUsers.generateOne
       gitLabStub.addAuthenticated(someAuthUser)
 
@@ -76,18 +76,15 @@ class ProjectStatusResourceSpec
       gitLabStub.addAuthenticated(memberUser)
       val commitId = commitIds.generateOne
       gitLabStub.replaceCommits(project.id, commitId)
-      // making the triples generation be happy and not throwing exceptions to the logs
-      `GET <triples-generator>/projects/:id/commits/:id returning OK with some triples`(project, commitId)
       mockCommitDataOnTripleGenerator(project, toPayloadJsonLD(project), commitId)
 
       webhookServiceClient.`POST projects/:id/webhooks`(project.id, memberUser.accessToken).status shouldBe Created
 
       Then("the non-member user should get OK with 'activated' = true")
       eventually {
-        val authUserResponse =
-          webhookServiceClient.`GET projects/:id/events/status`(project.id, someAuthUser.accessToken)
-        authUserResponse.status                                                    shouldBe Ok
-        authUserResponse.jsonBody.hcursor.downField("activated").as[Boolean].value shouldBe true
+        val response = webhookServiceClient.`GET projects/:id/events/status`(project.id, someAuthUser.accessToken)
+        response.status                                                    shouldBe Ok
+        response.jsonBody.hcursor.downField("activated").as[Boolean].value shouldBe true
       }
     }
 
@@ -107,8 +104,11 @@ class ProjectStatusResourceSpec
       When("there's a webhook created for the project")
       And("there are events under processing")
       val allCommitIds = commitIds.generateNonEmptyList(min = numberOfEvents, max = numberOfEvents)
-      gitLabStub.setupProject(project, allCommitIds.toList: _*)
+      gitLabStub.replaceCommits(project.id, allCommitIds.toList: _*)
       mockCommitDataOnTripleGenerator(project, toPayloadJsonLD(project), allCommitIds)
+
+      webhookServiceClient.`POST projects/:id/webhooks`(project.id, memberUser.accessToken).status shouldBe Created
+
       `data in the Triples Store`(project, allCommitIds, memberUser.accessToken)
 
       Then("the Status API should return OK with some status info")

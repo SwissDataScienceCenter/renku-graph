@@ -43,7 +43,10 @@ private[gitlab] object GitLabAuth {
     final case class AuthedUser(userId: persons.GitLabId, accessToken: UserAccessToken) extends AuthedReq {
       type AT = UserAccessToken
     }
-    final case class AuthedProject(projectId: projects.GitLabId, accessToken: ProjectAccessToken) extends AuthedReq {
+    final case class AuthedProject(projectId:   projects.GitLabId,
+                                   userId:      persons.GitLabId,
+                                   accessToken: ProjectAccessToken
+    ) extends AuthedReq {
       type AT = ProjectAccessToken
     }
   }
