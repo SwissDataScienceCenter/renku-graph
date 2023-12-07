@@ -23,11 +23,9 @@ import cats.syntax.all._
 import io.renku.commiteventservice.events.consumers.common.UpdateResult.{Deleted, Failed}
 import io.renku.commiteventservice.events.consumers.common.{CommitEventsRemover, SynchronizationSummary, UpdateResult}
 import io.renku.events.consumers.ConsumersModelGenerators.consumerProjects
-import io.renku.generators.CommonGraphGenerators.personalAccessTokens
 import io.renku.generators.Generators.Implicits._
 import io.renku.generators.Generators.{exceptions, nonEmptyStrings}
 import io.renku.graph.model.EventsGenerators.commitIds
-import io.renku.http.client.AccessToken
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
@@ -88,9 +86,6 @@ class CommitEventDeleterSpec extends AnyWordSpec with should.Matchers with MockF
   }
 
   private trait TestCase {
-
-    implicit val maybeAccessToken: Option[AccessToken] = personalAccessTokens.generateOption
-
     val commitEventsRemover = mock[CommitEventsRemover[Try]]
     val commitEventDeleter  = new CommitEventDeleterImpl[Try](commitEventsRemover)
   }

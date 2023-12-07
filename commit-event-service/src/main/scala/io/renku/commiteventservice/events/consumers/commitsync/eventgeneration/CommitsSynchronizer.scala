@@ -22,15 +22,13 @@ import cats.MonadThrow
 import cats.data.StateT
 import cats.effect.Async
 import cats.syntax.all._
-import io.circe.literal._
 import io.renku.commiteventservice.events.consumers.commitsync._
-import io.renku.commiteventservice.events.consumers.common._
 import io.renku.commiteventservice.events.consumers.common.SynchronizationSummary._
 import io.renku.commiteventservice.events.consumers.common.UpdateResult._
-import io.renku.events.{CategoryName, EventRequestContent}
+import io.renku.commiteventservice.events.consumers.common._
+import io.renku.eventlog
+import io.renku.eventlog.api.events.GlobalCommitSyncRequest
 import io.renku.events.consumers.Project
-import io.renku.events.producers.EventSender
-import io.renku.graph.config.EventLogUrl
 import io.renku.graph.model.events.{BatchDate, CommitId}
 import io.renku.graph.tokenrepository.AccessTokenFinder
 import io.renku.http.client.{AccessToken, GitLabClient}
@@ -38,6 +36,7 @@ import io.renku.logging.ExecutionTimeRecorder
 import io.renku.logging.ExecutionTimeRecorder.ElapsedTime
 import io.renku.metrics.MetricsRegistry
 import org.typelevel.log4cats.Logger
+import org.typelevel.log4cats.syntax._
 
 import scala.util.control.NonFatal
 
@@ -51,7 +50,7 @@ private[commitsync] class CommitsSynchronizerImpl[F[_]: MonadThrow: Logger: Acce
     commitInfoFinder:    CommitInfoFinder[F],
     commitToEventLog:    CommitToEventLog[F],
     commitEventsRemover: CommitEventsRemover[F],
-    eventSender:         EventSender[F],
+    elClient:            eventlog.api.events.Client[F],
     clock:               java.time.Clock = java.time.Clock.systemUTC()
 ) extends CommitsSynchronizer[F] {
 
@@ -66,12 +65,14 @@ private[commitsync] class CommitsSynchronizerImpl[F[_]: MonadThrow: Logger: Acce
   import latestCommitFinder._
 
   override def synchronizeEvents(event: CommitSyncEvent): F[Unit] = {
-    for {
-      _                                   <- Logger[F].info(show"$categoryName: $event accepted")
-      implicit0(mat: Option[AccessToken]) <- findAccessToken(event.project.id)
-      maybeLatestCommit                   <- findLatestCommit(event.project.id)
-      _                                   <- checkForSkippedEvent(maybeLatestCommit, event)
-    } yield ()
+    (Logger[F].info(show"$categoryName: $event accepted") >>
+      findAccessToken(event.project.id)) >>= {
+      case None =>
+        info"${logMessageCommon(event)} -> No access token found sending GlobalCommitSyncRequest" >>
+          triggerGlobalCommitSync(event)
+      case implicit0(mat: Option[AccessToken]) =>
+        findLatestCommit(event.project.id) >>= (checkForSkippedEvent(_, event))
+    }
   } recoverWith loggingError(event, "Synchronization failed")
 
   private def checkForSkippedEvent(maybeLatestCommit: Option[CommitInfo], event: CommitSyncEvent)(implicit
@@ -102,17 +103,7 @@ private[commitsync] class CommitsSynchronizerImpl[F[_]: MonadThrow: Logger: Acce
   }
 
   private def triggerGlobalCommitSync(event: CommitSyncEvent): F[Unit] =
-    eventSender.sendEvent(
-      EventRequestContent.NoPayload(
-        json"""{
-          "categoryName": "GLOBAL_COMMIT_SYNC_REQUEST", 
-          "project":{ "id": ${event.project.id}, "slug": ${event.project.slug}}
-        }"""
-      ),
-      EventSender.EventContext(CategoryName("GLOBAL_COMMIT_SYNC_REQUEST"),
-                               s"$categoryName: Triggering Global Commit Sync Failed"
-      )
-    )
+    elClient.send(GlobalCommitSyncRequest(event.project))
 
   private val DontCareCommitId = CommitId("0000000000000000000000000000000000000000")
 
@@ -231,12 +222,12 @@ private[commitsync] object CommitsSynchronizer {
     commitInfoFinder    <- CommitInfoFinder[F]
     commitToEventLog    <- CommitToEventLog[F]
     commitEventsRemover <- CommitEventsRemover[F]
-    eventSender         <- EventSender[F](EventLogUrl)
+    elClient            <- eventlog.api.events.Client[F]
   } yield new CommitsSynchronizerImpl[F](latestCommitFinder,
                                          eventDetailsFinder,
                                          commitInfoFinder,
                                          commitToEventLog,
                                          commitEventsRemover,
-                                         eventSender
+                                         elClient
   )
 }

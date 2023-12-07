@@ -33,8 +33,6 @@ import io.renku.graph.model.events.EventStatus.TriplesStore
 import io.renku.graph.model.projects.Role
 import io.renku.graph.model.testentities.cliShapedPersons
 import io.renku.graph.model.testentities.generators.EntitiesGenerators._
-import io.renku.webhookservice.model.HookToken
-import org.http4s.Status._
 import tooling.{AcceptanceSpec, ApplicationServices}
 
 class CommitSyncFlowsSpec extends AcceptanceSpec with ApplicationServices with TSProvisioning with TypeSerializers {
@@ -61,14 +59,6 @@ class CommitSyncFlowsSpec extends AcceptanceSpec with ApplicationServices with T
       val missedCommitId = commitIds.generateOne
       `GET <triples-generator>/projects/:id/commits/:id returning OK with some triples`(project, nonMissedCommitId)
       `GET <triples-generator>/projects/:id/commits/:id returning OK with some triples`(project, missedCommitId)
-
-      And("access token is present")
-      givenAccessTokenPresentFor(project, user.accessToken)
-
-      When("a Push Event arrives for the non missed event")
-      webhookServiceClient
-        .POST("webhooks/events", HookToken(project.id), data.GitLab.pushEvent(project, nonMissedCommitId))
-        .status shouldBe Accepted
 
       And("relevant commit events are processed")
       `data in the Triples Store`(project, nonMissedCommitId, user.accessToken)

@@ -52,10 +52,12 @@ trait GitLabStateGenerators {
 
   def projectAccessTokenInfos: Gen[ProjectAccessTokenInfo] = for {
     id     <- positiveInts()
+    userId <- GraphModelGenerators.personGitLabIds
     token  <- projectAccessTokens
     expiry <- localDates(min = LocalDate.now().plusWeeks(1))
   } yield ProjectAccessTokenInfo(
     id.value,
+    userId,
     name = find[Try, String]("project-token-name", ConfigFactory.load).fold(throw _, identity),
     token,
     expiry

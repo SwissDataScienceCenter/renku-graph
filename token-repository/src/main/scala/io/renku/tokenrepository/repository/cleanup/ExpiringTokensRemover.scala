@@ -22,7 +22,7 @@ import cats.effect.{Async, Temporal}
 import cats.syntax.all._
 import fs2.Stream
 import io.renku.eventlog
-import io.renku.eventlog.api.events.CommitSyncRequest
+import io.renku.eventlog.api.events.GlobalCommitSyncRequest
 import io.renku.http.client.GitLabClient
 import io.renku.metrics.MetricsRegistry
 import io.renku.tokenrepository.repository.ProjectsTokensDB.SessionResource
@@ -58,7 +58,7 @@ private class ExpiringTokensRemoverImpl[F[_]: Async: Logger](tokensFinder: Expir
   private def findAndRemoveTokens: Stream[F, (ExpiringToken, DeletionResult)] =
     tokensFinder.findExpiringTokens
       .evalMap(et => removeToken(et).tupleLeft(et))
-      .evalTap { case (et, _) => sendCommitSyncRequest(et) }
+      .evalTap { case (et, _) => sendGlobalCommitSyncRequest(et) }
       .evalTap { case (et, result) => Logger[F].info(show"Expiring token for ${et.project.id} $result") }
 
   private lazy val removeToken: ExpiringToken => F[DeletionResult] = {
@@ -66,12 +66,12 @@ private class ExpiringTokensRemoverImpl[F[_]: Async: Logger](tokensFinder: Expir
     case ExpiringToken.NonDecryptable(project, _)  => dbTokenRemover.delete(project.id)
   }
 
-  private def sendCommitSyncRequest(et: ExpiringToken): F[Unit] =
+  private def sendGlobalCommitSyncRequest(et: ExpiringToken): F[Unit] =
     elClient
-      .send(CommitSyncRequest(et.project))
+      .send(GlobalCommitSyncRequest(et.project))
       .handleErrorWith(
         Logger[F].error(_)(
-          show"Failed to send ${CommitSyncRequest.categoryName} event for ${et.project.id} after expiring token removal"
+          show"Failed to send ${GlobalCommitSyncRequest.categoryName} event for ${et.project.id} after expiring token removal"
         )
       )
 
