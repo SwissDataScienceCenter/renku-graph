@@ -22,7 +22,7 @@ import eu.timepit.refined.api.Refined
 import eu.timepit.refined.auto._
 import eu.timepit.refined.numeric.Positive
 import io.circe.Json
-import io.renku.generators.CommonGraphGenerators.{accessTokens, authUsers}
+import io.renku.generators.CommonGraphGenerators.authUsers
 import io.renku.generators.Generators.Implicits._
 import io.renku.graph.acceptancetests.data.Project.Statistics.CommitsCount
 import io.renku.graph.acceptancetests.data._
