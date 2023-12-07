@@ -76,9 +76,9 @@ class ProjectStatusResourceSpec
       gitLabStub.addAuthenticated(memberUser)
       val commitId = commitIds.generateOne
       gitLabStub.replaceCommits(project.id, commitId)
-      givenAccessTokenPresentFor(project, accessTokens.generateOne)
       // making the triples generation be happy and not throwing exceptions to the logs
       `GET <triples-generator>/projects/:id/commits/:id returning OK with some triples`(project, commitId)
+      mockCommitDataOnTripleGenerator(project, toPayloadJsonLD(project), commitId)
 
       webhookServiceClient.`POST projects/:id/webhooks`(project.id, memberUser.accessToken).status shouldBe Created
 
