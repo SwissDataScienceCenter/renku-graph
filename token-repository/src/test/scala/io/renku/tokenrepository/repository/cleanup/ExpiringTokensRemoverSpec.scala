@@ -23,7 +23,7 @@ import cats.effect.testing.scalatest.AsyncIOSpec
 import cats.syntax.all._
 import fs2.Stream
 import io.renku.eventlog
-import io.renku.eventlog.api.events.CommitSyncRequest
+import io.renku.eventlog.api.events.GlobalCommitSyncRequest
 import io.renku.events.consumers.ConsumersModelGenerators.consumerProjects
 import io.renku.generators.CommonGraphGenerators.accessTokens
 import io.renku.generators.Generators.Implicits._
@@ -46,7 +46,7 @@ class ExpiringTokensRemoverSpec extends AsyncFlatSpec with AsyncIOSpec with shou
     givenTokensFinding(returning = Stream.emits(tokens))
     tokens foreach { et =>
       givenTokenRemoval(et, returning = deletionResults.generateOne.pure[IO])
-      givenCommitSyncRequestSending(et, returning = ().pure[IO])
+      givenGlobalCommitSyncRequestSending(et, returning = ().pure[IO])
     }
 
     remover.removeExpiringTokens().assertNoException
@@ -59,15 +59,15 @@ class ExpiringTokensRemoverSpec extends AsyncFlatSpec with AsyncIOSpec with shou
     val token3 = expiringTokens.generateOne
     givenTokensFinding(returning = Stream(token1, token2, token3))
     givenTokenRemoval(token1, returning = deletionResults.generateOne.pure[IO])
-    givenCommitSyncRequestSending(token1, returning = ().pure[IO])
+    givenGlobalCommitSyncRequestSending(token1, returning = ().pure[IO])
     val exception = exceptions.generateOne
     givenTokenRemoval(token2, returning = exception.raiseError[IO, Nothing])
 
     givenTokensFinding(returning = Stream(token2, token3))
     givenTokenRemoval(token2, returning = deletionResults.generateOne.pure[IO])
-    givenCommitSyncRequestSending(token2, returning = ().pure[IO])
+    givenGlobalCommitSyncRequestSending(token2, returning = ().pure[IO])
     givenTokenRemoval(token3, returning = deletionResults.generateOne.pure[IO])
-    givenCommitSyncRequestSending(token3, returning = ().pure[IO])
+    givenGlobalCommitSyncRequestSending(token3, returning = ().pure[IO])
 
     remover.removeExpiringTokens().assertNoException
   }
@@ -101,10 +101,10 @@ class ExpiringTokensRemoverSpec extends AsyncFlatSpec with AsyncIOSpec with shou
           .returning(returning)
     }
 
-  private def givenCommitSyncRequestSending(expiringToken: ExpiringToken, returning: IO[Unit]) =
+  private def givenGlobalCommitSyncRequestSending(expiringToken: ExpiringToken, returning: IO[Unit]) =
     (elClient
-      .send(_: CommitSyncRequest))
-      .expects(CommitSyncRequest(expiringToken.project))
+      .send(_: GlobalCommitSyncRequest))
+      .expects(GlobalCommitSyncRequest(expiringToken.project))
       .returning(returning)
 
   private lazy val expiringTokens: Gen[ExpiringToken] =

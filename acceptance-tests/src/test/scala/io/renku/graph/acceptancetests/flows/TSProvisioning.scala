@@ -104,7 +104,7 @@ trait TSProvisioning
     val ids            = expect.map(_._1).toSet
 
     implicit val showTuple: Show[(EventId, EventStatus)] =
-      Show.show { case (id, status) => s"$id:$status" }
+      Show.show { case (id, status) => s"${id.value.take(7)}:$status" }
 
     implicit val showTuples: Show[Iterable[(EventId, EventStatus)]] =
       Show.show(_.toList.mkString_(", "))

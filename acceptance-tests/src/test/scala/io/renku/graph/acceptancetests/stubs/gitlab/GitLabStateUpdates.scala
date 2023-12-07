@@ -21,16 +21,17 @@ package io.renku.graph.acceptancetests.stubs.gitlab
 import GitLabApiStub._
 import GitLabStateGenerators._
 import cats.Monoid
-import cats.syntax.all._
 import cats.data.NonEmptyList
+import cats.syntax.all._
 import io.renku.generators.Generators.Implicits._
-import io.renku.graph.acceptancetests.data.Project
+import io.renku.graph.acceptancetests.data.{Project, ProjectFunctions}
+import io.renku.graph.model._
 import io.renku.graph.model.entities.EntityFunctions
 import io.renku.graph.model.events.CommitId
-import io.renku.graph.model.testentities.{Person, Project => RenkuProject}
-import io.renku.graph.model._
 import io.renku.graph.model.gitlab.GitLabUser
+import io.renku.graph.model.testentities.{Person, Project => RenkuProject}
 import io.renku.http.client.UserAccessToken
+import monocle.Traversal
 import org.http4s.Uri
 
 /** Collection of functions to update the state in [[GitLabApiStub]]. */
@@ -47,6 +48,8 @@ trait GitLabStateUpdates {
 
   def clearState: StateUpdate =
     _ => State.empty
+
+  private val projectsLens = Traversal.fromTraverse[List, Project]
 
   def addUser(id: persons.GitLabId, token: UserAccessToken): StateUpdate =
     state => state.copy(users = state.users.updated(id, token))
@@ -97,10 +100,12 @@ trait GitLabStateUpdates {
     state.copy(persons = glIdPersons.toList ::: state.persons.filterNot(p => p.maybeGitLabId.exists(ids.contains)))
   }
 
-  def addProject(project: Project): StateUpdate =
-    state => state.copy(projects = project :: state.projects.filter(_.id != project.id))
+  def addProject(project: Project)(implicit renkuUrl: RenkuUrl): StateUpdate =
+    ((state: State) => state.copy(projects = project :: state.projects.filter(_.id != project.id))) >>
+      addPersons(EntityFunctions[RenkuProject].findAllPersons(project.entitiesProject).map(toPerson)) >>
+      addPersons((project.members.map(_.user) appendList project.maybeCreator.toList).map(userToPerson).toList)
 
-  def addProject(project: Project, webhook: Uri): StateUpdate =
+  def addProject(project: Project, webhook: Uri)(implicit renkuUrl: RenkuUrl): StateUpdate =
     addProject(project) >> addWebhook(project.id, webhook)
 
   def setupProject(project: Project, webhook: Uri, commits: CommitId*)(implicit renkuUrl: RenkuUrl): StateUpdate =
@@ -111,6 +116,16 @@ trait GitLabStateUpdates {
 
   def addProjectAccessToken(projectId: projects.GitLabId, token: ProjectAccessTokenInfo): StateUpdate =
     state => state.copy(projectAccessTokens = state.projectAccessTokens.updated(projectId, token))
+
+  def addPatAsProjectMember(projectId: projects.GitLabId, token: ProjectAccessTokenInfo): StateUpdate = {
+    val patPerson = testentities.Person(persons.Name("renku"), maybeGitLabId = Some(token.userId))
+    state =>
+      state.copy(projects = projectsLens.modify {
+        case p if p.id == projectId =>
+          ProjectFunctions.addMemberFrom(patPerson, token.userId, projects.Role.Maintainer)(p)
+        case p => p
+      }(state.projects))
+  }
 
   private lazy val toPerson: entities.Person => Person = person =>
     Person(

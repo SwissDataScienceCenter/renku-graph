@@ -18,7 +18,7 @@
 
 package io.renku.eventlog.api.events
 
-import Generators._
+import Generators.globalCommitSyncRequests
 import io.circe.literal._
 import io.circe.syntax._
 import io.renku.events.consumers.Project
@@ -31,30 +31,35 @@ import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
 import org.scalatestplus.scalacheck.ScalaCheckPropertyChecks
 
-class CommitSyncRequestSpec extends AnyWordSpec with should.Matchers with EitherValues with ScalaCheckPropertyChecks {
+class GlobalCommitSyncRequestSpec
+    extends AnyWordSpec
+    with should.Matchers
+    with EitherValues
+    with ScalaCheckPropertyChecks {
 
   "json codec" should {
 
     "encode and decode" in {
 
-      val event = commitSyncRequests.generateOne
+      val event = globalCommitSyncRequests.generateOne
 
-      event.asJson.hcursor.as[CommitSyncRequest].value shouldBe event
+      event.asJson.hcursor.as[GlobalCommitSyncRequest].value shouldBe event
     }
 
     "be able to decode json valid from the contract point of view" in {
       json"""{
-        "categoryName": "COMMIT_SYNC_REQUEST",
+        "categoryName": "GLOBAL_COMMIT_SYNC_REQUEST",
         "project": {
           "id":   1,
           "slug": "project/path"
         }
-      }""".hcursor.as[CommitSyncRequest].value shouldBe CommitSyncRequest(
-        Project(
-          projects.GitLabId(1),
-          projects.Slug("project/path")
+      }""".hcursor.as[GlobalCommitSyncRequest].value shouldBe
+        GlobalCommitSyncRequest(
+          Project(
+            projects.GitLabId(1),
+            projects.Slug("project/path")
+          )
         )
-      )
     }
 
     "fail if categoryName does not match" in {

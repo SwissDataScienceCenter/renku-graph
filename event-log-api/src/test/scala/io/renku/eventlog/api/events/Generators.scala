@@ -25,4 +25,7 @@ object Generators extends StatusChangeGenerators {
 
   val commitSyncRequests: Gen[CommitSyncRequest] =
     consumerProjects.map(CommitSyncRequest.apply)
+
+  val globalCommitSyncRequests: Gen[GlobalCommitSyncRequest] =
+    consumerProjects.map(GlobalCommitSyncRequest.apply)
 }
