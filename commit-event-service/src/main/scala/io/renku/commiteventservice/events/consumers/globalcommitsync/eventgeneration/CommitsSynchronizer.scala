@@ -18,11 +18,11 @@
 
 package io.renku.commiteventservice.events.consumers.globalcommitsync.eventgeneration
 
-import cats.{NonEmptyParallel, Show}
 import cats.effect.Async
 import cats.syntax.all._
-import io.renku.commiteventservice.events.consumers.common.{SynchronizationSummary, UpdateResult}
+import cats.{NonEmptyParallel, Show}
 import io.renku.commiteventservice.events.consumers.common.SynchronizationSummary.semigroup
+import io.renku.commiteventservice.events.consumers.common.{SynchronizationSummary, UpdateResult}
 import io.renku.commiteventservice.events.consumers.globalcommitsync._
 import io.renku.commiteventservice.events.consumers.globalcommitsync.eventgeneration.gitlab.{GitLabCommitFetcher, GitLabCommitStatFetcher}
 import io.renku.events.consumers.Project
@@ -68,14 +68,17 @@ private[globalcommitsync] class CommitsSynchronizerImpl[F[
 
   override def synchronizeEvents(event: GlobalCommitSyncEvent): F[Unit] = {
     Logger[F].info(show"$categoryName: $event accepted") >>
-      findAccessToken(event.project.id) >>= { implicit mat =>
-      fetchCommitStats(event.project.id) >>= {
-        case maybeStats if outOfSync(event)(maybeStats) => createOrDeleteEvents(event)
-        case _ =>
-          logSummary(event.project,
-                     SynchronizationSummary().updated(UpdateResult.Skipped, event.commits.count.value.toInt)
-          )
-      }
+      findAccessToken(event.project.id) >>= {
+      case None =>
+        deleteAllEvents(event)
+      case implicit0(mat: Option[AccessToken]) =>
+        fetchCommitStats(event.project.id) >>= {
+          case maybeStats if outOfSync(event)(maybeStats) => createOrDeleteEvents(event)
+          case _ =>
+            logSummary(event.project,
+                       SynchronizationSummary().updated(UpdateResult.Skipped, event.commits.count.value.toInt)
+            )
+        }
     }
   } recoverWith { case NonFatal(error) =>
     Logger[F].error(error)(show"$categoryName: failed to sync commits for project ${event.project}") >>
@@ -91,9 +94,27 @@ private[globalcommitsync] class CommitsSynchronizerImpl[F[
 
   private def createOrDeleteEvents(
       event: GlobalCommitSyncEvent
-  )(implicit maybeAccessToken: Option[AccessToken]): F[Unit] = measureExecutionTime {
-    buildActionsList(event) >>= execute(event.project)
-  } >>= logSummary(event.project)
+  )(implicit maybeAccessToken: Option[AccessToken]): F[Unit] =
+    measureExecutionTime {
+      buildActionsList(event) >>= execute(event.project)
+    } >>= logSummary(event.project)
+
+  private def deleteAllEvents(event: GlobalCommitSyncEvent): F[Unit] =
+    measureExecutionTime {
+      buildDeleteActionsList(event).flatMap(actions => deleteCommits(event.project, actions.getOrElse(Delete, Nil)))
+    } >>= logSummary(event.project)
+
+  private def buildDeleteActionsList(event:           GlobalCommitSyncEvent,
+                                     maybeNextELPage: Option[Page] = Some(Page.first),
+                                     actions:         Map[Action, List[CommitId]] = Map(Create -> Nil, Delete -> Nil)
+  ): F[Map[Action, List[CommitId]]] =
+    fetch(maybeNextELPage, fetchELCommits(event.project.slug, DateCondition.Until(now()), _))
+      .flatMap {
+        case pr @ PageResult(_, None) =>
+          update(actions, glCommitsPage = PageResult.empty, pr).pure[F]
+        case pr =>
+          buildDeleteActionsList(event, pr.maybeNextPage, update(actions, glCommitsPage = PageResult.empty, pr))
+      }
 
   private def buildActionsList(
       event:           GlobalCommitSyncEvent,

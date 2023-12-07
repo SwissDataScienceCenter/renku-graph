@@ -169,7 +169,7 @@ lazy val commitEventService = project
   .in(file("commit-event-service"))
   .withId("commit-event-service")
   .settings(commonSettings)
-  .dependsOn(graphCommons % "compile->compile; test->test")
+  .dependsOn(eventLogApi % "compile->compile; test->test")
   .enablePlugins(
     JavaAppPackaging,
     AutomateHeaderPlugin

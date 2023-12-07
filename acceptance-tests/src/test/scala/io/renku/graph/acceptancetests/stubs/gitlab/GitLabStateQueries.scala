@@ -80,7 +80,7 @@ trait GitLabStateQueries {
 
   def findAuthedProject(token: ProjectAccessToken): StateQuery[Option[AuthedProject]] =
     _.projectAccessTokens.find(_._2.token == token).map { case (projectId, tokenInfo) =>
-      AuthedProject(projectId, tokenInfo.token)
+      AuthedProject(projectId, tokenInfo.userId, tokenInfo.token)
     }
 
   def findAuthedUser(token: UserAccessToken): StateQuery[Option[AuthedUser]] =
@@ -102,9 +102,9 @@ trait GitLabStateQueries {
     }
 
   def findCallerProjects: Option[AuthedReq] => StateQuery[List[Project]] = {
-    case None                        => _ => Nil
-    case Some(AuthedProject(_, _))   => _ => Nil
-    case Some(AuthedUser(userId, _)) => projectsWhereUserIsMember(userId)
+    case None                         => _ => Nil
+    case Some(AuthedProject(_, _, _)) => _ => Nil
+    case Some(AuthedUser(userId, _))  => projectsWhereUserIsMember(userId)
   }
 
   def findProject(id: projects.GitLabId, user: Option[persons.GitLabId]): StateQuery[Option[Project]] =
@@ -124,10 +124,10 @@ trait GitLabStateQueries {
 
   def findProjectById(id: projects.GitLabId, maybeAuthedReq: Option[AuthedReq]): StateQuery[Option[Project]] =
     maybeAuthedReq match {
-      case Some(AuthedProject(`id`, _)) => findProjectById(id)
-      case Some(AuthedProject(_, _))    => _ => None
-      case Some(AuthedUser(userId, _))  => findProject(id, userId.some)
-      case None                         => findProject(id, None)
+      case Some(AuthedProject(`id`, _, _)) => findProjectById(id)
+      case Some(AuthedProject(_, _, _))    => _ => None
+      case Some(AuthedUser(userId, _))     => findProject(id, userId.some)
+      case None                            => findProject(id, None)
     }
 
   def findProjectBySlug(slug: projects.Slug): StateQuery[Option[Project]] =
@@ -135,9 +135,9 @@ trait GitLabStateQueries {
 
   def findProjectBySlug(slug: projects.Slug, maybeAuthedReq: Option[AuthedReq]): StateQuery[Option[Project]] =
     maybeAuthedReq match {
-      case Some(AuthedProject(id, _))  => findProject(id, slug)
-      case Some(AuthedUser(userId, _)) => findProject(slug, userId.some)
-      case None                        => findProject(slug, None)
+      case Some(AuthedProject(id, _, _)) => findProject(id, slug)
+      case Some(AuthedUser(userId, _))   => findProject(slug, userId.some)
+      case None                          => findProject(slug, None)
     }
 
   def findWebhooks(projectId: projects.GitLabId): StateQuery[List[Webhook]] =

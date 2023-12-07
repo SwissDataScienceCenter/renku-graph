@@ -53,12 +53,7 @@ class ServicesRunner(semaphore: Semaphore[IO])(implicit logger: Logger[IO]) {
         new Exception("A permit to run services wasn't acquired").raiseError[IO, Unit]
       case true =>
         whenNotStarted(services.toList) {
-          for {
-            _ <- services.toList.map(start).parSequence
-            _ <- Logger[IO].info("Waiting for the services to finish init tasks")
-            _ <- Temporal[IO].sleep(5 seconds)
-            _ <- Logger[IO].info("Waiting for the services to finish init tasks - done")
-          } yield ()
+          services.toList.map(start).parSequence.void
         }
     }
 

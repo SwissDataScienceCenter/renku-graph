@@ -25,16 +25,13 @@ import io.renku.commiteventservice.events.consumers.common.UpdateResult.Failed
 import io.renku.commiteventservice.events.consumers.common.{CommitEventsRemover, SynchronizationSummary}
 import io.renku.events.consumers.Project
 import io.renku.graph.model.events.CommitId
-import io.renku.http.client.AccessToken
 import io.renku.metrics.MetricsRegistry
 import org.typelevel.log4cats.Logger
 
 import scala.util.control.NonFatal
 
 private[eventgeneration] trait CommitEventDeleter[F[_]] {
-  def deleteCommits(project: Project, commitsToDelete: List[CommitId])(implicit
-      maybeAccessToken: Option[AccessToken]
-  ): F[SynchronizationSummary]
+  def deleteCommits(project: Project, commitsToDelete: List[CommitId]): F[SynchronizationSummary]
 }
 private[eventgeneration] class CommitEventDeleterImpl[F[_]: MonadThrow](
     commitEventsRemover: CommitEventsRemover[F]
@@ -42,15 +39,14 @@ private[eventgeneration] class CommitEventDeleterImpl[F[_]: MonadThrow](
 
   import commitEventsRemover._
 
-  override def deleteCommits(project: Project, commitsToDelete: List[CommitId])(implicit
-      maybeAccessToken: Option[AccessToken]
-  ): F[SynchronizationSummary] = commitsToDelete.foldLeftM(SynchronizationSummary()) { (summary, commit) =>
-    removeDeletedEvent(project, commit)
-      .map(summary.incrementCount)
-      .recoverWith { case NonFatal(error) =>
-        summary.incrementCount(Failed(s"Failed to delete commit $commit", error)).pure[F]
-      }
-  }
+  override def deleteCommits(project: Project, commitsToDelete: List[CommitId]): F[SynchronizationSummary] =
+    commitsToDelete.foldLeftM(SynchronizationSummary()) { (summary, commit) =>
+      removeDeletedEvent(project, commit)
+        .map(summary.incrementCount)
+        .recoverWith { case NonFatal(error) =>
+          summary.incrementCount(Failed(s"Failed to delete commit $commit", error)).pure[F]
+        }
+    }
 }
 private[eventgeneration] object CommitEventDeleter {
   def apply[F[_]: Async: Logger: MetricsRegistry]: F[CommitEventDeleter[F]] =
