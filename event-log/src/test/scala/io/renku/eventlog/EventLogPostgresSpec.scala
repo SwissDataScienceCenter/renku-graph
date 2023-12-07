@@ -25,9 +25,14 @@ import io.renku.db.{PostgresServer, PostgresSpec, SessionResource}
 import io.renku.eventlog.init.DbInitializer
 import io.renku.interpreters.TestLogger
 import org.scalamock.scalatest.AsyncMockFactory
-import org.scalatest.Suite
+import org.scalatest.{BeforeAndAfterEach, Suite}
 
-trait EventLogPostgresSpec extends PostgresSpec[EventLogDB] with TypeSerializers with EventLogDBProvisioning {
+trait EventLogPostgresSpec
+    extends PostgresSpec[EventLogDB]
+    with TypeSerializers
+    with EventLogDBProvisioning
+    with EventLogDBFetching
+    with BeforeAndAfterEach {
   self: Suite with AsyncMockFactory =>
 
   lazy val server: PostgresServer = EventLogPostgresServer
@@ -40,4 +45,9 @@ trait EventLogPostgresSpec extends PostgresSpec[EventLogDB] with TypeSerializers
 
   implicit def moduleSessionResource(implicit cfg: DBConfig[EventLogDB]): EventLogDB.SessionResource[IO] =
     io.renku.db.SessionResource[IO, EventLogDB](sessionResource(cfg), cfg)
+
+  protected override def beforeEach(): Unit = {
+    super.beforeEach()
+    logger.reset()
+  }
 }

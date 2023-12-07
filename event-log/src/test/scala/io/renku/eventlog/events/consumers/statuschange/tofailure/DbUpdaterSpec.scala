@@ -20,310 +20,338 @@ package io.renku.eventlog.events.consumers.statuschange.tofailure
 
 import cats.data.Kleisli
 import cats.effect.IO
+import cats.effect.testing.scalatest.AsyncIOSpec
 import cats.syntax.all._
+import io.renku.db.DBConfigProvider.DBConfig
 import io.renku.eventlog.api.events.StatusChangeEvent.ToFailure
 import io.renku.eventlog.events.consumers.statuschange.SkunkExceptionsGenerators.postgresErrors
 import io.renku.eventlog.events.consumers.statuschange.{DBUpdateResults, DeliveryInfoRemover}
-import io.renku.eventlog.metrics.QueriesExecutionTimes
-import io.renku.eventlog.{InMemoryEventLogDbSpec, TypeSerializers}
-import io.renku.events.consumers.ConsumersModelGenerators
+import io.renku.eventlog.metrics.{QueriesExecutionTimes, TestQueriesExecutionTimes}
+import io.renku.eventlog.{EventLogDB, EventLogPostgresSpec}
+import io.renku.events.consumers.ConsumersModelGenerators.consumerProjects
+import io.renku.events.consumers.Project
 import io.renku.generators.Generators.Implicits._
 import io.renku.generators.Generators.{exceptions, timestamps, timestampsNotInTheFuture}
 import io.renku.graph.model.EventContentGenerators.{eventDates, eventMessages}
 import io.renku.graph.model.EventsGenerators.{compoundEventIds, eventBodies, eventIds}
 import io.renku.graph.model.events.EventStatus._
 import io.renku.graph.model.events._
-import io.renku.interpreters.TestLogger
-import io.renku.metrics.TestMetricsRegistry
-import io.renku.testtools.IOSpec
-import org.scalamock.scalatest.MockFactory
-import org.scalatest.OptionValues
+import org.scalamock.scalatest.AsyncMockFactory
 import org.scalatest.matchers.should
-import org.scalatest.wordspec.AnyWordSpec
+import org.scalatest.wordspec.AsyncWordSpec
+import org.scalatest.{OptionValues, Succeeded}
 import skunk.SqlState
 
 import java.time.{Duration, Instant}
 
 class DbUpdaterSpec
-    extends AnyWordSpec
-    with IOSpec
-    with InMemoryEventLogDbSpec
-    with TypeSerializers
+    extends AsyncWordSpec
+    with AsyncIOSpec
+    with EventLogPostgresSpec
+    with AsyncMockFactory
     with should.Matchers
-    with OptionValues
-    with MockFactory {
+    with OptionValues {
 
   "updateDB" should {
 
-    "change status of the given event from ProcessingStatus to FailureStatus" in new TestCase {
-      Set(
-        createFailureEvent(GenerationNonRecoverableFailure, None),
-        createFailureEvent(GenerationRecoverableFailure, Duration.ofHours(100).some)
-      ) foreach { statusChangeEvent =>
-        givenDeliveryInfoRemoved(statusChangeEvent.eventId)
+    "change status of the given event from ProcessingStatus to FailureStatus" in testDBResource.use { implicit cfg =>
+      val project = consumerProjects.generateOne
+      List(
+        createFailureEvent(project, GenerationNonRecoverableFailure, executionDelay = None),
+        createFailureEvent(project, GenerationRecoverableFailure, Duration.ofHours(100).some)
+      ).map {
+        _.flatMap { event =>
+          givenDeliveryInfoRemoved(event.eventId)
 
-        sessionResource
-          .useK(dbUpdater updateDB statusChangeEvent)
-          .unsafeRunSync() shouldBe DBUpdateResults.ForProjects(
-          project.slug,
-          Map(statusChangeEvent.currentStatus -> -1, statusChangeEvent.newStatus -> 1)
-        )
+          for {
+            _ <- moduleSessionResource
+                   .useK(dbUpdater updateDB event)
+                   .asserting {
+                     _ shouldBe DBUpdateResults.ForProjects(project.slug,
+                                                            Map(event.currentStatus -> -1, event.newStatus -> 1)
+                     )
+                   }
 
-        val (executionDate, executionStatus, Some(message)) = findEvent(statusChangeEvent.eventId).value
-
-        statusChangeEvent.newStatus match {
-          case _: GenerationRecoverableFailure | _: TransformationRecoverableFailure =>
-            executionDate.value shouldBe >(Instant.now())
-          case _ => executionDate.value shouldBe <=(Instant.now())
+            _ <- findEvent(event.eventId).asserting {
+                   case None => fail("expecting some results here")
+                   case Some((executionDate, executionStatus, maybeMessage)) =>
+                     event.newStatus match {
+                       case _: GenerationRecoverableFailure | _: TransformationRecoverableFailure =>
+                         executionDate.value shouldBe >(Instant.now())
+                       case _ => executionDate.value shouldBe <=(Instant.now())
+                     }
+                     executionStatus shouldBe event.newStatus
+                     maybeMessage    shouldBe event.message.some
+                 }
+          } yield Succeeded
         }
-
-        executionStatus shouldBe statusChangeEvent.newStatus
-        message         shouldBe statusChangeEvent.message
-      }
-    }
+      }.sequence
+    }.void
 
     "change status of the given event from TRANSFORMING_TRIPLES to TRANSFORMATION_RECOVERABLE_FAILURE " +
-      "as well as all the older events which are TRIPLES_GENERATED status to TRANSFORMATION_RECOVERABLE_FAILURE" in new TestCase {
-        val latestEventDate = eventDates.generateOne
-        val statusChangeEvent = ToFailure(
-          addEvent(compoundEventIds.generateOne.copy(projectId = project.id), TransformingTriples, latestEventDate).id,
-          project,
-          eventMessages.generateOne,
-          TransformationRecoverableFailure,
-          None
-        )
+      "as well as all the older events which are TRIPLES_GENERATED status to TRANSFORMATION_RECOVERABLE_FAILURE" in testDBResource
+        .use { implicit cfg =>
+          val project         = consumerProjects.generateOne
+          val latestEventDate = eventDates.generateOne
 
-        val eventToUpdate = addEvent(
-          compoundEventIds.generateOne.copy(projectId = project.id),
-          TriplesGenerated,
-          timestamps(max = latestEventDate.value).generateAs(EventDate)
-        )
+          for {
+            event <- addEvent(project, compoundEventIds(project.id).generateOne, TransformingTriples, latestEventDate)
+                       .map(eId =>
+                         ToFailure(eId.id, project, eventMessages.generateOne, TransformationRecoverableFailure, None)
+                       )
 
-        val eventsNotToUpdate = (EventStatus.all - TriplesGenerated).map { status =>
-          addEvent(
-            compoundEventIds.generateOne.copy(projectId = project.id),
-            status,
-            timestamps(max = latestEventDate.value).generateAs(EventDate)
-          ) -> status
-        } + {
-          addEvent(
-            compoundEventIds.generateOne.copy(projectId = project.id),
-            TriplesGenerated,
-            timestamps(min = latestEventDate.value.plusSeconds(2), max = Instant.now()).generateAs(EventDate)
-          ) -> TriplesGenerated
-        } + {
-          addEvent(
-            compoundEventIds.generateOne.copy(projectId = project.id),
-            TriplesGenerated,
-            latestEventDate
-          ) -> TriplesGenerated
+            eventToUpdate <- addEvent(project,
+                                      compoundEventIds(project.id).generateOne,
+                                      TriplesGenerated,
+                                      timestamps(max = latestEventDate.value).generateAs(EventDate)
+                             )
+            eventsNotToUpdate <- ((EventStatus.all - TriplesGenerated).map { status =>
+                                   addEvent(project,
+                                            compoundEventIds(project.id).generateOne,
+                                            status,
+                                            timestamps(max = latestEventDate.value).generateAs(EventDate)
+                                   ).tupleRight(status)
+                                 } + {
+                                   addEvent(
+                                     project,
+                                     compoundEventIds(project.id).generateOne,
+                                     TriplesGenerated,
+                                     timestamps(min = latestEventDate.value.plusSeconds(2), max = Instant.now())
+                                       .generateAs(EventDate)
+                                   ).tupleRight(TriplesGenerated)
+                                 } + {
+                                   addEvent(project,
+                                            compoundEventIds(project.id).generateOne,
+                                            TriplesGenerated,
+                                            latestEventDate
+                                   ).tupleRight(TriplesGenerated)
+                                 }).toList.sequence
+
+            _ = givenDeliveryInfoRemoved(event.eventId)
+
+            _ <- moduleSessionResource
+                   .useK(dbUpdater updateDB event)
+                   .asserting {
+                     _ shouldBe DBUpdateResults.ForProjects(
+                       project.slug,
+                       Map(TriplesGenerated -> -1, event.currentStatus -> -1, event.newStatus -> 2)
+                     )
+                   }
+
+            _ <- findEvent(event.eventId).asserting { updatedEvent =>
+                   updatedEvent.map(_._2)     shouldBe Some(event.newStatus)
+                   updatedEvent.flatMap(_._3) shouldBe Some(event.message)
+                 }
+
+            _ <- findEvent(eventToUpdate).asserting(_.map(_._2) shouldBe Some(TransformationRecoverableFailure))
+
+            _ <- eventsNotToUpdate.map { case (eventId, status) =>
+                   findEvent(eventId).asserting(_.map(_._2) shouldBe Some(status))
+                 }.sequence
+          } yield Succeeded
         }
-
-        givenDeliveryInfoRemoved(statusChangeEvent.eventId)
-
-        sessionResource
-          .useK(dbUpdater updateDB statusChangeEvent)
-          .unsafeRunSync() shouldBe DBUpdateResults.ForProjects(
-          project.slug,
-          Map(TriplesGenerated -> -1, statusChangeEvent.currentStatus -> -1, statusChangeEvent.newStatus -> 2)
-        )
-
-        val updatedEvent = findEvent(statusChangeEvent.eventId)
-        updatedEvent.map(_._2)     shouldBe Some(statusChangeEvent.newStatus)
-        updatedEvent.flatMap(_._3) shouldBe Some(statusChangeEvent.message)
-
-        findEvent(eventToUpdate).map(_._2) shouldBe Some(TransformationRecoverableFailure)
-
-        eventsNotToUpdate foreach { case (eventId, status) =>
-          findEvent(eventId).map(_._2) shouldBe Some(status)
-        }
-      }
 
     "change status of the given event from TRANSFORMING_TRIPLES to TRANSFORMATION_NON_RECOVERABLE_FAILURE " +
-      "as well as all the older events which are TRIPLES_GENERATED status to NEW" in new TestCase {
+      "as well as all the older events which are TRIPLES_GENERATED status to NEW" in testDBResource.use {
+        implicit cfg =>
+          val project         = consumerProjects.generateOne
+          val latestEventDate = eventDates.generateOne
 
-        val latestEventDate = eventDates.generateOne
-        val statusChangeEvent = ToFailure(
-          addEvent(compoundEventIds.generateOne.copy(projectId = project.id), TransformingTriples, latestEventDate).id,
-          project,
-          eventMessages.generateOne,
-          TransformationNonRecoverableFailure,
-          None
-        )
+          for {
+            event <-
+              addEvent(project, compoundEventIds(project.id).generateOne, TransformingTriples, latestEventDate)
+                .map { eId =>
+                  ToFailure(eId.id,
+                            project,
+                            eventMessages.generateOne,
+                            TransformationNonRecoverableFailure,
+                            executionDelay = None
+                  )
+                }
 
-        val eventToUpdate = addEvent(
-          compoundEventIds.generateOne.copy(projectId = project.id),
-          TriplesGenerated,
-          timestamps(max = latestEventDate.value).generateAs(EventDate)
-        )
+            eventToUpdate <- addEvent(project,
+                                      compoundEventIds(project.id).generateOne,
+                                      TriplesGenerated,
+                                      timestamps(max = latestEventDate.value).generateAs(EventDate)
+                             )
 
-        val eventsNotToUpdate = (EventStatus.all - TriplesGenerated).map { status =>
-          addEvent(
-            compoundEventIds.generateOne.copy(projectId = project.id),
-            status,
-            timestamps(max = latestEventDate.value).generateAs(EventDate)
-          ) -> status
-        } + {
-          addEvent(
-            compoundEventIds.generateOne.copy(projectId = project.id),
-            TriplesGenerated,
-            timestamps(min = latestEventDate.value.plusSeconds(2), max = Instant.now()).generateAs(EventDate)
-          ) -> TriplesGenerated
-        } + {
-          addEvent(
-            compoundEventIds.generateOne.copy(projectId = project.id),
-            TriplesGenerated,
-            latestEventDate
-          ) -> TriplesGenerated
-        }
+            eventsNotToUpdate <- ((EventStatus.all - TriplesGenerated).map { status =>
+                                   addEvent(project,
+                                            compoundEventIds(project.id).generateOne,
+                                            status,
+                                            timestamps(max = latestEventDate.value).generateAs(EventDate)
+                                   ).tupleRight(status)
+                                 } + {
+                                   addEvent(
+                                     project,
+                                     compoundEventIds(project.id).generateOne,
+                                     TriplesGenerated,
+                                     timestamps(min = latestEventDate.value.plusSeconds(2), max = Instant.now())
+                                       .generateAs(EventDate)
+                                   ).tupleRight(TriplesGenerated)
+                                 } + {
+                                   addEvent(project,
+                                            compoundEventIds(project.id).generateOne,
+                                            TriplesGenerated,
+                                            latestEventDate
+                                   ).tupleRight(TriplesGenerated)
+                                 }).toList.sequence
 
-        givenDeliveryInfoRemoved(statusChangeEvent.eventId)
+            _ = givenDeliveryInfoRemoved(event.eventId)
 
-        sessionResource
-          .useK(dbUpdater updateDB statusChangeEvent)
-          .unsafeRunSync() shouldBe DBUpdateResults.ForProjects(
-          project.slug,
-          Map(statusChangeEvent.currentStatus -> -1, statusChangeEvent.newStatus -> 1, New -> 1, TriplesGenerated -> -1)
-        )
+            _ <- moduleSessionResource
+                   .useK(dbUpdater updateDB event)
+                   .asserting {
+                     _ shouldBe DBUpdateResults.ForProjects(
+                       project.slug,
+                       Map(event.currentStatus -> -1, event.newStatus -> 1, New -> 1, TriplesGenerated -> -1)
+                     )
+                   }
 
-        val updatedEvent = findEvent(statusChangeEvent.eventId)
-        updatedEvent.map(_._2)     shouldBe Some(statusChangeEvent.newStatus)
-        updatedEvent.flatMap(_._3) shouldBe Some(statusChangeEvent.message)
+            _ <- findEvent(event.eventId).asserting { updatedEvent =>
+                   updatedEvent.map(_._2)     shouldBe Some(event.newStatus)
+                   updatedEvent.flatMap(_._3) shouldBe Some(event.message)
+                 }
 
-        findEvent(eventToUpdate).map(_._2) shouldBe Some(New)
+            _ <- findEvent(eventToUpdate).asserting(_.map(_._2) shouldBe Some(New))
 
-        eventsNotToUpdate foreach { case (eventId, status) =>
-          findEvent(eventId).map(_._2) shouldBe Some(status)
-        }
+            _ <- eventsNotToUpdate.map { case (eventId, status) =>
+                   findEvent(eventId).asserting(_.map(_._2) shouldBe Some(status))
+                 }.sequence
+          } yield Succeeded
       }
 
-    EventStatus.all.diff(Set(GeneratingTriples, TransformingTriples)) foreach { invalidStatus =>
-      s"do nothing if the given event is in $invalidStatus" in new TestCase {
+    "do nothing if the given event is in an invalidStatus" in testDBResource.use { implicit cfg =>
+      EventStatus.all
+        .diff(Set(GeneratingTriples, TransformingTriples))
+        .toList
+        .map { invalidStatus =>
+          val project         = consumerProjects.generateOne
+          val latestEventDate = eventDates.generateOne
+          val message         = eventMessages.generateOne
 
-        val latestEventDate = eventDates.generateOne
-        val eventId =
-          addEvent(compoundEventIds.generateOne.copy(projectId = project.id), invalidStatus, latestEventDate)
-        val message = eventMessages.generateOne
+          for {
+            eventId <- addEvent(project, compoundEventIds(project.id).generateOne, invalidStatus, latestEventDate)
 
-        Set(
-          ToFailure(eventId.id, project, message, GenerationNonRecoverableFailure, None),
-          ToFailure(eventId.id, project, message, GenerationRecoverableFailure, None),
-          ToFailure(eventId.id, project, message, TransformationNonRecoverableFailure, None),
-          ToFailure(eventId.id, project, message, TransformationRecoverableFailure, None)
-        ) foreach { statusChangeEvent =>
-          givenDeliveryInfoRemoved(statusChangeEvent.eventId)
+            res <- List(
+                     ToFailure(eventId.id, project, message, GenerationNonRecoverableFailure, None),
+                     ToFailure(eventId.id, project, message, GenerationRecoverableFailure, None),
+                     ToFailure(eventId.id, project, message, TransformationNonRecoverableFailure, None),
+                     ToFailure(eventId.id, project, message, TransformationRecoverableFailure, None)
+                   ).map { event =>
+                     givenDeliveryInfoRemoved(event.eventId)
+                     for {
+                       ancestorEventId <- addEvent(
+                                            project,
+                                            compoundEventIds(project.id).generateOne,
+                                            TriplesGenerated,
+                                            timestamps(max = latestEventDate.value.minusSeconds(1))
+                                              .generateAs(EventDate)
+                                          )
 
-          val ancestorEventId = addEvent(
-            compoundEventIds.generateOne.copy(projectId = project.id),
-            TriplesGenerated,
-            timestamps(max = latestEventDate.value.minusSeconds(1)).generateAs(EventDate)
-          )
+                       _ <- moduleSessionResource
+                              .useK(dbUpdater.updateDB(event))
+                              .asserting(_ shouldBe DBUpdateResults.ForProjects.empty)
 
-          sessionResource
-            .useK(dbUpdater.updateDB(statusChangeEvent))
-            .unsafeRunSync() shouldBe DBUpdateResults.ForProjects.empty
-
-          findEvent(eventId).map(_._2)         shouldBe Some(invalidStatus)
-          findEvent(ancestorEventId).map(_._2) shouldBe Some(TriplesGenerated)
+                       _ <- findEvent(eventId).asserting(_.map(_._2) shouldBe Some(invalidStatus))
+                       _ <- findEvent(ancestorEventId).asserting(_.map(_._2) shouldBe Some(TriplesGenerated))
+                     } yield Succeeded
+                   }.sequence
+          } yield res
         }
-      }
+        .sequence
+        .void
     }
   }
 
   "onRollback" should {
 
-    "retry the updateDB procedure on DeadlockDetected" in new TestCase {
+    "retry the updateDB procedure on DeadlockDetected" in testDBResource.use { implicit cfg =>
+      val project = consumerProjects.generateOne
+      for {
+        event <- createFailureEvent(project, GenerationNonRecoverableFailure, None)
 
-      val statusChangeEvent = createFailureEvent(GenerationNonRecoverableFailure, None)
+        _ = givenDeliveryInfoRemoved(event.eventId)
 
-      givenDeliveryInfoRemoved(statusChangeEvent.eventId)
+        deadlockException = postgresErrors(SqlState.DeadlockDetected).generateOne
+        _ <- (dbUpdater onRollback event)
+               .apply(deadlockException)
+               .asserting {
+                 _ shouldBe DBUpdateResults.ForProjects(
+                   project.slug,
+                   Map(event.currentStatus -> -1, event.newStatus -> 1)
+                 )
+               }
 
-      val deadlockException = postgresErrors(SqlState.DeadlockDetected).generateOne
-      (dbUpdater onRollback statusChangeEvent)
-        .apply(deadlockException)
-        .unsafeRunSync() shouldBe DBUpdateResults.ForProjects(
-        project.slug,
-        Map(statusChangeEvent.currentStatus -> -1, statusChangeEvent.newStatus -> 1)
-      )
-
-      val (executionDate, executionStatus, Some(message)) = findEvent(statusChangeEvent.eventId).value
-
-      executionDate.value shouldBe <=(Instant.now())
-      executionStatus     shouldBe statusChangeEvent.newStatus
-      message             shouldBe statusChangeEvent.message
+        res <- findEvent(event.eventId).asserting {
+                 case None => fail("expecting some results here")
+                 case Some((executionDate, executionStatus, maybeMessage)) =>
+                   executionDate.value shouldBe <=(Instant.now())
+                   executionStatus     shouldBe event.newStatus
+                   maybeMessage        shouldBe event.message.some
+               }
+      } yield res
     }
 
     "clean the delivery info for the event when Exception different than DeadlockDetected " +
-      "and rethrow the exception" in new TestCase {
-
+      "and rethrow the exception" in testDBResource.use { implicit cfg =>
         val event = ToFailure(eventIds.generateOne,
-                              ConsumersModelGenerators.consumerProjects.generateOne,
+                              consumerProjects.generateOne,
                               eventMessages.generateOne,
                               GenerationNonRecoverableFailure,
-                              None
+                              executionDelay = None
         )
 
         givenDeliveryInfoRemoved(event.eventId)
 
         val exception = exceptions.generateOne
-        intercept[Exception] {
-          (dbUpdater onRollback event)
-            .apply(exception)
-            .unsafeRunSync() shouldBe DBUpdateResults.ForProjects.empty
-        } shouldBe exception
+        (dbUpdater onRollback event).apply(exception).assertThrowsError[Exception](_ shouldBe exception)
       }
   }
 
-  private trait TestCase {
+  private lazy val now            = Instant.now()
+  private val deliveryInfoRemover = mock[DeliveryInfoRemover[IO]]
+  private lazy val dbUpdater = {
+    implicit val qet: QueriesExecutionTimes[IO] = TestQueriesExecutionTimes[IO]
+    new DbUpdater[IO](deliveryInfoRemover, () => now)
+  }
 
-    val project = ConsumersModelGenerators.consumerProjects.generateOne
+  private def givenDeliveryInfoRemoved(eventId: CompoundEventId) =
+    (deliveryInfoRemover.deleteDelivery _).expects(eventId).returning(Kleisli.pure(()))
 
-    implicit val logger: TestLogger[IO] = TestLogger[IO]()
-    private val currentTime         = mockFunction[Instant]
-    private val deliveryInfoRemover = mock[DeliveryInfoRemover[IO]]
-    private implicit val metricsRegistry:  TestMetricsRegistry[IO]   = TestMetricsRegistry[IO]
-    private implicit val queriesExecTimes: QueriesExecutionTimes[IO] = QueriesExecutionTimes[IO]().unsafeRunSync()
-    val dbUpdater = new DbUpdater[IO](deliveryInfoRemover, currentTime)
-
-    private val now = Instant.now()
-    currentTime.expects().returning(now).anyNumberOfTimes()
-
-    def givenDeliveryInfoRemoved(eventId: CompoundEventId) =
-      (deliveryInfoRemover.deleteDelivery _).expects(eventId).returning(Kleisli.pure(()))
-
-    def createFailureEvent(newStatus: FailureStatus, executionDelay: Option[Duration]): ToFailure = {
-      val currentStatus = newStatus match {
-        case GenerationNonRecoverableFailure | GenerationRecoverableFailure         => GeneratingTriples
-        case TransformationNonRecoverableFailure | TransformationRecoverableFailure => TransformingTriples
-      }
-      val compoundId = addEvent(currentStatus)
+  private def createFailureEvent(project: Project, newStatus: FailureStatus, executionDelay: Option[Duration])(implicit
+      cfg: DBConfig[EventLogDB]
+  ): IO[ToFailure] = {
+    val currentStatus = newStatus match {
+      case GenerationNonRecoverableFailure | GenerationRecoverableFailure         => GeneratingTriples
+      case TransformationNonRecoverableFailure | TransformationRecoverableFailure => TransformingTriples
+    }
+    addEvent(project, currentStatus).map(compoundId =>
       ToFailure(compoundId.id,
                 project.copy(id = compoundId.projectId),
                 eventMessages.generateOne,
                 newStatus,
                 executionDelay
       )
-    }
-
-    private def addEvent(status: ProcessingStatus): CompoundEventId = {
-      val eventId = CompoundEventId(eventIds.generateOne, project.id)
-      addEvent(eventId, status)
-      eventId
-    }
-
-    def addEvent(eventId:   CompoundEventId,
-                 status:    EventStatus,
-                 eventDate: EventDate = timestampsNotInTheFuture.generateAs(EventDate)
-    ): CompoundEventId = {
-      storeEvent(
-        eventId,
-        status,
-        timestampsNotInTheFuture.generateAs(ExecutionDate),
-        eventDate,
-        eventBodies.generateOne,
-        projectSlug = project.slug
-      )
-      eventId
-    }
+    )
   }
+
+  private def addEvent(project: Project, status: ProcessingStatus)(implicit
+      cfg: DBConfig[EventLogDB]
+  ): IO[CompoundEventId] =
+    addEvent(project, CompoundEventId(eventIds.generateOne, project.id), status)
+
+  private def addEvent(project:   Project,
+                       eventId:   CompoundEventId,
+                       status:    EventStatus,
+                       eventDate: EventDate = timestampsNotInTheFuture.generateAs(EventDate)
+  )(implicit cfg: DBConfig[EventLogDB]): IO[CompoundEventId] =
+    storeEvent(
+      eventId,
+      status,
+      timestampsNotInTheFuture.generateAs(ExecutionDate),
+      eventDate,
+      eventBodies.generateOne,
+      projectSlug = project.slug
+    ).as(eventId)
 }
