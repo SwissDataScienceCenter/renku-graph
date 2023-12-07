@@ -91,7 +91,7 @@ final class GitLabApiStub[F[_]: Async: Logger](private val stateRef: Ref[F, Stat
             case Some(AuthedUser(userId, _)) =>
               if (id == userId) query(projectsFor(id.some)).flatMap(OkWithTotalHeader(req))
               else OkWithTotalHeader(req)(List.empty[Project])
-            case Some(AuthedProject(projectId, _)) =>
+            case Some(AuthedProject(projectId, _, _)) =>
               query(findProjectById(projectId)).map(_.toList).flatMap(OkWithTotalHeader(req))
             case None =>
               query(projectsFor(id.some)).flatMap(OkWithTotalHeader(req))
@@ -141,6 +141,7 @@ final class GitLabApiStub[F[_]: Async: Logger](private val stateRef: Ref[F, Stat
           EitherT(req.as[Json].map(_.hcursor.downField("expires_at").as[LocalDate]))
             .map(expiryDate => projectAccessTokenInfos.generateOne.copy(expiryDate = expiryDate))
             .semiflatTap(tokenInfo => update(addProjectAccessToken(projectId, tokenInfo)))
+            .semiflatTap(tokenInfo => update(addPatAsProjectMember(projectId, tokenInfo)))
             .semiflatMap(tokenInfo => Created().map(_.withEntity(tokenInfo.asJson)))
             .leftSemiflatMap(err => BadRequest(s"No or invalid Project Access Token creation payload: ${err.message}"))
             .merge
@@ -157,8 +158,9 @@ final class GitLabApiStub[F[_]: Async: Logger](private val stateRef: Ref[F, Stat
         case GET -> Root / ProjectId(id) / "hooks" =>
           query(findWebhooks(id)).flatMap(Ok(_))
 
-        case POST -> Root / ProjectId(_) / "hooks" =>
-          Created()
+        case POST -> Root / ProjectId(projectId) / "hooks" =>
+          update(addWebhook(projectId, GitLabStubIOSyntax.webhookUri)) >>
+            Created()
 
         case GET -> Root / ProjectId(id) / "events" :? PageParam(page) :? ActionParam(action) =>
           // action is always "pushed", page is always 1
@@ -221,6 +223,7 @@ final class GitLabApiStub[F[_]: Async: Logger](private val stateRef: Ref[F, Stat
 }
 
 object GitLabApiStub {
+
   def apply[F[_]: Async: Logger](initial: State): F[GitLabApiStub[F]] =
     Ref.of[F, State](initial).map(new GitLabApiStub[F](_))
 
@@ -254,5 +257,10 @@ object GitLabApiStub {
       message:   String,
       parents:   List[CommitId]
   )
-  final case class ProjectAccessTokenInfo(tokenId: Int, name: String, token: ProjectAccessToken, expiryDate: LocalDate)
+  final case class ProjectAccessTokenInfo(tokenId:    Int,
+                                          userId:     persons.GitLabId,
+                                          name:       String,
+                                          token:      ProjectAccessToken,
+                                          expiryDate: LocalDate
+  )
 }

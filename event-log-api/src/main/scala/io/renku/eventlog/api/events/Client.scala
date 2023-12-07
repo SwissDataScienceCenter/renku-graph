@@ -29,6 +29,7 @@ import org.typelevel.log4cats.Logger
 
 trait Client[F[_]] {
   def send(event: CommitSyncRequest):                           F[Unit]
+  def send(event: GlobalCommitSyncRequest):                     F[Unit]
   def send(event: StatusChangeEvent.RedoProjectTransformation): F[Unit]
 }
 
@@ -51,6 +52,14 @@ private class ClientImpl[F[_]](eventSender: EventSender[F]) extends Client[F] {
     eventSender.sendEvent(
       EventRequestContent.NoPayload(event.asJson),
       EventContext(CommitSyncRequest.categoryName, show"${CommitSyncRequest.categoryName}: sending event $event failed")
+    )
+
+  override def send(event: GlobalCommitSyncRequest): F[Unit] =
+    eventSender.sendEvent(
+      EventRequestContent.NoPayload(event.asJson),
+      EventContext(GlobalCommitSyncRequest.categoryName,
+                   show"${GlobalCommitSyncRequest.categoryName}: sending event $event failed"
+      )
     )
 
   override def send(event: StatusChangeEvent.RedoProjectTransformation): F[Unit] =

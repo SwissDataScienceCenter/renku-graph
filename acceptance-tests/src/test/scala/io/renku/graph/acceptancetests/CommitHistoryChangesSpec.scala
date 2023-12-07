@@ -33,7 +33,6 @@ import io.renku.graph.model.testentities._
 import io.renku.http.client.AccessToken
 import io.renku.http.rest.Links
 import io.renku.http.server.EndpointTester.{JsonOps, jsonEntityDecoder}
-import io.renku.webhookservice.model
 import org.http4s.Status._
 import org.scalatest.EitherValues
 
@@ -77,11 +76,7 @@ class CommitHistoryChangesSpec
       gitLabStub.replaceCommits(project.id, newCommits.toList: _*)
       mockCommitDataOnTripleGenerator(project, toPayloadJsonLD(projectWithNewData), newCommits)
 
-      webhookServiceClient
-        .POST("webhooks/events", model.HookToken(project.id), GitLab.pushEvent(project, newCommits.last))
-        .status shouldBe Accepted
-
-      `data in the Triples Store`(project, newCommits, user.accessToken)
+      `data in the Triples Store`(project, newCommits.last, user.accessToken)
 
       waitForAllEventsInFinalState(project.id)
 
