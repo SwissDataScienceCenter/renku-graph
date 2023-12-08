@@ -175,12 +175,12 @@ class EventFinderSpec
         projectId       = projectIds.generateOne
         projectSlug     = projectSlugs.generateOne
 
-        event0Id          = compoundEventIds.generateOne.copy(projectId = projectId)
+        event0Id          = compoundEventIds(projectId).generateOne
         event0CreatedDate = createdDates.generateOne
         _ <- addEvent(event0Id, commonEventDate, projectSlug, event0CreatedDate)
         _ <- upsertCategorySyncTime(projectId, categoryName, lastSynced)
 
-        event1Id          = compoundEventIds.generateOne.copy(projectId = projectId)
+        event1Id          = compoundEventIds(projectId).generateOne
         event1CreatedDate = createdDates.generateOne
         _ <- addEvent(event1Id, commonEventDate, projectSlug, event1CreatedDate)
         _ <- upsertCategorySyncTime(projectId, categoryName, lastSynced)
@@ -210,7 +210,7 @@ class EventFinderSpec
           event0Id   = compoundEventIds.generateOne
           _ <- addEvent(event0Id, event0Date, sharedProjectSlug, eventStatus = AwaitingDeletion)
 
-          event1Id   = compoundEventIds.generateOne.copy(projectId = event0Id.projectId)
+          event1Id   = compoundEventIds(event0Id.projectId).generateOne
           event1Date = EventDate(event0Date.value.plus(1L, ChronoUnit.MINUTES))
           _ <- addEvent(event1Id, event1Date, sharedProjectSlug, eventStatus = AwaitingDeletion)
 
@@ -220,10 +220,7 @@ class EventFinderSpec
           _ <- finder.popEvent().asserting(_ shouldBe None)
 
           // This event should not be picked up as the last sync date was set to NOW()
-          _ <- addEvent(compoundEventIds.generateOne.copy(projectId = event0Id.projectId),
-                        eventDates.generateOne,
-                        sharedProjectSlug
-               )
+          _ <- addEvent(compoundEventIds(event0Id.projectId).generateOne, eventDates.generateOne, sharedProjectSlug)
 
           _ <- finder.popEvent().asserting(_ shouldBe None)
         } yield Succeeded

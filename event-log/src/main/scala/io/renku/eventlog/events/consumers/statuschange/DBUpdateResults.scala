@@ -29,6 +29,8 @@ private sealed trait DBUpdateResults {
 
 private object DBUpdateResults {
 
+  lazy val empty: ForProjects = ForProjects.empty
+
   final case class ForProjects(statusCounts: Set[(projects.Slug, Map[EventStatus, Int])]) extends DBUpdateResults {
     def apply(project: projects.Slug): Map[EventStatus, Int] =
       statusCounts.find(_._1 == project).map(_._2).getOrElse(Map.empty)

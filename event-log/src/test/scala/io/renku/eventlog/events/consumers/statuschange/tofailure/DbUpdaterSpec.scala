@@ -36,6 +36,7 @@ import io.renku.graph.model.EventContentGenerators.{eventDates, eventMessages}
 import io.renku.graph.model.EventsGenerators.{compoundEventIds, eventBodies, eventIds}
 import io.renku.graph.model.events.EventStatus._
 import io.renku.graph.model.events._
+import org.scalacheck.Gen
 import org.scalamock.scalatest.AsyncMockFactory
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AsyncWordSpec
@@ -54,95 +55,87 @@ class DbUpdaterSpec
 
   "updateDB" should {
 
-    "change status of the given event from ProcessingStatus to FailureStatus" in testDBResource.use { implicit cfg =>
-      val project = consumerProjects.generateOne
-      List(
-        createFailureEvent(project, GenerationNonRecoverableFailure, executionDelay = None),
-        createFailureEvent(project, GenerationRecoverableFailure, Duration.ofHours(100).some)
-      ).map {
-        _.flatMap { event =>
-          givenDeliveryInfoRemoved(event.eventId)
+    "change status of the given event from ProcessingStatus to GenerationNonRecoverableFailure" in testDBResource.use {
+      implicit cfg =>
+        for {
+          event <- createFailureEvent(GenerationNonRecoverableFailure)
 
-          for {
-            _ <- moduleSessionResource
-                   .useK(dbUpdater updateDB event)
-                   .asserting(_ shouldBe DBUpdateResults(project.slug, event.currentStatus -> -1, event.newStatus -> 1))
+          _ = givenDeliveryInfoRemoved(event.eventId)
 
-            _ <- findEvent(event.eventId).asserting {
-                   case None => fail("expecting some results here")
-                   case Some(Event(executionDate, executionStatus, maybeMessage)) =>
-                     event.newStatus match {
-                       case _: GenerationRecoverableFailure | _: TransformationRecoverableFailure =>
-                         executionDate.value shouldBe >(Instant.now())
-                       case _ => executionDate.value shouldBe <=(Instant.now())
-                     }
-                     executionStatus shouldBe event.newStatus
-                     maybeMessage    shouldBe event.message.some
+          _ <- runDBUpdate(event).asserting {
+                 _ shouldBe DBUpdateResults(event.project.slug, event.currentStatus -> -1, event.newStatus -> 1)
+               }
+
+          res <- findEvent(event.eventId).map(_.value).asserting {
+                   _ shouldBe Event(ExecutionDate(now), event.newStatus, event.message.some)
                  }
-          } yield Succeeded
-        }
-      }.sequence
-    }.void
+        } yield res
+    }
+
+    "change status of the given event from ProcessingStatus to GenerationRecoverableFailure" in testDBResource.use {
+      implicit cfg =>
+        for {
+          event <- createFailureEvent(GenerationRecoverableFailure, executionDelay = Duration.ofHours(100))
+
+          _ = givenDeliveryInfoRemoved(event.eventId)
+
+          _ <- runDBUpdate(event).asserting {
+                 _ shouldBe DBUpdateResults(event.project.slug, event.currentStatus -> -1, event.newStatus -> 1)
+               }
+
+          res <- findEvent(event.eventId).map(_.value).asserting {
+                   _ shouldBe Event(ExecutionDate(now plus event.executionDelay.value),
+                                    event.newStatus,
+                                    event.message.some
+                   )
+                 }
+        } yield res
+    }
 
     "change status of the given event from TRANSFORMING_TRIPLES to TRANSFORMATION_RECOVERABLE_FAILURE " +
       "as well as all the older events which are TRIPLES_GENERATED status to TRANSFORMATION_RECOVERABLE_FAILURE" in testDBResource
         .use { implicit cfg =>
           val project         = consumerProjects.generateOne
-          val latestEventDate = eventDates.generateOne
+          val latestEventDate = timestamps(max = now.minusSeconds(1)).generateAs(EventDate)
 
           for {
-            event <- addEvent(project, compoundEventIds(project.id).generateOne, TransformingTriples, latestEventDate)
-                       .map(eId =>
-                         ToFailure(eId.id, project, eventMessages.generateOne, TransformationRecoverableFailure, None)
-                       )
+            event <- addEvent(project, TransformingTriples, latestEventDate).map { eId =>
+                       ToFailure(eId.id, project, eventMessages.generateOne, TransformationRecoverableFailure, None)
+                     }
 
-            eventToUpdate <- addEvent(project,
-                                      compoundEventIds(project.id).generateOne,
-                                      TriplesGenerated,
-                                      timestamps(max = latestEventDate.value).generateAs(EventDate)
-                             )
-            eventsNotToUpdate <- ((EventStatus.all - TriplesGenerated).map { status =>
-                                   addEvent(project,
-                                            compoundEventIds(project.id).generateOne,
-                                            status,
-                                            timestamps(max = latestEventDate.value).generateAs(EventDate)
-                                   ).tupleRight(status)
-                                 } + {
-                                   addEvent(
-                                     project,
-                                     compoundEventIds(project.id).generateOne,
-                                     TriplesGenerated,
-                                     timestamps(min = latestEventDate.value.plusSeconds(2), max = Instant.now())
-                                       .generateAs(EventDate)
-                                   ).tupleRight(TriplesGenerated)
-                                 } + {
-                                   addEvent(project,
-                                            compoundEventIds(project.id).generateOne,
-                                            TriplesGenerated,
-                                            latestEventDate
-                                   ).tupleRight(TriplesGenerated)
-                                 }).toList.sequence
+            eventToUpdate <- addEvent(project, TriplesGenerated, timestamps(max = latestEventDate.value))
+            eventsNotToUpdate <- {
+                                   (EventStatus.all - TriplesGenerated).map { status =>
+                                     addEvent(project, status, timestamps(max = latestEventDate.value))
+                                       .tupleRight(status)
+                                   } +
+                                     addEvent(
+                                       project,
+                                       TriplesGenerated,
+                                       timestamps(min = latestEventDate.value.plusSeconds(1), max = now)
+                                     ).tupleRight(TriplesGenerated) +
+                                     addEvent(project, TriplesGenerated, latestEventDate)
+                                       .tupleRight(TriplesGenerated)
+                                 }.toList.sequence
 
             _ = givenDeliveryInfoRemoved(event.eventId)
 
-            _ <- moduleSessionResource
-                   .useK(dbUpdater updateDB event)
-                   .asserting {
-                     _ shouldBe DBUpdateResults.ForProjects(
-                       project.slug,
-                       Map(TriplesGenerated -> -1, event.currentStatus -> -1, event.newStatus -> 2)
-                     )
-                   }
-
-            _ <- findEvent(event.eventId).asserting { updatedEvent =>
-                   updatedEvent.map(_.status)           shouldBe Some(event.newStatus)
-                   updatedEvent.flatMap(_.maybeMessage) shouldBe Some(event.message)
+            _ <- runDBUpdate(event).asserting {
+                   _ shouldBe DBUpdateResults(project.slug,
+                                              TriplesGenerated    -> -1,
+                                              event.currentStatus -> -1,
+                                              event.newStatus     -> 2
+                   )
                  }
 
-            _ <- findEvent(eventToUpdate).asserting(_.map(_.status) shouldBe Some(TransformationRecoverableFailure))
+            _ <- findEvent(event.eventId).asserting {
+                   _.value.statusAndMessage shouldBe event.newStatus -> event.message.some
+                 }
+
+            _ <- findEvent(eventToUpdate).asserting(_.value.status shouldBe TransformationRecoverableFailure)
 
             _ <- eventsNotToUpdate.map { case (eventId, status) =>
-                   findEvent(eventId).asserting(_.map(_.status) shouldBe Some(status))
+                   findEvent(eventId).asserting(_.value.status shouldBe status)
                  }.sequence
           } yield Succeeded
         }
@@ -151,68 +144,49 @@ class DbUpdaterSpec
       "as well as all the older events which are TRIPLES_GENERATED status to NEW" in testDBResource.use {
         implicit cfg =>
           val project         = consumerProjects.generateOne
-          val latestEventDate = eventDates.generateOne
+          val latestEventDate = timestamps(max = now.minusSeconds(1)).generateAs(EventDate)
 
           for {
             event <-
-              addEvent(project, compoundEventIds(project.id).generateOne, TransformingTriples, latestEventDate)
-                .map { eId =>
-                  ToFailure(eId.id,
-                            project,
-                            eventMessages.generateOne,
-                            TransformationNonRecoverableFailure,
-                            executionDelay = None
-                  )
-                }
+              addEvent(project, TransformingTriples, latestEventDate).map { eId =>
+                ToFailure(eId.id, project, eventMessages.generateOne, TransformationNonRecoverableFailure, None)
+              }
 
-            eventToUpdate <- addEvent(project,
-                                      compoundEventIds(project.id).generateOne,
-                                      TriplesGenerated,
-                                      timestamps(max = latestEventDate.value).generateAs(EventDate)
-                             )
+            eventToUpdate <- addEvent(project, TriplesGenerated, timestamps(max = latestEventDate.value))
 
-            eventsNotToUpdate <- ((EventStatus.all - TriplesGenerated).map { status =>
-                                   addEvent(project,
-                                            compoundEventIds(project.id).generateOne,
-                                            status,
-                                            timestamps(max = latestEventDate.value).generateAs(EventDate)
-                                   ).tupleRight(status)
-                                 } + {
-                                   addEvent(
-                                     project,
-                                     compoundEventIds(project.id).generateOne,
-                                     TriplesGenerated,
-                                     timestamps(min = latestEventDate.value.plusSeconds(2), max = Instant.now())
-                                       .generateAs(EventDate)
-                                   ).tupleRight(TriplesGenerated)
-                                 } + {
-                                   addEvent(project,
-                                            compoundEventIds(project.id).generateOne,
-                                            TriplesGenerated,
-                                            latestEventDate
-                                   ).tupleRight(TriplesGenerated)
-                                 }).toList.sequence
+            eventsNotToUpdate <- {
+                                   (EventStatus.all - TriplesGenerated).map { status =>
+                                     addEvent(project, status, timestamps(max = latestEventDate.value))
+                                       .tupleRight(status)
+                                   } +
+                                     addEvent(
+                                       project,
+                                       TriplesGenerated,
+                                       timestamps(min = latestEventDate.value.plusSeconds(1), max = now)
+                                     ).tupleRight(TriplesGenerated) +
+                                     addEvent(project, TriplesGenerated, latestEventDate)
+                                       .tupleRight(TriplesGenerated)
+                                 }.toList.sequence
 
             _ = givenDeliveryInfoRemoved(event.eventId)
 
-            _ <- moduleSessionResource
-                   .useK(dbUpdater updateDB event)
-                   .asserting {
-                     _ shouldBe DBUpdateResults.ForProjects(
-                       project.slug,
-                       Map(event.currentStatus -> -1, event.newStatus -> 1, New -> 1, TriplesGenerated -> -1)
-                     )
-                   }
-
-            _ <- findEvent(event.eventId).asserting { updatedEvent =>
-                   updatedEvent.map(_.status)           shouldBe Some(event.newStatus)
-                   updatedEvent.flatMap(_.maybeMessage) shouldBe Some(event.message)
+            _ <- runDBUpdate(event).asserting {
+                   _ shouldBe DBUpdateResults(project.slug,
+                                              event.currentStatus -> -1,
+                                              event.newStatus     -> 1,
+                                              New                 -> 1,
+                                              TriplesGenerated    -> -1
+                   )
                  }
 
-            _ <- findEvent(eventToUpdate).asserting(_.map(_.status) shouldBe Some(New))
+            _ <- findEvent(event.eventId).asserting {
+                   _.value.statusAndMessage shouldBe event.newStatus -> event.message.some
+                 }
+
+            _ <- findEvent(eventToUpdate).asserting(_.value.status shouldBe New)
 
             _ <- eventsNotToUpdate.map { case (eventId, status) =>
-                   findEvent(eventId).asserting(_.map(_.status) shouldBe Some(status))
+                   findEvent(eventId).asserting(_.value.status shouldBe status)
                  }.sequence
           } yield Succeeded
       }
@@ -227,7 +201,7 @@ class DbUpdaterSpec
           val message         = eventMessages.generateOne
 
           for {
-            eventId <- addEvent(project, compoundEventIds(project.id).generateOne, invalidStatus, latestEventDate)
+            eventId <- addEvent(project, invalidStatus, latestEventDate)
 
             res <- List(
                      ToFailure(eventId.id, project, message, GenerationNonRecoverableFailure, None),
@@ -239,18 +213,14 @@ class DbUpdaterSpec
                      for {
                        ancestorEventId <- addEvent(
                                             project,
-                                            compoundEventIds(project.id).generateOne,
                                             TriplesGenerated,
                                             timestamps(max = latestEventDate.value.minusSeconds(1))
-                                              .generateAs(EventDate)
                                           )
 
-                       _ <- moduleSessionResource
-                              .useK(dbUpdater.updateDB(event))
-                              .asserting(_ shouldBe DBUpdateResults.ForProjects.empty)
+                       _ <- runDBUpdate(event).asserting(_ shouldBe DBUpdateResults.empty)
 
-                       _ <- findEvent(eventId).asserting(_.map(_.status) shouldBe Some(invalidStatus))
-                       _ <- findEvent(ancestorEventId).asserting(_.map(_.status) shouldBe Some(TriplesGenerated))
+                       _ <- findEvent(eventId).asserting(_.value.status shouldBe invalidStatus)
+                       _ <- findEvent(ancestorEventId).asserting(_.value.status shouldBe TriplesGenerated)
                      } yield Succeeded
                    }.sequence
           } yield res
@@ -272,19 +242,10 @@ class DbUpdaterSpec
         deadlockException = postgresErrors(SqlState.DeadlockDetected).generateOne
         _ <- (dbUpdater onRollback event)
                .apply(deadlockException)
-               .asserting {
-                 _ shouldBe DBUpdateResults.ForProjects(
-                   project.slug,
-                   Map(event.currentStatus -> -1, event.newStatus -> 1)
-                 )
-               }
+               .asserting(_ shouldBe DBUpdateResults(project.slug, event.currentStatus -> -1, event.newStatus -> 1))
 
         res <- findEvent(event.eventId).asserting {
-                 case None => fail("expecting some results here")
-                 case Some(Event(executionDate, executionStatus, maybeMessage)) =>
-                   executionDate.value shouldBe <=(Instant.now())
-                   executionStatus     shouldBe event.newStatus
-                   maybeMessage        shouldBe event.message.some
+                 _.value shouldBe Event(ExecutionDate(now), event.newStatus, event.message.some)
                }
       } yield res
     }
@@ -312,11 +273,23 @@ class DbUpdaterSpec
     new DbUpdater[IO](deliveryInfoRemover, () => now)
   }
 
+  private def runDBUpdate(event: ToFailure)(implicit cfg: DBConfig[EventLogDB]) =
+    moduleSessionResource
+      .useK(dbUpdater updateDB event)
+
   private def givenDeliveryInfoRemoved(eventId: CompoundEventId) =
     (deliveryInfoRemover.deleteDelivery _).expects(eventId).returning(Kleisli.pure(()))
 
-  private def createFailureEvent(project: Project, newStatus: FailureStatus, executionDelay: Option[Duration])(implicit
+  private def createFailureEvent(newStatus: FailureStatus)(implicit cfg: DBConfig[EventLogDB]): IO[ToFailure] =
+    createFailureEvent(consumerProjects.generateOne, newStatus, executionDelay = None)
+
+  private def createFailureEvent(newStatus: FailureStatus, executionDelay: Duration)(implicit
       cfg: DBConfig[EventLogDB]
+  ): IO[ToFailure] =
+    createFailureEvent(consumerProjects.generateOne, newStatus, executionDelay.some)
+
+  private def createFailureEvent(project: Project, newStatus: FailureStatus, executionDelay: Option[Duration] = None)(
+      implicit cfg: DBConfig[EventLogDB]
   ): IO[ToFailure] = {
     val currentStatus = newStatus match {
       case GenerationNonRecoverableFailure | GenerationRecoverableFailure         => GeneratingTriples
@@ -335,19 +308,24 @@ class DbUpdaterSpec
   private def addEvent(project: Project, status: ProcessingStatus)(implicit
       cfg: DBConfig[EventLogDB]
   ): IO[CompoundEventId] =
-    addEvent(project, CompoundEventId(eventIds.generateOne, project.id), status)
+    addEvent(project, status, timestampsNotInTheFuture.generateAs(EventDate))
 
-  private def addEvent(project:   Project,
-                       eventId:   CompoundEventId,
-                       status:    EventStatus,
-                       eventDate: EventDate = timestampsNotInTheFuture.generateAs(EventDate)
-  )(implicit cfg: DBConfig[EventLogDB]): IO[CompoundEventId] =
+  private def addEvent(project: Project, status: EventStatus, eventDate: Gen[Instant])(implicit
+      cfg: DBConfig[EventLogDB]
+  ): IO[CompoundEventId] =
+    addEvent(project, status, eventDate.generateAs(EventDate))
+
+  private def addEvent(project: Project, status: EventStatus, eventDate: EventDate)(implicit
+      cfg: DBConfig[EventLogDB]
+  ): IO[CompoundEventId] = {
+    val ceId = compoundEventIds(project.id).generateOne
     storeEvent(
-      eventId,
+      ceId,
       status,
       timestampsNotInTheFuture.generateAs(ExecutionDate),
       eventDate,
       eventBodies.generateOne,
       projectSlug = project.slug
-    ).as(eventId)
+    ).as(ceId)
+  }
 }

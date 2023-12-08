@@ -26,7 +26,9 @@ trait EventLogDBFetching {
       session.prepare(query).flatMap(_.stream(status *: Void *: EmptyTuple, 32).compile.toList)
     }
 
-  protected case class Event(executionDate: ExecutionDate, status: EventStatus, maybeMessage: Option[EventMessage])
+  protected case class Event(executionDate: ExecutionDate, status: EventStatus, maybeMessage: Option[EventMessage]) {
+    lazy val statusAndMessage: (EventStatus, Option[EventMessage]) = status -> maybeMessage
+  }
 
   protected def findEvent(
       eventId: CompoundEventId
