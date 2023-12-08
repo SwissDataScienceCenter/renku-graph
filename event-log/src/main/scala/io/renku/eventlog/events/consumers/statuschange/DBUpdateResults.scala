@@ -34,12 +34,18 @@ private object DBUpdateResults {
       statusCounts.find(_._1 == project).map(_._2).getOrElse(Map.empty)
   }
 
+  def apply(projectSlug: projects.Slug, statusCounts: (EventStatus, Int)*): ForProjects =
+    ForProjects(projectSlug, statusCounts.toMap[EventStatus, Int])
+
   object ForProjects {
 
-    lazy val empty: ForProjects = ForProjects(Set.empty)
+    lazy val empty: ForProjects = ForProjects(Set.empty[(projects.Slug, Map[EventStatus, Int])])
 
     def apply(projectSlug: projects.Slug, statusCount: Map[EventStatus, Int]): ForProjects =
       ForProjects(Set(projectSlug -> statusCount))
+
+    def apply(projectSlug: projects.Slug, statusCounts: (EventStatus, Int)*): ForProjects =
+      apply(projectSlug, statusCounts.toMap)
   }
 
   final case object ForAllProjects extends DBUpdateResults

@@ -221,16 +221,15 @@ class StatusChangerSpec
       )
     case ToAwaitingDeletion(_, project) =>
       Gen.const(
-        DBUpdateResults.ForProjects(project.slug,
-                                    Map(eventStatuses.generateOne -> -1, EventStatus.AwaitingDeletion -> 1)
-        )
+        DBUpdateResults(project.slug, eventStatuses.generateOne -> -1, EventStatus.AwaitingDeletion -> 1)
       )
     case RollbackToAwaitingDeletion(Project(_, projectSlug)) =>
       val updatedRows = Generators.positiveInts(max = 40).generateOne
       Gen.const(
-        DBUpdateResults.ForProjects(
+        DBUpdateResults(
           projectSlug,
-          Map(EventStatus.Deleting -> -updatedRows, EventStatus.AwaitingDeletion -> updatedRows)
+          EventStatus.Deleting         -> -updatedRows,
+          EventStatus.AwaitingDeletion -> updatedRows
         )
       )
   }

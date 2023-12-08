@@ -26,17 +26,21 @@ trait EventLogDBFetching {
       session.prepare(query).flatMap(_.stream(status *: Void *: EmptyTuple, 32).compile.toList)
     }
 
+  protected case class Event(executionDate: ExecutionDate, status: EventStatus, maybeMessage: Option[EventMessage])
+
   protected def findEvent(
       eventId: CompoundEventId
-  )(implicit cfg: DBConfig[EventLogDB]): IO[Option[(ExecutionDate, EventStatus, Option[EventMessage])]] =
+  )(implicit cfg: DBConfig[EventLogDB]): IO[Option[Event]] =
     moduleSessionResource(cfg).session.use { session =>
-      val query: Query[EventId *: projects.GitLabId *: EmptyTuple, (ExecutionDate, EventStatus, Option[EventMessage])] =
+      val query: Query[EventId *: projects.GitLabId *: EmptyTuple, Event] =
         sql"""
           SELECT execution_date, status, message
           FROM event
           WHERE event_id = $eventIdEncoder AND project_id = $projectIdEncoder"""
           .query(executionDateDecoder ~ eventStatusDecoder ~ eventMessageDecoder.opt)
-          .map { case executionDate ~ status ~ maybeMessage => (executionDate, status, maybeMessage) }
+          .map { case (executionDate: ExecutionDate) ~ (status: EventStatus) ~ (maybeMessage: Option[EventMessage]) =>
+            Event(executionDate, status, maybeMessage)
+          }
       session.prepare(query).flatMap(_.option(eventId.id *: eventId.projectId *: EmptyTuple))
     }
 }

@@ -66,15 +66,11 @@ class DbUpdaterSpec
           for {
             _ <- moduleSessionResource
                    .useK(dbUpdater updateDB event)
-                   .asserting {
-                     _ shouldBe DBUpdateResults.ForProjects(project.slug,
-                                                            Map(event.currentStatus -> -1, event.newStatus -> 1)
-                     )
-                   }
+                   .asserting(_ shouldBe DBUpdateResults(project.slug, event.currentStatus -> -1, event.newStatus -> 1))
 
             _ <- findEvent(event.eventId).asserting {
                    case None => fail("expecting some results here")
-                   case Some((executionDate, executionStatus, maybeMessage)) =>
+                   case Some(Event(executionDate, executionStatus, maybeMessage)) =>
                      event.newStatus match {
                        case _: GenerationRecoverableFailure | _: TransformationRecoverableFailure =>
                          executionDate.value shouldBe >(Instant.now())
@@ -139,14 +135,14 @@ class DbUpdaterSpec
                    }
 
             _ <- findEvent(event.eventId).asserting { updatedEvent =>
-                   updatedEvent.map(_._2)     shouldBe Some(event.newStatus)
-                   updatedEvent.flatMap(_._3) shouldBe Some(event.message)
+                   updatedEvent.map(_.status)           shouldBe Some(event.newStatus)
+                   updatedEvent.flatMap(_.maybeMessage) shouldBe Some(event.message)
                  }
 
-            _ <- findEvent(eventToUpdate).asserting(_.map(_._2) shouldBe Some(TransformationRecoverableFailure))
+            _ <- findEvent(eventToUpdate).asserting(_.map(_.status) shouldBe Some(TransformationRecoverableFailure))
 
             _ <- eventsNotToUpdate.map { case (eventId, status) =>
-                   findEvent(eventId).asserting(_.map(_._2) shouldBe Some(status))
+                   findEvent(eventId).asserting(_.map(_.status) shouldBe Some(status))
                  }.sequence
           } yield Succeeded
         }
@@ -209,14 +205,14 @@ class DbUpdaterSpec
                    }
 
             _ <- findEvent(event.eventId).asserting { updatedEvent =>
-                   updatedEvent.map(_._2)     shouldBe Some(event.newStatus)
-                   updatedEvent.flatMap(_._3) shouldBe Some(event.message)
+                   updatedEvent.map(_.status)           shouldBe Some(event.newStatus)
+                   updatedEvent.flatMap(_.maybeMessage) shouldBe Some(event.message)
                  }
 
-            _ <- findEvent(eventToUpdate).asserting(_.map(_._2) shouldBe Some(New))
+            _ <- findEvent(eventToUpdate).asserting(_.map(_.status) shouldBe Some(New))
 
             _ <- eventsNotToUpdate.map { case (eventId, status) =>
-                   findEvent(eventId).asserting(_.map(_._2) shouldBe Some(status))
+                   findEvent(eventId).asserting(_.map(_.status) shouldBe Some(status))
                  }.sequence
           } yield Succeeded
       }
@@ -253,8 +249,8 @@ class DbUpdaterSpec
                               .useK(dbUpdater.updateDB(event))
                               .asserting(_ shouldBe DBUpdateResults.ForProjects.empty)
 
-                       _ <- findEvent(eventId).asserting(_.map(_._2) shouldBe Some(invalidStatus))
-                       _ <- findEvent(ancestorEventId).asserting(_.map(_._2) shouldBe Some(TriplesGenerated))
+                       _ <- findEvent(eventId).asserting(_.map(_.status) shouldBe Some(invalidStatus))
+                       _ <- findEvent(ancestorEventId).asserting(_.map(_.status) shouldBe Some(TriplesGenerated))
                      } yield Succeeded
                    }.sequence
           } yield res
@@ -285,7 +281,7 @@ class DbUpdaterSpec
 
         res <- findEvent(event.eventId).asserting {
                  case None => fail("expecting some results here")
-                 case Some((executionDate, executionStatus, maybeMessage)) =>
+                 case Some(Event(executionDate, executionStatus, maybeMessage)) =>
                    executionDate.value shouldBe <=(Instant.now())
                    executionStatus     shouldBe event.newStatus
                    maybeMessage        shouldBe event.message.some
