@@ -43,6 +43,7 @@ import org.scalatest.wordspec.AsyncWordSpec
 import org.scalatest.{OptionValues, Succeeded}
 import skunk.SqlState
 
+import java.time.temporal.ChronoUnit
 import java.time.{Duration, Instant}
 
 class DbUpdaterSpec
@@ -275,7 +276,7 @@ class DbUpdaterSpec
       }
   }
 
-  private lazy val now            = Instant.now()
+  private lazy val now            = Instant.now().truncatedTo(ChronoUnit.SECONDS)
   private val deliveryInfoRemover = mock[DeliveryInfoRemover[IO]]
   private lazy val dbUpdater = {
     implicit val qet: QueriesExecutionTimes[IO] = TestQueriesExecutionTimes[IO]
@@ -304,14 +305,8 @@ class DbUpdaterSpec
       case GenerationNonRecoverableFailure | GenerationRecoverableFailure         => GeneratingTriples
       case TransformationNonRecoverableFailure | TransformationRecoverableFailure => TransformingTriples
     }
-    addEvent(project, currentStatus).map(compoundId =>
-      ToFailure(compoundId.id,
-                project.copy(id = compoundId.projectId),
-                eventMessages.generateOne,
-                newStatus,
-                executionDelay
-      )
-    )
+    addEvent(project, currentStatus)
+      .map(compoundId => ToFailure(compoundId.id, project, eventMessages.generateOne, newStatus, executionDelay))
   }
 
   private def addEvent(project: Project, status: ProcessingStatus)(implicit
