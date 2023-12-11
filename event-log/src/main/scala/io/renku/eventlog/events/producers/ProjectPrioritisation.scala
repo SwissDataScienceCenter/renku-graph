@@ -25,8 +25,8 @@ import eu.timepit.refined.api.Refined
 import eu.timepit.refined.numeric.NonNegative
 import io.renku.eventlog.events.producers.DefaultSubscribers.DefaultSubscribers
 import io.renku.eventlog.events.producers.ProjectPrioritisation._
+import io.renku.events.consumers.Project
 import io.renku.graph.model.events.EventDate
-import io.renku.graph.model.projects
 import io.renku.tinytypes.{BigDecimalTinyType, TinyTypeFactory}
 
 import java.time.Duration
@@ -69,12 +69,12 @@ private class ProjectPrioritisationImpl[F[_]: DefaultSubscribers] extends Projec
   private lazy val findPrioritiesBasedOnLatestEventDate
       : List[ProjectInfo] => List[(ProjectIds, Priority, Int Refined NonNegative)] = {
     case Nil => Nil
-    case ProjectInfo(projectId, projectSlug, _, currentOccupancy) :: Nil =>
-      List((ProjectIds(projectId, projectSlug), MaxPriority, currentOccupancy))
+    case ProjectInfo(project, _, currentOccupancy) :: Nil =>
+      List((ProjectIds(project), MaxPriority, currentOccupancy))
     case projects =>
-      val ProjectInfo(_, _, latestEventDate, _) = projects.head
-      val ProjectInfo(_, _, oldestEventDate, _) = projects.last
-      val maxDistance                           = BigDecimal(oldestEventDate.distance(from = latestEventDate))
+      val ProjectInfo(_, latestEventDate, _) = projects.head
+      val ProjectInfo(_, oldestEventDate, _) = projects.last
+      val maxDistance                        = BigDecimal(oldestEventDate.distance(from = latestEventDate))
 
       def findPriority(eventDate: EventDate): Priority = maxDistance match {
         case maxDistance if maxDistance == 0 => MaxPriority
@@ -83,8 +83,8 @@ private class ProjectPrioritisationImpl[F[_]: DefaultSubscribers] extends Projec
             BigDecimal(oldestEventDate.distance(from = eventDate).toDouble) / maxDistance
           )
       }
-      projects.map { case ProjectInfo(projectId, projectSlug, eventDate, currentOccupancy) =>
-        (ProjectIds(projectId, projectSlug), findPriority(eventDate), currentOccupancy)
+      projects.map { case ProjectInfo(project, eventDate, currentOccupancy) =>
+        (ProjectIds(project), findPriority(eventDate), currentOccupancy)
       }
   }
 
@@ -148,11 +148,7 @@ private object ProjectPrioritisation {
   def apply[F[_]: MonadThrow: DefaultSubscribers]: F[ProjectPrioritisation[F]] =
     MonadThrow[F].catchNonFatal(new ProjectPrioritisationImpl[F])
 
-  final case class ProjectInfo(id:               projects.GitLabId,
-                               slug:             projects.Slug,
-                               latestEventDate:  EventDate,
-                               currentOccupancy: Int Refined NonNegative
-  )
+  final case class ProjectInfo(project: Project, latestEventDate: EventDate, currentOccupancy: Int Refined NonNegative)
   final class Priority private (val value: BigDecimal) extends AnyVal with BigDecimalTinyType
   object Priority extends TinyTypeFactory[Priority](new Priority(_)) {
 

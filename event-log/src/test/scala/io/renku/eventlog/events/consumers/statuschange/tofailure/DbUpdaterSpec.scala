@@ -67,7 +67,7 @@ class DbUpdaterSpec
                }
 
           res <- findEvent(event.eventId).map(_.value).asserting {
-                   _ shouldBe Event(ExecutionDate(now), event.newStatus, event.message.some)
+                   _ shouldBe FoundEvent(event.eventId, ExecutionDate(now), event.newStatus, event.message.some)
                  }
         } yield res
     }
@@ -84,9 +84,10 @@ class DbUpdaterSpec
                }
 
           res <- findEvent(event.eventId).map(_.value).asserting {
-                   _ shouldBe Event(ExecutionDate(now plus event.executionDelay.value),
-                                    event.newStatus,
-                                    event.message.some
+                   _ shouldBe FoundEvent(event.eventId,
+                                         ExecutionDate(now plus event.executionDelay.value),
+                                         event.newStatus,
+                                         event.message.some
                    )
                  }
         } yield res
@@ -129,7 +130,7 @@ class DbUpdaterSpec
                  }
 
             _ <- findEvent(event.eventId).asserting {
-                   _.value.statusAndMessage shouldBe event.newStatus -> event.message.some
+                   _.value.select(Field.Status, Field.Message) shouldBe FoundEvent(event.newStatus, event.message.some)
                  }
 
             _ <- findEvent(eventToUpdate).asserting(_.value.status shouldBe TransformationRecoverableFailure)
@@ -180,7 +181,7 @@ class DbUpdaterSpec
                  }
 
             _ <- findEvent(event.eventId).asserting {
-                   _.value.statusAndMessage shouldBe event.newStatus -> event.message.some
+                   _.value.select(Field.Status, Field.Message) shouldBe FoundEvent(event.newStatus, event.message.some)
                  }
 
             _ <- findEvent(eventToUpdate).asserting(_.value.status shouldBe New)
@@ -245,7 +246,7 @@ class DbUpdaterSpec
                .asserting(_ shouldBe DBUpdateResults(project.slug, event.currentStatus -> -1, event.newStatus -> 1))
 
         res <- findEvent(event.eventId).asserting {
-                 _.value shouldBe Event(ExecutionDate(now), event.newStatus, event.message.some)
+                 _.value shouldBe FoundEvent(event.eventId, ExecutionDate(now), event.newStatus, event.message.some)
                }
       } yield res
     }
