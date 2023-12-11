@@ -24,18 +24,67 @@ import io.renku.db.DBConfigProvider.DBConfig
 import io.renku.eventlog.events.producers.eventdelivery.EventTypeId
 import io.renku.events.Subscription.{SubscriberId, SubscriberUrl}
 import io.renku.generators.Generators.Implicits._
+import io.renku.generators.Generators.timestampsNotInTheFuture
+import io.renku.graph.model.EventContentGenerators.eventMessages
+import io.renku.graph.model.EventsGenerators.{eventBodies, eventIds, eventProcessingTimes, zippedEventPayloads}
 import io.renku.graph.model.RenkuTinyTypeGenerators.projectSlugs
 import io.renku.graph.model.events.EventStatus.{AwaitingDeletion, TransformationNonRecoverableFailure, TransformationRecoverableFailure, TransformingTriples, TriplesGenerated, TriplesStore}
-import io.renku.graph.model.events.{CompoundEventId, _}
+import io.renku.graph.model.events.{CompoundEventId, EventId, EventStatus, _}
 import io.renku.graph.model.projects
 import io.renku.microservices.MicroserviceBaseUrl
 import skunk._
 import skunk.implicits._
 
 import java.time.Instant
+import scala.util.Random
 
 trait EventLogDBProvisioning {
   self: EventLogPostgresSpec with TypeSerializers =>
+
+  protected case class GeneratedEvent(eventId:         CompoundEventId,
+                                      status:          EventStatus,
+                                      maybeMessage:    Option[EventMessage],
+                                      maybePayload:    Option[ZippedEventPayload],
+                                      processingTimes: List[EventProcessingTime]
+  )
+  protected def storeGeneratedEvent(status:      EventStatus,
+                                    eventDate:   EventDate,
+                                    projectId:   projects.GitLabId,
+                                    projectSlug: projects.Slug,
+                                    message:     Option[EventMessage] = None
+  )(implicit cfg: DBConfig[EventLogDB]): IO[GeneratedEvent] = {
+    val eventId = CompoundEventId(eventIds.generateOne, projectId)
+    val maybeMessage = status match {
+      case _: EventStatus.FailureStatus => message orElse eventMessages.generateSome
+      case _ => message orElse eventMessages.generateOption
+    }
+    val maybePayload = status match {
+      case TriplesGenerated | TransformingTriples | TriplesStore => zippedEventPayloads.generateSome
+      case AwaitingDeletion                                      => zippedEventPayloads.generateOption
+      case _                                                     => zippedEventPayloads.generateNone
+    }
+
+    for {
+      _ <- storeEvent(
+             eventId,
+             status,
+             timestampsNotInTheFuture.generateAs(ExecutionDate),
+             eventDate,
+             eventBodies.generateOne,
+             projectSlug = projectSlug,
+             maybeMessage = maybeMessage,
+             maybeEventPayload = maybePayload
+           )
+      processingTimes = status match {
+                          case TriplesGenerated | TriplesStore => List(eventProcessingTimes.generateOne)
+                          case AwaitingDeletion =>
+                            if (Random.nextBoolean()) List(eventProcessingTimes.generateOne)
+                            else Nil
+                          case _ => Nil
+                        }
+      _ <- processingTimes.traverse_(upsertProcessingTime(eventId, status, _))
+    } yield GeneratedEvent(eventId, status, maybeMessage, maybePayload, processingTimes)
+  }
 
   protected def storeEvent(compoundEventId:   CompoundEventId,
                            eventStatus:       EventStatus,
@@ -141,6 +190,25 @@ trait EventLogDBProvisioning {
           }
           .getOrElse(().pure[IO])
       case _ => ().pure[IO]
+    }
+
+  protected def upsertProcessingTime(compoundEventId: CompoundEventId,
+                                     eventStatus:     EventStatus,
+                                     processingTime:  EventProcessingTime
+  )(implicit cfg: DBConfig[EventLogDB]): IO[Unit] =
+    moduleSessionResource(cfg).session.use { session =>
+      val query: Command[EventId *: projects.GitLabId *: EventStatus *: EventProcessingTime *: EmptyTuple] =
+        sql"""INSERT INTO status_processing_time (event_id, project_id, status, processing_time)
+              VALUES ($eventIdEncoder, $projectIdEncoder, $eventStatusEncoder, $eventProcessingTimeEncoder)
+              ON CONFLICT (event_id, project_id, status)
+              DO UPDATE SET processing_time = excluded.processing_time
+        """.command
+      session
+        .prepare(query)
+        .flatMap(
+          _.execute(compoundEventId.id *: compoundEventId.projectId *: eventStatus *: processingTime *: EmptyTuple)
+        )
+        .void
     }
 
   protected case class FoundDelivery(eventId: CompoundEventId, subscriberId: SubscriberId)
