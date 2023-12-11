@@ -41,8 +41,21 @@ trait EventLogDBFetching {
 
     def select(first: Field, other: Field*): FoundEvent = {
       val allFields = first :: other.toList
-      def clearOrSet[V](orig: Option[V], field: Field): Option[V] =
+      def setOrClear[V](orig: Option[V], field: Field): Option[V] =
         if (allFields contains field) orig else Option.empty[V]
+      FoundEvent(
+        setOrClear(maybeId, Field.Id),
+        setOrClear(maybeExecutionDate, Field.ExecutionDate),
+        setOrClear(maybeStatus, Field.Status),
+        setOrClear(maybeMaybeMessage, Field.Message),
+        setOrClear(maybeBatchDate, Field.BatchDate)
+      )
+    }
+
+    def unselect(first: Field, other: Field*): FoundEvent = {
+      val allFields = first :: other.toList
+      def clearOrSet[V](orig: Option[V], field: Field): Option[V] =
+        if (allFields contains field) Option.empty[V] else orig
       FoundEvent(
         clearOrSet(maybeId, Field.Id),
         clearOrSet(maybeExecutionDate, Field.ExecutionDate),
