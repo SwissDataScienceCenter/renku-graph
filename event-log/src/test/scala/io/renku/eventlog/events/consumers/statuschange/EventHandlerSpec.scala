@@ -20,130 +20,121 @@ package io.renku.eventlog.events.consumers
 package statuschange
 
 import cats.effect.IO
+import cats.effect.testing.scalatest.AsyncIOSpec
 import cats.syntax.all._
 import io.circe.syntax._
-import io.renku.eventlog.InMemoryEventLogDbSpec
+import io.renku.db.DBConfigProvider.DBConfig
 import io.renku.eventlog.api.events.StatusChangeEvent._
 import io.renku.eventlog.api.events.{StatusChangeEvent, StatusChangeGenerators}
-import io.renku.eventlog.metrics.QueriesExecutionTimes
+import io.renku.eventlog.metrics.{QueriesExecutionTimes, TestQueriesExecutionTimes}
+import io.renku.eventlog.{EventLogDB, EventLogPostgresSpec}
 import io.renku.events.EventRequestContent
 import io.renku.events.consumers.{EventSchedulingResult, ProcessExecutor}
 import io.renku.events.producers.EventSender
 import io.renku.generators.Generators.Implicits._
-import io.renku.interpreters.TestLogger
+import io.renku.interpreters.TestLogger.Level.{Error, Info}
 import io.renku.metrics.{MetricsRegistry, TestMetricsRegistry}
-import io.renku.testtools.IOSpec
-import org.scalamock.scalatest.MockFactory
+import org.scalamock.scalatest.AsyncMockFactory
 import org.scalatest.EitherValues
 import org.scalatest.matchers.should
-import org.scalatest.wordspec.AnyWordSpec
+import org.scalatest.wordspec.AsyncWordSpec
 import org.scalatestplus.scalacheck.ScalaCheckPropertyChecks
 
 class EventHandlerSpec
-    extends AnyWordSpec
-    with IOSpec
-    with InMemoryEventLogDbSpec
-    with MockFactory
+    extends AsyncWordSpec
+    with AsyncIOSpec
+    with EventLogPostgresSpec
+    with AsyncMockFactory
     with EitherValues
     with should.Matchers
     with ScalaCheckPropertyChecks {
 
-  def eventRequestContent(event: StatusChangeEvent): EventRequestContent = event match {
-    case e: StatusChangeEvent.ToTriplesGenerated =>
-      EventRequestContent.WithPayload(event.asJson, e.payload)
-    case _ => EventRequestContent.NoPayload(event.asJson)
-  }
-
   "createHandlingDefinition.decode" should {
 
-    "decode valid event data" in new TestCase {
-      val definition = handler.createHandlingDefinition()
+    "decode valid event data" in testDBResource.use { implicit cfg =>
+      val definition = handler().createHandlingDefinition()
       forAll(StatusChangeGenerators.statusChangeEvents) { event =>
         val decoded = definition.decode(eventRequestContent(event))
         decoded shouldBe Right(event)
-      }
+      }.pure[IO]
     }
 
-    "fail if no payload exist for TriplesGenerated" in new TestCase {
-      val definition = handler.createHandlingDefinition()
+    "fail if no payload exist for TriplesGenerated" in testDBResource.use { implicit cfg =>
+      val definition = handler().createHandlingDefinition()
       forAll(StatusChangeGenerators.toTriplesGeneratedEvents) { event =>
         val req = EventRequestContent(event.asJson)
         definition.decode(req).left.value.getMessage should endWith(show"Missing event payload for: $event")
-      }
+      }.pure[IO]
     }
   }
 
   "createHandlingDefinition.process" should {
-    "call to StatusChanger" in new TestCase {
-      val definition = handler.createHandlingDefinition()
-      forAll(StatusChangeGenerators.statusChangeEvents) { event =>
-        (statusChanger
-          .updateStatuses(_: DBUpdater[IO, StatusChangeEvent])(_: StatusChangeEvent))
-          .expects(*, event)
-          .returning(IO.unit)
 
-        definition.process(event).unsafeRunSync() shouldBe ()
-      }
-    }
-
-    "not log rollback events when Accepted" in new TestCase {
-      forAll(StatusChangeGenerators.rollbackEvents) { event =>
-        (statusChanger
-          .updateStatuses(_: DBUpdater[IO, StatusChangeEvent])(_: StatusChangeEvent))
-          .expects(*, event)
-          .returning(IO.unit)
-
-        handler.tryHandling(eventRequestContent(event)).unsafeRunSync()
-        logger.expectNoLogs()
-      }
-    }
-
-    "log other events when Accepted" in new TestCase {
-      forAll(StatusChangeGenerators.nonRollbackEvents) { event =>
-        (statusChanger
-          .updateStatuses(_: DBUpdater[IO, StatusChangeEvent])(_: StatusChangeEvent))
-          .expects(*, event)
-          .returning(IO.unit)
-
-        handler.tryHandling(eventRequestContent(event)).unsafeRunSync()
-        logger.logged(TestLogger.Level.Info(show"$categoryName: $event -> ${EventSchedulingResult.Accepted}"))
-        logger.reset()
-      }
-    }
-
-    "log on scheduling error" in new TestCase {
-      val error  = new Exception("fail")
-      val result = EventSchedulingResult.SchedulingError(error)
-      override val processExecutor: ProcessExecutor[IO] =
-        ProcessExecutor[IO](_ => IO.pure(result))
-
+    "call to StatusChanger" in testDBResource.use { implicit cfg =>
       val event = StatusChangeGenerators.statusChangeEvents.generateOne
-      handler.tryHandling(eventRequestContent(event)).unsafeRunSync() shouldBe result
-      logger.logged(TestLogger.Level.Error(show"$categoryName: $event -> $result", error))
+      givenStatusChanging(event, returning = IO.unit)
+
+      handler().createHandlingDefinition().process(event).assertNoException
+    }
+
+    "not log rollback events when Accepted" in testDBResource.use { implicit cfg =>
+      val event = StatusChangeGenerators.rollbackEvents.generateOne
+      givenStatusChanging(event, returning = IO.unit)
+
+      logger.resetF() >>
+        handler().tryHandling(eventRequestContent(event)).assertNoException >>
+        logger.expectNoLogsF()
+    }
+
+    "log other events when Accepted" in testDBResource.use { implicit cfg =>
+      val event = StatusChangeGenerators.nonRollbackEvents.generateOne
+      givenStatusChanging(event, returning = IO.unit)
+
+      handler().tryHandling(eventRequestContent(event)).assertNoException >>
+        logger.loggedF(Info(show"$categoryName: $event -> ${EventSchedulingResult.Accepted}"))
+    }
+
+    "log on scheduling error" in testDBResource.use { implicit cfg =>
+      val error           = new Exception("fail")
+      val result          = EventSchedulingResult.SchedulingError(error)
+      val processExecutor = ProcessExecutor[IO](_ => IO.pure(result))
+      val event           = StatusChangeGenerators.statusChangeEvents.generateOne
+
+      handler(processExecutor).tryHandling(eventRequestContent(event)).asserting(_ shouldBe result) >>
+        logger.loggedF(Error(show"$categoryName: $event -> $result", error))
     }
   }
 
   "createHandlingDefinition" should {
-    "not define onRelease and precondition" in new TestCase {
-      val definition = handler.createHandlingDefinition()
-      definition.precondition.unsafeRunSync() shouldBe None
-      definition.onRelease                    shouldBe None
+    "not define onRelease and precondition" in testDBResource.use { implicit cfg =>
+      val definition = handler().createHandlingDefinition()
+      definition.onRelease shouldBe None
+      definition.precondition.asserting(_ shouldBe None)
     }
   }
 
-  private trait TestCase {
+  private lazy val statusChanger  = mock[StatusChanger[IO]]
+  private val deliveryInfoRemover = mock[DeliveryInfoRemover[IO]]
+  private val eventsQueue         = mock[StatusChangeEventsQueue[IO]]
+  private val eventSender         = mock[EventSender[IO]]
 
-    implicit val logger:                   TestLogger[IO]            = TestLogger[IO]()
-    private implicit val metricsRegistry:  MetricsRegistry[IO]       = TestMetricsRegistry[IO]
-    private implicit val queriesExecTimes: QueriesExecutionTimes[IO] = QueriesExecutionTimes[IO]().unsafeRunSync()
-    val statusChanger               = mock[StatusChanger[IO]]
-    private val deliveryInfoRemover = mock[DeliveryInfoRemover[IO]]
-    private val eventsQueue         = mock[StatusChangeEventsQueue[IO]]
-    private val eventSender         = mock[EventSender[IO]]
+  val processExecutor: ProcessExecutor[IO] = ProcessExecutor.sequential
 
-    val processExecutor: ProcessExecutor[IO] = ProcessExecutor.sequential
+  private def handler(processExecutor: ProcessExecutor[IO] = processExecutor)(implicit cfg: DBConfig[EventLogDB]) = {
+    implicit val metricsRegistry: MetricsRegistry[IO]       = TestMetricsRegistry[IO]
+    implicit val qet:             QueriesExecutionTimes[IO] = TestQueriesExecutionTimes[IO]
+    new EventHandler[IO](processExecutor, statusChanger, eventSender, eventsQueue, deliveryInfoRemover)
+  }
 
-    lazy val handler =
-      new EventHandler[IO](processExecutor, statusChanger, eventSender, eventsQueue, deliveryInfoRemover)
+  private def givenStatusChanging(event: StatusChangeEvent, returning: IO[Unit]) =
+    (statusChanger
+      .updateStatuses(_: DBUpdater[IO, StatusChangeEvent])(_: StatusChangeEvent))
+      .expects(*, event)
+      .returning(returning)
+
+  private def eventRequestContent(event: StatusChangeEvent): EventRequestContent = event match {
+    case e: StatusChangeEvent.ToTriplesGenerated =>
+      EventRequestContent.WithPayload(event.asJson, e.payload)
+    case _ => EventRequestContent.NoPayload(event.asJson)
   }
 }

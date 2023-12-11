@@ -20,4 +20,4 @@ package io.renku.eventlog
 
 import io.renku.db.PostgresServer
 
-object EventLogPostgresServer extends PostgresServer(module = "token_repository", port = 5403)
+object EventLogPostgresServer extends PostgresServer(module = "event-log", port = 5403)
