@@ -21,7 +21,7 @@ package io.renku.eventlog
 import cats.effect.IO
 import cats.syntax.all._
 import io.renku.db.DBConfigProvider.DBConfig
-import io.renku.eventlog.events.producers.eventdelivery.EventTypeId
+import io.renku.events.Generators.subscriberIds
 import io.renku.events.Subscription.{SubscriberId, SubscriberUrl}
 import io.renku.generators.Generators.Implicits._
 import io.renku.generators.Generators.timestampsNotInTheFuture
@@ -211,38 +211,17 @@ trait EventLogDBProvisioning {
         .void
     }
 
-  protected case class FoundDelivery(eventId: CompoundEventId, subscriberId: SubscriberId)
-
-  protected def findAllEventDeliveries(implicit cfg: DBConfig[EventLogDB]): IO[List[FoundDelivery]] =
+  protected def upsertEventDelivery(eventId: CompoundEventId, deliveryId: SubscriberId = subscriberIds.generateOne)(
+      implicit cfg: DBConfig[EventLogDB]
+  ): IO[Unit] =
     moduleSessionResource(cfg).session.use { session =>
-      val query: Query[Void, FoundDelivery] =
-        sql"""SELECT event_id, project_id, delivery_id
-              FROM event_delivery WHERE event_id IS NOT NULL"""
-          .query(eventIdDecoder ~ projectIdDecoder ~ subscriberIdDecoder)
-          .map { case (eventId: EventId) ~ (projectId: projects.GitLabId) ~ (subscriberId: SubscriberId) =>
-            FoundDelivery(CompoundEventId(eventId, projectId), subscriberId)
-          }
-
-      session.execute(query)
-    }
-
-  protected case class FoundProjectDelivery(projectId:    projects.GitLabId,
-                                            subscriberId: SubscriberId,
-                                            eventTypeId:  EventTypeId
-  )
-
-  protected def findAllProjectDeliveries(implicit cfg: DBConfig[EventLogDB]): IO[List[FoundProjectDelivery]] =
-    moduleSessionResource(cfg).session.use { session =>
-      val query: Query[Void, FoundProjectDelivery] =
-        sql"""SELECT project_id, delivery_id, event_type_id
-              FROM event_delivery
-              WHERE event_id IS NULL"""
-          .query(projectIdDecoder ~ subscriberIdDecoder ~ eventTypeIdDecoder)
-          .map { case (projectId: projects.GitLabId) ~ (subscriberId: SubscriberId) ~ (eventTypeId: EventTypeId) =>
-            FoundProjectDelivery(projectId, subscriberId, eventTypeId)
-          }
-
-      session.execute(query)
+      val query: Command[EventId *: projects.GitLabId *: SubscriberId *: EmptyTuple] =
+        sql"""INSERT INTO event_delivery (event_id, project_id, delivery_id)
+              VALUES ($eventIdEncoder, $projectIdEncoder, $subscriberIdEncoder)
+              ON CONFLICT (event_id, project_id)
+              DO NOTHING
+        """.command
+      session.prepare(query).flatMap(_.execute(eventId.id *: eventId.projectId *: deliveryId *: EmptyTuple)).void
     }
 
   protected def upsertSubscriber(deliveryId: SubscriberId, deliveryUrl: SubscriberUrl, sourceUrl: MicroserviceBaseUrl)(

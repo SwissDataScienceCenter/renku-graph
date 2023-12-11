@@ -3,6 +3,8 @@ package io.renku.eventlog
 import cats.effect.IO
 import cats.syntax.all._
 import io.renku.db.DBConfigProvider.DBConfig
+import io.renku.eventlog.events.producers.eventdelivery.EventTypeId
+import io.renku.events.Subscription.SubscriberId
 import io.renku.graph.model.events._
 import io.renku.graph.model.projects
 import org.scalatest.Suite
@@ -114,5 +116,38 @@ trait EventLogDBFetching {
           FoundEvent(eventId, executionDate, status, maybeMessage)
         }
       session.prepare(query).flatMap(_.option(eventId.id *: eventId.projectId *: EmptyTuple))
+    }
+  protected case class FoundDelivery(eventId: CompoundEventId, subscriberId: SubscriberId)
+
+  protected def findAllEventDeliveries(implicit cfg: DBConfig[EventLogDB]): IO[List[FoundDelivery]] =
+    moduleSessionResource(cfg).session.use { session =>
+      val query: Query[Void, FoundDelivery] =
+        sql"""SELECT event_id, project_id, delivery_id
+              FROM event_delivery WHERE event_id IS NOT NULL"""
+          .query(eventIdDecoder ~ projectIdDecoder ~ subscriberIdDecoder)
+          .map { case (eventId: EventId) ~ (projectId: projects.GitLabId) ~ (subscriberId: SubscriberId) =>
+            FoundDelivery(CompoundEventId(eventId, projectId), subscriberId)
+          }
+
+      session.execute(query)
+    }
+
+  protected case class FoundProjectDelivery(projectId:    projects.GitLabId,
+                                            subscriberId: SubscriberId,
+                                            eventTypeId:  EventTypeId
+  )
+
+  protected def findAllProjectDeliveries(implicit cfg: DBConfig[EventLogDB]): IO[List[FoundProjectDelivery]] =
+    moduleSessionResource(cfg).session.use { session =>
+      val query: Query[Void, FoundProjectDelivery] =
+        sql"""SELECT project_id, delivery_id, event_type_id
+              FROM event_delivery
+              WHERE event_id IS NULL"""
+          .query(projectIdDecoder ~ subscriberIdDecoder ~ eventTypeIdDecoder)
+          .map { case (projectId: projects.GitLabId) ~ (subscriberId: SubscriberId) ~ (eventTypeId: EventTypeId) =>
+            FoundProjectDelivery(projectId, subscriberId, eventTypeId)
+          }
+
+      session.execute(query)
     }
 }
