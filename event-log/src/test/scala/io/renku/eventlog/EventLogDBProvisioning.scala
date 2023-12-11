@@ -21,11 +21,14 @@ package io.renku.eventlog
 import cats.effect.IO
 import cats.syntax.all._
 import io.renku.db.DBConfigProvider.DBConfig
+import io.renku.eventlog.events.producers.eventdelivery.EventTypeId
+import io.renku.events.Subscription.{SubscriberId, SubscriberUrl}
 import io.renku.generators.Generators.Implicits._
 import io.renku.graph.model.RenkuTinyTypeGenerators.projectSlugs
 import io.renku.graph.model.events.EventStatus.{AwaitingDeletion, TransformationNonRecoverableFailure, TransformationRecoverableFailure, TransformingTriples, TriplesGenerated, TriplesStore}
-import io.renku.graph.model.events._
+import io.renku.graph.model.events.{CompoundEventId, _}
 import io.renku.graph.model.projects
+import io.renku.microservices.MicroserviceBaseUrl
 import skunk._
 import skunk.implicits._
 
@@ -138,5 +141,56 @@ trait EventLogDBProvisioning {
           }
           .getOrElse(().pure[IO])
       case _ => ().pure[IO]
+    }
+
+  protected case class FoundDelivery(eventId: CompoundEventId, subscriberId: SubscriberId)
+
+  protected def findAllEventDeliveries(implicit cfg: DBConfig[EventLogDB]): IO[List[FoundDelivery]] =
+    moduleSessionResource(cfg).session.use { session =>
+      val query: Query[Void, FoundDelivery] =
+        sql"""SELECT event_id, project_id, delivery_id
+              FROM event_delivery WHERE event_id IS NOT NULL"""
+          .query(eventIdDecoder ~ projectIdDecoder ~ subscriberIdDecoder)
+          .map { case (eventId: EventId) ~ (projectId: projects.GitLabId) ~ (subscriberId: SubscriberId) =>
+            FoundDelivery(CompoundEventId(eventId, projectId), subscriberId)
+          }
+
+      session.execute(query)
+    }
+
+  protected case class FoundProjectDelivery(projectId:    projects.GitLabId,
+                                            subscriberId: SubscriberId,
+                                            eventTypeId:  EventTypeId
+  )
+
+  protected def findAllProjectDeliveries(implicit cfg: DBConfig[EventLogDB]): IO[List[FoundProjectDelivery]] =
+    moduleSessionResource(cfg).session.use { session =>
+      val query: Query[Void, FoundProjectDelivery] =
+        sql"""SELECT project_id, delivery_id, event_type_id
+              FROM event_delivery
+              WHERE event_id IS NULL"""
+          .query(projectIdDecoder ~ subscriberIdDecoder ~ eventTypeIdDecoder)
+          .map { case (projectId: projects.GitLabId) ~ (subscriberId: SubscriberId) ~ (eventTypeId: EventTypeId) =>
+            FoundProjectDelivery(projectId, subscriberId, eventTypeId)
+          }
+
+      session.execute(query)
+    }
+
+  protected def upsertSubscriber(deliveryId: SubscriberId, deliveryUrl: SubscriberUrl, sourceUrl: MicroserviceBaseUrl)(
+      implicit cfg: DBConfig[EventLogDB]
+  ): IO[Unit] =
+    moduleSessionResource(cfg).session.use { session =>
+      val query: Command[SubscriberId *: SubscriberUrl *: MicroserviceBaseUrl *: SubscriberId *: EmptyTuple] =
+        sql"""INSERT INTO subscriber (delivery_id, delivery_url, source_url)
+              VALUES ($subscriberIdEncoder, $subscriberUrlEncoder, $microserviceBaseUrlEncoder)
+              ON CONFLICT (delivery_url, source_url)
+              DO UPDATE SET delivery_id = $subscriberIdEncoder, delivery_url = EXCLUDED.delivery_url, source_url = EXCLUDED.source_url
+        """.command
+
+      session
+        .prepare(query)
+        .flatMap(_.execute(deliveryId *: deliveryUrl *: sourceUrl *: deliveryId *: EmptyTuple))
+        .void
     }
 }
