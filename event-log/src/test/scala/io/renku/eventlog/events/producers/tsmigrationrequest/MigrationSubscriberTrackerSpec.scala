@@ -193,9 +193,9 @@ class MigrationSubscriberTrackerSpec
       val query: Query[SubscriberUrl,
                        (SubscriberUrl, ServiceVersion, MigrationStatus, ChangeDate, Option[MigrationMessage])
       ] = sql"""
-         SELECT subscriber_url, subscriber_version, status, change_date, message
-         FROM ts_migration
-         WHERE subscriber_url = $subscriberUrlEncoder"""
+          SELECT subscriber_url, subscriber_version, status, change_date, message
+          FROM ts_migration
+          WHERE subscriber_url = $subscriberUrlEncoder"""
         .query(
           subscriberUrlDecoder ~ serviceVersionDecoder ~ migrationStatusDecoder ~ changeDateDecoder ~ migrationMessageDecoder.opt
         )
