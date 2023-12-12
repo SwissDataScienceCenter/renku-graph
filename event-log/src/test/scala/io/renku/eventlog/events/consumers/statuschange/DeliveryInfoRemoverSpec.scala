@@ -23,11 +23,12 @@ import cats.effect.testing.scalatest.AsyncIOSpec
 import io.renku.eventlog.EventLogPostgresSpec
 import io.renku.eventlog.metrics.{QueriesExecutionTimes, TestQueriesExecutionTimes}
 import io.renku.events.Generators.{subscriberIds, subscriberUrls}
+import io.renku.events.consumers.ConsumersModelGenerators.consumerProjects
 import io.renku.generators.CommonGraphGenerators.microserviceBaseUrls
 import io.renku.generators.Generators.Implicits._
 import io.renku.graph.model.EventContentGenerators._
 import io.renku.graph.model.EventsGenerators._
-import io.renku.graph.model.GraphModelGenerators.{projectIds, projectSlugs}
+import io.renku.graph.model.GraphModelGenerators.projectIds
 import org.scalamock.scalatest.AsyncMockFactory
 import org.scalatest.Succeeded
 import org.scalatest.matchers.should
@@ -50,12 +51,12 @@ class DeliveryInfoRemoverSpec
     "remove delivery info for the given eventId from the DB" in testDBResource.use { implicit cfg =>
       for {
         event <-
-          storeGeneratedEvent(eventStatuses.generateOne, eventDates.generateOne, projectId, projectSlugs.generateOne)
+          storeGeneratedEvent(eventStatuses.generateOne, eventDates.generateOne, consumerProjects.generateOne)
         _ <- upsertSubscriber(subscriberId, subscriberUrl, sourceUrl)
         _ <- upsertEventDelivery(event.eventId, subscriberId)
 
         otherEvent <-
-          storeGeneratedEvent(eventStatuses.generateOne, eventDates.generateOne, projectId, projectSlugs.generateOne)
+          storeGeneratedEvent(eventStatuses.generateOne, eventDates.generateOne, consumerProjects.generateOne)
         _ <- upsertEventDelivery(otherEvent.eventId, subscriberId)
 
         _ <- findAllEventDeliveries.asserting {

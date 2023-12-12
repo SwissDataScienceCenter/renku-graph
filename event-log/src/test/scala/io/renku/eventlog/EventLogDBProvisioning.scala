@@ -23,10 +23,11 @@ import cats.syntax.all._
 import io.renku.db.DBConfigProvider.DBConfig
 import io.renku.events.Generators.subscriberIds
 import io.renku.events.Subscription.{SubscriberId, SubscriberUrl}
+import io.renku.events.consumers.Project
 import io.renku.generators.Generators.Implicits._
 import io.renku.generators.Generators.timestampsNotInTheFuture
 import io.renku.graph.model.EventContentGenerators.eventMessages
-import io.renku.graph.model.EventsGenerators.{eventBodies, eventIds, eventProcessingTimes, zippedEventPayloads}
+import io.renku.graph.model.EventsGenerators.{compoundEventIds, eventBodies, eventProcessingTimes, zippedEventPayloads}
 import io.renku.graph.model.RenkuTinyTypeGenerators.projectSlugs
 import io.renku.graph.model.events.EventStatus.{AwaitingDeletion, TransformationNonRecoverableFailure, TransformationRecoverableFailure, TransformingTriples, TriplesGenerated, TriplesStore}
 import io.renku.graph.model.events.{CompoundEventId, EventId, EventStatus, _}
@@ -47,13 +48,12 @@ trait EventLogDBProvisioning {
                                       maybePayload:    Option[ZippedEventPayload],
                                       processingTimes: List[EventProcessingTime]
   )
-  protected def storeGeneratedEvent(status:      EventStatus,
-                                    eventDate:   EventDate,
-                                    projectId:   projects.GitLabId,
-                                    projectSlug: projects.Slug,
-                                    message:     Option[EventMessage] = None
+  protected def storeGeneratedEvent(status:    EventStatus,
+                                    eventDate: EventDate,
+                                    project:   Project,
+                                    message:   Option[EventMessage] = None
   )(implicit cfg: DBConfig[EventLogDB]): IO[GeneratedEvent] = {
-    val eventId = CompoundEventId(eventIds.generateOne, projectId)
+    val eventId = compoundEventIds(project.id).generateOne
     val maybeMessage = status match {
       case _: EventStatus.FailureStatus => message orElse eventMessages.generateSome
       case _ => message orElse eventMessages.generateOption
@@ -71,7 +71,7 @@ trait EventLogDBProvisioning {
              timestampsNotInTheFuture.generateAs(ExecutionDate),
              eventDate,
              eventBodies.generateOne,
-             projectSlug = projectSlug,
+             projectSlug = project.slug,
              maybeMessage = maybeMessage,
              maybeEventPayload = maybePayload
            )

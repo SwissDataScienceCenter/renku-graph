@@ -26,6 +26,7 @@ import cats.syntax.all._
 import io.renku.db.DBConfigProvider.DBConfig
 import io.renku.eventlog.metrics.{QueriesExecutionTimes, TestQueriesExecutionTimes}
 import io.renku.eventlog.{EventLogDB, EventLogPostgresSpec}
+import io.renku.events.consumers.ConsumersModelGenerators.consumerProjects
 import io.renku.generators.Generators.Implicits._
 import io.renku.generators.Generators.fixed
 import io.renku.graph.model.EventContentGenerators._
@@ -57,11 +58,7 @@ class EventsFinderSpec
     for {
       _ <- infos.traverse_(storeEventFrom)
 
-      _ <- storeGeneratedEvent(eventStatuses.generateOne,
-                               eventDates.generateOne,
-                               projectIds.generateOne,
-                               projectSlugs.generateOne
-           )
+      _ <- storeGeneratedEvent(eventStatuses.generateOne, eventDates.generateOne, consumerProjects.generateOne)
 
       _ <- eventsFinder
              .findEvents(Criteria(Filters.ProjectEvents(projectSlug, maybeStatus = None, maybeDates = None)))
