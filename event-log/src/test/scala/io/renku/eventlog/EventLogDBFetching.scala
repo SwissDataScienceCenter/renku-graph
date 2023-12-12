@@ -38,8 +38,9 @@ trait EventLogDBFetching {
                                   maybeBatchDate:     Option[BatchDate]
   ) {
 
-    lazy val id:     CompoundEventId = maybeId.getOrElse(fail("expected id on FoundEvent"))
-    lazy val status: EventStatus     = maybeStatus.getOrElse(fail("expected status on FoundEvent"))
+    lazy val id:           CompoundEventId      = maybeId.getOrElse(fail("expected id on FoundEvent"))
+    lazy val status:       EventStatus          = maybeStatus.getOrElse(fail("expected status on FoundEvent"))
+    lazy val maybeMessage: Option[EventMessage] = maybeMaybeMessage.getOrElse(fail("expected message on FoundEvent"))
 
     def select(first: Field, other: Field*): FoundEvent = {
       val allFields = first :: other.toList
@@ -117,6 +118,55 @@ trait EventLogDBFetching {
         }
       session.prepare(query).flatMap(_.option(eventId.id *: eventId.projectId *: EmptyTuple))
     }
+
+  protected case class FoundPayload(eventId: CompoundEventId, payload: ZippedEventPayload)
+
+  protected def findPayload(eventId: CompoundEventId)(implicit cfg: DBConfig[EventLogDB]): IO[Option[FoundPayload]] =
+    moduleSessionResource(cfg).session.use { session =>
+      val query: Query[EventId *: projects.GitLabId *: EmptyTuple, FoundPayload] = sql"""
+          SELECT event_id, project_id, payload
+          FROM event_payload
+          WHERE event_id = $eventIdEncoder AND project_id = $projectIdEncoder"""
+        .query(eventIdDecoder ~ projectIdDecoder ~ zippedPayloadDecoder)
+        .map { case (eventId: EventId) ~ (projectId: projects.GitLabId) ~ (payload: ZippedEventPayload) =>
+          FoundPayload(CompoundEventId(eventId, projectId), payload)
+        }
+      session.prepare(query).flatMap(_.option(eventId.id *: eventId.projectId *: EmptyTuple))
+    }
+
+  protected case class ProcessingTime(eventId: CompoundEventId, processingTime: EventProcessingTime)
+
+  protected def findProcessingTimes(
+      eventId: CompoundEventId
+  )(implicit cfg: DBConfig[EventLogDB]): IO[List[ProcessingTime]] =
+    moduleSessionResource(cfg).session.use { session =>
+      val query: Query[EventId *: projects.GitLabId *: EmptyTuple, ProcessingTime] = sql"""
+          SELECT event_id, project_id, processing_time
+          FROM status_processing_time
+          WHERE event_id = $eventIdEncoder AND project_id = $projectIdEncoder;
+        """
+        .query(eventIdDecoder ~ projectIdDecoder ~ eventProcessingTimeDecoder)
+        .map { case (eventId: EventId) ~ (projectId: projects.GitLabId) ~ (processingTime: EventProcessingTime) =>
+          ProcessingTime(CompoundEventId(eventId, projectId), processingTime)
+        }
+      session.prepare(query).flatMap(_.stream(eventId.id *: eventId.projectId *: EmptyTuple, 32).compile.toList)
+    }
+
+  protected def findProcessingTimes(
+      projectId: projects.GitLabId
+  )(implicit cfg: DBConfig[EventLogDB]): IO[List[ProcessingTime]] =
+    moduleSessionResource(cfg).session.use { session =>
+      val query: Query[projects.GitLabId, ProcessingTime] = sql"""
+          SELECT event_id, project_id, processing_time
+          FROM status_processing_time
+          WHERE project_id = $projectIdEncoder"""
+        .query(eventIdDecoder ~ projectIdDecoder ~ eventProcessingTimeDecoder)
+        .map { case (eventId: EventId) ~ (projectId: projects.GitLabId) ~ (processingTime: EventProcessingTime) =>
+          ProcessingTime(CompoundEventId(eventId, projectId), processingTime)
+        }
+      session.prepare(query).flatMap(_.stream(projectId, 32).compile.toList)
+    }
+
   protected case class FoundDelivery(eventId: CompoundEventId, subscriberId: SubscriberId)
 
   protected def findAllEventDeliveries(implicit cfg: DBConfig[EventLogDB]): IO[List[FoundDelivery]] =
