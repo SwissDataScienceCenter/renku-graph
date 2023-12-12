@@ -24,9 +24,9 @@ import cats.syntax.all._
 import io.renku.db.DBConfigProvider.DBConfig
 import io.renku.eventlog.metrics.{QueriesExecutionTimes, TestQueriesExecutionTimes}
 import io.renku.eventlog.{EventLogDB, EventLogPostgresSpec}
+import io.renku.events.consumers.ConsumersModelGenerators.consumerProjects
 import io.renku.generators.Generators.Implicits._
 import io.renku.graph.model.EventContentGenerators.eventDates
-import io.renku.graph.model.GraphModelGenerators._
 import org.scalamock.scalatest.AsyncMockFactory
 import org.scalatest.flatspec.AsyncFlatSpec
 import org.scalatest.matchers.should
@@ -38,17 +38,15 @@ class ProjectIdFinderSpec
     with AsyncMockFactory
     with should.Matchers {
 
-  private val slug = projectSlugs.generateOne
+  private val project = consumerProjects.generateOne
 
   it should "return id of the project with the given slug" in testDBResource.use { implicit cfg =>
-    val id = projectIds.generateOne
-
-    upsertProject(id, slug, eventDates.generateOne) >>
-      finder.findProjectId(slug).asserting(_ shouldBe id.some)
+    upsertProject(project, eventDates.generateOne) >>
+      finder.findProjectId(project.slug).asserting(_ shouldBe project.id.some)
   }
 
   it should "return None if project with the given slug does not exist" in testDBResource.use { implicit cfg =>
-    finder.findProjectId(slug).asserting(_ shouldBe None)
+    finder.findProjectId(project.slug).asserting(_ shouldBe None)
   }
 
   private def finder(implicit cfg: DBConfig[EventLogDB]) = {

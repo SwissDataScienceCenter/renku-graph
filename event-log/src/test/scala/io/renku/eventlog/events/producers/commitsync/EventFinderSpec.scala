@@ -25,7 +25,7 @@ import io.renku.db.DBConfigProvider.DBConfig
 import io.renku.eventlog.events.producers.SubscriptionProvisioning
 import io.renku.eventlog.metrics.{QueriesExecutionTimes, TestQueriesExecutionTimes}
 import io.renku.eventlog.{EventLogDB, EventLogPostgresSpec}
-import io.renku.events.consumers.Project
+import io.renku.events.consumers.ConsumersModelGenerators.consumerProjects
 import io.renku.generators.Generators.Implicits._
 import io.renku.generators.Generators.relativeTimestamps
 import io.renku.graph.model.EventContentGenerators._
@@ -84,20 +84,18 @@ class EventFinderSpec
       for {
         _ <- finder.popEvent().asserting(_ shouldBe None)
 
-        project1Id        = projectIds.generateOne
-        project1Slug      = projectSlugs.generateOne
+        project1          = consumerProjects.generateOne
         project1EventDate = eventDates.generateOne
-        _ <- upsertProject(project1Id, project1Slug, project1EventDate)
+        _ <- upsertProject(project1, project1EventDate)
 
-        project2Id        = projectIds.generateOne
-        project2Slug      = projectSlugs.generateOne
+        project2          = consumerProjects.generateOne
         project2EventDate = eventDates.generateOne
-        _ <- upsertProject(project2Id, project2Slug, project2EventDate)
+        _ <- upsertProject(project2, project2EventDate)
 
         _ <-
           List(
-            (Project(project1Id, project1Slug), project1EventDate),
-            (Project(project2Id, project2Slug), project2EventDate)
+            (project1, project1EventDate),
+            (project2, project2EventDate)
           ).sortBy(_._2)
             .reverse
             .map { case (project, _) => finder.popEvent().asserting(_ shouldBe Some(MinimalCommitSyncEvent(project))) }

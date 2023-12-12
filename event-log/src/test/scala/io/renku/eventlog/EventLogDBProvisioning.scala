@@ -97,7 +97,7 @@ trait EventLogDBProvisioning {
                            maybeMessage:      Option[EventMessage] = None,
                            maybeEventPayload: Option[ZippedEventPayload] = None
   )(implicit cfg: DBConfig[EventLogDB]): IO[Unit] =
-    upsertProject(compoundEventId.projectId, projectSlug, eventDate) >>
+    upsertProject(Project(compoundEventId.projectId, projectSlug), eventDate) >>
       insertEvent(compoundEventId,
                   eventStatus,
                   executionDate,
@@ -109,9 +109,7 @@ trait EventLogDBProvisioning {
       ) >>
       upsertEventPayload(compoundEventId, eventStatus, maybeEventPayload)
 
-  protected def upsertProject(projectId: projects.GitLabId, projectSlug: projects.Slug, eventDate: EventDate)(implicit
-      cfg: DBConfig[EventLogDB]
-  ): IO[Unit] =
+  protected def upsertProject(project: Project, eventDate: EventDate)(implicit cfg: DBConfig[EventLogDB]): IO[Unit] =
     moduleSessionResource(cfg).session.use { session =>
       val query: Command[projects.GitLabId *: projects.Slug *: EventDate *: EmptyTuple] = sql"""
           INSERT INTO project (project_id, project_slug, latest_event_date)
@@ -119,7 +117,7 @@ trait EventLogDBProvisioning {
           ON CONFLICT (project_id)
           DO UPDATE SET latest_event_date = excluded.latest_event_date WHERE excluded.latest_event_date > project.latest_event_date
           """.command
-      session.prepare(query).flatMap(_.execute(projectId *: projectSlug *: eventDate *: EmptyTuple)).void
+      session.prepare(query).flatMap(_.execute(project.id *: project.slug *: eventDate *: EmptyTuple)).void
     }
 
   protected def insertEvent(compoundEventId: CompoundEventId,

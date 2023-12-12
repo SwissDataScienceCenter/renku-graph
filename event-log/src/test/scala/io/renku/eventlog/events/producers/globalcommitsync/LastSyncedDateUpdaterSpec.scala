@@ -57,7 +57,7 @@ class LastSyncedDateUpdaterSpec
     val oldLastSyncedDate = lastSyncedDates.generateOne
 
     for {
-      _ <- upsertProject(project.id, project.slug, eventDates.generateOne)
+      _ <- upsertProject(project, eventDates.generateOne)
       _ <- upsertCategorySyncTime(project.id, categoryName, oldLastSyncedDate)
 
       _ <- getLastSyncedDate(project).asserting(_ shouldBe oldLastSyncedDate.some)
@@ -71,7 +71,7 @@ class LastSyncedDateUpdaterSpec
   it should "update the previous last synced date" in testDBResource.use { implicit cfg =>
     val oldLastSyncedDate = lastSyncedDates.generateOne
     for {
-      _ <- upsertProject(project.id, project.slug, eventDates.generateOne)
+      _ <- upsertProject(project, eventDates.generateOne)
       _ <- upsertCategorySyncTime(project.id, categoryName, oldLastSyncedDate)
 
       _ <- getLastSyncedDate(project).asserting(_ shouldBe oldLastSyncedDate.some)
@@ -88,7 +88,7 @@ class LastSyncedDateUpdaterSpec
     val newLastSyncedDate = lastSyncedDates.generateOne
 
     for {
-      _ <- upsertProject(project.id, project.slug, eventDates.generateOne)
+      _ <- upsertProject(project, eventDates.generateOne)
 
       _ <- updater.run(project.id, newLastSyncedDate.some).asserting(_ shouldBe Completion.Insert(1))
 
@@ -97,7 +97,7 @@ class LastSyncedDateUpdaterSpec
   }
 
   it should "do nothing if project with the given id does not exist" in testDBResource.use { implicit cfg =>
-    upsertProject(project.id, project.slug, eventDates.generateOne) >>
+    upsertProject(project, eventDates.generateOne) >>
       updater
         .run(projectIds.generateOne, lastSyncedDates.generateSome)
         .asserting(_ shouldBe Completion.Insert(0))
