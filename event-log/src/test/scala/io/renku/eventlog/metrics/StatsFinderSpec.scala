@@ -320,9 +320,9 @@ class StatsFinderSpec
 
           _ <- stats.countEvents(Set(New, GenerationRecoverableFailure)).asserting {
                  _ shouldBe events
-                   .groupBy(_.eventId.projectId)
-                   .map { case (projectId, sameProjectGroup) =>
-                     projectId -> sameProjectGroup.count { ev =>
+                   .groupBy(_.project.slug)
+                   .map { case (projectSlug, sameProjectGroup) =>
+                     projectSlug -> sameProjectGroup.count { ev =>
                        Set(New, GenerationRecoverableFailure) contains ev.status
                      }
                    }
