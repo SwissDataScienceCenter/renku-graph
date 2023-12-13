@@ -57,16 +57,20 @@ trait SubscriptionProvisioning extends EventLogDBProvisioning with SubscriptionT
       session.prepare(query).flatMap(_.option(projectId *: categoryName *: EmptyTuple))
     }
 
+  protected case class CategorySync(name: CategoryName, lastSyncedDate: LastSyncedDate)
+
   protected def findProjectCategorySyncTimes(
       projectId: projects.GitLabId
-  )(implicit cfg: DBConfig[EventLogDB]): IO[List[(CategoryName, LastSyncedDate)]] =
+  )(implicit cfg: DBConfig[EventLogDB]): IO[List[CategorySync]] =
     moduleSessionResource(cfg).session.use { session =>
-      val query: Query[projects.GitLabId, (CategoryName, LastSyncedDate)] = sql"""
+      val query: Query[projects.GitLabId, CategorySync] = sql"""
           SELECT category_name, last_synced
           FROM subscription_category_sync_time
           WHERE project_id = $projectIdEncoder"""
         .query(varchar ~ lastSyncedDateDecoder)
-        .map { case (category: String) ~ lastSynced => (CategoryName(category), lastSynced) }
+        .map { case (category: String) ~ (lastSynced: LastSyncedDate) =>
+          CategorySync(CategoryName(category), lastSynced)
+        }
       session.prepare(query).flatMap(_.stream(projectId, 32).compile.toList)
     }
 }

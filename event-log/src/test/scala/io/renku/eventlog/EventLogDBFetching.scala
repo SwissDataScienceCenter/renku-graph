@@ -5,6 +5,7 @@ import cats.syntax.all._
 import io.renku.db.DBConfigProvider.DBConfig
 import io.renku.eventlog.events.producers.eventdelivery.EventTypeId
 import io.renku.events.Subscription.SubscriberId
+import io.renku.events.consumers.Project
 import io.renku.graph.model.events._
 import io.renku.graph.model.projects
 import org.scalatest.Suite
@@ -199,5 +200,49 @@ trait EventLogDBFetching {
           }
 
       session.execute(query)
+    }
+
+  protected case class FoundProject(project: Project, eventDate: EventDate)
+
+  protected def findProjects(implicit cfg: DBConfig[EventLogDB]): IO[List[FoundProject]] =
+    moduleSessionResource(cfg).session.use { session =>
+      val query: Query[Void, FoundProject] =
+        sql"""SELECT * FROM project"""
+          .query(projectIdDecoder ~ projectSlugDecoder ~ eventDateDecoder)
+          .map { case (projectId: projects.GitLabId) ~ (projectSlug: projects.Slug) ~ (eventDate: EventDate) =>
+            FoundProject(Project(projectId, projectSlug), eventDate)
+          }
+      session.execute(query)
+    }
+
+  protected def findAllProjectEvents(
+      projectId: projects.GitLabId
+  )(implicit cfg: DBConfig[EventLogDB]): IO[List[CompoundEventId]] =
+    moduleSessionResource(cfg).session.use { session =>
+      val query: Query[projects.GitLabId, CompoundEventId] = sql"""
+          SELECT event_id, project_id
+          FROM event
+          WHERE project_id = $projectIdEncoder
+          ORDER BY event_date"""
+        .query(eventIdDecoder ~ projectIdDecoder)
+        .map { case eventId ~ projectId => CompoundEventId(eventId, projectId) }
+      session.prepare(query).flatMap(_.stream(projectId, 32).compile.toList)
+    }
+
+  protected case class FoundProjectPayload(eventId: CompoundEventId, payload: ZippedEventPayload)
+
+  protected def findAllProjectPayloads(
+      projectId: projects.GitLabId
+  )(implicit cfg: DBConfig[EventLogDB]): IO[List[FoundProjectPayload]] =
+    moduleSessionResource(cfg).session.use { session =>
+      val query: Query[projects.GitLabId, FoundProjectPayload] = sql"""
+            SELECT event_id, project_id, payload
+            FROM event_payload
+            WHERE project_id = $projectIdEncoder"""
+        .query(eventIdDecoder ~ projectIdDecoder ~ zippedPayloadDecoder)
+        .map { case (eventId: EventId) ~ (projectId: projects.GitLabId) ~ (eventPayload: ZippedEventPayload) =>
+          FoundProjectPayload(CompoundEventId(eventId, projectId), eventPayload)
+        }
+      session.prepare(query).flatMap(_.stream(projectId, 32).compile.toList)
     }
 }

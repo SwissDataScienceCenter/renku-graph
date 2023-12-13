@@ -20,10 +20,12 @@ package io.renku.eventlog
 
 import cats.effect.IO
 import cats.syntax.all._
+import io.circe.Json
 import io.renku.db.DBConfigProvider.DBConfig
-import io.renku.events.Generators.subscriberIds
+import io.renku.events.Generators.{subscriberIds, subscriberUrls}
 import io.renku.events.Subscription.{SubscriberId, SubscriberUrl}
 import io.renku.events.consumers.Project
+import io.renku.generators.CommonGraphGenerators.microserviceBaseUrls
 import io.renku.generators.Generators.Implicits._
 import io.renku.generators.Generators.timestampsNotInTheFuture
 import io.renku.graph.model.EventContentGenerators.eventMessages
@@ -34,9 +36,10 @@ import io.renku.graph.model.events.{CompoundEventId, EventId, EventStatus, _}
 import io.renku.graph.model.projects
 import io.renku.microservices.MicroserviceBaseUrl
 import skunk._
+import skunk.codec.all.{text, timestamptz, varchar}
 import skunk.implicits._
 
-import java.time.Instant
+import java.time.{Instant, OffsetDateTime}
 import scala.util.Random
 
 trait EventLogDBProvisioning {
@@ -44,14 +47,17 @@ trait EventLogDBProvisioning {
 
   protected case class GeneratedEvent(eventId:         CompoundEventId,
                                       status:          EventStatus,
+                                      eventDate:       EventDate,
+                                      project:         Project,
                                       maybeMessage:    Option[EventMessage],
                                       maybePayload:    Option[ZippedEventPayload],
                                       processingTimes: List[EventProcessingTime]
   )
-  protected def storeGeneratedEvent(status:    EventStatus,
-                                    eventDate: EventDate,
-                                    project:   Project,
-                                    message:   Option[EventMessage] = None
+  protected def storeGeneratedEvent(status:        EventStatus,
+                                    eventDate:     EventDate,
+                                    project:       Project,
+                                    executionDate: ExecutionDate = timestampsNotInTheFuture.generateAs(ExecutionDate),
+                                    message:       Option[EventMessage] = None
   )(implicit cfg: DBConfig[EventLogDB]): IO[GeneratedEvent] = {
     val eventId = compoundEventIds(project.id).generateOne
     val maybeMessage = status match {
@@ -65,15 +71,14 @@ trait EventLogDBProvisioning {
     }
 
     for {
-      _ <- storeEvent(
-             eventId,
-             status,
-             timestampsNotInTheFuture.generateAs(ExecutionDate),
-             eventDate,
-             eventBodies.generateOne,
-             projectSlug = project.slug,
-             maybeMessage = maybeMessage,
-             maybeEventPayload = maybePayload
+      _ <- storeEvent(eventId,
+                      status,
+                      executionDate,
+                      eventDate,
+                      eventBodies.generateOne,
+                      projectSlug = project.slug,
+                      maybeMessage = maybeMessage,
+                      maybeEventPayload = maybePayload
            )
       processingTimes = status match {
                           case TriplesGenerated | TriplesStore => List(eventProcessingTimes.generateOne)
@@ -83,7 +88,7 @@ trait EventLogDBProvisioning {
                           case _ => Nil
                         }
       _ <- processingTimes.traverse_(upsertProcessingTime(eventId, status, _))
-    } yield GeneratedEvent(eventId, status, maybeMessage, maybePayload, processingTimes)
+    } yield GeneratedEvent(eventId, status, eventDate, project, maybeMessage, maybePayload, processingTimes)
   }
 
   protected def storeEvent(compoundEventId:   CompoundEventId,
@@ -209,6 +214,15 @@ trait EventLogDBProvisioning {
         .void
     }
 
+  protected def upsertEventDeliveryInfo(
+      eventId:     CompoundEventId,
+      deliveryId:  SubscriberId = subscriberIds.generateOne,
+      deliveryUrl: SubscriberUrl = subscriberUrls.generateOne,
+      sourceUrl:   MicroserviceBaseUrl = microserviceBaseUrls.generateOne
+  )(implicit cfg: DBConfig[EventLogDB]): IO[Unit] =
+    upsertSubscriber(deliveryId, deliveryUrl, sourceUrl) >>
+      upsertEventDelivery(eventId, deliveryId)
+
   protected def upsertEventDelivery(eventId: CompoundEventId, deliveryId: SubscriberId = subscriberIds.generateOne)(
       implicit cfg: DBConfig[EventLogDB]
   ): IO[Unit] =
@@ -236,6 +250,17 @@ trait EventLogDBProvisioning {
       session
         .prepare(query)
         .flatMap(_.execute(deliveryId *: deliveryUrl *: sourceUrl *: deliveryId *: EmptyTuple))
+        .void
+    }
+
+  def insertEventIntoEventsQueue(eventType: String, payload: Json)(implicit cfg: DBConfig[EventLogDB]): IO[Unit] =
+    moduleSessionResource(cfg).session.use { session =>
+      val query: Command[OffsetDateTime *: String *: String *: EmptyTuple] =
+        sql"""INSERT INTO status_change_events_queue (date, event_type, payload)
+              VALUES ($timestamptz, $varchar, $text)""".command
+      session
+        .prepare(query)
+        .flatMap(_.execute(OffsetDateTime.now() *: eventType *: payload.noSpaces *: EmptyTuple))
         .void
     }
 }
