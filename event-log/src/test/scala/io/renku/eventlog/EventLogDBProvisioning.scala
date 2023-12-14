@@ -28,7 +28,7 @@ import io.renku.events.consumers.Project
 import io.renku.generators.CommonGraphGenerators.microserviceBaseUrls
 import io.renku.generators.Generators.Implicits._
 import io.renku.generators.Generators.timestampsNotInTheFuture
-import io.renku.graph.model.EventContentGenerators.eventMessages
+import io.renku.graph.model.EventContentGenerators.{eventDates, eventMessages}
 import io.renku.graph.model.EventsGenerators.{compoundEventIds, eventBodies, eventProcessingTimes, zippedEventPayloads}
 import io.renku.graph.model.RenkuTinyTypeGenerators.projectSlugs
 import io.renku.graph.model.events.EventStatus.{AwaitingDeletion, TransformationNonRecoverableFailure, TransformationRecoverableFailure, TransformingTriples, TriplesGenerated, TriplesStore}
@@ -114,7 +114,9 @@ trait EventLogDBProvisioning {
       ) >>
       upsertEventPayload(compoundEventId, eventStatus, maybeEventPayload)
 
-  protected def upsertProject(project: Project, eventDate: EventDate)(implicit cfg: DBConfig[EventLogDB]): IO[Unit] =
+  protected def upsertProject(project: Project, eventDate: EventDate = eventDates.generateOne)(implicit
+      cfg: DBConfig[EventLogDB]
+  ): IO[Unit] =
     moduleSessionResource(cfg).session.use { session =>
       val query: Command[projects.GitLabId *: projects.Slug *: EventDate *: EmptyTuple] = sql"""
           INSERT INTO project (project_id, project_slug, latest_event_date)
