@@ -60,13 +60,7 @@ class StatusChangerSpec
   "updateStatuses" should {
 
     "succeeds if db update completes" in testDBResource.use { implicit cfg =>
-      val event = Gen
-        .oneOf(
-          StatusChangeGenerators.toTriplesGeneratedEvents,
-          StatusChangeGenerators.toTripleStoreEvents,
-          StatusChangeGenerators.rollbackToNewEvents
-        )
-        .generateOne
+      val event = eventsGen.generateOne
 
       val dbUpdater: DBUpdater[IO, StatusChangeEvent] = mock[DBUpdater[IO, StatusChangeEvent]]
       val updateResults = updateResultsGen(event).generateOne
@@ -80,13 +74,7 @@ class StatusChangerSpec
 
     "rollbacks, run the updater's onRollback and fail if the updater doesn't handle the exception" in testDBResource
       .use { implicit cfg =>
-        val event: StatusChangeEvent = Gen
-          .oneOf(
-            StatusChangeGenerators.toTriplesGeneratedEvents,
-            StatusChangeGenerators.toTripleStoreEvents,
-            StatusChangeGenerators.rollbackToNewEvents
-          )
-          .generateOne
+        val event: StatusChangeEvent = eventsGen.generateOne
 
         val exception = exceptions.generateOne
         val dbUpdater: DBUpdater[IO, StatusChangeEvent] = mock[DBUpdater[IO, StatusChangeEvent]]
@@ -133,13 +121,8 @@ class StatusChangerSpec
     }
 
     "succeed if updating the gauge fails" in testDBResource.use { implicit cfg =>
-      val event: StatusChangeEvent = Gen
-        .oneOf(
-          StatusChangeGenerators.toTriplesGeneratedEvents,
-          StatusChangeGenerators.toTripleStoreEvents,
-          StatusChangeGenerators.rollbackToNewEvents
-        )
-        .generateOne
+      val event: StatusChangeEvent = eventsGen.generateOne
+
       val updateResults = updateResultsGen(event).generateOne
       val dbUpdater: DBUpdater[IO, StatusChangeEvent] = mock[DBUpdater[IO, StatusChangeEvent]]
       (dbUpdater.updateDB _).expects(event).returning(Kleisli.pure(updateResults))
@@ -244,4 +227,10 @@ class StatusChangerSpec
     statuses <- eventStatuses.toGeneratorOfSet()
     counts   <- statuses.toList.map(s => nonNegativeInts().map(count => s -> count.value)).sequence
   } yield DBUpdateResults.ForProjects(forProject, counts.toMap)
+
+  private lazy val eventsGen = Gen.oneOf(
+    StatusChangeGenerators.toTriplesGeneratedEvents,
+    StatusChangeGenerators.toTripleStoreEvents,
+    StatusChangeGenerators.rollbackToNewEvents
+  )
 }
