@@ -22,6 +22,8 @@ import cats.effect.IO
 import io.renku.db.DBConfigProvider.DBConfig
 import io.renku.eventlog.{EventLogDB, EventLogDBProvisioning, EventLogPostgresSpec}
 import io.renku.events.CategoryName
+import io.renku.generators.Generators.Implicits._
+import io.renku.graph.model.EventsGenerators.lastSyncedDates
 import io.renku.graph.model.events.LastSyncedDate
 import io.renku.graph.model.projects
 import skunk._
@@ -33,7 +35,7 @@ trait SubscriptionProvisioning extends EventLogDBProvisioning with SubscriptionT
 
   protected def upsertCategorySyncTime(projectId:    projects.GitLabId,
                                        categoryName: CategoryName,
-                                       lastSynced:   LastSyncedDate
+                                       lastSynced:   LastSyncedDate = lastSyncedDates.generateOne
   )(implicit cfg: DBConfig[EventLogDB]): IO[Unit] =
     moduleSessionResource(cfg).session.use { session =>
       val query: Command[projects.GitLabId *: CategoryName *: LastSyncedDate *: EmptyTuple] = sql"""

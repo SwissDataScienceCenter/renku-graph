@@ -22,247 +22,210 @@ package projecteventstonew
 import SkunkExceptionsGenerators._
 import cats.data.Kleisli
 import cats.effect.IO
+import cats.effect.testing.scalatest.AsyncIOSpec
 import cats.syntax.all._
+import io.renku.db.DBConfigProvider.DBConfig
 import io.renku.eventlog.api.events.StatusChangeEvent.ProjectEventsToNew
 import io.renku.eventlog.events.consumers.statuschange.DBUpdateResults
 import io.renku.eventlog.events.consumers.statuschange.projecteventstonew.cleaning.ProjectCleaner
-import io.renku.eventlog.events.producers.{SubscriptionDataProvisioning, minprojectinfo}
-import io.renku.eventlog.metrics.QueriesExecutionTimes
-import io.renku.eventlog.{InMemoryEventLogDbSpec, TypeSerializers}
-import io.renku.events.CategoryName
+import io.renku.eventlog.events.producers.{SubscriptionProvisioning, minprojectinfo}
+import io.renku.eventlog.metrics.{QueriesExecutionTimes, TestQueriesExecutionTimes}
+import io.renku.eventlog.{EventLogDB, EventLogPostgresSpec}
 import io.renku.events.Generators.{categoryNames, subscriberIds, subscriberUrls}
 import io.renku.events.consumers.ConsumersModelGenerators.consumerProjects
 import io.renku.events.consumers.Project
 import io.renku.generators.CommonGraphGenerators.microserviceBaseUrls
 import io.renku.generators.Generators.Implicits._
-import io.renku.generators.Generators.{exceptions, timestamps, timestampsNotInTheFuture}
-import io.renku.graph.model.EventContentGenerators.eventMessages
-import io.renku.graph.model.EventsGenerators.{compoundEventIds, eventBodies, eventProcessingTimes, lastSyncedDates, zippedEventPayloads}
+import io.renku.generators.Generators.{exceptions, timestampsNotInTheFuture}
 import io.renku.graph.model.events.EventStatus._
 import io.renku.graph.model.events._
-import io.renku.interpreters.TestLogger
 import io.renku.interpreters.TestLogger.Level.Error
-import io.renku.metrics.TestMetricsRegistry
-import io.renku.testtools.IOSpec
 import org.scalacheck.Gen
-import org.scalamock.scalatest.MockFactory
+import org.scalamock.scalatest.AsyncMockFactory
+import org.scalatest.Succeeded
 import org.scalatest.matchers.should
-import org.scalatest.prop.TableDrivenPropertyChecks
-import org.scalatest.wordspec.AnyWordSpec
+import org.scalatest.wordspec.AsyncWordSpec
 import skunk.SqlState.{DeadlockDetected, ForeignKeyViolation}
 
 import java.time.Instant
-import scala.util.Random
 
 class DequeuedEventHandlerSpec
-    extends AnyWordSpec
-    with IOSpec
-    with InMemoryEventLogDbSpec
-    with SubscriptionDataProvisioning
-    with TypeSerializers
-    with should.Matchers
-    with MockFactory
-    with TableDrivenPropertyChecks {
+    extends AsyncWordSpec
+    with AsyncIOSpec
+    with EventLogPostgresSpec
+    with AsyncMockFactory
+    with SubscriptionProvisioning
+    with should.Matchers {
 
   "updateDB" should {
 
     "change the status of all events of a specific project to NEW " +
-      "except SKIPPED and GENERATING_TRIPLES (if delivered)" in new TestCase {
-
+      "except SKIPPED and GENERATING_TRIPLES (if delivered)" in testDBResource.use { implicit cfg =>
         val project = consumerProjects.generateOne
         val eventsStatuses = Gen
           .oneOf(EventStatus.all diff Set(Skipped, GeneratingTriples, AwaitingDeletion, Deleting))
           .generateList(min = 2)
 
-        val eventsAndDates = eventsStatuses.map { status =>
-          val eventDate = timestampsNotInTheFuture.generateAs(EventDate)
-          val id        = addEvent(status, project, eventDate)
-          upsertEventDelivery(id, subscriberId)
-          id -> eventDate
-        }
+        for {
+          _ <- upsertSubscriber(subscriberId, subscriberUrl, sourceUrl)
 
-        val events = eventsAndDates.map(_._1)
+          eventsAndDates <- eventsStatuses.map { status =>
+                              for {
+                                event <- addEvent(status, project)
+                                _     <- upsertEventDelivery(event.eventId, subscriberId)
+                              } yield event.eventId -> event.eventDate
+                            }.sequence
+          events = eventsAndDates.map(_._1)
 
-        val skippedEventDate           = timestampsNotInTheFuture.generateAs(EventDate)
-        val skippedEvent               = addEvent(Skipped, project, skippedEventDate)
-        val awaitingDeletionEventDate  = timestampsNotInTheFuture.generateAs(EventDate)
-        val awaitingDeletionEvent      = addEvent(AwaitingDeletion, project, awaitingDeletionEventDate)
-        val deletingEvent              = addEvent(Deleting, project)
-        val generatingTriplesEventDate = timestampsNotInTheFuture.generateAs(EventDate)
-        val generatingTriplesEvent     = addEvent(GeneratingTriples, project, generatingTriplesEventDate)
-        upsertEventDelivery(generatingTriplesEvent, subscriberId)
+          skippedEventDate = timestampsNotInTheFuture.generateAs(EventDate)
+          skippedEvent <- addEvent(Skipped, project, skippedEventDate)
+          awaitingDeletionEventDate = timestampsNotInTheFuture.generateAs(EventDate)
+          awaitingDeletionEvent <- addEvent(AwaitingDeletion, project, awaitingDeletionEventDate)
+          deletingEvent         <- addEvent(Deleting, project)
+          generatingTriplesEventDate = timestampsNotInTheFuture.generateAs(EventDate)
+          generatingTriplesEvent <- addEvent(GeneratingTriples, project, generatingTriplesEventDate)
+          _                      <- upsertEventDelivery(generatingTriplesEvent.eventId, subscriberId)
 
-        val otherProject      = consumerProjects.generateOne
-        val eventStatus       = Gen.oneOf(EventStatus.all.diff(Set(Skipped, AwaitingDeletion))).generateOne
-        val otherProjectEvent = addEvent(eventStatus, otherProject)
-        upsertEventDelivery(otherProjectEvent, subscriberId)
+          otherProject = consumerProjects.generateOne
+          eventStatus  = Gen.oneOf(EventStatus.all.diff(Set(Skipped, AwaitingDeletion))).generateOne
+          otherProjectEvent <- addEvent(eventStatus, otherProject)
+          _                 <- upsertEventDelivery(otherProjectEvent.eventId, subscriberId)
 
-        upsertCategorySyncTime(project.id, minprojectinfo.categoryName, lastSyncedDates.generateOne)
-        val otherCategoryName: CategoryName = categoryNames.generateOne
-        upsertCategorySyncTime(project.id, otherCategoryName, lastSyncedDates.generateOne)
+          _ <- upsertCategorySyncTime(project.id, minprojectinfo.categoryName)
+          otherCategoryName = categoryNames.generateOne
+          _ <- upsertCategorySyncTime(project.id, otherCategoryName)
 
-        val counts: Map[EventStatus, Int] = eventsStatuses
-          .groupBy(identity)
-          .map { case (eventStatus, statuses) => (eventStatus, -1 * statuses.length) }
-          .updatedWith(EventStatus.New)(_.map(_ + events.size).orElse(Some(events.size)))
-          .updated(AwaitingDeletion, -1)
-          .updated(Deleting, -1)
+          counts: Map[EventStatus, Int] =
+            eventsStatuses
+              .groupBy(identity)
+              .map { case (eventStatus, statuses) => (eventStatus, -1 * statuses.length) }
+              .updatedWith(EventStatus.New)(_.map(_ + events.size).orElse(Some(events.size)))
+              .updated(AwaitingDeletion, -1)
+              .updated(Deleting, -1)
 
-        sessionResource
-          .useK(dbUpdater updateDB ProjectEventsToNew(project))
-          .unsafeRunSync() shouldBe DBUpdateResults.ForProjects(project.slug, counts)
+          _ <- moduleSessionResource.session
+                 .useKleisli(dbUpdater updateDB ProjectEventsToNew(project))
+                 .asserting(_ shouldBe DBUpdateResults.ForProjects(project.slug, counts))
 
-        events.flatMap(findFullEvent) shouldBe events.map { eventId =>
-          (eventId.id, EventStatus.New, None, None, Nil)
-        }
+          _ <- events
+                 .map(findFullEvent)
+                 .sequence
+                 .asserting(_ shouldBe events.map(eventId => (eventId.id, EventStatus.New, None, None, Nil).some))
 
-        findEvent(skippedEvent).map(_._2)           shouldBe Some(Skipped)
-        findEvent(awaitingDeletionEvent).map(_._2)  shouldBe None
-        findEvent(deletingEvent).map(_._2)          shouldBe None
-        findEvent(generatingTriplesEvent).map(_._2) shouldBe Some(GeneratingTriples)
-        findAllEventDeliveries should contain theSameElementsAs List(otherProjectEvent -> subscriberId,
-                                                                     generatingTriplesEvent -> subscriberId
-        )
-        findProjectCategorySyncTimes(project.id).map(_._1) shouldBe List(otherCategoryName)
+          _ <- findEvent(skippedEvent.eventId).asserting(_.map(_.status) shouldBe Some(Skipped))
+          _ <- findEvent(awaitingDeletionEvent.eventId).asserting(_.map(_.status) shouldBe None)
+          _ <- findEvent(deletingEvent.eventId).asserting(_.map(_.status) shouldBe None)
+          _ <- findEvent(generatingTriplesEvent.eventId).asserting(_.map(_.status) shouldBe Some(GeneratingTriples))
+          _ <- findAllEventDeliveries.asserting(
+                 _ should contain theSameElementsAs List(FoundDelivery(otherProjectEvent, subscriberId),
+                                                         FoundDelivery(generatingTriplesEvent, subscriberId)
+                 )
+               )
+          _ <- findProjectCategorySyncTimes(project.id).asserting(_.map(_.name) shouldBe List(otherCategoryName))
 
-        val latestEventDate = (skippedEventDate :: generatingTriplesEventDate :: eventsAndDates.map(_._2)).max
+          latestEventDate = (skippedEventDate :: generatingTriplesEventDate :: eventsAndDates.map(_._2)).max
 
-        findProjects.find(_._1 == project.id).map(_._3) shouldBe Some(latestEventDate)
+          _ <- findProjects
+                 .asserting(_.find(_.project.id == project.id).map(_.eventDate) shouldBe Some(latestEventDate))
 
-        findEvent(otherProjectEvent).map(_._2) shouldBe Some(eventStatus)
+          _ <- findEvent(otherProjectEvent.eventId).asserting(_.map(_.status) shouldBe Some(eventStatus))
+        } yield Succeeded
       }
 
     "change the status of all events of a specific project to NEW except SKIPPED events " +
-      "- case when there are no events left in the project" in new TestCase {
-
+      "- case when there are no events left in the project" in testDBResource.use { implicit cfg =>
         val project = consumerProjects.generateOne
 
-        val event1 = addEvent(Deleting, project)
-        val event2 = addEvent(Deleting, project)
+        for {
+          event1 <- addEvent(Deleting, project)
+          event2 <- addEvent(Deleting, project)
 
-        upsertCategorySyncTime(project.id, categoryNames.generateOne, lastSyncedDates.generateOne)
+          _ <- upsertCategorySyncTime(project.id, categoryNames.generateOne)
 
-        (projectCleaner.cleanUp _).expects(project).returns(Kleisli.pure(()))
+          _ = givenProjectCleaning(project, returning = ().pure[IO])
 
-        sessionResource
-          .useK(dbUpdater.updateDB(ProjectEventsToNew(project)))
-          .unsafeRunSync() shouldBe DBUpdateResults.ForProjects(project.slug,
-                                                                Map(AwaitingDeletion -> 0, Deleting -> -2)
-        )
+          _ <- moduleSessionResource(cfg).session
+                 .useKleisli(dbUpdater.updateDB(ProjectEventsToNew(project)))
+                 .asserting(_ shouldBe DBUpdateResults(project.slug, AwaitingDeletion -> 0, Deleting -> -2))
 
-        findEvent(event1) shouldBe None
-        findEvent(event2) shouldBe None
+          _ <- findEvent(event1.eventId).asserting(_ shouldBe None)
+          _ <- findEvent(event2.eventId).asserting(_ shouldBe None)
+        } yield Succeeded
       }
 
-    "fail if the cleaning the project fails" in new TestCase {
-
+    "fail if the cleaning the project fails" in testDBResource.use { implicit cfg =>
       val project = consumerProjects.generateOne
 
-      addEvent(Deleting, project)
-      addEvent(Deleting, project)
+      for {
+        _ <- addEvent(Deleting, project)
+        _ <- addEvent(Deleting, project)
+        exception = exceptions.generateOne
+        _         = givenProjectCleaning(project, returning = exception.raiseError[IO, Unit])
 
-      val exception = exceptions.generateOne
-      (projectCleaner.cleanUp _)
-        .expects(project)
-        .returning(Kleisli.liftF(exception.raiseError[IO, Unit]))
+        _ <- logger.resetF()
 
-      intercept[Exception](
-        sessionResource
-          .useK(dbUpdater.updateDB(ProjectEventsToNew(project)))
-          .unsafeRunSync()
-      ) shouldBe exception
+        _ <- moduleSessionResource(cfg).session
+               .useKleisli(dbUpdater.updateDB(ProjectEventsToNew(project)))
+               .assertThrowsError[Exception](_ shouldBe exception)
 
-      logger.loggedOnly(Error(show"$categoryName: project clean up failed: ${project.show}; will retry", exception))
+        _ <- logger.loggedOnlyF(
+               Error(show"$categoryName: project clean up failed: ${project.show}; will retry", exception)
+             )
+      } yield Succeeded
     }
   }
 
   "onRollback" should {
 
-    forAll(
-      Table(
-        "failure name"        -> "failure",
-        "Deadlock"            -> postgresErrors(DeadlockDetected).generateOne,
-        "ForeignKeyViolation" -> postgresErrors(ForeignKeyViolation).generateOne
-      )
-    ) { (failureName, failure) =>
-      s"run the updateDB on $failureName" in new TestCase {
+    s"run the updateDB on db failure" in testDBResource.use { implicit cfg =>
+      List(postgresErrors(DeadlockDetected).generateOne, postgresErrors(ForeignKeyViolation).generateOne)
+        .traverse_ { failure =>
+          val project = consumerProjects.generateOne
+          for {
+            event <- addEvent(Deleting, project)
 
-        val project = consumerProjects.generateOne
+            _ <- upsertCategorySyncTime(project.id, categoryNames.generateOne)
 
-        val event = addEvent(Deleting, project)
+            _ = givenProjectCleaning(project, returning = ().pure[IO])
 
-        upsertCategorySyncTime(project.id, categoryNames.generateOne, lastSyncedDates.generateOne)
+            _ <- (dbUpdater onRollback ProjectEventsToNew(project))
+                   .apply(failure)
+                   .asserting(_ shouldBe DBUpdateResults(project.slug, AwaitingDeletion -> 0, Deleting -> -1))
 
-        (projectCleaner.cleanUp _).expects(project).returns(Kleisli.pure(()))
-
-        (dbUpdater onRollback ProjectEventsToNew(project)).apply(failure).unsafeRunSync() shouldBe
-          DBUpdateResults.ForProjects(project.slug, Map(AwaitingDeletion -> 0, Deleting -> -1))
-
-        findEvent(event) shouldBe None
-      }
+            _ <- findEvent(event.eventId).asserting(_ shouldBe None)
+          } yield Succeeded
+        }
     }
   }
 
   private def addEvent(status:    EventStatus,
                        project:   Project = consumerProjects.generateOne,
                        eventDate: EventDate = timestampsNotInTheFuture.generateAs(EventDate)
-  ): CompoundEventId = {
-    val eventId = compoundEventIds.generateOne.copy(projectId = project.id)
-    storeEvent(
-      eventId,
-      status,
-      timestamps.generateAs(ExecutionDate),
-      eventDate,
-      eventBodies.generateOne,
-      maybeMessage = status match {
-        case _: FailureStatus => eventMessages.generateSome
-        case _ => eventMessages.generateOption
-      },
-      maybeEventPayload = status match {
-        case TriplesStore | TriplesGenerated => zippedEventPayloads.generateSome
-        case AwaitingDeletion                => zippedEventPayloads.generateOption
-        case _                               => zippedEventPayloads.generateNone
-      },
-      projectSlug = project.slug
-    )
+  )(implicit cfg: DBConfig[EventLogDB]) =
+    storeGeneratedEvent(status, eventDate, project)
 
-    status match {
-      case TriplesGenerated | TriplesStore =>
-        upsertProcessingTime(eventId, status, eventProcessingTimes.generateOne)
-      case AwaitingDeletion =>
-        if (Random.nextBoolean())
-          upsertProcessingTime(eventId, status, eventProcessingTimes.generateOne)
-        else ()
-      case _ => ()
+  private def findFullEvent(eventId: CompoundEventId)(implicit cfg: DBConfig[EventLogDB]) =
+    for {
+      maybeEvent     <- findEvent(eventId)
+      maybePayload   <- findPayload(eventId)
+      processingTime <- findProcessingTimes(eventId)
+    } yield maybeEvent.map { fe =>
+      (eventId.id, fe.status, fe.maybeMessage, maybePayload.map(_.payload), processingTime.map(_.processingTime))
     }
 
-    eventId
+  private lazy val now          = Instant.now()
+  private lazy val subscriberId = subscriberIds.generateOne
+  private val sourceUrl         = microserviceBaseUrls.generateOne
+  private val subscriberUrl     = subscriberUrls.generateOne
+
+  private lazy val projectCleaner = mock[ProjectCleaner[IO]]
+  private def dbUpdater(implicit cfg: DBConfig[EventLogDB]) = {
+    implicit val qet: QueriesExecutionTimes[IO] = TestQueriesExecutionTimes[IO]
+    new DequeuedEventHandler.DequeuedEventHandlerImpl[IO](projectCleaner, () => now)
   }
 
-  private def findFullEvent(eventId: CompoundEventId) = {
-    val maybeEvent     = findEvent(eventId)
-    val maybePayload   = findPayload(eventId).map(_._2)
-    val processingTime = findProcessingTime(eventId)
-    maybeEvent.map { case (_, status, maybeMessage) =>
-      (eventId.id, status, maybeMessage, maybePayload, processingTime.map(_._2))
-    }
-  }
-
-  private trait TestCase {
-
-    private val currentTime = mockFunction[Instant]
-    private val now         = Instant.now()
-    currentTime.expects().returning(now).anyNumberOfTimes()
-
-    val subscriberId          = subscriberIds.generateOne
-    private val sourceUrl     = microserviceBaseUrls.generateOne
-    private val subscriberUrl = subscriberUrls.generateOne
-    upsertSubscriber(subscriberId, subscriberUrl, sourceUrl)
-
-    implicit val logger:                   TestLogger[IO]            = TestLogger[IO]()
-    private implicit val metricsRegistry:  TestMetricsRegistry[IO]   = TestMetricsRegistry[IO]
-    private implicit val queriesExecTimes: QueriesExecutionTimes[IO] = QueriesExecutionTimes[IO]().unsafeRunSync()
-    val projectCleaner = mock[ProjectCleaner[IO]]
-    val dbUpdater      = new DequeuedEventHandler.DequeuedEventHandlerImpl[IO](projectCleaner, currentTime)
-  }
+  private def givenProjectCleaning(project: Project, returning: IO[Unit]) =
+    (projectCleaner.cleanUp _)
+      .expects(project)
+      .returning(Kleisli.liftF(returning))
 }

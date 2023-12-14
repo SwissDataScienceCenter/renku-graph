@@ -170,6 +170,11 @@ trait EventLogDBFetching {
 
   protected case class FoundDelivery(eventId: CompoundEventId, subscriberId: SubscriberId)
 
+  protected object FoundDelivery {
+    def apply(event: GeneratedEvent, subscriberId: SubscriberId): FoundDelivery =
+      FoundDelivery(event.eventId, subscriberId)
+  }
+
   protected def findAllEventDeliveries(implicit cfg: DBConfig[EventLogDB]): IO[List[FoundDelivery]] =
     moduleSessionResource(cfg).session.use { session =>
       val query: Query[Void, FoundDelivery] =
