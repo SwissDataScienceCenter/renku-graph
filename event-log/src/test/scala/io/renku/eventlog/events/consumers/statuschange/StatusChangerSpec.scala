@@ -20,8 +20,10 @@ package io.renku.eventlog.events.consumers.statuschange
 
 import cats.data.Kleisli
 import cats.effect.IO
+import cats.effect.testing.scalatest.AsyncIOSpec
 import cats.syntax.all._
 import eu.timepit.refined.auto._
+import io.renku.db.DBConfigProvider.DBConfig
 import io.renku.db.{DbClient, SqlStatement}
 import io.renku.eventlog.EventLogDB.SessionResource
 import io.renku.eventlog._
@@ -29,6 +31,7 @@ import io.renku.eventlog.api.events.StatusChangeEvent._
 import io.renku.eventlog.api.events.{StatusChangeEvent, StatusChangeGenerators}
 import io.renku.eventlog.events.consumers.statuschange.DBUpdater.{RollbackOp, UpdateOp}
 import io.renku.events.Generators.{subscriberIds, subscriberUrls}
+import io.renku.events.consumers.ConsumersModelGenerators.consumerProjects
 import io.renku.events.consumers.Project
 import io.renku.generators.CommonGraphGenerators.microserviceBaseUrls
 import io.renku.generators.Generators
@@ -39,164 +42,167 @@ import io.renku.graph.model.EventsGenerators._
 import io.renku.graph.model.GraphModelGenerators._
 import io.renku.graph.model.events.{EventId, EventStatus}
 import io.renku.graph.model.projects
-import io.renku.interpreters.TestLogger
-import io.renku.testtools.IOSpec
 import org.scalacheck.Gen
-import org.scalamock.scalatest.MockFactory
+import org.scalamock.scalatest.AsyncMockFactory
+import org.scalatest.Succeeded
 import org.scalatest.matchers.should
-import org.scalatest.wordspec.AnyWordSpec
+import org.scalatest.wordspec.AsyncWordSpec
 import skunk._
 import skunk.implicits._
 
 class StatusChangerSpec
-    extends AnyWordSpec
-    with IOSpec
-    with InMemoryEventLogDbSpec
-    with TypeSerializers
-    with should.Matchers
-    with MockFactory {
+    extends AsyncWordSpec
+    with AsyncIOSpec
+    with EventLogPostgresSpec
+    with AsyncMockFactory
+    with should.Matchers {
 
   "updateStatuses" should {
 
-    "succeeds if db update completes" in new MockedTestCase {
+    "succeeds if db update completes" in testDBResource.use { implicit cfg =>
+      val event = Gen
+        .oneOf(
+          StatusChangeGenerators.toTriplesGeneratedEvents,
+          StatusChangeGenerators.toTripleStoreEvents,
+          StatusChangeGenerators.rollbackToNewEvents
+        )
+        .generateOne
 
+      val dbUpdater: DBUpdater[IO, StatusChangeEvent] = mock[DBUpdater[IO, StatusChangeEvent]]
       val updateResults = updateResultsGen(event).generateOne
-
       (dbUpdater.updateDB _).expects(event).returning(Kleisli.pure(updateResults))
+
+      val gaugesUpdater = mock[GaugesUpdater[IO]]
       (gaugesUpdater.updateGauges _).expects(updateResults).returning(().pure[IO])
 
-      statusChanger.updateStatuses(dbUpdater)(event).unsafeRunSync() shouldBe ()
+      statusChanger(gaugesUpdater).updateStatuses(dbUpdater)(event).assertNoException
     }
 
-    "rollbacks, run the updater's onRollback and fail if the updater doesn't handle the exception" in new MockedTestCase {
-
-      val exception = exceptions.generateOne
-      (dbUpdater.updateDB _).expects(event).returning(Kleisli.liftF(exception.raiseError[IO, DBUpdateResults]))
-
-      val onRollbackF = PartialFunction.empty[Throwable, IO[DBUpdateResults]]
-      (dbUpdater
-        .onRollback(_: StatusChangeEvent)(_: SessionResource[IO]))
-        .expects(event, sessionResource)
-        .returning(onRollbackF)
-
-      intercept[Exception](
-        statusChanger.updateStatuses(dbUpdater)(event).unsafeRunSync()
-      ) shouldBe exception
-    }
-
-    "rollback and run the updater's onRollback" in new NonMockedTestCase {
-
-      findEvent(eventId).map(_._2) shouldBe Some(initialStatus)
-      findAllEventDeliveries       shouldBe List(eventId -> subscriberId)
-
-      val event = ToTriplesGenerated(eventId.id,
-                                     Project(eventId.projectId, projectSlugs.generateOne),
-                                     eventProcessingTimes.generateOne,
-                                     zippedEventPayloads.generateOne
-      ).widen
-
-      (gaugesUpdater.updateGauges _).expects(DBUpdateResults.ForProjects.empty).returning(().pure[IO])
-
-      statusChanger.updateStatuses(dbUpdater)(event).unsafeRunSync()
-
-      findEvent(eventId).map(_._2) shouldBe Some(initialStatus)
-      findAllEventDeliveries       shouldBe Nil
-    }
-
-    "succeed if updating the gauge fails" in new MockedTestCase {
-
-      val exception = Generators.exceptions.generateOne
-
-      val updateResults = updateResultsGen(event).generateOne
-      (dbUpdater.updateDB _).expects(event).returning(Kleisli.pure(updateResults))
-      (gaugesUpdater.updateGauges _).expects(updateResults).returning(exception.raiseError[IO, Unit])
-
-      statusChanger.updateStatuses(dbUpdater)(event).unsafeRunSync() shouldBe ()
-    }
-  }
-
-  private trait MockedTestCase {
-
-    val event = Gen
-      .oneOf(
-        StatusChangeGenerators.toTriplesGeneratedEvents,
-        StatusChangeGenerators.toTripleStoreEvents,
-        StatusChangeGenerators.rollbackToNewEvents
-      )
-      .generateOne
-
-    implicit val dbUpdater: DBUpdater[IO, StatusChangeEvent] = mock[DBUpdater[IO, StatusChangeEvent]]
-
-    private implicit val logger: TestLogger[IO] = TestLogger()
-    val gaugesUpdater = mock[GaugesUpdater[IO]]
-    val statusChanger = new StatusChangerImpl[IO](gaugesUpdater)
-  }
-
-  private trait NonMockedTestCase {
-
-    val eventId               = compoundEventIds.generateOne
-    val initialStatus         = EventStatus.New
-    val subscriberId          = subscriberIds.generateOne
-    private val subscriberUrl = subscriberUrls.generateOne
-    private val sourceUrl     = microserviceBaseUrls.generateOne
-
-    storeEvent(eventId, initialStatus, executionDates.generateOne, eventDates.generateOne, eventBodies.generateOne)
-    upsertSubscriber(subscriberId, subscriberUrl, sourceUrl)
-    upsertEventDelivery(eventId, subscriberId)
-
-    private class TestDbUpdater extends DbClient[IO](None) with DBUpdater[IO, StatusChangeEvent] {
-
-      override def updateDB(event: StatusChangeEvent): UpdateOp[IO] = Kleisli { session =>
-        val passingQuery = SqlStatement[IO](name = "passing dbUpdater query")
-          .command[EventId](
-            sql"""UPDATE event
-                  SET status = '#${EventStatus.TriplesGenerated.value}'
-                  WHERE event_id = $eventIdEncoder
-           """.command
+    "rollbacks, run the updater's onRollback and fail if the updater doesn't handle the exception" in testDBResource
+      .use { implicit cfg =>
+        val event: StatusChangeEvent = Gen
+          .oneOf(
+            StatusChangeGenerators.toTriplesGeneratedEvents,
+            StatusChangeGenerators.toTripleStoreEvents,
+            StatusChangeGenerators.rollbackToNewEvents
           )
-          .arguments(eventId.id)
-          .build
-          .mapResult(_ => genUpdateResult(projectSlugs.generateOne).generateOne)
-          .queryExecution
+          .generateOne
 
-        val failingQuery = SqlStatement[IO](name = "failing dbUpdater query")
-          .command[EventId](
-            sql"""UPDATE event
-                  SET sta = '#${EventStatus.TriplesStore.value}'
-                  WHERE event_id = $eventIdEncoder
-           """.command
-          )
-          .arguments(eventId.id)
-          .build
-          .mapResult(_ => genUpdateResult(projectSlugs.generateOne).generateOne)
-          .queryExecution
+        val exception = exceptions.generateOne
+        val dbUpdater: DBUpdater[IO, StatusChangeEvent] = mock[DBUpdater[IO, StatusChangeEvent]]
+        (dbUpdater.updateDB _).expects(event).returning(Kleisli.liftF(exception.raiseError[IO, DBUpdateResults]))
 
-        passingQuery.run(session) >> failingQuery.run(session)
+        val onRollbackF = PartialFunction.empty[Throwable, IO[DBUpdateResults]]
+        (dbUpdater
+          .onRollback(_: StatusChangeEvent)(_: SessionResource[IO]))
+          .expects(event, *)
+          .returning(onRollbackF)
+
+        val gaugesUpdater = mock[GaugesUpdater[IO]]
+
+        statusChanger(gaugesUpdater).updateStatuses(dbUpdater)(event).assertThrowsError[Exception](_ shouldBe exception)
       }
 
-      override def onRollback(event: StatusChangeEvent)(implicit sr: SessionResource[IO]): RollbackOp[IO] = { _ =>
-        sr.useK {
-          Kleisli {
-            SqlStatement[IO](name = "onRollback dbUpdater query")
-              .command[EventId *: projects.GitLabId *: EmptyTuple](
-                sql"""DELETE FROM event_delivery
+    "rollback and run the updater's onRollback" in testDBResource.use { implicit cfg =>
+      val initialStatus = EventStatus.New
+      val subscriberId  = subscriberIds.generateOne
+      val subscriberUrl = subscriberUrls.generateOne
+      val sourceUrl     = microserviceBaseUrls.generateOne
+
+      for {
+        generatedEvent <- storeGeneratedEvent(initialStatus, eventDates.generateOne, consumerProjects.generateOne)
+        _              <- upsertSubscriber(subscriberId, subscriberUrl, sourceUrl)
+        _              <- upsertEventDelivery(generatedEvent.eventId, subscriberId)
+
+        _ <- findEvent(generatedEvent.eventId).asserting(_.map(_.status) shouldBe Some(initialStatus))
+        _ <- findAllEventDeliveries.asserting(_ shouldBe List(FoundDelivery(generatedEvent.eventId, subscriberId)))
+
+        event = ToTriplesGenerated(generatedEvent.eventId.id,
+                                   generatedEvent.project,
+                                   eventProcessingTimes.generateOne,
+                                   zippedEventPayloads.generateOne
+                ).widen
+        gaugesUpdater = mock[GaugesUpdater[IO]]
+        _             = (gaugesUpdater.updateGauges _).expects(DBUpdateResults.empty).returning(().pure[IO])
+
+        _ <- statusChanger(gaugesUpdater).updateStatuses(new TestDbUpdater(generatedEvent))(event).assertNoException
+
+        _ <- findEvent(generatedEvent.eventId).asserting(_.map(_.status) shouldBe Some(initialStatus))
+        _ <- findAllEventDeliveries.asserting(_ shouldBe Nil)
+      } yield Succeeded
+    }
+
+    "succeed if updating the gauge fails" in testDBResource.use { implicit cfg =>
+      val event: StatusChangeEvent = Gen
+        .oneOf(
+          StatusChangeGenerators.toTriplesGeneratedEvents,
+          StatusChangeGenerators.toTripleStoreEvents,
+          StatusChangeGenerators.rollbackToNewEvents
+        )
+        .generateOne
+      val updateResults = updateResultsGen(event).generateOne
+      val dbUpdater: DBUpdater[IO, StatusChangeEvent] = mock[DBUpdater[IO, StatusChangeEvent]]
+      (dbUpdater.updateDB _).expects(event).returning(Kleisli.pure(updateResults))
+      val exception     = Generators.exceptions.generateOne
+      val gaugesUpdater = mock[GaugesUpdater[IO]]
+      (gaugesUpdater.updateGauges _).expects(updateResults).returning(exception.raiseError[IO, Unit])
+
+      statusChanger(gaugesUpdater).updateStatuses(dbUpdater)(event).assertNoException
+    }
+  }
+
+  private def statusChanger(gaugesUpdater: GaugesUpdater[IO])(implicit cfg: DBConfig[EventLogDB]) =
+    new StatusChangerImpl[IO](gaugesUpdater)
+
+  private class TestDbUpdater(generatedEvent: GeneratedEvent)
+      extends DbClient[IO](None)
+      with DBUpdater[IO, StatusChangeEvent] {
+
+    override def updateDB(event: StatusChangeEvent): UpdateOp[IO] = Kleisli { session =>
+      val passingQuery = SqlStatement[IO](name = "passing dbUpdater query")
+        .command[EventId](
+          sql"""UPDATE event
+                SET status = '#${EventStatus.TriplesGenerated.value}'
+                WHERE event_id = $eventIdEncoder
+           """.command
+        )
+        .arguments(generatedEvent.eventId.id)
+        .build
+        .mapResult(_ => genUpdateResult(projectSlugs.generateOne).generateOne)
+        .queryExecution
+
+      val failingQuery = SqlStatement[IO](name = "failing dbUpdater query")
+        .command[EventId](
+          sql"""UPDATE event
+                SET sta = '#${EventStatus.TriplesStore.value}'
+                WHERE event_id = $eventIdEncoder
+           """.command
+        )
+        .arguments(generatedEvent.eventId.id)
+        .build
+        .mapResult(_ => genUpdateResult(projectSlugs.generateOne).generateOne)
+        .queryExecution
+
+      passingQuery.run(session) >> failingQuery.run(session)
+    }
+
+    override def onRollback(event: StatusChangeEvent)(implicit sr: SessionResource[IO]): RollbackOp[IO] = { _ =>
+      sr.useK {
+        Kleisli {
+          SqlStatement[IO](name = "onRollback dbUpdater query")
+            .command[EventId *: projects.GitLabId *: EmptyTuple](
+              sql"""DELETE FROM event_delivery
                       WHERE event_id = $eventIdEncoder AND project_id = $projectIdEncoder
                """.command
-              )
-              .arguments(eventId.id *: eventId.projectId *: EmptyTuple)
-              .build
-              .mapResult(_ => DBUpdateResults.ForProjects.empty.widen)
-              .queryExecution
-              .run
-          }
+            )
+            .arguments(generatedEvent.eventId.id *: generatedEvent.eventId.projectId *: EmptyTuple)
+            .build
+            .mapResult(_ => DBUpdateResults.ForProjects.empty.widen)
+            .queryExecution
+            .run
         }
       }
     }
-
-    implicit val dbUpdater:      DBUpdater[IO, StatusChangeEvent] = new TestDbUpdater
-    private implicit val logger: TestLogger[IO]                   = TestLogger()
-    val gaugesUpdater = mock[GaugesUpdater[IO]]
-    val statusChanger = new StatusChangerImpl[IO](gaugesUpdater)
   }
 
   private def updateResultsGen(event: StatusChangeEvent): Gen[DBUpdateResults] = event match {
