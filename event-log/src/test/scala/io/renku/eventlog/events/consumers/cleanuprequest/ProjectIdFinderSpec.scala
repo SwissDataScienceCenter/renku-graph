@@ -26,7 +26,6 @@ import io.renku.eventlog.metrics.{QueriesExecutionTimes, TestQueriesExecutionTim
 import io.renku.eventlog.{EventLogDB, EventLogPostgresSpec}
 import io.renku.events.consumers.ConsumersModelGenerators.consumerProjects
 import io.renku.generators.Generators.Implicits._
-import io.renku.graph.model.EventContentGenerators.eventDates
 import org.scalamock.scalatest.AsyncMockFactory
 import org.scalatest.flatspec.AsyncFlatSpec
 import org.scalatest.matchers.should
@@ -41,7 +40,7 @@ class ProjectIdFinderSpec
   private val project = consumerProjects.generateOne
 
   it should "return id of the project with the given slug" in testDBResource.use { implicit cfg =>
-    upsertProject(project, eventDates.generateOne) >>
+    upsertProject(project) >>
       finder.findProjectId(project.slug).asserting(_ shouldBe project.id.some)
   }
 

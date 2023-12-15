@@ -32,7 +32,6 @@ import io.renku.events.consumers.ConsumersModelGenerators.consumerProjects
 import io.renku.events.consumers.Project
 import io.renku.generators.Generators.Implicits._
 import io.renku.generators.Generators._
-import io.renku.graph.model.EventContentGenerators.eventDates
 import io.renku.graph.model.EventsGenerators._
 import io.renku.graph.model.projects
 import io.renku.interpreters.TestLogger.Level.{Error, Info}
@@ -131,7 +130,7 @@ class ProjectCleanerSpec
   private lazy val projectCleaner = new ProjectCleanerImpl[IO](tgClient, projectHookRemover)
 
   private def prepareDB(project: Project)(implicit cfg: DBConfig[EventLogDB]): IO[Unit] =
-    upsertProject(project, eventDates.generateOne) >>
+    upsertProject(project) >>
       insertCleanUpEvent(project) >>
       upsertCategorySyncTime(project.id, categoryNames.generateOne, lastSyncedDates.generateOne)
 

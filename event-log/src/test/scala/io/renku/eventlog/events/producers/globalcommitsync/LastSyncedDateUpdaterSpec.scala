@@ -29,7 +29,6 @@ import io.renku.events.CategoryName
 import io.renku.events.consumers.ConsumersModelGenerators.consumerProjects
 import io.renku.events.consumers.Project
 import io.renku.generators.Generators.Implicits._
-import io.renku.graph.model.EventContentGenerators.eventDates
 import io.renku.graph.model.EventsGenerators.lastSyncedDates
 import io.renku.graph.model.GraphModelGenerators.projectIds
 import io.renku.graph.model.events.LastSyncedDate
@@ -57,7 +56,7 @@ class LastSyncedDateUpdaterSpec
     val oldLastSyncedDate = lastSyncedDates.generateOne
 
     for {
-      _ <- upsertProject(project, eventDates.generateOne)
+      _ <- upsertProject(project)
       _ <- upsertCategorySyncTime(project.id, categoryName, oldLastSyncedDate)
 
       _ <- getLastSyncedDate(project).asserting(_ shouldBe oldLastSyncedDate.some)
@@ -71,7 +70,7 @@ class LastSyncedDateUpdaterSpec
   it should "update the previous last synced date" in testDBResource.use { implicit cfg =>
     val oldLastSyncedDate = lastSyncedDates.generateOne
     for {
-      _ <- upsertProject(project, eventDates.generateOne)
+      _ <- upsertProject(project)
       _ <- upsertCategorySyncTime(project.id, categoryName, oldLastSyncedDate)
 
       _ <- getLastSyncedDate(project).asserting(_ shouldBe oldLastSyncedDate.some)
@@ -88,7 +87,7 @@ class LastSyncedDateUpdaterSpec
     val newLastSyncedDate = lastSyncedDates.generateOne
 
     for {
-      _ <- upsertProject(project, eventDates.generateOne)
+      _ <- upsertProject(project)
 
       _ <- updater.run(project.id, newLastSyncedDate.some).asserting(_ shouldBe Completion.Insert(1))
 
@@ -97,7 +96,7 @@ class LastSyncedDateUpdaterSpec
   }
 
   it should "do nothing if project with the given id does not exist" in testDBResource.use { implicit cfg =>
-    upsertProject(project, eventDates.generateOne) >>
+    upsertProject(project) >>
       updater
         .run(projectIds.generateOne, lastSyncedDates.generateSome)
         .asserting(_ shouldBe Completion.Insert(0))

@@ -19,92 +19,87 @@
 package io.renku.eventlog.events.consumers.commitsyncrequest
 
 import cats.effect.IO
-import io.renku.eventlog.{InMemoryEventLogDbSpec, TypeSerializers}
+import cats.effect.testing.scalatest.AsyncIOSpec
+import io.renku.db.DBConfigProvider.DBConfig
 import io.renku.eventlog.events.producers._
-import io.renku.eventlog.metrics.QueriesExecutionTimes
+import io.renku.eventlog.metrics.{QueriesExecutionTimes, TestQueriesExecutionTimes}
+import io.renku.eventlog.{EventLogDB, EventLogPostgresSpec}
 import io.renku.events.Generators.categoryNames
+import io.renku.events.consumers.ConsumersModelGenerators.consumerProjects
 import io.renku.generators.Generators.Implicits._
-import io.renku.graph.model.EventContentGenerators.eventDates
-import io.renku.graph.model.EventsGenerators._
-import io.renku.graph.model.GraphModelGenerators._
 import io.renku.graph.model.events.EventDate
-import io.renku.metrics.TestMetricsRegistry
-import io.renku.testtools.IOSpec
-import org.scalamock.scalatest.MockFactory
+import org.scalamock.scalatest.AsyncMockFactory
+import org.scalatest.Succeeded
 import org.scalatest.matchers.should
-import org.scalatest.wordspec.AnyWordSpec
+import org.scalatest.wordspec.AsyncWordSpec
 
 import java.time.Instant
 
 class CommitSyncForcerSpec
-    extends AnyWordSpec
-    with IOSpec
-    with InMemoryEventLogDbSpec
-    with SubscriptionDataProvisioning
-    with MockFactory
-    with TypeSerializers
+    extends AsyncWordSpec
+    with AsyncIOSpec
+    with EventLogPostgresSpec
+    with AsyncMockFactory
+    with SubscriptionProvisioning
     with should.Matchers {
 
   "forceCommitSync" should {
 
     "remove row for the given project id and COMMIT_SYNC category " +
       "from the subscription_category_sync_time " +
-      "if it exists" in new TestCase {
+      "if it exists" in testDBResource.use { implicit cfg =>
+        val project = consumerProjects.generateOne
+        for {
+          _ <- upsertProject(project)
 
-        val projectId   = projectIds.generateOne
-        val projectSlug = projectSlugs.generateOne
-        upsertProject(projectId, projectSlug, eventDates.generateOne)
+          otherCategoryName = categoryNames.generateOne
+          _ <- upsertCategorySyncTime(project.id, commitsync.categoryName)
+          _ <- upsertCategorySyncTime(project.id, otherCategoryName)
 
-        val otherCategoryName = categoryNames.generateOne
-        upsertCategorySyncTime(projectId, commitsync.categoryName, lastSyncedDates.generateOne)
-        upsertCategorySyncTime(projectId, otherCategoryName, lastSyncedDates.generateOne)
+          _ <- findSyncTime(project.id, commitsync.categoryName).asserting(_ shouldBe a[Some[_]])
+          _ <- findSyncTime(project.id, otherCategoryName).asserting(_ shouldBe a[Some[_]])
 
-        findSyncTime(projectId, commitsync.categoryName) shouldBe a[Some[_]]
-        findSyncTime(projectId, otherCategoryName)       shouldBe a[Some[_]]
+          _ <- forcer.forceCommitSync(project.id, project.slug).assertNoException
 
-        forcer.forceCommitSync(projectId, projectSlug).unsafeRunSync() shouldBe ()
-
-        findSyncTime(projectId, commitsync.categoryName) shouldBe None
-        findSyncTime(projectId, otherCategoryName)       shouldBe a[Some[_]]
+          _ <- findSyncTime(project.id, commitsync.categoryName).asserting(_ shouldBe None)
+          _ <- findSyncTime(project.id, otherCategoryName).asserting(_ shouldBe a[Some[_]])
+        } yield Succeeded
       }
 
     "upsert a new project " +
       "if there's no row the given project id and category in the subscription_category_sync_time" +
-      "and there's no project in the project table" in new TestCase {
+      "and there's no project in the project table" in testDBResource.use { implicit cfg =>
+        val project = consumerProjects.generateOne
+        for {
+          _ <- findSyncTime(project.id, commitsync.categoryName).asserting(_ shouldBe None)
 
-        val projectId   = projectIds.generateOne
-        val projectSlug = projectSlugs.generateOne
+          _ <- forcer.forceCommitSync(project.id, project.slug).assertNoException
 
-        findSyncTime(projectId, commitsync.categoryName) shouldBe None
-
-        forcer.forceCommitSync(projectId, projectSlug).unsafeRunSync() shouldBe ()
-
-        findSyncTime(projectId, commitsync.categoryName) shouldBe None
-        findProjects shouldBe List((projectId, projectSlug, EventDate(Instant.EPOCH)))
+          _ <- findSyncTime(project.id, commitsync.categoryName).asserting(_ shouldBe None)
+          _ <- findProjects.asserting(_ shouldBe List(FoundProject(project, EventDate(Instant.EPOCH))))
+        } yield Succeeded
       }
 
     "do nothing " +
       "if there's no row the given project id and category in the subscription_category_sync_time" +
-      "but the project exists in the project table" in new TestCase {
+      "but the project exists in the project table" in testDBResource.use { implicit cfg =>
+        val project = consumerProjects.generateOne
+        for {
+          _ <- upsertProject(project)
+          _ <- findProjects.asserting(_.map(_.project) shouldBe List(project))
 
-        val projectId   = projectIds.generateOne
-        val projectSlug = projectSlugs.generateOne
+          _ <- findSyncTime(project.id, commitsync.categoryName).asserting(_ shouldBe None)
 
-        upsertProject(projectId, projectSlug, eventDates.generateOne)
-        findProjects.map(proj => proj._1 -> proj._2) shouldBe List(projectId -> projectSlug)
+          _ <- forcer.forceCommitSync(project.id, project.slug).assertNoException
 
-        findSyncTime(projectId, commitsync.categoryName) shouldBe None
-
-        forcer.forceCommitSync(projectId, projectSlug).unsafeRunSync() shouldBe ()
-
-        findSyncTime(projectId, commitsync.categoryName) shouldBe None
-        findProjects.map(proj => proj._1 -> proj._2)     shouldBe List(projectId -> projectSlug)
+          _ <- findSyncTime(project.id, commitsync.categoryName).asserting(_ shouldBe None)
+          _ <- findProjects.asserting(_.map(_.project) shouldBe List(project))
+        } yield Succeeded
       }
   }
 
-  private trait TestCase {
-    private implicit val metricsRegistry: TestMetricsRegistry[IO]   = TestMetricsRegistry[IO]
-    implicit val queriesExecTimes:        QueriesExecutionTimes[IO] = QueriesExecutionTimes[IO]().unsafeRunSync()
-    val forcer = new CommitSyncForcerImpl[IO]
+  private def forcer(implicit cfg: DBConfig[EventLogDB]) = {
+    implicit val qet: QueriesExecutionTimes[IO] = TestQueriesExecutionTimes[IO]
+    new CommitSyncForcerImpl[IO]
   }
 }
