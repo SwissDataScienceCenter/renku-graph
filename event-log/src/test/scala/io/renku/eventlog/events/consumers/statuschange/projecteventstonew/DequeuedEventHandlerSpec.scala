@@ -121,7 +121,7 @@ class DequeuedEventHandlerSpec
                                                          FoundDelivery(generatingTriplesEvent, subscriberId)
                  )
                )
-          _ <- findProjectCategorySyncTimes(project.id).asserting(_.map(_.name) shouldBe List(otherCategoryName))
+          _ <- findCategorySyncTimes(project.id).asserting(_.map(_.name) shouldBe List(otherCategoryName))
 
           latestEventDate = (skippedEventDate :: generatingTriplesEventDate :: eventsAndDates.map(_._2)).max
 

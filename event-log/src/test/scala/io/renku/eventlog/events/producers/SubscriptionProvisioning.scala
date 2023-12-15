@@ -61,7 +61,7 @@ trait SubscriptionProvisioning extends EventLogDBProvisioning with SubscriptionT
 
   protected case class CategorySync(name: CategoryName, lastSyncedDate: LastSyncedDate)
 
-  protected def findProjectCategorySyncTimes(
+  protected def findCategorySyncTimes(
       projectId: projects.GitLabId
   )(implicit cfg: DBConfig[EventLogDB]): IO[List[CategorySync]] =
     moduleSessionResource(cfg).session.use { session =>

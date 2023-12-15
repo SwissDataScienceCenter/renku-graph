@@ -73,7 +73,7 @@ class ProjectCleanerSpec
           _ <- moduleSessionResource(cfg).session.useKleisli(projectCleaner cleanUp project).assertNoException
 
           _ <- findProjects.asserting(_.find(_.project.id == project.id) shouldBe None)
-          _ <- findProjectCategorySyncTimes(project.id).asserting(_ shouldBe Nil)
+          _ <- findCategorySyncTimes(project.id).asserting(_ shouldBe Nil)
           _ <- findCleanUpEvents.asserting(_ shouldBe List(Project(otherProject.id, otherProject.slug)))
 
           _ <- logger.loggedOnlyF(Info(show"$categoryName: $project removed"))
@@ -93,7 +93,7 @@ class ProjectCleanerSpec
         _ <- moduleSessionResource(cfg).session.useKleisli(projectCleaner cleanUp project).assertNoException
 
         _ <- findProjects.asserting(_.find(_.project.id == project.id) shouldBe None)
-        _ <- findProjectCategorySyncTimes(project.id).asserting(_ shouldBe Nil)
+        _ <- findCategorySyncTimes(project.id).asserting(_ shouldBe Nil)
 
         _ <- logger.loggedOnlyF(
                Error(show"$categoryName: sending ProjectViewingDeletion for project: $project failed", exception),
@@ -115,7 +115,7 @@ class ProjectCleanerSpec
         _ <- moduleSessionResource(cfg).session.useKleisli(projectCleaner cleanUp project).assertNoException
 
         _ <- findProjects.asserting(_.find(_.project.id == project.id) shouldBe None)
-        _ <- findProjectCategorySyncTimes(project.id).asserting(_ shouldBe Nil)
+        _ <- findCategorySyncTimes(project.id).asserting(_ shouldBe Nil)
 
         _ <- logger.loggedOnlyF(
                Error(show"$categoryName: removing webhook or token for project: $project failed", exception),

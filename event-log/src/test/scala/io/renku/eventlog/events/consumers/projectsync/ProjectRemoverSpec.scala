@@ -70,7 +70,7 @@ class ProjectRemoverSpec
           _ <- findAllProjectPayloads(project.id).asserting(_ shouldBe Nil)
           _ <- findProcessingTimes(project.id).asserting(_ shouldBe Nil)
           _ <- findAllProjectDeliveries.asserting(_ shouldBe Nil)
-          _ <- findProjectCategorySyncTimes(project.id).asserting(_ shouldBe Nil)
+          _ <- findCategorySyncTimes(project.id).asserting(_ shouldBe Nil)
           _ <- findCleanUpEvents.asserting(_ shouldBe Nil)
         } yield Succeeded
       }
