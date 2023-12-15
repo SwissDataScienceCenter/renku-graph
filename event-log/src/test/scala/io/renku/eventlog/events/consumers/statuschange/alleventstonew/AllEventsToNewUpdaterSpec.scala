@@ -20,112 +20,79 @@ package io.renku.eventlog.events.consumers.statuschange
 package alleventstonew
 
 import cats.effect.IO
+import cats.effect.testing.scalatest.AsyncIOSpec
 import cats.syntax.all._
 import io.circe.literal._
+import io.renku.db.DBConfigProvider.DBConfig
 import io.renku.eventlog.api.events.StatusChangeEvent.AllEventsToNew
 import io.renku.eventlog.events.consumers.statuschange.{DBUpdateResults, categoryName}
-import io.renku.eventlog.metrics.QueriesExecutionTimes
-import io.renku.eventlog.{InMemoryEventLogDbSpec, TypeSerializers}
+import io.renku.eventlog.metrics.{QueriesExecutionTimes, TestQueriesExecutionTimes}
+import io.renku.eventlog.{EventLogDB, EventLogPostgresSpec}
+import io.renku.events.consumers.ConsumersModelGenerators.consumerProjects
 import io.renku.events.consumers.Project
 import io.renku.events.producers.EventSender
 import io.renku.events.{CategoryName, EventRequestContent}
 import io.renku.generators.Generators.Implicits._
-import io.renku.generators.Generators.{timestamps, timestampsNotInTheFuture}
-import io.renku.graph.model.EventContentGenerators.{eventDates, eventMessages}
 import io.renku.graph.model.EventsGenerators._
-import io.renku.graph.model.GraphModelGenerators._
-import io.renku.graph.model.events.{EventDate, EventId, EventStatus, ExecutionDate}
-import io.renku.metrics.TestMetricsRegistry
-import io.renku.testtools.IOSpec
-import org.scalacheck.Gen
-import org.scalamock.scalatest.MockFactory
+import org.scalamock.scalatest.AsyncMockFactory
+import org.scalatest.Succeeded
 import org.scalatest.matchers.should
-import org.scalatest.wordspec.AnyWordSpec
+import org.scalatest.wordspec.AsyncWordSpec
 
 import scala.util.Random
 
 class AllEventsToNewUpdaterSpec
-    extends AnyWordSpec
-    with IOSpec
-    with InMemoryEventLogDbSpec
-    with TypeSerializers
-    with should.Matchers
-    with MockFactory {
+    extends AsyncWordSpec
+    with AsyncIOSpec
+    with EventLogPostgresSpec
+    with AsyncMockFactory
+    with should.Matchers {
 
   "updateDB" should {
 
-    "send ProjectEventsToNew events for all the projects" in new TestCase {
+    "send ProjectEventsToNew events for all the projects" in testDBResource.use { implicit cfg =>
+      val projects = consumerProjects.generateNonEmptyList().toList
 
-      val projects = projectObjects.generateNonEmptyList().toList
+      for {
+        _ <- projects.traverse_ { project =>
+               if (Random.nextBoolean()) addEvent(project)
+               else upsertProject(project)
+             }
 
-      projects foreach { project =>
-        if (Random.nextBoolean()) addEvent(project)
-        else upsertProject(project.id, project.slug, eventDates.generateOne)
-      }
+        _ = projects foreach { givenEventSending(_, returning = IO.unit) }
 
-      projects foreach { project =>
-        (eventSender
-          .sendEvent(_: EventRequestContent.NoPayload, _: EventSender.EventContext))
-          .expects(
-            EventRequestContent.NoPayload(toEventJson(project)),
-            EventSender.EventContext(CategoryName(projecteventstonew.eventType.show),
-                                     show"$categoryName: generating ${projecteventstonew.eventType} for $project failed"
-            )
-          )
-          .returning(().pure[IO])
-      }
-
-      sessionResource.useK(dbUpdater updateDB AllEventsToNew).unsafeRunSync() shouldBe DBUpdateResults.ForProjects.empty
+        _ <- moduleSessionResource.session
+               .useKleisli(dbUpdater updateDB AllEventsToNew)
+               .asserting(_ shouldBe DBUpdateResults.empty)
+      } yield Succeeded
     }
 
-    "do not send any events if there are no projects in the DB" in new TestCase {
-      sessionResource.useK(dbUpdater updateDB AllEventsToNew).unsafeRunSync() shouldBe DBUpdateResults.ForProjects.empty
+    "do not send any events if there are no projects in the DB" in testDBResource.use { implicit cfg =>
+      moduleSessionResource.session
+        .useKleisli(dbUpdater updateDB AllEventsToNew)
+        .asserting(_ shouldBe DBUpdateResults.empty)
     }
   }
 
-  private trait TestCase {
+  private val eventSender = mock[EventSender[IO]]
+  val dbUpdater = {
+    implicit val qet: QueriesExecutionTimes[IO] = TestQueriesExecutionTimes[IO]
+    new DbUpdater[IO](eventSender)
+  }
 
-    val eventSender = mock[EventSender[IO]]
-    private implicit val metricsRegistry:  TestMetricsRegistry[IO]   = TestMetricsRegistry[IO]
-    private implicit val queriesExecTimes: QueriesExecutionTimes[IO] = QueriesExecutionTimes[IO]().unsafeRunSync()
-    val dbUpdater = new DbUpdater[IO](eventSender)
-
-    def addEvent(project: Project): EventId = {
-      val eventId = compoundEventIds.generateOne.copy(projectId = project.id)
-      val status  = eventStatuses.generateOne
-      storeEvent(
-        eventId,
-        status,
-        timestamps.generateAs(ExecutionDate),
-        timestampsNotInTheFuture.generateAs(EventDate),
-        eventBodies.generateOne,
-        maybeMessage = status match {
-          case _: EventStatus.FailureStatus => eventMessages.generateSome
-          case _ => eventMessages.generateOption
-        },
-        maybeEventPayload = status match {
-          case EventStatus.TriplesStore | EventStatus.TriplesGenerated => zippedEventPayloads.generateSome
-          case EventStatus.AwaitingDeletion                            => zippedEventPayloads.generateOption
-          case _                                                       => zippedEventPayloads.generateNone
-        },
-        projectSlug = project.slug
+  private def givenEventSending(project: Project, returning: IO[Unit]) =
+    (eventSender
+      .sendEvent(_: EventRequestContent.NoPayload, _: EventSender.EventContext))
+      .expects(
+        EventRequestContent.NoPayload(toEventJson(project)),
+        EventSender.EventContext(CategoryName(projecteventstonew.eventType.show),
+                                 show"$categoryName: generating ${projecteventstonew.eventType} for $project failed"
+        )
       )
+      .returning(returning)
 
-      status match {
-        case EventStatus.TriplesGenerated | EventStatus.TriplesStore =>
-          upsertProcessingTime(eventId, status, eventProcessingTimes.generateOne)
-        case EventStatus.AwaitingDeletion =>
-          if (Random.nextBoolean()) {
-            upsertProcessingTime(eventId, status, eventProcessingTimes.generateOne)
-          } else ()
-        case _ => ()
-      }
-
-      eventId.id
-    }
-  }
-
-  private lazy val projectObjects: Gen[Project] = (projectIds -> projectSlugs).mapN(Project.apply)
+  private def addEvent(project: Project)(implicit cfg: DBConfig[EventLogDB]) =
+    storeGeneratedEvent(eventStatuses.generateOne, project = project)
 
   private def toEventJson(project: Project) = json"""{
     "categoryName": "EVENTS_STATUS_CHANGE",

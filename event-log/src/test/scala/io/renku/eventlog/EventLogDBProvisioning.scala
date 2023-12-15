@@ -24,6 +24,7 @@ import io.circe.Json
 import io.renku.db.DBConfigProvider.DBConfig
 import io.renku.events.Generators.{subscriberIds, subscriberUrls}
 import io.renku.events.Subscription.{SubscriberId, SubscriberUrl}
+import io.renku.events.consumers.ConsumersModelGenerators.consumerProjects
 import io.renku.events.consumers.Project
 import io.renku.generators.CommonGraphGenerators.microserviceBaseUrls
 import io.renku.generators.Generators.Implicits._
@@ -54,8 +55,8 @@ trait EventLogDBProvisioning {
                                       processingTimes: List[EventProcessingTime]
   )
   protected def storeGeneratedEvent(status:        EventStatus,
-                                    eventDate:     EventDate,
-                                    project:       Project,
+                                    eventDate:     EventDate = timestampsNotInTheFuture.generateAs(EventDate),
+                                    project:       Project = consumerProjects.generateOne,
                                     executionDate: ExecutionDate = timestampsNotInTheFuture.generateAs(ExecutionDate),
                                     message:       Option[EventMessage] = None
   )(implicit cfg: DBConfig[EventLogDB]): IO[GeneratedEvent] = {
