@@ -64,7 +64,7 @@ private class ExpiringTokensFinderImpl[F[_]: Async: SessionResource: QueriesExec
     (Stream.eval(SessionResource[F].useK(measureExecutionTime(query))) ++ fetchAllChunks)
       .takeWhile(_.nonEmpty)
 
-  private lazy val query =
+  private def query =
     SqlStatement
       .named("find expiring tokens")
       .select[LocalDate, (Project, EncryptedAccessToken)](
