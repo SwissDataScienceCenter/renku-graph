@@ -20,21 +20,36 @@ trait EventLogDBFetching {
   ): IO[List[FoundEvent]] =
     moduleSessionResource(cfg).session.use { session =>
       val query: Query[EventStatus *: Void *: EmptyTuple, FoundEvent] = (sql"""
-          SELECT event_id, project_id, execution_date, batch_date
+          SELECT event_id, project_id, execution_date, execution_date, event_date, event_body, batch_date, message
           FROM event
           WHERE status = $eventStatusEncoder
           ORDER BY """ *: orderBy)
-        .query(eventIdDecoder ~ projectIdDecoder ~ executionDateDecoder ~ batchDateDecoder)
+        .query(
+          eventIdDecoder ~ projectIdDecoder ~ executionDateDecoder ~ createdDateDecoder ~ eventDateDecoder ~ eventBodyDecoder ~ batchDateDecoder ~ eventMessageDecoder.opt
+        )
         .map {
-          case (eventId: EventId) ~ (projectId: projects.GitLabId) ~ (executionDate: ExecutionDate) ~ (batchDate: BatchDate) =>
-            FoundEvent(CompoundEventId(eventId, projectId), executionDate, status, batchDate)
+          case (eventId: EventId) ~ (projectId: projects.GitLabId) ~ (executionDate: ExecutionDate) ~ (createdDate: CreatedDate) ~ (eventDate: EventDate) ~ (body: EventBody) ~ (batchDate: BatchDate) ~ (maybeMessage: Option[
+                EventMessage
+              ]) =>
+            FoundEvent(CompoundEventId(eventId, projectId),
+                       executionDate,
+                       createdDate,
+                       eventDate,
+                       status,
+                       body,
+                       batchDate,
+                       maybeMessage
+            )
         }
       session.prepare(query).flatMap(_.stream(status *: Void *: EmptyTuple, 32).compile.toList)
     }
 
   protected case class FoundEvent(maybeId:            Option[CompoundEventId],
                                   maybeExecutionDate: Option[ExecutionDate],
+                                  maybeCreatedDate:   Option[CreatedDate],
+                                  maybeEventDate:     Option[EventDate],
                                   maybeStatus:        Option[EventStatus],
+                                  maybeBody:          Option[EventBody],
                                   maybeMaybeMessage:  Option[Option[EventMessage]],
                                   maybeBatchDate:     Option[BatchDate]
   ) {
@@ -50,7 +65,10 @@ trait EventLogDBFetching {
       FoundEvent(
         setOrClear(maybeId, Field.Id),
         setOrClear(maybeExecutionDate, Field.ExecutionDate),
+        setOrClear(maybeCreatedDate, Field.CreatedDate),
+        setOrClear(maybeEventDate, Field.EventDate),
         setOrClear(maybeStatus, Field.Status),
+        setOrClear(maybeBody, Field.Body),
         setOrClear(maybeMaybeMessage, Field.Message),
         setOrClear(maybeBatchDate, Field.BatchDate)
       )
@@ -63,7 +81,10 @@ trait EventLogDBFetching {
       FoundEvent(
         clearOrSet(maybeId, Field.Id),
         clearOrSet(maybeExecutionDate, Field.ExecutionDate),
+        clearOrSet(maybeCreatedDate, Field.CreatedDate),
+        clearOrSet(maybeEventDate, Field.EventDate),
         clearOrSet(maybeStatus, Field.Status),
+        clearOrSet(maybeBody, Field.Body),
         clearOrSet(maybeMaybeMessage, Field.Message),
         clearOrSet(maybeBatchDate, Field.BatchDate)
       )
@@ -73,7 +94,10 @@ trait EventLogDBFetching {
   protected trait Field extends Product
   protected object Field {
     case object Id            extends Field
+    case object CreatedDate   extends Field
     case object ExecutionDate extends Field
+    case object EventDate     extends Field
+    case object Body          extends Field
     case object Status        extends Field
     case object Message       extends Field
     case object BatchDate     extends Field
@@ -86,23 +110,63 @@ trait EventLogDBFetching {
               status:        EventStatus,
               maybeMessage:  Option[EventMessage]
     ): FoundEvent =
-      FoundEvent(id.some, executionDate.some, status.some, maybeMessage.some, maybeBatchDate = None)
+      FoundEvent(id.some, executionDate.some, None, None, status.some, None, maybeMessage.some, maybeBatchDate = None)
 
     def apply(id:            CompoundEventId,
               executionDate: ExecutionDate,
+              createdDate:   CreatedDate,
+              eventDate:     EventDate,
               status:        EventStatus,
-              batchDate:     BatchDate
-    ): FoundEvent =
-      FoundEvent(id.some, executionDate.some, status.some, maybeMaybeMessage = None, batchDate.some)
+              body:          EventBody,
+              batchDate:     BatchDate,
+              maybeMessage:  Option[EventMessage]
+    ): FoundEvent = FoundEvent(id.some,
+                               executionDate.some,
+                               createdDate.some,
+                               eventDate.some,
+                               status.some,
+                               body.some,
+                               maybeMaybeMessage = maybeMessage.some,
+                               batchDate.some
+    )
 
     def apply(id: CompoundEventId): FoundEvent =
-      FoundEvent(id.some, None, None, None, None)
+      FoundEvent(id.some, None, None, None, None, None, None, None)
 
     def apply(id: CompoundEventId, executionDate: ExecutionDate): FoundEvent =
-      FoundEvent(id.some, executionDate.some, maybeStatus = None, maybeMaybeMessage = None, maybeBatchDate = None)
+      FoundEvent(id.some,
+                 executionDate.some,
+                 maybeCreatedDate = None,
+                 maybeEventDate = None,
+                 maybeStatus = None,
+                 maybeBody = None,
+                 maybeMaybeMessage = None,
+                 maybeBatchDate = None
+      )
+
+    def apply(id: CompoundEventId, executionDate: ExecutionDate, batchDate: BatchDate): FoundEvent =
+      FoundEvent(
+        id.some,
+        executionDate.some,
+        maybeCreatedDate = None,
+        maybeEventDate = None,
+        maybeStatus = None,
+        maybeBody = None,
+        maybeMaybeMessage = None,
+        maybeBatchDate = batchDate.some
+      )
 
     def apply(status: EventStatus, maybeMessage: Option[EventMessage]): FoundEvent =
-      FoundEvent(maybeId = None, maybeExecutionDate = None, status.some, maybeMessage.some, maybeBatchDate = None)
+      FoundEvent(
+        maybeId = None,
+        maybeExecutionDate = None,
+        maybeCreatedDate = None,
+        maybeEventDate = None,
+        maybeStatus = status.some,
+        maybeBody = None,
+        maybeMaybeMessage = maybeMessage.some,
+        maybeBatchDate = None
+      )
   }
 
   protected def findEvent(
@@ -110,12 +174,16 @@ trait EventLogDBFetching {
   )(implicit cfg: DBConfig[EventLogDB]): IO[Option[FoundEvent]] =
     moduleSessionResource(cfg).session.use { session =>
       val query: Query[EventId *: projects.GitLabId *: EmptyTuple, FoundEvent] = sql"""
-          SELECT execution_date, status, message
+          SELECT execution_date, execution_date, event_date, status, event_body, batch_date, message
           FROM event
           WHERE event_id = $eventIdEncoder AND project_id = $projectIdEncoder"""
-        .query(executionDateDecoder ~ eventStatusDecoder ~ eventMessageDecoder.opt)
-        .map { case (executionDate: ExecutionDate) ~ (status: EventStatus) ~ (maybeMessage: Option[EventMessage]) =>
-          FoundEvent(eventId, executionDate, status, maybeMessage)
+        .query(
+          executionDateDecoder ~ createdDateDecoder ~ eventDateDecoder ~ eventStatusDecoder ~ eventBodyDecoder ~ batchDateDecoder ~ eventMessageDecoder.opt
+        )
+        .map {
+          case (executionDate: ExecutionDate) ~ (createdDate: CreatedDate) ~ (eventDate: EventDate) ~ (status: EventStatus) ~ (body: EventBody) ~ (batchDate: BatchDate) ~
+              (maybeMessage: Option[EventMessage]) =>
+            FoundEvent(eventId, executionDate, createdDate, eventDate, status, body, batchDate, maybeMessage)
         }
       session.prepare(query).flatMap(_.option(eventId.id *: eventId.projectId *: EmptyTuple))
     }
