@@ -19,44 +19,44 @@
 package io.renku.eventlog.eventdetails
 
 import cats.effect.IO
+import cats.effect.testing.scalatest.AsyncIOSpec
 import cats.syntax.all._
-import io.renku.eventlog.InMemoryEventLogDbSpec
-import io.renku.eventlog.metrics.QueriesExecutionTimes
+import io.renku.db.DBConfigProvider.DBConfig
+import io.renku.eventlog.metrics.{QueriesExecutionTimes, TestQueriesExecutionTimes}
+import io.renku.eventlog.{EventLogDB, EventLogPostgresSpec}
 import io.renku.generators.Generators.Implicits._
-import io.renku.graph.model.EventContentGenerators._
-import io.renku.graph.model.EventsGenerators.{compoundEventIds, eventBodies, eventStatuses}
-import io.renku.graph.model.events.{CompoundEventId, EventDetails}
-import io.renku.metrics.TestMetricsRegistry
-import io.renku.testtools.IOSpec
+import io.renku.graph.model.EventsGenerators.compoundEventIds
+import io.renku.graph.model.events.EventDetails
+import org.scalamock.scalatest.AsyncMockFactory
+import org.scalatest.Succeeded
 import org.scalatest.matchers.should
-import org.scalatest.wordspec.AnyWordSpec
+import org.scalatest.wordspec.AsyncWordSpec
 
-class EventDetailsFinderSpec extends AnyWordSpec with IOSpec with InMemoryEventLogDbSpec with should.Matchers {
+class EventDetailsFinderSpec
+    extends AsyncWordSpec
+    with AsyncIOSpec
+    with EventLogPostgresSpec
+    with AsyncMockFactory
+    with should.Matchers {
 
   "findDetails" should {
 
-    "return the details of the event if found" in new TestCase {
-      storeEvent(
-        eventId,
-        eventStatuses.generateOne,
-        executionDates.generateOne,
-        eventDates.generateOne,
-        eventBody
-      )
-      eventDetailsFinder.findDetails(eventId).unsafeRunSync() shouldBe EventDetails(eventId, eventBody).some
+    "return the details of the event if found" in testDBResource.use { implicit cfg =>
+      for {
+        event <- storeGeneratedEvent()
+        _ <- eventDetailsFinder
+               .findDetails(event.eventId)
+               .asserting(_ shouldBe EventDetails(event.eventId, event.body).some)
+      } yield Succeeded
     }
 
-    "return None if the event is not found" in new TestCase {
-      eventDetailsFinder.findDetails(eventId).unsafeRunSync() shouldBe Option.empty[CompoundEventId]
+    "return None if the event is not found" in testDBResource.use { implicit cfg =>
+      eventDetailsFinder.findDetails(compoundEventIds.generateOne).asserting(_ shouldBe None)
     }
   }
 
-  private trait TestCase {
-    val eventId   = compoundEventIds.generateOne
-    val eventBody = eventBodies.generateOne
-
-    private implicit val metricsRegistry:  TestMetricsRegistry[IO]   = TestMetricsRegistry[IO]
-    private implicit val queriesExecTimes: QueriesExecutionTimes[IO] = QueriesExecutionTimes[IO]().unsafeRunSync()
-    val eventDetailsFinder = new EventDetailsFinderImpl[IO]
+  private def eventDetailsFinder(implicit cfg: DBConfig[EventLogDB]) = {
+    implicit val qet: QueriesExecutionTimes[IO] = TestQueriesExecutionTimes[IO]
+    new EventDetailsFinderImpl[IO]
   }
 }

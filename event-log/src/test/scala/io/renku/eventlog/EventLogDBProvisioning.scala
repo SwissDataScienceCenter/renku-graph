@@ -30,7 +30,7 @@ import io.renku.generators.CommonGraphGenerators.microserviceBaseUrls
 import io.renku.generators.Generators.Implicits._
 import io.renku.generators.Generators.timestampsNotInTheFuture
 import io.renku.graph.model.EventContentGenerators.{eventDates, eventMessages}
-import io.renku.graph.model.EventsGenerators.{compoundEventIds, eventBodies, eventProcessingTimes, zippedEventPayloads}
+import io.renku.graph.model.EventsGenerators.{compoundEventIds, eventBodies, eventProcessingTimes, eventStatuses, zippedEventPayloads}
 import io.renku.graph.model.RenkuTinyTypeGenerators.projectSlugs
 import io.renku.graph.model.events.EventStatus.{AwaitingDeletion, TransformationNonRecoverableFailure, TransformationRecoverableFailure, TransformingTriples, TriplesGenerated, TriplesStore}
 import io.renku.graph.model.events.{CompoundEventId, EventId, EventStatus, _}
@@ -49,15 +49,17 @@ trait EventLogDBProvisioning {
   protected case class GeneratedEvent(eventId:         CompoundEventId,
                                       status:          EventStatus,
                                       eventDate:       EventDate,
+                                      body:            EventBody,
                                       project:         Project,
                                       maybeMessage:    Option[EventMessage],
                                       maybePayload:    Option[ZippedEventPayload],
                                       processingTimes: List[EventProcessingTime]
   )
-  protected def storeGeneratedEvent(status:        EventStatus,
+  protected def storeGeneratedEvent(status:        EventStatus = eventStatuses.generateOne,
                                     eventDate:     EventDate = timestampsNotInTheFuture.generateAs(EventDate),
                                     project:       Project = consumerProjects.generateOne,
                                     executionDate: ExecutionDate = timestampsNotInTheFuture.generateAs(ExecutionDate),
+                                    eventBody:     EventBody = eventBodies.generateOne,
                                     message:       Option[EventMessage] = None
   )(implicit cfg: DBConfig[EventLogDB]): IO[GeneratedEvent] = {
     val eventId = compoundEventIds(project.id).generateOne
@@ -76,7 +78,7 @@ trait EventLogDBProvisioning {
                       status,
                       executionDate,
                       eventDate,
-                      eventBodies.generateOne,
+                      eventBody,
                       projectSlug = project.slug,
                       maybeMessage = maybeMessage,
                       maybeEventPayload = maybePayload
@@ -89,7 +91,7 @@ trait EventLogDBProvisioning {
                           case _ => Nil
                         }
       _ <- processingTimes.traverse_(upsertProcessingTime(eventId, status, _))
-    } yield GeneratedEvent(eventId, status, eventDate, project, maybeMessage, maybePayload, processingTimes)
+    } yield GeneratedEvent(eventId, status, eventDate, eventBody, project, maybeMessage, maybePayload, processingTimes)
   }
 
   protected def storeEvent(compoundEventId:   CompoundEventId,
