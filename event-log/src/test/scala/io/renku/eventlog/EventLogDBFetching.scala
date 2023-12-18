@@ -156,6 +156,18 @@ trait EventLogDBFetching {
         maybeBatchDate = batchDate.some
       )
 
+    def apply(status: EventStatus, executionDate: ExecutionDate, maybeMessage: Option[EventMessage]): FoundEvent =
+      FoundEvent(
+        maybeId = None,
+        maybeExecutionDate = executionDate.some,
+        maybeCreatedDate = None,
+        maybeEventDate = None,
+        maybeStatus = status.some,
+        maybeBody = None,
+        maybeMaybeMessage = maybeMessage.some,
+        maybeBatchDate = None
+      )
+
     def apply(status: EventStatus, maybeMessage: Option[EventMessage]): FoundEvent =
       FoundEvent(
         maybeId = None,
