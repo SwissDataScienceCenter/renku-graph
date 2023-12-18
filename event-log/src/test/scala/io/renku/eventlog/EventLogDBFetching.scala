@@ -186,7 +186,7 @@ trait EventLogDBFetching {
   )(implicit cfg: DBConfig[EventLogDB]): IO[Option[FoundEvent]] =
     moduleSessionResource(cfg).session.use { session =>
       val query: Query[EventId *: projects.GitLabId *: EmptyTuple, FoundEvent] = sql"""
-          SELECT execution_date, execution_date, event_date, status, event_body, batch_date, message
+          SELECT execution_date, created_date, event_date, status, event_body, batch_date, message
           FROM event
           WHERE event_id = $eventIdEncoder AND project_id = $projectIdEncoder"""
         .query(

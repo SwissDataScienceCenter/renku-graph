@@ -68,11 +68,13 @@ class DbUpdaterSpec
                }
 
           res <- findEvent(event.eventId).map(_.value).asserting {
-                   _.unselect(Field.BatchDate) shouldBe FoundEvent(event.eventId,
-                                                                   ExecutionDate(now),
-                                                                   event.newStatus,
-                                                                   event.message.some
-                   )
+                   _.select(Field.Id, Field.ExecutionDate, Field.Status, Field.Message) shouldBe
+                     FoundEvent(
+                       event.eventId,
+                       ExecutionDate(now),
+                       event.newStatus,
+                       event.message.some
+                     )
                  }
         } yield res
     }
@@ -89,11 +91,13 @@ class DbUpdaterSpec
                }
 
           res <- findEvent(event.eventId).map(_.value).asserting {
-                   _.unselect(Field.BatchDate) shouldBe FoundEvent(event.eventId,
-                                                                   ExecutionDate(now plus event.executionDelay.value),
-                                                                   event.newStatus,
-                                                                   event.message.some
-                   )
+                   _.select(Field.Id, Field.ExecutionDate, Field.Status, Field.Message) shouldBe
+                     FoundEvent(
+                       event.eventId,
+                       ExecutionDate(now plus event.executionDelay.value),
+                       event.newStatus,
+                       event.message.some
+                     )
                  }
         } yield res
     }
@@ -251,11 +255,13 @@ class DbUpdaterSpec
                .asserting(_ shouldBe DBUpdateResults(project.slug, event.currentStatus -> -1, event.newStatus -> 1))
 
         res <- findEvent(event.eventId).asserting {
-                 _.value.unselect(Field.BatchDate) shouldBe FoundEvent(event.eventId,
-                                                                       ExecutionDate(now),
-                                                                       event.newStatus,
-                                                                       event.message.some
-                 )
+                 _.value.select(Field.Id, Field.ExecutionDate, Field.Status, Field.Message) shouldBe
+                   FoundEvent(
+                     event.eventId,
+                     ExecutionDate(now),
+                     event.newStatus,
+                     event.message.some
+                   )
                }
       } yield res
     }
