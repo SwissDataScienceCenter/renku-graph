@@ -59,6 +59,7 @@ trait EventLogDBProvisioning {
                                     eventDate:     EventDate = timestampsNotInTheFuture.generateAs(EventDate),
                                     project:       Project = consumerProjects.generateOne,
                                     executionDate: ExecutionDate = timestampsNotInTheFuture.generateAs(ExecutionDate),
+                                    createdDate:   CreatedDate = CreatedDate(Instant.now),
                                     eventBody:     EventBody = eventBodies.generateOne,
                                     message:       Option[EventMessage] = None
   )(implicit cfg: DBConfig[EventLogDB]): IO[GeneratedEvent] = {
@@ -79,6 +80,7 @@ trait EventLogDBProvisioning {
                       executionDate,
                       eventDate,
                       eventBody,
+                      createdDate,
                       projectSlug = project.slug,
                       maybeMessage = maybeMessage,
                       maybeEventPayload = maybePayload
