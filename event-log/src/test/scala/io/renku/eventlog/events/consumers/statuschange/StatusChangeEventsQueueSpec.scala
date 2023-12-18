@@ -119,7 +119,7 @@ class StatusChangeEventsQueueSpec
     }
 
   it should "continue if there are general problems with dequeueing" in testDBResource.use { implicit cfg =>
-    implicit val failingSessionResource: SessionResource[IO] = io.renku.db.SessionResource[IO, EventLogDB](
+    val failingSessionResource: SessionResource[IO] = io.renku.db.SessionResource[IO, EventLogDB](
       Session.single[IO](
         host = cfg.host.value,
         port = Generators.positiveInts().generateOne.value,
@@ -144,7 +144,7 @@ class StatusChangeEventsQueueSpec
         }
 
     for {
-      _ <- queue.register(projecteventstonew.eventType, handler = _ => ().pure[IO])
+      _ <- queue.register(projecteventstonew.eventType, handler = (_: ProjectEventsToNew) => ().pure[IO])
       _ <- logger.resetF()
       _ <- queue.run.start
       _ <- assureTheProcessRecovers
