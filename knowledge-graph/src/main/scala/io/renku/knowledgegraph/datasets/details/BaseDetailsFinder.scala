@@ -201,7 +201,7 @@ private class BaseDetailsFinderImpl[F[_]: Async: Logger: SparqlQueryTimeRecorder
   )
 
   private def allowedProjectFilterQuery(user: Option[AuthUser]): Fragment =
-    SparqlSnippets(VarName("dsProjectId")).visibleProjects(user.map(_.id), Visibility.all)
+    SparqlSnippets(VarName("originalDsProjId")).visibleProjects(user.map(_.id), Visibility.all)
 
   def findKeywords(dataset: Dataset): F[List[Keyword]] =
     queryExpecting[List[Keyword]](queryKeywords(dataset))

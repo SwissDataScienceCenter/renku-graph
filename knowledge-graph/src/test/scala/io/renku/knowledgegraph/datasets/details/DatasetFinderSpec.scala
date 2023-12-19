@@ -594,9 +594,9 @@ class DatasetFinderSpec
 
         provisionTestProjects(project1Updated, project2).unsafeRunSync()
 
-//        findById(dataset1.identifier, project1.slug)                          shouldBe None
-        findByTopmostSameAs(dataset1.provenance.topmostSameAs, project1.slug) shouldBe None
-//        findById(dataset1Invalidation.identifier, project1.slug)              shouldBe None
+        findById(dataset1.identifier)             shouldBe None
+        findById(dataset1Invalidation.identifier) shouldBe None
+        findByTopmostSameAs(dataset1.provenance.topmostSameAs).map(_.slug)   shouldBe Some(dataset2.identification.slug)
 
         val expectedDS2 = importedInternalToNonModified(dataset2, project2)
         findById(dataset2.identifier, project2.slug).value                          shouldBe expectedDS2
