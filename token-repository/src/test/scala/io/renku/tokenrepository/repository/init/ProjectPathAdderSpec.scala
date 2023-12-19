@@ -41,7 +41,6 @@ class ProjectPathAdderSpec
       for {
         _ <- verifyColumnExists("projects_tokens", "project_path").asserting(_ shouldBe false)
 
-        _ <- logger.resetF()
         _ <- ProjectPathAdder[IO].run.assertNoException
         _ <- verifyColumnExists("projects_tokens", "project_path").asserting(_ shouldBe true)
         _ <- logger.loggedOnlyF(Info("'project_path' column added"))

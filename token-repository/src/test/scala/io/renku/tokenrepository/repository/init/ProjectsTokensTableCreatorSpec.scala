@@ -40,7 +40,6 @@ class ProjectsTokensTableCreatorSpec
     for {
       _ <- tableExists("projects_tokens").asserting(_ shouldBe false)
 
-      _ <- logger.resetF()
       _ <- ProjectsTokensTableCreator[IO].run.assertNoException
       _ <- tableExists("projects_tokens").asserting(_ shouldBe true)
       _ <- logger.loggedOnlyF(Info("'projects_tokens' table created"))

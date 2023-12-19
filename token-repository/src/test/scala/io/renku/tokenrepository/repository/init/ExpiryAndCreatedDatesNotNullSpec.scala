@@ -41,7 +41,6 @@ class ExpiryAndCreatedDatesNotNullSpec
       _ <- verifyColumnNullable("projects_tokens", "expiry_date").asserting(_ shouldBe true)
       _ <- verifyColumnNullable("projects_tokens", "created_at").asserting(_ shouldBe true)
 
-      _ <- logger.resetF()
       _ <- ExpiryAndCreatedDatesNotNull[IO].run.assertNoException
       _ <- verifyColumnNullable("projects_tokens", "expiry_date").asserting(_ shouldBe false)
       _ <- verifyColumnNullable("projects_tokens", "created_at").asserting(_ shouldBe false)
