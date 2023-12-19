@@ -18,9 +18,11 @@
 
 package io.renku.eventlog.init
 
-import cats.data.Kleisli
 import cats.effect.IO
+import cats.effect.testing.scalatest.AsyncIOSpec
 import io.circe.literal._
+import io.renku.db.DBConfigProvider.DBConfig
+import io.renku.eventlog.EventLogDB
 import io.renku.eventlog.init.Generators.events
 import io.renku.eventlog.init.model.Event
 import io.renku.generators.Generators.Implicits._
@@ -29,90 +31,74 @@ import io.renku.graph.model.EventsGenerators._
 import io.renku.graph.model.events._
 import io.renku.graph.model.projects
 import io.renku.graph.model.projects.Slug
-import io.renku.interpreters.TestLogger
 import io.renku.interpreters.TestLogger.Level.Info
-import io.renku.testtools.IOSpec
-import org.scalatest.concurrent.{Eventually, IntegrationPatience}
+import org.scalatest.Succeeded
+import org.scalatest.flatspec.AsyncFlatSpec
 import org.scalatest.matchers.should
-import org.scalatest.wordspec.AnyWordSpec
 import skunk._
 import skunk.codec.all._
 import skunk.implicits._
 
-class ProjectPathAdderSpec
-    extends AnyWordSpec
-    with IOSpec
-    with DbInitSpec
-    with should.Matchers
-    with Eventually
-    with IntegrationPatience {
+class ProjectPathAdderSpec extends AsyncFlatSpec with AsyncIOSpec with DbInitSpec with should.Matchers {
 
-  protected[init] override lazy val migrationsToRun: List[DbMigrator[IO]] = allMigrations.takeWhile {
-    case _: ProjectPathAdderImpl[IO] => false
-    case _ => true
+  protected[init] override val runMigrationsUpTo: Class[_ <: DbMigrator[IO]] = classOf[ProjectPathAdder[IO]]
+
+  it should "do nothing if the 'event' table already exists" in testDBResource.use { implicit cfg =>
+    for {
+      _ <- createEventTable >> logger.resetF()
+
+      _ <- projectPathAdder.run.assertNoException
+
+      _ <- logger.loggedOnlyF(Info("'project_path' column adding skipped"))
+    } yield Succeeded
   }
 
-  "run" should {
+  it should "do nothing if the 'project_path' column already exists" in testDBResource.use { implicit cfg =>
+    for {
+      _ <- verifyColumnExists("event_log", "project_path").asserting(_ shouldBe false)
 
-    "do nothing if the 'event' table already exists" in new TestCase {
+      _ <- projectPathAdder.run.assertNoException
 
-      createEventTable()
+      _ <- verifyColumnExists("event_log", "project_path").asserting(_ shouldBe true)
 
-      projectPathAdder.run.unsafeRunSync() shouldBe ()
+      _ <- logger.loggedOnlyF(Info("'project_path' column added"))
 
-      logger.loggedOnly(Info("'project_path' column adding skipped"))
-    }
+      _ <- logger.resetF()
 
-    "do nothing if the 'project_path' column already exists" in new TestCase {
+      _ <- projectPathAdder.run.assertNoException
 
-      verifyColumnExists("event_log", "project_path") shouldBe false
-
-      projectPathAdder.run.unsafeRunSync() shouldBe ()
-
-      verifyColumnExists("event_log", "project_path") shouldBe true
-
-      logger.loggedOnly(Info("'project_path' column added"))
-
-      logger.reset()
-
-      projectPathAdder.run.unsafeRunSync() shouldBe ()
-
-      logger.loggedOnly(Info("'project_path' column exists"))
-    }
-
-    "add the 'project_path' column if does not exist and migrate the data for it" in new TestCase {
-
-      verifyColumnExists("event_log", "project_path") shouldBe false
-
-      val event1 = events.generateOne
-      storeEvent(event1)
-      val event2 = events.generateOne
-      storeEvent(event2)
-
-      projectPathAdder.run.unsafeRunSync() shouldBe ()
-
-      findProjectSlugs shouldBe Set(event1.project.slug, event2.project.slug)
-
-      verifyIndexExists("event_log", "idx_project_path") shouldBe true
-
-      eventually {
-        logger.loggedOnly(Info("'project_path' column added"))
-      }
-    }
+      _ <- logger.loggedOnlyF(Info("'project_path' column exists"))
+    } yield Succeeded
   }
 
-  private trait TestCase {
-    implicit val logger: TestLogger[IO] = TestLogger[IO]()
-    val projectPathAdder = new ProjectPathAdderImpl[IO]
+  it should "add the 'project_path' column if does not exist and migrate the data for it" in testDBResource.use {
+    implicit cfg =>
+      for {
+        _ <- verifyColumnExists("event_log", "project_path").asserting(_ shouldBe false)
+
+        event1 = events.generateOne
+        _ <- storeEvent(event1)
+        event2 = events.generateOne
+        _ <- storeEvent(event2)
+
+        _ <- projectPathAdder.run.assertNoException
+
+        _ <- findProjectSlugs.asserting(_ shouldBe Set(event1.project.slug, event2.project.slug))
+
+        _ <- verifyIndexExists("event_log", "idx_project_path").asserting(_ shouldBe true)
+
+        _ <- logger.loggedOnlyF(Info("'project_path' column added"))
+      } yield Succeeded
   }
 
-  private def storeEvent(event: Event): Unit = execute[Unit] {
-    Kleisli { session =>
+  private def projectPathAdder(implicit cfg: DBConfig[EventLogDB]) = new ProjectPathAdderImpl[IO]
+
+  private def storeEvent(event: Event)(implicit cfg: DBConfig[EventLogDB]): IO[Unit] =
+    moduleSessionResource.session.use { session =>
       val query: Command[
         EventId *: projects.GitLabId *: EventStatus *: CreatedDate *: ExecutionDate *: EventDate *: String *: EmptyTuple
       ] =
-        sql"""insert into
-            event_log (event_id, project_id, status, created_date, execution_date, event_date, event_body) 
+        sql"""insert into event_log (event_id, project_id, status, created_date, execution_date, event_date, event_body)
             values (
             $eventIdEncoder, 
             $projectIdEncoder, 
@@ -139,7 +125,6 @@ class ProjectPathAdderSpec
         )
         .void
     }
-  }
 
   private def toJson(event: Event): String = json"""{
     "project": {
@@ -148,13 +133,11 @@ class ProjectPathAdderSpec
     }
   }""".noSpaces
 
-  private def findProjectSlugs: Set[Slug] = sessionResource
-    .useK {
-      Kleisli { session =>
+  private def findProjectSlugs(implicit cfg: DBConfig[EventLogDB]): IO[Set[Slug]] =
+    moduleSessionResource.session
+      .use { session =>
         val query: Query[Void, projects.Slug] = sql"select project_path from event_log".query(projectSlugDecoder)
         session.execute(query)
       }
-    }
-    .unsafeRunSync()
-    .toSet
+      .map(_.toSet)
 }

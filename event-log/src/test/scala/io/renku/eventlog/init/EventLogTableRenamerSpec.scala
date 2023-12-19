@@ -18,103 +18,99 @@
 
 package io.renku.eventlog.init
 
-import cats.data.Kleisli
 import cats.effect.IO
-import io.renku.interpreters.TestLogger
+import cats.effect.testing.scalatest.AsyncIOSpec
+import io.renku.db.DBConfigProvider.DBConfig
+import io.renku.eventlog.EventLogDB
 import io.renku.interpreters.TestLogger.Level.Info
-import io.renku.testtools.IOSpec
+import org.scalatest.Succeeded
+import org.scalatest.flatspec.AsyncFlatSpec
 import org.scalatest.matchers.should
-import org.scalatest.wordspec.AnyWordSpec
 import skunk._
 import skunk.implicits._
 
-class EventLogTableRenamerSpec extends AnyWordSpec with IOSpec with DbInitSpec with should.Matchers {
+class EventLogTableRenamerSpec extends AsyncFlatSpec with AsyncIOSpec with DbInitSpec with should.Matchers {
 
-  protected[init] override lazy val migrationsToRun: List[DbMigrator[IO]] = allMigrations.takeWhile {
-    case _: EventLogTableRenamerImpl[IO] => false
-    case _ => true
+  protected[init] override val runMigrationsUpTo: Class[_ <: DbMigrator[IO]] = classOf[EventLogTableRenamer[IO]]
+
+  it should "rename the 'event_log' table to 'event' when 'event' does not exist" in testDBResource.use {
+    implicit cfg =>
+      for {
+        _ <- tableExists("event_log").asserting(_ shouldBe true)
+
+        _ <- tableRenamer.run.assertNoException
+
+        _ <- tableExists("event_log").asserting(_ shouldBe false)
+        _ <- tableExists("event").asserting(_ shouldBe true)
+
+        _ <- logger.loggedOnlyF(Info("'event_log' table renamed to 'event'"))
+      } yield Succeeded
   }
 
-  "run" should {
+  it should "do nothing if the 'event' table already exists and 'event_log' does not exist" in testDBResource.use {
+    implicit cfg =>
+      for {
+        _ <- tableExists("event_log").asserting(_ shouldBe true)
 
-    "rename the 'event_log' table to 'event' when 'event' does not exist" in new TestCase {
+        _ <- tableRenamer.run.assertNoException
 
-      tableExists("event_log") shouldBe true
+        _ <- tableExists("event_log").asserting(_ shouldBe false)
+        _ <- tableExists("event").asserting(_ shouldBe true)
 
-      tableRenamer.run.unsafeRunSync() shouldBe ((): Unit)
+        _ <- logger.loggedOnlyF(Info("'event_log' table renamed to 'event'"))
 
-      tableExists("event_log") shouldBe false
-      tableExists("event")     shouldBe true
+        _ <- logger.resetF()
 
-      logger.loggedOnly(Info("'event_log' table renamed to 'event'"))
-    }
+        _ <- tableRenamer.run.assertNoException
 
-    "do nothing if the 'event' table already exists and 'event_log' does not exist" in new TestCase {
-
-      tableExists("event_log") shouldBe true
-
-      tableRenamer.run.unsafeRunSync() shouldBe ((): Unit)
-
-      tableExists("event_log") shouldBe false
-      tableExists("event")     shouldBe true
-
-      logger.loggedOnly(Info("'event_log' table renamed to 'event'"))
-
-      logger.reset()
-
-      tableRenamer.run.unsafeRunSync() shouldBe ((): Unit)
-
-      logger.loggedOnly(Info("'event' table already exists"))
-    }
-
-    "drop 'event_log' table if both the 'event' and 'event_log' tables exist" in new TestCase {
-
-      tableExists("event_log") shouldBe true
-
-      tableRenamer.run.unsafeRunSync() shouldBe ((): Unit)
-
-      tableExists("event_log") shouldBe false
-      tableExists("event")     shouldBe true
-
-      logger.loggedOnly(Info("'event_log' table renamed to 'event'"))
-
-      logger.reset()
-
-      createEventLogTable() shouldBe ((): Unit)
-
-      tableExists("event_log") shouldBe true
-      tableExists("event")     shouldBe true
-
-      tableRenamer.run.unsafeRunSync() shouldBe ((): Unit)
-
-      tableExists("event_log") shouldBe false
-      tableExists("event")     shouldBe true
-
-      logger.loggedOnly(Info("'event_log' table dropped"))
-    }
+        _ <- logger.loggedOnlyF(Info("'event' table already exists"))
+      } yield Succeeded
   }
 
-  private trait TestCase {
-    implicit val logger: TestLogger[IO] = TestLogger[IO]()
-    val tableRenamer = new EventLogTableRenamerImpl[IO]
+  it should "drop 'event_log' table if both the 'event' and 'event_log' tables exist" in testDBResource.use {
+    implicit cfg =>
+      for {
+        _ <- tableExists("event_log").asserting(_ shouldBe true)
+
+        _ <- tableRenamer.run.assertNoException
+
+        _ <- tableExists("event_log").asserting(_ shouldBe false)
+        _ <- tableExists("event").asserting(_ shouldBe true)
+
+        _ <- logger.loggedOnlyF(Info("'event_log' table renamed to 'event'"))
+
+        _ <- logger.resetF()
+
+        _ <- createEventLogTable
+
+        _ <- tableExists("event_log").asserting(_ shouldBe true)
+        _ <- tableExists("event").asserting(_ shouldBe true)
+
+        _ <- tableRenamer.run.assertNoException
+
+        _ <- tableExists("event_log").asserting(_ shouldBe false)
+        _ <- tableExists("event").asserting(_ shouldBe true)
+
+        _ <- logger.loggedOnlyF(Info("'event_log' table dropped"))
+      } yield Succeeded
   }
 
-  private def createEventLogTable(): Unit = execute[Unit] {
-    Kleisli { session =>
+  private def tableRenamer(implicit cfg: DBConfig[EventLogDB]) = new EventLogTableRenamerImpl[IO]
+
+  private def createEventLogTable(implicit cfg: DBConfig[EventLogDB]): IO[Unit] =
+    moduleSessionResource.session.use { session =>
       val query: Command[Void] = sql"""
-    CREATE TABLE IF NOT EXISTS event_log(
-      event_id       varchar   NOT NULL,
-      project_id     int4      NOT NULL,
-      status         varchar   NOT NULL,
-      created_date   timestamp NOT NULL,
-      execution_date timestamp NOT NULL,
-      event_date     timestamp NOT NULL,
-      event_body     text      NOT NULL,
-      message        varchar,
-      PRIMARY KEY (event_id, project_id)
-    );
-    """.command
+        CREATE TABLE IF NOT EXISTS event_log(
+          event_id       varchar   NOT NULL,
+          project_id     int4      NOT NULL,
+          status         varchar   NOT NULL,
+          created_date   timestamp NOT NULL,
+          execution_date timestamp NOT NULL,
+          event_date     timestamp NOT NULL,
+          event_body     text      NOT NULL,
+          message        varchar,
+          PRIMARY KEY (event_id, project_id)
+        )""".command
       session.execute(query).void
     }
-  }
 }

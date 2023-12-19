@@ -42,7 +42,6 @@ class ProjectPathToSlugSpec
         _ <- verifyColumnExists("projects_tokens", "project_path").asserting(_ shouldBe true)
         _ <- verifyColumnExists("projects_tokens", "project_slug").asserting(_ shouldBe false)
 
-        _ <- logger.resetF()
         _ <- ProjectPathToSlug[IO].run.assertNoException
         _ <- verifyColumnExists("projects_tokens", "project_path").asserting(_ shouldBe false)
         _ <- verifyColumnExists("projects_tokens", "project_slug").asserting(_ shouldBe true)

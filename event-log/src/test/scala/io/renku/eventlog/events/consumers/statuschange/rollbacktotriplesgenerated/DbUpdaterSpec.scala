@@ -19,91 +19,70 @@
 package io.renku.eventlog.events.consumers.statuschange.rollbacktotriplesgenerated
 
 import cats.effect.IO
-import io.renku.eventlog.events.consumers.statuschange.DBUpdateResults
+import cats.effect.testing.scalatest.AsyncIOSpec
+import io.renku.db.DBConfigProvider.DBConfig
 import io.renku.eventlog.api.events.StatusChangeEvent.RollbackToTriplesGenerated
-import io.renku.eventlog.metrics.QueriesExecutionTimes
-import io.renku.eventlog.{InMemoryEventLogDbSpec, TypeSerializers}
+import io.renku.eventlog.events.consumers.statuschange.DBUpdateResults
+import io.renku.eventlog.metrics.{QueriesExecutionTimes, TestQueriesExecutionTimes}
+import io.renku.eventlog.{EventLogDB, EventLogPostgresSpec}
+import io.renku.events.consumers.ConsumersModelGenerators.consumerProjects
 import io.renku.events.consumers.Project
 import io.renku.generators.Generators.Implicits._
 import io.renku.generators.Generators.timestampsNotInTheFuture
-import io.renku.graph.model.EventsGenerators.{eventBodies, eventIds}
-import io.renku.graph.model.GraphModelGenerators.{projectIds, projectSlugs}
 import io.renku.graph.model.events.EventStatus._
 import io.renku.graph.model.events._
-import io.renku.metrics.TestMetricsRegistry
-import io.renku.testtools.IOSpec
 import org.scalacheck.Gen
-import org.scalamock.scalatest.MockFactory
+import org.scalamock.scalatest.AsyncMockFactory
+import org.scalatest.Succeeded
 import org.scalatest.matchers.should
-import org.scalatest.wordspec.AnyWordSpec
+import org.scalatest.wordspec.AsyncWordSpec
 
 import java.time.Instant
 
 class DbUpdaterSpec
-    extends AnyWordSpec
-    with IOSpec
-    with InMemoryEventLogDbSpec
-    with TypeSerializers
-    with should.Matchers
-    with MockFactory {
+    extends AsyncWordSpec
+    with AsyncIOSpec
+    with EventLogPostgresSpec
+    with AsyncMockFactory
+    with should.Matchers {
 
   "updateDB" should {
 
-    s"change the status of the given event from $TransformingTriples to $TriplesGenerated" in new TestCase {
+    s"change the status of the given event from $TransformingTriples to $TriplesGenerated" in testDBResource.use {
+      implicit cfg =>
+        val project = consumerProjects.generateOne
+        for {
+          event      <- addEvent(TransformingTriples, project)
+          otherEvent <- addEvent(TransformingTriples, project)
 
-      val eventId      = addEvent(TransformingTriples)
-      val otherEventId = addEvent(TransformingTriples)
+          _ <- moduleSessionResource.session
+                 .useKleisli(dbUpdater updateDB RollbackToTriplesGenerated(event.eventId.id, project))
+                 .asserting(_ shouldBe DBUpdateResults(project.slug, TransformingTriples -> -1, TriplesGenerated -> 1))
 
-      sessionResource
-        .useK(dbUpdater updateDB RollbackToTriplesGenerated(eventId, project))
-        .unsafeRunSync() shouldBe DBUpdateResults.ForProjects(
-        projectSlug,
-        Map(TransformingTriples -> -1, TriplesGenerated -> 1)
-      )
-
-      findEvent(CompoundEventId(eventId, projectId)).map(_._2)      shouldBe Some(TriplesGenerated)
-      findEvent(CompoundEventId(otherEventId, projectId)).map(_._2) shouldBe Some(TransformingTriples)
+          _ <- findEvent(event.eventId).asserting(_.map(_.status) shouldBe Some(TriplesGenerated))
+          _ <- findEvent(otherEvent.eventId).asserting(_.map(_.status) shouldBe Some(TransformingTriples))
+        } yield Succeeded
     }
 
-    s"do nothing if event is not in the $TransformingTriples status" in new TestCase {
-
+    s"do nothing if event is not in the $TransformingTriples status" in testDBResource.use { implicit cfg =>
       val invalidStatus = Gen.oneOf(EventStatus.all.filterNot(_ == TransformingTriples)).generateOne
-      val eventId       = addEvent(invalidStatus)
+      val project       = consumerProjects.generateOne
 
-      sessionResource
-        .useK(dbUpdater updateDB RollbackToTriplesGenerated(eventId, project))
-        .unsafeRunSync() shouldBe DBUpdateResults.ForProjects.empty
+      for {
+        event <- addEvent(invalidStatus, project)
 
-      findEvent(CompoundEventId(eventId, projectId)).map(_._2) shouldBe Some(invalidStatus)
+        _ <- moduleSessionResource.session
+               .useKleisli(dbUpdater updateDB RollbackToTriplesGenerated(event.eventId.id, project))
+               .asserting(_ shouldBe DBUpdateResults.empty)
+
+        _ <- findEvent(event.eventId).asserting(_.map(_.status) shouldBe Some(invalidStatus))
+      } yield Succeeded
     }
   }
 
-  private trait TestCase {
+  private implicit val qet: QueriesExecutionTimes[IO] = TestQueriesExecutionTimes[IO]
+  private lazy val dbUpdater = new DbUpdater[IO](() => Instant.now())
 
-    val projectId   = projectIds.generateOne
-    val projectSlug = projectSlugs.generateOne
-    val project     = Project(projectId, projectSlug)
-
-    val currentTime = mockFunction[Instant]
-    private implicit val metricsRegistry:  TestMetricsRegistry[IO]   = TestMetricsRegistry[IO]
-    private implicit val queriesExecTimes: QueriesExecutionTimes[IO] = QueriesExecutionTimes[IO]().unsafeRunSync()
-    val dbUpdater = new DbUpdater[IO](currentTime)
-
-    val now = Instant.now()
-    currentTime.expects().returning(now).anyNumberOfTimes()
-
-    def addEvent(status: EventStatus): EventId = {
-      val eventId = CompoundEventId(eventIds.generateOne, projectId)
-
-      storeEvent(
-        eventId,
-        status,
-        timestampsNotInTheFuture.generateAs(ExecutionDate),
-        timestampsNotInTheFuture.generateAs(EventDate),
-        eventBodies.generateOne,
-        projectSlug = projectSlug
-      )
-      eventId.id
-    }
-  }
+  private def addEvent(status: EventStatus, project: Project)(implicit cfg: DBConfig[EventLogDB]): IO[GeneratedEvent] =
+    storeGeneratedEvent(status, timestampsNotInTheFuture.generateAs(EventDate), project)
 }

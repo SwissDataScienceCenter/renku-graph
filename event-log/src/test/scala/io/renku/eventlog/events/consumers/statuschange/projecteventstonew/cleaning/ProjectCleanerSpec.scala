@@ -19,117 +19,127 @@
 package io.renku.eventlog.events.consumers.statuschange.projecteventstonew.cleaning
 
 import cats.effect.IO
+import cats.effect.testing.scalatest.AsyncIOSpec
 import cats.syntax.all._
-import io.renku.eventlog.{CleanUpEventsProvisioning, InMemoryEventLogDbSpec, TypeSerializers}
+import io.renku.db.DBConfigProvider.DBConfig
 import io.renku.eventlog.events.consumers.statuschange.categoryName
-import io.renku.eventlog.events.producers.SubscriptionDataProvisioning
-import io.renku.eventlog.metrics.QueriesExecutionTimes
-import io.renku.events.{consumers, CategoryName}
+import io.renku.eventlog.events.producers.SubscriptionProvisioning
+import io.renku.eventlog.metrics.{QueriesExecutionTimes, TestQueriesExecutionTimes}
+import io.renku.eventlog.{CleanUpEventsProvisioning, EventLogDB, EventLogPostgresSpec}
 import io.renku.events.Generators.categoryNames
+import io.renku.events.consumers
 import io.renku.events.consumers.ConsumersModelGenerators.consumerProjects
-import io.renku.generators.Generators._
+import io.renku.events.consumers.Project
 import io.renku.generators.Generators.Implicits._
-import io.renku.graph.model.EventContentGenerators.eventDates
+import io.renku.generators.Generators._
 import io.renku.graph.model.EventsGenerators._
-import io.renku.graph.model.events.LastSyncedDate
 import io.renku.graph.model.projects
-import io.renku.interpreters.TestLogger
 import io.renku.interpreters.TestLogger.Level.{Error, Info}
-import io.renku.metrics.TestMetricsRegistry
-import io.renku.testtools.IOSpec
 import io.renku.triplesgenerator
 import io.renku.triplesgenerator.api.events.ProjectViewingDeletion
-import org.scalamock.scalatest.MockFactory
+import org.scalamock.scalatest.AsyncMockFactory
+import org.scalatest.Succeeded
 import org.scalatest.matchers.should
-import org.scalatest.wordspec.AnyWordSpec
+import org.scalatest.wordspec.AsyncWordSpec
 
 class ProjectCleanerSpec
-    extends AnyWordSpec
-    with IOSpec
-    with InMemoryEventLogDbSpec
+    extends AsyncWordSpec
+    with AsyncIOSpec
+    with EventLogPostgresSpec
+    with AsyncMockFactory
+    with SubscriptionProvisioning
     with CleanUpEventsProvisioning
-    with SubscriptionDataProvisioning
-    with TypeSerializers
-    with MockFactory
     with should.Matchers {
+
+  private val project = consumerProjects.generateOne
 
   "cleanUp" should {
 
     "remove related records from the subscription_category_sync_time table, " +
       "related records from the the clean_up_events_queue " +
-      "and remove the project itself" in new TestCase {
+      "and remove the project itself" in testDBResource.use { implicit cfg =>
+        for {
+          _ <- prepareDB(project)
 
-        val otherProject = consumerProjects.generateOne
-        insertCleanUpEvent(otherProject)
+          otherProject = consumerProjects.generateOne
+          _ <- insertCleanUpEvent(otherProject)
 
-        givenProjectViewingDeletionEventSent(project.slug, returning = ().pure[IO])
-        givenHookAndTokenRemoval(project, returning = ().pure[IO])
+          _ = givenProjectViewingDeletionEventSent(project.slug, returning = ().pure[IO])
+          _ = givenHookAndTokenRemoval(project, returning = ().pure[IO])
 
-        sessionResource.useK(projectCleaner cleanUp project).unsafeRunSync()
+          _ <- logger.resetF()
 
-        findProjects.find(_._1 == project.id)    shouldBe None
-        findProjectCategorySyncTimes(project.id) shouldBe List.empty[(CategoryName, LastSyncedDate)]
-        findCleanUpEvents                        shouldBe List(otherProject.id -> otherProject.slug)
+          _ <- moduleSessionResource(cfg).session.useKleisli(projectCleaner cleanUp project).assertNoException
 
-        logger.loggedOnly(Info(show"$categoryName: $project removed"))
+          _ <- findProjects.asserting(_.find(_.project.id == project.id) shouldBe None)
+          _ <- findCategorySyncTimes(project.id).asserting(_ shouldBe Nil)
+          _ <- findCleanUpEvents.asserting(_ shouldBe List(Project(otherProject.id, otherProject.slug)))
+
+          _ <- logger.loggedOnlyF(Info(show"$categoryName: $project removed"))
+        } yield Succeeded
       }
 
-    "log an error if sending ProjectViewingDeletion event fails" in new TestCase {
+    "log an error if sending ProjectViewingDeletion event fails" in testDBResource.use { implicit cfg =>
+      for {
+        _ <- prepareDB(project)
 
-      val exception = exceptions.generateOne
-      givenProjectViewingDeletionEventSent(project.slug, returning = exception.raiseError[IO, Unit])
-      givenHookAndTokenRemoval(project, returning = ().pure[IO])
+        exception = exceptions.generateOne
+        _         = givenProjectViewingDeletionEventSent(project.slug, returning = exception.raiseError[IO, Unit])
+        _         = givenHookAndTokenRemoval(project, returning = ().pure[IO])
 
-      sessionResource.useK(projectCleaner cleanUp project).unsafeRunSync()
+        _ <- logger.resetF()
 
-      findProjects.find(_._1 == project.id)    shouldBe None
-      findProjectCategorySyncTimes(project.id) shouldBe List.empty[(CategoryName, LastSyncedDate)]
+        _ <- moduleSessionResource(cfg).session.useKleisli(projectCleaner cleanUp project).assertNoException
 
-      logger.loggedOnly(
-        Error(show"$categoryName: sending ProjectViewingDeletion for project: $project failed", exception),
-        Info(show"$categoryName: $project removed")
-      )
+        _ <- findProjects.asserting(_.find(_.project.id == project.id) shouldBe None)
+        _ <- findCategorySyncTimes(project.id).asserting(_ shouldBe Nil)
+
+        _ <- logger.loggedOnlyF(
+               Error(show"$categoryName: sending ProjectViewingDeletion for project: $project failed", exception),
+               Info(show"$categoryName: $project removed")
+             )
+      } yield Succeeded
     }
 
-    "log an error if removal of webhook and token fails" in new TestCase {
+    "log an error if removal of webhook and token fails" in testDBResource.use { implicit cfg =>
+      for {
+        _ <- prepareDB(project)
 
-      givenProjectViewingDeletionEventSent(project.slug, returning = ().pure[IO])
-      val exception = exceptions.generateOne
-      givenHookAndTokenRemoval(project, returning = exception.raiseError[IO, Unit])
+        _         = givenProjectViewingDeletionEventSent(project.slug, returning = ().pure[IO])
+        exception = exceptions.generateOne
+        _         = givenHookAndTokenRemoval(project, returning = exception.raiseError[IO, Unit])
 
-      sessionResource.useK(projectCleaner cleanUp project).unsafeRunSync()
+        _ <- logger.resetF()
 
-      findProjects.find(_._1 == project.id)    shouldBe None
-      findProjectCategorySyncTimes(project.id) shouldBe List.empty[(CategoryName, LastSyncedDate)]
+        _ <- moduleSessionResource(cfg).session.useKleisli(projectCleaner cleanUp project).assertNoException
 
-      logger.loggedOnly(
-        Error(show"$categoryName: removing webhook or token for project: $project failed", exception),
-        Info(show"$categoryName: $project removed")
-      )
+        _ <- findProjects.asserting(_.find(_.project.id == project.id) shouldBe None)
+        _ <- findCategorySyncTimes(project.id).asserting(_ shouldBe Nil)
+
+        _ <- logger.loggedOnlyF(
+               Error(show"$categoryName: removing webhook or token for project: $project failed", exception),
+               Info(show"$categoryName: $project removed")
+             )
+      } yield Succeeded
     }
   }
 
-  private trait TestCase {
-    val project = consumerProjects.generateOne
+  private implicit val qet: QueriesExecutionTimes[IO] = TestQueriesExecutionTimes[IO]
+  private val projectHookRemover  = mock[ProjectWebhookAndTokenRemover[IO]]
+  private val tgClient            = mock[triplesgenerator.api.events.Client[IO]]
+  private lazy val projectCleaner = new ProjectCleanerImpl[IO](tgClient, projectHookRemover)
 
-    upsertProject(project.id, project.slug, eventDates.generateOne)
-    insertCleanUpEvent(project)
-    upsertCategorySyncTime(project.id, categoryNames.generateOne, lastSyncedDates.generateOne)
+  private def prepareDB(project: Project)(implicit cfg: DBConfig[EventLogDB]): IO[Unit] =
+    upsertProject(project) >>
+      insertCleanUpEvent(project) >>
+      upsertCategorySyncTime(project.id, categoryNames.generateOne, lastSyncedDates.generateOne)
 
-    implicit val logger:                   TestLogger[IO]            = TestLogger[IO]()
-    private implicit val metricsRegistry:  TestMetricsRegistry[IO]   = TestMetricsRegistry[IO]
-    private implicit val queriesExecTimes: QueriesExecutionTimes[IO] = QueriesExecutionTimes[IO]().unsafeRunSync()
-    private val projectHookRemover = mock[ProjectWebhookAndTokenRemover[IO]]
-    private val tgClient           = mock[triplesgenerator.api.events.Client[IO]]
-    val projectCleaner             = new ProjectCleanerImpl[IO](tgClient, projectHookRemover)
+  private def givenProjectViewingDeletionEventSent(slug: projects.Slug, returning: IO[Unit]) =
+    (tgClient
+      .send(_: ProjectViewingDeletion))
+      .expects(ProjectViewingDeletion(slug))
+      .returning(returning)
 
-    def givenProjectViewingDeletionEventSent(slug: projects.Slug, returning: IO[Unit]) =
-      (tgClient
-        .send(_: ProjectViewingDeletion))
-        .expects(ProjectViewingDeletion(slug))
-        .returning(returning)
-
-    def givenHookAndTokenRemoval(project: consumers.Project, returning: IO[Unit]) =
-      (projectHookRemover.removeWebhookAndToken _).expects(project).returning(returning)
-  }
+  private def givenHookAndTokenRemoval(project: consumers.Project, returning: IO[Unit]) =
+    (projectHookRemover.removeWebhookAndToken _).expects(project).returning(returning)
 }

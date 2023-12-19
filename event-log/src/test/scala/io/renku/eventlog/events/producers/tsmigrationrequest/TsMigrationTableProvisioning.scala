@@ -18,9 +18,9 @@
 
 package io.renku.eventlog.events.producers.tsmigrationrequest
 
-import cats.data.Kleisli
 import cats.effect.IO
 import io.renku.config.ServiceVersion
+import io.renku.db.DBConfigProvider.DBConfig
 import io.renku.eventlog.TSMigtationTypeSerializers._
 import io.renku.eventlog._
 import io.renku.events.Subscription.SubscriberUrl
@@ -28,14 +28,14 @@ import skunk._
 import skunk.implicits._
 
 trait TsMigrationTableProvisioning {
-  self: InMemoryEventLogDb =>
+  self: EventLogPostgresSpec with TypeSerializers =>
 
   protected def insertSubscriptionRecord(url:        SubscriberUrl,
                                          version:    ServiceVersion,
                                          status:     MigrationStatus,
                                          changeDate: ChangeDate
-  ): IO[Unit] = executeIO[Unit] {
-    Kleisli { session =>
+  )(implicit cfg: DBConfig[EventLogDB]): IO[Unit] =
+    moduleSessionResource(cfg).session.use { session =>
       val query: Command[ServiceVersion *: SubscriberUrl *: MigrationStatus *: ChangeDate *: EmptyTuple] = sql"""
         INSERT INTO ts_migration (subscriber_version, subscriber_url, status, change_date)
         VALUES ($serviceVersionEncoder, $subscriberUrlEncoder, $migrationStatusEncoder, $changeDateEncoder)
@@ -45,35 +45,37 @@ trait TsMigrationTableProvisioning {
         .flatMap(_.execute(version *: url *: status *: changeDate *: EmptyTuple))
         .void
     }
-  }
 
-  protected def findRow(url: SubscriberUrl, version: ServiceVersion): IO[(MigrationStatus, ChangeDate)] =
-    executeIO {
-      Kleisli { session =>
-        val query: Query[SubscriberUrl *: ServiceVersion *: EmptyTuple, (MigrationStatus, ChangeDate)] = sql"""
-            SELECT status, change_date
-            FROM ts_migration
-            WHERE subscriber_url = $subscriberUrlEncoder AND subscriber_version = $serviceVersionEncoder"""
-          .query(migrationStatusDecoder ~ changeDateDecoder)
-          .map { case status ~ changeDate => status -> changeDate }
-        session.prepare(query).flatMap(_.unique(url *: version *: EmptyTuple))
-      }
+  protected def findRow(url: SubscriberUrl, version: ServiceVersion)(implicit
+      cfg: DBConfig[EventLogDB]
+  ): IO[(MigrationStatus, ChangeDate)] =
+    moduleSessionResource(cfg).session.use { session =>
+      val query: Query[SubscriberUrl *: ServiceVersion *: EmptyTuple, (MigrationStatus, ChangeDate)] = sql"""
+          SELECT status, change_date
+          FROM ts_migration
+          WHERE subscriber_url = $subscriberUrlEncoder AND subscriber_version = $serviceVersionEncoder"""
+        .query(migrationStatusDecoder ~ changeDateDecoder)
+        .map { case status ~ changeDate => status -> changeDate }
+      session.prepare(query).flatMap(_.unique(url *: version *: EmptyTuple))
     }
 
-  protected def findRows(version: ServiceVersion): IO[Set[(SubscriberUrl, MigrationStatus, ChangeDate)]] = executeIO {
-    Kleisli { session =>
+  protected def findRows(
+      version: ServiceVersion
+  )(implicit cfg: DBConfig[EventLogDB]): IO[Set[(SubscriberUrl, MigrationStatus, ChangeDate)]] =
+    moduleSessionResource(cfg).session.use { session =>
       val query: Query[ServiceVersion, (SubscriberUrl, MigrationStatus, ChangeDate)] = sql"""
-            SELECT subscriber_url, status, change_date
-            FROM ts_migration
-            WHERE subscriber_version = $serviceVersionEncoder"""
+          SELECT subscriber_url, status, change_date
+          FROM ts_migration
+          WHERE subscriber_version = $serviceVersionEncoder"""
         .query(subscriberUrlDecoder ~ migrationStatusDecoder ~ changeDateDecoder)
         .map { case url ~ status ~ changeDate => (url, status, changeDate) }
       session.prepare(query).flatMap(_.stream(version, 32).compile.toList.map(_.toSet))
     }
-  }
 
-  protected def findMessage(url: SubscriberUrl, version: ServiceVersion): Option[MigrationMessage] = execute {
-    Kleisli { session =>
+  protected def findMessage(url: SubscriberUrl, version: ServiceVersion)(implicit
+      cfg: DBConfig[EventLogDB]
+  ): IO[Option[MigrationMessage]] =
+    moduleSessionResource(cfg).session.use { session =>
       val query: Query[SubscriberUrl *: ServiceVersion *: EmptyTuple, Option[MigrationMessage]] = sql"""
         SELECT message
         FROM ts_migration
@@ -81,5 +83,4 @@ trait TsMigrationTableProvisioning {
         .query(migrationMessageDecoder.opt)
       session.prepare(query).flatMap(_.unique(url *: version *: EmptyTuple))
     }
-  }
 }

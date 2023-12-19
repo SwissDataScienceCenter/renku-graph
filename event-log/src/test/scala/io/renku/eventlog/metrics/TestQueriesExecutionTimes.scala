@@ -16,36 +16,10 @@
  * limitations under the License.
  */
 
-package io.renku.eventlog
+package io.renku.eventlog.metrics
 
-import cats.effect._
-import eu.timepit.refined.auto._
-import io.renku.db.DBConfigProvider.DBConfig
-import io.renku.eventlog.EventLogDB.SessionResource
-import io.renku.testtools.IOSpec
-import natchez.Trace.Implicits.noop
-import skunk._
+import cats.MonadThrow
 
-trait ExternalEventLogDb { self: IOSpec =>
-
-  val dbConfig: DBConfig[EventLogDB] =
-    DBConfig(
-      "localhost",
-      5432,
-      "event_log",
-      "renku",
-      "renku",
-      1
-    )
-
-  implicit lazy val sessionResource: SessionResource[IO] = io.renku.db.SessionResource[IO, EventLogDB](
-    Session.single(
-      host = dbConfig.host,
-      port = dbConfig.port,
-      user = dbConfig.user,
-      database = dbConfig.name,
-      password = Some(dbConfig.pass)
-    ),
-    dbConfig
-  )
+object TestQueriesExecutionTimes {
+  def apply[F[_]: MonadThrow]: QueriesExecutionTimes[F] = QueriesExecutionTimes.histogram[F]
 }

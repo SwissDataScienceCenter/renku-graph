@@ -19,46 +19,41 @@
 package io.renku.eventlog.init
 
 import cats.effect.IO
-import io.renku.interpreters.TestLogger
+import cats.effect.testing.scalatest.AsyncIOSpec
+import io.renku.db.DBConfigProvider.DBConfig
+import io.renku.eventlog.EventLogDB
 import io.renku.interpreters.TestLogger.Level.Info
-import io.renku.testtools.IOSpec
+import org.scalatest.Succeeded
+import org.scalatest.flatspec.AsyncFlatSpec
 import org.scalatest.matchers.should
-import org.scalatest.wordspec.AnyWordSpec
-import skunk.implicits._
 
-class StatusChangeEventsTableCreatorSpec extends AnyWordSpec with IOSpec with DbInitSpec with should.Matchers {
+class StatusChangeEventsTableCreatorSpec extends AsyncFlatSpec with AsyncIOSpec with DbInitSpec with should.Matchers {
 
-  protected[init] override lazy val migrationsToRun: List[DbMigrator[IO]] = allMigrations.takeWhile {
-    case _: StatusChangeEventsTableCreatorImpl[IO] => false
-    case _ => true
+  protected[init] override val runMigrationsUpTo: Class[_ <: DbMigrator[IO]] =
+    classOf[StatusChangeEventsTableCreator[IO]]
+
+  it should "create the 'status_change_events_queue' table if does not exist" in testDBResource.use { implicit cfg =>
+    for {
+      _ <- tableCreator.run.assertNoException
+
+      _ <- logger.loggedOnlyF(Info("'status_change_events_queue' table created"))
+
+      _ <- tableCreator.run.assertNoException
+
+      _ <- logger.loggedOnlyF(Info("'status_change_events_queue' table created"),
+                              Info("'status_change_events_queue' table exists")
+           )
+    } yield Succeeded
   }
 
-  "run" should {
+  it should "create indices for the date and event_type columns" in testDBResource.use { implicit cfg =>
+    for {
+      _ <- tableCreator.run.assertNoException
 
-    "create the 'status_change_events_queue' table if does not exist" in new TestCase {
-
-      tableCreator.run.unsafeRunSync() shouldBe ()
-
-      logger.loggedOnly(Info("'status_change_events_queue' table created"))
-
-      tableCreator.run.unsafeRunSync() shouldBe ()
-
-      logger.loggedOnly(Info("'status_change_events_queue' table created"),
-                        Info("'status_change_events_queue' table exists")
-      )
-    }
-
-    "create indices for the date and event_type columns" in new TestCase {
-
-      tableCreator.run.unsafeRunSync() shouldBe ((): Unit)
-
-      verifyTrue(sql"DROP INDEX idx_date;".command)
-      verifyTrue(sql"DROP INDEX idx_event_type;".command)
-    }
+      _ <- verifyIndexExists("status_change_events_queue", "idx_date").asserting(_ shouldBe true)
+      _ <- verifyIndexExists("status_change_events_queue", "idx_event_type").asserting(_ shouldBe true)
+    } yield Succeeded
   }
 
-  private trait TestCase {
-    implicit val logger: TestLogger[IO] = TestLogger[IO]()
-    val tableCreator = new StatusChangeEventsTableCreatorImpl[IO]
-  }
+  private def tableCreator(implicit cfg: DBConfig[EventLogDB]) = new StatusChangeEventsTableCreatorImpl[IO]
 }

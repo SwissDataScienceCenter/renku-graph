@@ -42,9 +42,9 @@ private class EventDeliveryTableCreatorImpl[F[_]: MonadCancelThrow: Logger: Sess
 
   private def createTable(): Kleisli[F, Session[F], Unit] = for {
     _ <- execute(createTableSql)
-    _ <- execute(sql"CREATE INDEX IF NOT EXISTS idx_event_id    ON event_delivery(event_id)".command)
-    _ <- execute(sql"CREATE INDEX IF NOT EXISTS idx_project_id  ON event_delivery(project_id)".command)
-    _ <- execute(sql"CREATE INDEX IF NOT EXISTS idx_delivery_id ON event_delivery(delivery_id)".command)
+    _ <- execute(sql"CREATE INDEX IF NOT EXISTS idx_event_delivery_event_id    ON event_delivery(event_id)".command)
+    _ <- execute(sql"CREATE INDEX IF NOT EXISTS idx_event_delivery_project_id  ON event_delivery(project_id)".command)
+    _ <- execute(sql"CREATE INDEX IF NOT EXISTS idx_event_delivery_delivery_id ON event_delivery(delivery_id)".command)
     _ <- Kleisli.liftF(Logger[F] info "'event_delivery' table created")
     _ <- execute(foreignKeySql)
   } yield ()

@@ -26,19 +26,20 @@ import io.renku.db.DBConfigProvider.DBConfig
 import natchez.Trace.Implicits.noop
 import org.typelevel.log4cats.Logger
 import org.typelevel.log4cats.slf4j.Slf4jLogger
-import skunk.Session
+import skunk.{Session, SqlState}
 import skunk.implicits._
 
 class PostgresClient[DB](server: PostgresServer, migrations: SessionResource[IO, DB] => IO[Unit]) {
 
   private[this] implicit val logger: Logger[IO] = Slf4jLogger.getLoggerFromClass[IO](getClass)
 
-  def randomizedDBResource(prefix: String): Resource[IO, DBConfig[DB]] =
+  def randomizedDBResource(prefix: String): Resource[IO, DBConfig[DB]] = {
     Random
       .scalaUtilRandom[IO]
       .flatMap(_.nextIntBounded(1000))
       .map(v => s"${prefix}_$v")
       .toResource >>= dbResource
+  }.recoverWith { case SqlState.DuplicateDatabase(_) => randomizedDBResource(prefix) }
 
   def dbResource(dbName: String): Resource[IO, DBConfig[DB]] =
     Resource

@@ -233,7 +233,7 @@ private[statuschange] class DbUpdater[F[_]: Async: Logger: QueriesExecutionTimes
 
   private def removeAwaitingDeletionEvents(eventsWindow: List[(EventId, EventStatus)], event: ToTriplesGenerated) =
     eventsWindow.collect { case (id, AwaitingDeletion) => id } match {
-      case Nil => Kleisli.pure(DBUpdateResults.ForProjects(event.project.slug, Map()))
+      case Nil => Kleisli.pure(DBUpdateResults(event.project.slug))
       case eventIdsToRemove =>
         measureExecutionTime {
           SqlStatement(name = "to_triples_generated - awaiting_deletions removal")

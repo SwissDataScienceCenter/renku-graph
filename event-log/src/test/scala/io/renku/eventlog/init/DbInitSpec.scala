@@ -16,44 +16,106 @@
  * limitations under the License.
  */
 
-package io.renku.eventlog.init
+package io.renku.eventlog
+package init
 
-import cats.data.Kleisli
 import cats.effect.IO
 import cats.syntax.all._
-import io.renku.eventlog.InMemoryEventLogDb
-import io.renku.interpreters.TestLogger
-import io.renku.testtools.IOSpec
-import org.scalatest.{BeforeAndAfter, Suite}
+import io.renku.db.DBConfigProvider.DBConfig
+import io.renku.db.SessionResource
+import io.renku.eventlog.{EventLogDB, EventLogPostgresSpec}
+import org.scalatest.Suite
 import skunk._
-import skunk.codec.all._
+import skunk.codec.all.{bool, varchar}
 import skunk.implicits._
 
-trait DbInitSpec extends InMemoryEventLogDb with EventLogDbMigrations with BeforeAndAfter {
-  self: Suite with IOSpec =>
+trait DbInitSpec extends EventLogPostgresSpec {
+  self: Suite =>
 
-  private implicit val logger: TestLogger[IO] = TestLogger[IO]()
-  protected[init] val migrationsToRun: List[DbMigrator[IO]]
+  protected val runMigrationsUpTo: Class[_ <: DbMigrator[IO]]
 
-  before {
-    findAllTables() foreach dropTable
-    migrationsToRun.map(_.run).sequence.unsafeRunSync()
+  override lazy val migrations: SessionResource[IO, EventLogDB] => IO[Unit] = { sr =>
+    implicit val msr: EventLogDB.SessionResource[IO] = EventLogDB.SessionResource[IO](sr)
+    DbInitializer
+      .migrations[IO]
+      .takeWhile(m => !runMigrationsUpTo.isAssignableFrom(m.getClass))
+      .traverse_(_.run) >> logger.resetF()
   }
 
-  private def findAllTables(): List[String] = execute {
-    Kleisli { session =>
-      val query: Query[Void, String] = sql"""
-          SELECT DISTINCT tablename FROM pg_tables
-          WHERE schemaname != 'pg_catalog'
-            AND schemaname != 'information_schema'""".query(name)
-      session.execute(query)
+  def createEventTable(implicit cfg: DBConfig[EventLogDB]): IO[Unit] =
+    DbInitializer
+      .migrations[IO]
+      .takeWhile(_.getClass != classOf[EventLogTableRenamer[IO]])
+      .traverse_(_.run)
+
+  def dropTable(tableName: String)(implicit cfg: DBConfig[EventLogDB]): IO[Unit] =
+    moduleSessionResource.session.use { session =>
+      val query: Command[Void] = sql"DROP TABLE IF EXISTS #$tableName CASCADE".command
+      session.execute(query).void
     }
-  }
 
-  protected def createEventTable(): Unit =
-    List(EventLogTableCreator[IO], BatchDateAdder[IO], EventLogTableRenamer[IO])
-      .map(_.run)
-      .sequence
-      .void
-      .unsafeRunSync()
+  def tableExists(tableName: String)(implicit cfg: DBConfig[EventLogDB]): IO[Boolean] =
+    moduleSessionResource.session.use { session =>
+      val query: Query[String, Boolean] =
+        sql"SELECT EXISTS (SELECT 1 FROM pg_tables WHERE tablename = $varchar)".query(bool)
+      session.prepare(query).flatMap(_.unique(tableName)).recover { case _ => false }
+    }
+
+  def verifyColumnExists(table: String, column: String)(implicit cfg: DBConfig[EventLogDB]): IO[Boolean] =
+    moduleSessionResource.session.use { session =>
+      val query: Query[String *: String *: EmptyTuple, Boolean] =
+        sql"""SELECT EXISTS (
+                SELECT 1
+                FROM information_schema.columns
+                WHERE table_name = $varchar AND column_name = $varchar
+              )""".query(bool)
+      session
+        .prepare(query)
+        .flatMap(_.unique(table *: column *: EmptyTuple))
+        .recover { case _ => false }
+    }
+
+  def verifyConstraintExists(table: String, constraintName: String)(implicit cfg: DBConfig[EventLogDB]): IO[Boolean] =
+    moduleSessionResource.session.use { session =>
+      val query: Query[String *: String *: EmptyTuple, Boolean] =
+        sql"""SELECT EXISTS (
+                 SELECT *
+                 FROM information_schema.constraint_column_usage
+                 WHERE table_name = $varchar AND constraint_name = $varchar
+               )""".query(bool)
+      session
+        .prepare(query)
+        .flatMap(_.unique(table *: constraintName *: EmptyTuple))
+        .recover { case _ => false }
+    }
+
+  def verifyIndexExists(table: String, indexName: String)(implicit cfg: DBConfig[EventLogDB]): IO[Boolean] =
+    moduleSessionResource.session.use { session =>
+      val query: Query[String *: String *: EmptyTuple, Boolean] =
+        sql"""SELECT EXISTS (
+                 SELECT *
+                 FROM pg_indexes
+                 WHERE tablename = $varchar AND indexname = $varchar
+               )""".query(bool)
+      session
+        .prepare(query)
+        .flatMap(_.unique(table *: indexName *: EmptyTuple))
+        .recover { case _ => false }
+    }
+
+  def verifyExists(table: String, column: String, hasType: String)(implicit cfg: DBConfig[EventLogDB]): IO[Boolean] =
+    moduleSessionResource.session.use { session =>
+      val query: Query[String *: String *: EmptyTuple, String] =
+        sql"""SELECT data_type
+                FROM information_schema.columns
+                WHERE table_name = $varchar AND column_name = $varchar;""".query(varchar)
+      session
+        .prepare(query)
+        .flatMap(_.unique(table *: column *: EmptyTuple))
+        .map(dataType => dataType == hasType)
+        .recover { case _ => false }
+    }
+
+  def executeCommand(sql: Command[Void])(implicit cfg: DBConfig[EventLogDB]): IO[Unit] =
+    moduleSessionResource.session.use(_.execute(sql).void)
 }

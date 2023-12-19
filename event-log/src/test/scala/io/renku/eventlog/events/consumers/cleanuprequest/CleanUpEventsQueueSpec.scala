@@ -19,59 +19,56 @@
 package io.renku.eventlog.events.consumers.cleanuprequest
 
 import cats.effect.IO
-import io.renku.eventlog.metrics.QueriesExecutionTimes
-import io.renku.eventlog.{CleanUpEventsProvisioning, InMemoryEventLogDbSpec}
+import cats.effect.testing.scalatest.AsyncIOSpec
+import io.renku.db.DBConfigProvider.DBConfig
+import io.renku.eventlog.metrics.{QueriesExecutionTimes, TestQueriesExecutionTimes}
+import io.renku.eventlog.{CleanUpEventsProvisioning, EventLogDB, EventLogPostgresSpec}
+import io.renku.events.consumers.ConsumersModelGenerators.consumerProjects
 import io.renku.generators.Generators.Implicits._
-import io.renku.graph.model.GraphModelGenerators.{projectIds, projectSlugs}
-import io.renku.metrics.TestMetricsRegistry
-import io.renku.testtools.IOSpec
-import org.scalamock.scalatest.MockFactory
+import org.scalamock.scalatest.AsyncMockFactory
+import org.scalatest.Succeeded
 import org.scalatest.matchers.should
-import org.scalatest.wordspec.AnyWordSpec
+import org.scalatest.wordspec.AsyncWordSpec
 
 import java.time.OffsetDateTime
 
 class CleanUpEventsQueueSpec
-    extends AnyWordSpec
-    with IOSpec
-    with InMemoryEventLogDbSpec
+    extends AsyncWordSpec
+    with AsyncIOSpec
+    with EventLogPostgresSpec
+    with AsyncMockFactory
     with CleanUpEventsProvisioning
-    with MockFactory
     with should.Matchers {
 
   "offer" should {
 
-    "insert a new row if there's no row for the project" in new TestCase {
-      val id1   = projectIds.generateOne
-      val slug1 = projectSlugs.generateOne
-      val id2   = projectIds.generateOne
-      val slug2 = projectSlugs.generateOne
+    "insert a new row if there's no row for the project" in testDBResource.use { implicit cfg =>
+      val project1 = consumerProjects.generateOne
+      val project2 = consumerProjects.generateOne
 
-      queue.offer(id1, slug1).unsafeRunSync() shouldBe ()
-      queue.offer(id2, slug2).unsafeRunSync() shouldBe ()
+      for {
+        _ <- queue.offer(project1.id, project1.slug).assertNoException
+        _ <- queue.offer(project2.id, project2.slug).assertNoException
 
-      findCleanUpEvents shouldBe List(id1 -> slug1, id2 -> slug2)
+        _ <- findCleanUpEvents.asserting(_ shouldBe List(project1, project2))
+      } yield Succeeded
     }
 
-    "do not insert duplicates" in new TestCase {
-      val id   = projectIds.generateOne
-      val slug = projectSlugs.generateOne
+    "do not insert duplicates" in testDBResource.use { implicit cfg =>
+      val project = consumerProjects.generateOne
 
-      queue.offer(id, slug).unsafeRunSync() shouldBe ()
-      queue.offer(id, slug).unsafeRunSync() shouldBe ()
+      for {
+        _ <- queue.offer(project.id, project.slug).assertNoException
+        _ <- queue.offer(project.id, project.slug).assertNoException
 
-      findCleanUpEvents shouldBe List(id -> slug)
+        _ <- findCleanUpEvents.asserting(_ shouldBe List(project))
+      } yield Succeeded
     }
   }
 
-  private trait TestCase {
-    val now = OffsetDateTime.now()
-
-    private implicit val metricsRegistry:  TestMetricsRegistry[IO]   = TestMetricsRegistry[IO]
-    private implicit val queriesExecTimes: QueriesExecutionTimes[IO] = QueriesExecutionTimes[IO]().unsafeRunSync()
-    val currentTime = mockFunction[OffsetDateTime]
-    val queue       = new CleanUpEventsQueueImpl[IO](currentTime)
-
-    currentTime.expects().returning(now).anyNumberOfTimes()
+  private lazy val now = OffsetDateTime.now()
+  private def queue(implicit cfg: DBConfig[EventLogDB]) = {
+    implicit val qet: QueriesExecutionTimes[IO] = TestQueriesExecutionTimes[IO]
+    new CleanUpEventsQueueImpl[IO](() => now)
   }
 }

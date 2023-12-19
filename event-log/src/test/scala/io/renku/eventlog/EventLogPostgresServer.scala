@@ -16,8 +16,8 @@
  * limitations under the License.
  */
 
-package io.renku.tokenrepository.repository
+package io.renku.eventlog
 
 import io.renku.db.PostgresServer
 
-object TokenRepositoryPostgresServer extends PostgresServer(module = "token_repository", port = 5402)
+object EventLogPostgresServer extends PostgresServer(module = "event_log", port = 5403)

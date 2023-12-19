@@ -18,23 +18,26 @@
 
 package io.renku.eventlog.events.producers
 
-import cats.data.Kleisli
-import io.renku.eventlog.{EventLogDataProvisioning, InMemoryEventLogDb}
+import cats.effect.IO
+import io.renku.db.DBConfigProvider.DBConfig
+import io.renku.eventlog.{EventLogDB, EventLogDBProvisioning, EventLogPostgresSpec}
 import io.renku.events.CategoryName
+import io.renku.generators.Generators.Implicits._
+import io.renku.graph.model.EventsGenerators.lastSyncedDates
 import io.renku.graph.model.events.LastSyncedDate
 import io.renku.graph.model.projects
 import skunk._
 import skunk.codec.all.varchar
 import skunk.implicits._
 
-trait SubscriptionDataProvisioning extends EventLogDataProvisioning with SubscriptionTypeSerializers {
-  self: InMemoryEventLogDb =>
+trait SubscriptionProvisioning extends EventLogDBProvisioning with SubscriptionTypeSerializers {
+  self: EventLogPostgresSpec =>
 
   protected def upsertCategorySyncTime(projectId:    projects.GitLabId,
                                        categoryName: CategoryName,
-                                       lastSynced:   LastSyncedDate
-  ): Unit = execute[Unit] {
-    Kleisli { session =>
+                                       lastSynced:   LastSyncedDate = lastSyncedDates.generateOne
+  )(implicit cfg: DBConfig[EventLogDB]): IO[Unit] =
+    moduleSessionResource(cfg).session.use { session =>
       val query: Command[projects.GitLabId *: CategoryName *: LastSyncedDate *: EmptyTuple] = sql"""
         INSERT INTO subscription_category_sync_time (project_id, category_name, last_synced)
         VALUES ($projectIdEncoder, $categoryNameEncoder, $lastSyncedDateEncoder)
@@ -43,30 +46,33 @@ trait SubscriptionDataProvisioning extends EventLogDataProvisioning with Subscri
       """.command
       session.prepare(query).flatMap(_.execute(projectId *: categoryName *: lastSynced *: EmptyTuple)).void
     }
-  }
 
-  protected def findSyncTime(projectId: projects.GitLabId, categoryName: CategoryName): Option[LastSyncedDate] =
-    execute {
-      Kleisli { session =>
-        val query: Query[projects.GitLabId *: CategoryName *: EmptyTuple, LastSyncedDate] = sql"""
+  protected def findSyncTime(projectId: projects.GitLabId, categoryName: CategoryName)(implicit
+      cfg: DBConfig[EventLogDB]
+  ): IO[Option[LastSyncedDate]] =
+    moduleSessionResource(cfg).session.use { session =>
+      val query: Query[projects.GitLabId *: CategoryName *: EmptyTuple, LastSyncedDate] = sql"""
         SELECT last_synced
         FROM subscription_category_sync_time
         WHERE project_id = $projectIdEncoder AND category_name = $categoryNameEncoder
       """.query(lastSyncedDateDecoder)
-        session.prepare(query).flatMap(_.option(projectId *: categoryName *: EmptyTuple))
-      }
+      session.prepare(query).flatMap(_.option(projectId *: categoryName *: EmptyTuple))
     }
 
-  protected def findProjectCategorySyncTimes(projectId: projects.GitLabId): List[(CategoryName, LastSyncedDate)] =
-    execute {
-      Kleisli { session =>
-        val query: Query[projects.GitLabId, (CategoryName, LastSyncedDate)] =
-          sql"""SELECT category_name, last_synced
-              FROM subscription_category_sync_time
-              WHERE project_id = $projectIdEncoder"""
-            .query(varchar ~ lastSyncedDateDecoder)
-            .map { case (category: String) ~ lastSynced => (CategoryName(category), lastSynced) }
-        session.prepare(query).flatMap(_.stream(projectId, 32).compile.toList)
-      }
+  protected case class CategorySync(name: CategoryName, lastSyncedDate: LastSyncedDate)
+
+  protected def findCategorySyncTimes(
+      projectId: projects.GitLabId
+  )(implicit cfg: DBConfig[EventLogDB]): IO[List[CategorySync]] =
+    moduleSessionResource(cfg).session.use { session =>
+      val query: Query[projects.GitLabId, CategorySync] = sql"""
+          SELECT category_name, last_synced
+          FROM subscription_category_sync_time
+          WHERE project_id = $projectIdEncoder"""
+        .query(varchar ~ lastSyncedDateDecoder)
+        .map { case (category: String) ~ (lastSynced: LastSyncedDate) =>
+          CategorySync(CategoryName(category), lastSynced)
+        }
+      session.prepare(query).flatMap(_.stream(projectId, 32).compile.toList)
     }
 }

@@ -66,7 +66,6 @@ class DuplicateProjectsRemoverSpec
       _ <- findToken(projectId1).asserting(_ shouldBe Some(encryptedToken1.value))
       _ <- findToken(projectId2).asserting(_ shouldBe Some(encryptedToken2.value))
 
-      _ <- logger.resetF()
       _ <- DuplicateProjectsRemover[IO].run.assertNoException
       _ <- findToken(projectId1).asserting(_ shouldBe None)
       _ <- findToken(projectId2).asserting(_ shouldBe Some(encryptedToken2.value))
@@ -82,8 +81,8 @@ class DuplicateProjectsRemoverSpec
     sessionResource(cfg).use { session =>
       val query: Command[Int *: String *: String *: EmptyTuple] =
         sql"""insert into
-                projects_tokens (project_id, project_path, token)
-                values ($int4, $varchar, $varchar)
+              projects_tokens (project_id, project_path, token)
+              values ($int4, $varchar, $varchar)
          """.command
       session
         .prepare(query)

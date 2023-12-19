@@ -42,7 +42,6 @@ class ExpiryAndCreatedDatesAdderSpec
         _ <- verifyColumnExists("projects_tokens", "expiry_date").asserting(_ shouldBe false)
         _ <- verifyColumnExists("projects_tokens", "created_at").asserting(_ shouldBe false)
 
-        _ <- logger.resetF()
         _ <- ExpiryAndCreatedDatesAdder[IO].run.assertNoException
         _ <- verifyColumnExists("projects_tokens", "expiry_date").asserting(_ shouldBe true)
         _ <- verifyColumnExists("projects_tokens", "created_at").asserting(_ shouldBe true)

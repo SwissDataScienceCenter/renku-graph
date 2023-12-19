@@ -19,43 +19,37 @@
 package io.renku.eventlog.events.consumers.cleanuprequest
 
 import cats.effect.IO
+import cats.effect.testing.scalatest.AsyncIOSpec
 import cats.syntax.all._
-import io.renku.eventlog.metrics.QueriesExecutionTimes
-import io.renku.eventlog.{InMemoryEventLogDbSpec, TypeSerializers}
+import io.renku.db.DBConfigProvider.DBConfig
+import io.renku.eventlog.metrics.{QueriesExecutionTimes, TestQueriesExecutionTimes}
+import io.renku.eventlog.{EventLogDB, EventLogPostgresSpec}
+import io.renku.events.consumers.ConsumersModelGenerators.consumerProjects
 import io.renku.generators.Generators.Implicits._
-import io.renku.graph.model.EventContentGenerators.eventDates
-import io.renku.graph.model.GraphModelGenerators._
-import io.renku.metrics.TestMetricsRegistry
-import io.renku.testtools.IOSpec
+import org.scalamock.scalatest.AsyncMockFactory
+import org.scalatest.flatspec.AsyncFlatSpec
 import org.scalatest.matchers.should
-import org.scalatest.wordspec.AnyWordSpec
 
 class ProjectIdFinderSpec
-    extends AnyWordSpec
-    with IOSpec
-    with InMemoryEventLogDbSpec
-    with TypeSerializers
+    extends AsyncFlatSpec
+    with AsyncIOSpec
+    with EventLogPostgresSpec
+    with AsyncMockFactory
     with should.Matchers {
 
-  "findProjectId" should {
+  private val project = consumerProjects.generateOne
 
-    "return id of the project with the given slug" in new TestCase {
-      val id = projectIds.generateOne
-      upsertProject(id, slug, eventDates.generateOne)
-
-      finder.findProjectId(slug).unsafeRunSync() shouldBe id.some
-    }
-
-    "return None if project with the given slug does not exist" in new TestCase {
-      finder.findProjectId(slug).unsafeRunSync() shouldBe None
-    }
+  it should "return id of the project with the given slug" in testDBResource.use { implicit cfg =>
+    upsertProject(project) >>
+      finder.findProjectId(project.slug).asserting(_ shouldBe project.id.some)
   }
 
-  private trait TestCase {
-    val slug = projectSlugs.generateOne
+  it should "return None if project with the given slug does not exist" in testDBResource.use { implicit cfg =>
+    finder.findProjectId(project.slug).asserting(_ shouldBe None)
+  }
 
-    private implicit val metricsRegistry:  TestMetricsRegistry[IO]   = TestMetricsRegistry[IO]
-    private implicit val queriesExecTimes: QueriesExecutionTimes[IO] = QueriesExecutionTimes[IO]().unsafeRunSync()
-    val finder = new ProjectIdFinderImpl[IO]
+  private def finder(implicit cfg: DBConfig[EventLogDB]) = {
+    implicit val qet: QueriesExecutionTimes[IO] = TestQueriesExecutionTimes[IO]
+    new ProjectIdFinderImpl[IO]
   }
 }

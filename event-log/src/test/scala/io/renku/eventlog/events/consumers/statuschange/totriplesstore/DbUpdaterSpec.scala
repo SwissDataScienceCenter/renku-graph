@@ -20,13 +20,15 @@ package io.renku.eventlog.events.consumers.statuschange.totriplesstore
 
 import cats.data.Kleisli
 import cats.effect.IO
+import cats.effect.testing.scalatest.AsyncIOSpec
 import cats.syntax.all._
+import io.renku.db.DBConfigProvider.DBConfig
 import io.renku.eventlog.api.events.StatusChangeEvent.ToTriplesStore
 import io.renku.eventlog.events.consumers.statuschange.SkunkExceptionsGenerators.postgresErrors
 import io.renku.eventlog.events.consumers.statuschange.{DBUpdateResults, DeliveryInfoRemover}
-import io.renku.eventlog.metrics.QueriesExecutionTimes
-import io.renku.eventlog.{InMemoryEventLogDbSpec, TypeSerializers}
-import io.renku.events.consumers.ConsumersModelGenerators
+import io.renku.eventlog.metrics.{QueriesExecutionTimes, TestQueriesExecutionTimes}
+import io.renku.eventlog.{EventLogDB, EventLogPostgresSpec}
+import io.renku.events.consumers.ConsumersModelGenerators.consumerProjects
 import io.renku.generators.Generators.Implicits._
 import io.renku.generators.Generators.{exceptions, timestamps}
 import io.renku.graph.model.EventContentGenerators.eventDates
@@ -34,227 +36,226 @@ import io.renku.graph.model.EventsGenerators
 import io.renku.graph.model.EventsGenerators.eventProcessingTimes
 import io.renku.graph.model.events.EventStatus._
 import io.renku.graph.model.events._
-import io.renku.metrics.TestMetricsRegistry
-import io.renku.testtools.IOSpec
-import org.scalamock.scalatest.MockFactory
+import org.scalamock.scalatest.AsyncMockFactory
 import org.scalatest.matchers.should
-import org.scalatest.wordspec.AnyWordSpec
+import org.scalatest.wordspec.AsyncWordSpec
+import org.scalatest.{OptionValues, Succeeded}
 import skunk.SqlState
 
 import java.time.Instant
 
 class DbUpdaterSpec
-    extends AnyWordSpec
-    with IOSpec
-    with InMemoryEventLogDbSpec
-    with TypeSerializers
+    extends AsyncWordSpec
+    with AsyncIOSpec
+    with EventLogPostgresSpec
+    with AsyncMockFactory
     with should.Matchers
-    with MockFactory {
+    with OptionValues {
 
   "updateDB" should {
 
-    "change the status of all events in statuses before TRIPLES_STORE up to the current event with the status TRIPLES_STORE" in new TestCase {
+    "change the status of all events in statuses before TRIPLES_STORE up to the current event with the status TRIPLES_STORE" in testDBResource
+      .use { implicit cfg =>
+        val project   = consumerProjects.generateOne
+        val eventDate = eventDates.generateOne
+        for {
+          eventsToUpdate <-
+            statusesToUpdate
+              .map(storeGeneratedEvent(_, timestamps(max = eventDate.value).generateAs(EventDate), project))
+              .sequence
 
-      val eventDate = eventDates.generateOne
+          eventsToSkip <-
+            (EventStatus.all.toList diff statusesToUpdate)
+              .map(storeGeneratedEvent(_, timestamps(max = eventDate.value).generateAs(EventDate), project))
+              .sequence >>= (events =>
+              storeGeneratedEvent(TriplesGenerated,
+                                  timestamps(min = eventDate.value, max = now).generateAs(EventDate),
+                                  project
+              ).map(_ :: events)
+            )
 
-      val eventsToUpdate = statusesToUpdate.map(addEvent(_, timestamps(max = eventDate.value).generateAs(EventDate)))
-      val eventsToSkip = EventStatus.all
-        .diff(statusesToUpdate)
-        .map(addEvent(_, timestamps(max = eventDate.value).generateAs(EventDate))) +
-        addEvent(TriplesGenerated, timestamps(min = eventDate.value, max = now).generateAs(EventDate))
+          event <- storeGeneratedEvent(TransformingTriples, eventDate, project)
 
-      val event = addEvent(TransformingTriples, eventDate)
+          statusChangeEvent = ToTriplesStore(event.eventId.id, project, eventProcessingTimes.generateOne)
 
-      val statusChangeEvent = ToTriplesStore(event._1, project, eventProcessingTimes.generateOne)
+          _ = givenDeliveryInfoRemoved(statusChangeEvent.eventId)
 
-      givenDeliveryInfoRemoved(statusChangeEvent.eventId)
+          _ <- moduleSessionResource.session.useKleisli(dbUpdater updateDB statusChangeEvent).asserting {
+                 _ shouldBe DBUpdateResults.ForProjects(
+                   project.slug,
+                   statusesToUpdate
+                     .map(_ -> -1)
+                     .toMap +
+                     (TransformingTriples -> (-1 /* for the event */ - 1 /* for the old TransformingTriples */ )) +
+                     (TriplesStore        -> (eventsToUpdate.size + 1 /* for the event */ ))
+                 )
+               }
 
-      sessionResource.useK(dbUpdater updateDB statusChangeEvent).unsafeRunSync() shouldBe DBUpdateResults
-        .ForProjects(
-          project.slug,
-          statusesToUpdate
-            .map(_ -> -1)
-            .toMap +
-            (TransformingTriples -> (-1 /* for the event */ - 1 /* for the old TransformingTriples */ )) +
-            (TriplesStore        -> (eventsToUpdate.size + 1 /* for the event */ ))
-        )
+          _ <- findFullEvent(event.eventId)
+                 .map(_.value)
+                 .asserting { case (_, status, _, maybePayload, processingTimes) =>
+                   status        shouldBe TriplesStore
+                   maybePayload  shouldBe a[Some[_]]
+                   processingTimes should contain(statusChangeEvent.processingTime)
+                 }
 
-      findFullEvent(CompoundEventId(event._1, project.id))
-        .map { case (_, status, _, maybePayload, processingTimes) =>
-          status        shouldBe TriplesStore
-          maybePayload  shouldBe a[Some[_]]
-          processingTimes should contain(statusChangeEvent.processingTime)
-        }
-        .getOrElse(fail("No event found for main event"))
+          _ <- eventsToUpdate.map { ge =>
+                 findFullEvent(ge.eventId).map(_.value).asserting {
+                   case (_, status, maybeMessage, maybePayload, processingTimes) =>
+                     status               shouldBe TriplesStore
+                     maybeMessage         shouldBe None
+                     (maybePayload.map(_.value) -> ge.maybePayload.map(_.value))
+                       .mapN(_ should contain theSameElementsAs _)
+                     processingTimes shouldBe ge.processingTimes
+                 }
+               }.sequence
 
-      eventsToUpdate.map { case (eventId, status, _, originalPayload, originalProcessingTimes) =>
-        findFullEvent(CompoundEventId(eventId, project.id))
-          .map { case (_, status, maybeMessage, maybePayload, processingTimes) =>
-            status               shouldBe TriplesStore
-            maybeMessage         shouldBe None
-            (maybePayload.map(_.value) -> originalPayload.map(_.value)) mapN (_ should contain theSameElementsAs _)
-            processingTimes      shouldBe originalProcessingTimes
-          }
-          .getOrElse(fail(s"No event found with old $status status"))
+          _ <- eventsToSkip.map { ge =>
+                 findFullEvent(ge.eventId).map(_.value).asserting {
+                   case (_, status, maybeMessage, maybePayload, processingTimes) =>
+                     status               shouldBe ge.status
+                     maybeMessage         shouldBe ge.maybeMessage
+                     (maybePayload.map(_.value) -> ge.maybePayload.map(_.value))
+                       .mapN(_ should contain theSameElementsAs _)
+                     processingTimes shouldBe ge.processingTimes
+                 }
+               }.sequence
+        } yield Succeeded
       }
 
-      eventsToSkip.map { case (eventId, originalStatus, originalMessage, originalPayload, originalProcessingTimes) =>
-        findFullEvent(CompoundEventId(eventId, project.id))
-          .map { case (_, status, maybeMessage, maybePayload, processingTimes) =>
-            status               shouldBe originalStatus
-            maybeMessage         shouldBe originalMessage
-            (maybePayload.map(_.value) -> originalPayload.map(_.value)) mapN (_ should contain theSameElementsAs _)
-            processingTimes      shouldBe originalProcessingTimes
-          }
-          .getOrElse(fail(s"No event found with old $originalStatus status"))
+    "change the status of all events older than the current event but not the events with the same date" in testDBResource
+      .use { implicit cfg =>
+        val project   = consumerProjects.generateOne
+        val eventDate = eventDates.generateOne
+        for {
+          event1 <- storeGeneratedEvent(TransformingTriples, eventDate, project)
+          event2 <- storeGeneratedEvent(TriplesGenerated, eventDate, project)
+
+          statusChangeEvent = ToTriplesStore(event1.eventId.id, project, eventProcessingTimes.generateOne)
+
+          _ = givenDeliveryInfoRemoved(statusChangeEvent.eventId)
+
+          _ <- moduleSessionResource.session.useKleisli(dbUpdater updateDB statusChangeEvent).asserting {
+                 _ shouldBe DBUpdateResults(project.slug, TransformingTriples -> -1, TriplesStore -> 1)
+               }
+
+          _ <- findFullEvent(event1.eventId)
+                 .map(_.value)
+                 .asserting { case (_, status, _, maybePayload, processingTimes) =>
+                   status        shouldBe TriplesStore
+                   maybePayload  shouldBe a[Some[_]]
+                   processingTimes should contain(statusChangeEvent.processingTime)
+                 }
+
+          _ <- findFullEvent(event2.eventId).asserting(_.map(_._2) shouldBe TriplesGenerated.some)
+        } yield Succeeded
       }
-    }
-
-    "change the status of all events older than the current event but not the events with the same date" in new TestCase {
-      val eventDate = eventDates.generateOne
-      val event1    = addEvent(TransformingTriples, eventDate)
-      val event2    = addEvent(TriplesGenerated, eventDate)
-
-      val statusChangeEvent =
-        ToTriplesStore(event1._1, project, eventProcessingTimes.generateOne)
-
-      givenDeliveryInfoRemoved(statusChangeEvent.eventId)
-
-      sessionResource.useK(dbUpdater updateDB statusChangeEvent).unsafeRunSync() shouldBe DBUpdateResults
-        .ForProjects(
-          project.slug,
-          statusCount = Map(TransformingTriples -> -1, TriplesStore -> 1)
-        )
-
-      findFullEvent(CompoundEventId(event1._1, project.id))
-        .map { case (_, status, _, maybePayload, processingTimes) =>
-          status        shouldBe TriplesStore
-          maybePayload  shouldBe a[Some[_]]
-          processingTimes should contain(statusChangeEvent.processingTime)
-        }
-        .getOrElse(fail("No event found for main event"))
-
-      findFullEvent(CompoundEventId(event2._1, project.id)).map(_._2) shouldBe TriplesGenerated.some
-    }
 
     (EventStatus.all - TransformingTriples) foreach { invalidStatus =>
-      s"do nothing if event in $invalidStatus" in new TestCase {
+      s"do nothing if event in $invalidStatus" in testDBResource.use { implicit cfg =>
         val latestEventDate = eventDates.generateOne
-        val eventId         = addEvent(invalidStatus, latestEventDate)._1
-        val ancestorEventId = addEvent(
-          TransformingTriples,
-          timestamps(max = latestEventDate.value.minusSeconds(1)).generateAs(EventDate)
-        )._1
+        val project         = consumerProjects.generateOne
+        for {
+          event <- storeGeneratedEvent(invalidStatus, latestEventDate, project)
+          ancestorEvent <- storeGeneratedEvent(
+                             TransformingTriples,
+                             timestamps(max = latestEventDate.value.minusSeconds(1)).generateAs(EventDate),
+                             project
+                           )
 
-        val statusChangeEvent =
-          ToTriplesStore(eventId, project, eventProcessingTimes.generateOne)
+          statusChangeEvent = ToTriplesStore(event.eventId.id, project, eventProcessingTimes.generateOne)
 
-        givenDeliveryInfoRemoved(statusChangeEvent.eventId)
+          _ = givenDeliveryInfoRemoved(statusChangeEvent.eventId)
 
-        sessionResource
-          .useK(dbUpdater updateDB statusChangeEvent)
-          .unsafeRunSync() shouldBe DBUpdateResults.ForProjects.empty
+          _ <- moduleSessionResource.session
+                 .useKleisli(dbUpdater updateDB statusChangeEvent)
+                 .asserting(_ shouldBe DBUpdateResults.empty)
 
-        findFullEvent(CompoundEventId(eventId, project.id)).map(_._2)         shouldBe invalidStatus.some
-        findFullEvent(CompoundEventId(ancestorEventId, project.id)).map(_._2) shouldBe TransformingTriples.some
+          _ <- findFullEvent(event.eventId).asserting(_.map(_._2) shouldBe invalidStatus.some)
+          _ <- findFullEvent(ancestorEvent.eventId) asserting (_.map(_._2) shouldBe TransformingTriples.some)
+        } yield Succeeded
       }
     }
   }
 
   "onRollback" should {
 
-    "retry the updateDB procedure on DeadlockDetected" in new TestCase {
-
+    "retry the updateDB procedure on DeadlockDetected" in testDBResource.use { implicit cfg =>
       val eventDate = eventDates.generateOne
+      val project   = consumerProjects.generateOne
 
-      // event to update =
-      addEvent(New, timestamps(max = eventDate.value).generateAs(EventDate))
+      for {
+        // event to update =
+        _ <- storeGeneratedEvent(New, timestamps(max = eventDate.value).generateAs(EventDate), project)
 
-      // event to skip
-      addEvent(EventStatus.all.diff(statusesToUpdate).head, timestamps(max = eventDate.value).generateAs(EventDate))
+        // event to skip
+        _ <- storeGeneratedEvent((EventStatus.all.toList diff statusesToUpdate).head,
+                                 timestamps(max = eventDate.value).generateAs(EventDate),
+                                 project
+             )
 
-      val event = addEvent(TransformingTriples, eventDate)
+        event <- storeGeneratedEvent(TransformingTriples, eventDate, project)
 
-      val statusChangeEvent = ToTriplesStore(event._1, project, eventProcessingTimes.generateOne)
+        statusChangeEvent = ToTriplesStore(event.eventId.id, project, eventProcessingTimes.generateOne)
 
-      givenDeliveryInfoRemoved(statusChangeEvent.eventId)
+        _ = givenDeliveryInfoRemoved(statusChangeEvent.eventId)
 
-      val deadlockException = postgresErrors(SqlState.DeadlockDetected).generateOne
-      (dbUpdater onRollback statusChangeEvent)
-        .apply(deadlockException)
-        .unsafeRunSync() shouldBe DBUpdateResults
-        .ForProjects(
-          project.slug,
-          Map(
-            New                 -> -1 /* for the event to update */,
-            TransformingTriples -> -1 /* for the event */,
-            TriplesStore        -> 2 /* event to update + the event */
-          )
-        )
+        deadlockException = postgresErrors(SqlState.DeadlockDetected).generateOne
+        _ <- (dbUpdater onRollback statusChangeEvent).apply(deadlockException).asserting {
+               _ shouldBe DBUpdateResults(
+                 project.slug,
+                 New                 -> -1 /* for the event to update */,
+                 TransformingTriples -> -1 /* for the event */,
+                 TriplesStore        -> 2 /* event to update + the event */
+               )
+             }
 
-      findFullEvent(CompoundEventId(event._1, project.id))
-        .map { case (_, status, _, maybePayload, processingTimes) =>
-          status        shouldBe TriplesStore
-          maybePayload  shouldBe a[Some[_]]
-          processingTimes should contain(statusChangeEvent.processingTime)
-        }
-        .getOrElse(fail("No event found for main event"))
+        _ <- findFullEvent(event.eventId).map(_.value).asserting { case (_, status, _, maybePayload, processingTimes) =>
+               status        shouldBe TriplesStore
+               maybePayload  shouldBe a[Some[_]]
+               processingTimes should contain(statusChangeEvent.processingTime)
+             }
+      } yield Succeeded
     }
 
     "clean the delivery info for the event when Exception different than DeadlockDetected " +
-      "and rethrow the exception" in new TestCase {
-
-        val event = ToTriplesStore(EventsGenerators.eventIds.generateOne, project, eventProcessingTimes.generateOne)
+      "and rethrow the exception" in testDBResource.use { implicit cfg =>
+        val project = consumerProjects.generateOne
+        val event   = ToTriplesStore(EventsGenerators.eventIds.generateOne, project, eventProcessingTimes.generateOne)
 
         givenDeliveryInfoRemoved(event.eventId)
 
         val exception = exceptions.generateOne
-        intercept[Exception] {
-          (dbUpdater onRollback event)
-            .apply(exception)
-            .unsafeRunSync() shouldBe DBUpdateResults.ForProjects.empty
-        } shouldBe exception
+        (dbUpdater onRollback event).apply(exception).assertThrowsError[Exception](_ shouldBe exception)
       }
   }
 
-  private trait TestCase {
+  private lazy val statusesToUpdate = List(New,
+                                           GeneratingTriples,
+                                           GenerationRecoverableFailure,
+                                           TriplesGenerated,
+                                           TransformingTriples,
+                                           TransformationRecoverableFailure
+  )
 
-    val statusesToUpdate = Set(New,
-                               GeneratingTriples,
-                               GenerationRecoverableFailure,
-                               TriplesGenerated,
-                               TransformingTriples,
-                               TransformationRecoverableFailure
-    )
+  private val deliveryInfoRemover = mock[DeliveryInfoRemover[IO]]
+  private lazy val now            = Instant.now()
+  private val dbUpdater = {
+    implicit val qet: QueriesExecutionTimes[IO] = TestQueriesExecutionTimes[IO]
+    new DbUpdater[IO](deliveryInfoRemover, () => now)
+  }
 
-    val project = ConsumersModelGenerators.consumerProjects.generateOne
+  private def givenDeliveryInfoRemoved(eventId: CompoundEventId) =
+    (deliveryInfoRemover.deleteDelivery _).expects(eventId).returning(Kleisli.pure(()))
 
-    private val currentTime         = mockFunction[Instant]
-    private val deliveryInfoRemover = mock[DeliveryInfoRemover[IO]]
-    private implicit val metricsRegistry:  TestMetricsRegistry[IO]   = TestMetricsRegistry[IO]
-    private implicit val queriesExecTimes: QueriesExecutionTimes[IO] = QueriesExecutionTimes[IO]().unsafeRunSync()
-    val dbUpdater = new DbUpdater[IO](deliveryInfoRemover, currentTime)
-
-    val now = Instant.now()
-    currentTime.expects().returning(now).anyNumberOfTimes()
-
-    def givenDeliveryInfoRemoved(eventId: CompoundEventId) =
-      (deliveryInfoRemover.deleteDelivery _).expects(eventId).returning(Kleisli.pure(()))
-
-    def addEvent(status:    EventStatus,
-                 eventDate: EventDate
-    ): (EventId, EventStatus, Option[EventMessage], Option[ZippedEventPayload], List[EventProcessingTime]) =
-      storeGeneratedEvent(status, eventDate, project.id, project.slug)
-
-    def findFullEvent(
-        eventId: CompoundEventId
-    ): Option[(EventId, EventStatus, Option[EventMessage], Option[ZippedEventPayload], List[EventProcessingTime])] = {
-      val maybeEvent     = findEvent(eventId)
-      val maybePayload   = findPayload(eventId).map(_._2)
-      val processingTime = findProcessingTime(eventId)
-      maybeEvent.map { case (_, status, maybeMessage) =>
-        (eventId.id, status, maybeMessage, maybePayload, processingTime.map(_._2))
-      }
+  private def findFullEvent(eventId: CompoundEventId)(implicit
+      cfg: DBConfig[EventLogDB]
+  ): IO[Option[(EventId, EventStatus, Option[EventMessage], Option[ZippedEventPayload], List[EventProcessingTime])]] =
+    for {
+      maybeEvent      <- findEvent(eventId)
+      maybePayload    <- findPayload(eventId)
+      processingTimes <- findProcessingTimes(eventId)
+    } yield maybeEvent.map { fe =>
+      (eventId.id, fe.status, fe.maybeMessage, maybePayload.map(_.payload), processingTimes.map(_.processingTime))
     }
-  }
 }

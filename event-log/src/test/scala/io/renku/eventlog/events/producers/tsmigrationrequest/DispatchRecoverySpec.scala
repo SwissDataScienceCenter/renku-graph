@@ -20,90 +20,78 @@ package io.renku.eventlog.events.producers
 package tsmigrationrequest
 
 import cats.effect.IO
+import cats.effect.testing.scalatest.AsyncIOSpec
 import cats.syntax.all._
-import io.renku.eventlog._
+import io.renku.db.DBConfigProvider.DBConfig
 import io.renku.eventlog.MigrationStatus._
 import io.renku.eventlog.TSMigrationGenerators.changeDates
+import io.renku.eventlog._
 import io.renku.eventlog.events.producers.EventsSender.SendingResult
 import io.renku.eventlog.events.producers.EventsSender.SendingResult.TemporarilyUnavailable
 import io.renku.eventlog.events.producers.Generators.sendingResults
-import io.renku.eventlog.metrics.QueriesExecutionTimes
+import io.renku.eventlog.metrics.{QueriesExecutionTimes, TestQueriesExecutionTimes}
 import io.renku.events.Generators.subscriberUrls
 import io.renku.generators.CommonGraphGenerators.serviceVersions
 import io.renku.generators.Generators.Implicits._
 import io.renku.generators.Generators.exceptions
-import io.renku.interpreters.TestLogger
 import io.renku.interpreters.TestLogger.Level.Info
-import io.renku.metrics.TestMetricsRegistry
-import io.renku.testtools.IOSpec
 import org.scalacheck.Gen
-import org.scalamock.scalatest.MockFactory
+import org.scalamock.scalatest.AsyncMockFactory
+import org.scalatest.Succeeded
 import org.scalatest.matchers.should
-import org.scalatest.wordspec.AnyWordSpec
+import org.scalatest.wordspec.AsyncWordSpec
 
 import java.time.Instant
 import java.time.temporal.ChronoUnit.MICROS
 
 class DispatchRecoverySpec
-    extends AnyWordSpec
-    with IOSpec
-    with InMemoryEventLogDbSpec
+    extends AsyncWordSpec
+    with AsyncIOSpec
+    with EventLogPostgresSpec
+    with AsyncMockFactory
     with TsMigrationTableProvisioning
-    with MockFactory
     with should.Matchers {
 
   "returnToQueue" should {
 
     "change the status of the corresponding row in the ts_migration table to New " +
-      "if it was in Sent and the reason is NOT TemporarilyUnavailable" in new TestCase {
-
-        insertSubscriptionRecord(url, version, Sent, changeDate).unsafeRunSync()
-
-        recovery
-          .returnToQueue(MigrationRequestEvent(url, version), reason = notBusyStatus.generateOne)
-          .unsafeRunSync() shouldBe ()
-
-        findRow(url, version).unsafeRunSync() shouldBe New -> ChangeDate(now)
+      "if it was in Sent and the reason is NOT TemporarilyUnavailable" in testDBResource.use { implicit cfg =>
+        insertSubscriptionRecord(url, version, Sent, changeDate) >>
+          recovery
+            .returnToQueue(MigrationRequestEvent(url, version), reason = notBusyStatus.generateOne)
+            .assertNoException >>
+          findRow(url, version).asserting(_ shouldBe New -> ChangeDate(now))
       }
 
     "leave the status of the corresponding row in the ts_migration table as Sent " +
       "and update the change_date " +
-      "if it was in Sent and the reason is TemporarilyUnavailable" in new TestCase {
-
-        insertSubscriptionRecord(url, version, Sent, changeDate).unsafeRunSync()
-
-        recovery
-          .returnToQueue(MigrationRequestEvent(url, version), reason = TemporarilyUnavailable)
-          .unsafeRunSync() shouldBe ()
-
-        findRow(url, version).unsafeRunSync() shouldBe Sent -> ChangeDate(now)
+      "if it was in Sent and the reason is TemporarilyUnavailable" in testDBResource.use { implicit cfg =>
+        insertSubscriptionRecord(url, version, Sent, changeDate) >>
+          recovery
+            .returnToQueue(MigrationRequestEvent(url, version), reason = TemporarilyUnavailable)
+            .assertNoException >>
+          findRow(url, version).asserting(_ shouldBe Sent -> ChangeDate(now))
       }
 
     MigrationStatus.all - Sent foreach { status =>
-      s"do no change the status of the corresponding row if it's in $status" in new TestCase {
-
-        insertSubscriptionRecord(url, version, status, changeDate).unsafeRunSync()
-
-        recovery
-          .returnToQueue(MigrationRequestEvent(url, version), reason = sendingResults.generateOne)
-          .unsafeRunSync() shouldBe ()
-
-        findRow(url, version).unsafeRunSync() shouldBe status -> changeDate
+      s"do no change the status of the corresponding row if it's in $status" in testDBResource.use { implicit cfg =>
+        insertSubscriptionRecord(url, version, status, changeDate) >>
+          recovery
+            .returnToQueue(MigrationRequestEvent(url, version), reason = sendingResults.generateOne)
+            .assertNoException >>
+          findRow(url, version).asserting(_ shouldBe status -> changeDate)
       }
     }
 
-    "do no change the status of rows other than the one pointed by the event" in new TestCase {
-
+    "do no change the status of rows other than the one pointed by the event" in testDBResource.use { implicit cfg =>
       val status = Gen.oneOf(MigrationStatus.all).generateOne
-      insertSubscriptionRecord(url, version, status, changeDate).unsafeRunSync()
-
-      recovery
-        .returnToQueue(MigrationRequestEvent(subscriberUrls.generateOne, serviceVersions.generateOne),
-                       reason = sendingResults.generateOne
-        )
-        .unsafeRunSync() shouldBe ()
-
-      findRow(url, version).unsafeRunSync() shouldBe status -> changeDate
+      insertSubscriptionRecord(url, version, status, changeDate) >>
+        recovery
+          .returnToQueue(MigrationRequestEvent(subscriberUrls.generateOne, serviceVersions.generateOne),
+                         reason = sendingResults.generateOne
+          )
+          .assertNoException >>
+        findRow(url, version).asserting(_ shouldBe status -> changeDate)
     }
   }
 
@@ -111,58 +99,55 @@ class DispatchRecoverySpec
 
     val exception = exceptions.generateOne
 
-    "change status of the relevant row to NonRecoverableFailure if in Sent" in new TestCase {
+    "change status of the relevant row to NonRecoverableFailure if in Sent" in testDBResource.use { implicit cfg =>
+      for {
+        _ <- insertSubscriptionRecord(url, version, Sent, changeDate)
 
-      insertSubscriptionRecord(url, version, Sent, changeDate).unsafeRunSync()
+        _ <- logger.resetF()
 
-      recovery.recover(url, MigrationRequestEvent(url, version))(exception).unsafeRunSync() shouldBe ()
+        _ <- recovery.recover(url, MigrationRequestEvent(url, version))(exception).assertNoException
 
-      findRow(url, version).unsafeRunSync() shouldBe NonRecoverableFailure -> ChangeDate(now)
-      findMessage(url, version)             shouldBe MigrationMessage(exception).some
+        _ <- findRow(url, version).asserting(_ shouldBe NonRecoverableFailure -> ChangeDate(now))
+        _ <- findMessage(url, version).asserting(_ shouldBe MigrationMessage(exception).some)
 
-      logger.loggedOnly(Info("TS_MIGRATION_REQUEST: recovering from NonRecoverable Failure", exception))
+        _ <- logger.loggedOnlyF(Info("TS_MIGRATION_REQUEST: recovering from NonRecoverable Failure", exception))
+      } yield Succeeded
     }
 
     MigrationStatus.all - Sent foreach { status =>
-      s"do no change the status of the corresponding row if it's in $status" in new TestCase {
-
-        insertSubscriptionRecord(url, version, status, changeDate).unsafeRunSync()
-
-        recovery.recover(url, MigrationRequestEvent(url, version))(exception).unsafeRunSync() shouldBe ()
-
-        findRow(url, version).unsafeRunSync() shouldBe status -> changeDate
+      s"do no change the status of the corresponding row if it's in $status" in testDBResource.use { implicit cfg =>
+        insertSubscriptionRecord(url, version, status, changeDate) >>
+          recovery.recover(url, MigrationRequestEvent(url, version))(exception).assertNoException >>
+          findRow(url, version).asserting(_ shouldBe status -> changeDate)
       }
     }
 
-    "do no change the status of rows other than the one pointed by the event" in new TestCase {
-
+    "do no change the status of rows other than the one pointed by the event" in testDBResource.use { implicit cfg =>
       val status = Gen.oneOf(MigrationStatus.all).generateOne
-      insertSubscriptionRecord(url, version, status, changeDate).unsafeRunSync()
+      for {
+        _ <- insertSubscriptionRecord(url, version, status, changeDate)
 
-      val failingEvent = MigrationRequestEvent(subscriberUrls.generateOne, serviceVersions.generateOne)
+        failingEvent = MigrationRequestEvent(subscriberUrls.generateOne, serviceVersions.generateOne)
 
-      recovery.recover(failingEvent.subscriberUrl, failingEvent)(exception).unsafeRunSync() shouldBe ()
+        _ <- recovery.recover(failingEvent.subscriberUrl, failingEvent)(exception).assertNoException
 
-      findRow(url, version).unsafeRunSync() shouldBe status -> changeDate
+        _ <- findRow(url, version).asserting(_ shouldBe status -> changeDate)
+      } yield Succeeded
     }
   }
 
-  private trait TestCase {
-    val url        = subscriberUrls.generateOne
-    val version    = serviceVersions.generateOne
-    val changeDate = changeDates.generateOne
-    val now        = Instant.now().truncatedTo(MICROS)
+  private lazy val url        = subscriberUrls.generateOne
+  private lazy val version    = serviceVersions.generateOne
+  private lazy val changeDate = changeDates.generateOne
+  private lazy val now        = Instant.now().truncatedTo(MICROS)
 
-    implicit val logger:                   TestLogger[IO]            = TestLogger[IO]()
-    private implicit val metricsRegistry:  TestMetricsRegistry[IO]   = TestMetricsRegistry[IO]
-    private implicit val queriesExecTimes: QueriesExecutionTimes[IO] = QueriesExecutionTimes[IO]().unsafeRunSync()
-    val currentTime = mockFunction[Instant]
-    val recovery    = new DispatchRecoveryImpl[IO](currentTime)
-
-    currentTime.expects().returning(now).anyNumberOfTimes()
+  private def recovery(implicit cfg: DBConfig[EventLogDB]) = {
+    implicit val qet: QueriesExecutionTimes[IO] = TestQueriesExecutionTimes[IO]
+    new DispatchRecoveryImpl[IO](() => now)
   }
 
-  private lazy val notBusyStatus: Gen[SendingResult] = Gen.oneOf(
-    EventsSender.SendingResult.all - TemporarilyUnavailable
-  )
+  private lazy val notBusyStatus: Gen[SendingResult] =
+    Gen.oneOf(
+      EventsSender.SendingResult.all - TemporarilyUnavailable
+    )
 }

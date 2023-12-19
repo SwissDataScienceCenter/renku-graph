@@ -23,13 +23,14 @@ import cats.syntax.all._
 import eu.timepit.refined.auto._
 import io.renku.metrics.{LabeledHistogram, LabeledHistogramImpl, MetricsRegistry}
 
+import scala.collection.immutable.Seq
 import scala.concurrent.duration._
 
 trait QueriesExecutionTimes[F[_]] extends LabeledHistogram[F]
 
 object QueriesExecutionTimes {
 
-  def apply[F[_]: MonadThrow: MetricsRegistry](): F[QueriesExecutionTimes[F]] = MetricsRegistry[F].register {
+  private[metrics] def histogram[F[_]: MonadThrow] =
     new LabeledHistogramImpl[F](
       name = "event_log_queries_execution_times",
       help = "Event Log queries execution times",
@@ -37,7 +38,9 @@ object QueriesExecutionTimes {
       maybeBuckets = Seq(.05, .1, .5, 1, 2.5, 5, 10, 50).some,
       maybeThreshold = (750 millis).some
     ) with QueriesExecutionTimes[F]
-  }.widen
+
+  def apply[F[_]: MonadThrow: MetricsRegistry](): F[QueriesExecutionTimes[F]] =
+    MetricsRegistry[F].register(histogram[F]).widen
 
   def apply[F[_]](implicit ev: QueriesExecutionTimes[F]): QueriesExecutionTimes[F] = ev
 }

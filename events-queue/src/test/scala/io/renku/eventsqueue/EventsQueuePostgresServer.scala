@@ -20,4 +20,4 @@ package io.renku.eventsqueue
 
 import io.renku.db.PostgresServer
 
-object EventsQueuePostgresServer extends PostgresServer(module = "events_queue", port = 5431)
+object EventsQueuePostgresServer extends PostgresServer(module = "events_queue", port = 5401)
