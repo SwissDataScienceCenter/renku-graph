@@ -19,61 +19,48 @@
 package io.renku.eventlog.init
 
 import cats.effect.IO
-import io.renku.interpreters.TestLogger
+import cats.effect.testing.scalatest.AsyncIOSpec
+import io.renku.db.DBConfigProvider.DBConfig
+import io.renku.eventlog.EventLogDB
 import io.renku.interpreters.TestLogger.Level.Info
-import io.renku.testtools.IOSpec
-import org.scalatest.concurrent.{Eventually, IntegrationPatience}
+import org.scalatest.Succeeded
+import org.scalatest.flatspec.AsyncFlatSpec
 import org.scalatest.matchers.should
-import org.scalatest.wordspec.AnyWordSpec
 
-class EventDeliveryEventTypeAdderSpec
-    extends AnyWordSpec
-    with IOSpec
-    with DbInitSpec
-    with should.Matchers
-    with Eventually
-    with IntegrationPatience {
+class EventDeliveryEventTypeAdderSpec extends AsyncFlatSpec with AsyncIOSpec with DbInitSpec with should.Matchers {
 
-  protected[init] override lazy val migrationsToRun: List[DbMigrator[IO]] = allMigrations.takeWhile {
-    case _: EventDeliveryEventTypeAdder[IO] => false
-    case _ => true
+  protected[init] override val runMigrationsUpTo: Class[_ <: DbMigrator[IO]] = classOf[EventDeliveryEventTypeAdder[IO]]
+
+  it should "do nothing if the 'event_type_id' collumn already exists" in testDBResource.use { implicit cfg =>
+    for {
+      _ <- eventTypeAdder.run.assertNoException
+
+      _ <- verifyColumnExists("event_delivery", "event_type_id").asserting(_ shouldBe true)
+
+      _ <- logger.resetF()
+
+      _ <- eventTypeAdder.run.assertNoException
+
+      _ <- logger.loggedOnlyF(Info("'event_type_id' column adding skipped"))
+    } yield Succeeded
   }
 
-  "run" should {
+  it should "add the 'event_type_id' column if does not exist and create the indices and unique keys" in testDBResource
+    .use { implicit cfg =>
+      for {
+        _ <- verifyColumnExists("event_delivery", "event_type_id").asserting(_ shouldBe false)
 
-    "do nothing if the 'event_type_id' collumn already exists" in new TestCase {
+        _ <- eventTypeAdder.run.assertNoException
 
-      eventTypeAdder.run.unsafeRunSync() shouldBe ()
+        _ <- verifyColumnExists("event_delivery", "event_type_id").asserting(_ shouldBe true)
 
-      verifyColumnExists("event_delivery", "event_type_id") shouldBe true
+        _ <- verifyConstraintExists("event_delivery", "event_delivery_pkey").asserting(_ shouldBe false)
+        _ <- verifyConstraintExists("event_delivery", "event_project_id_unique").asserting(_ shouldBe true)
+        _ <- verifyConstraintExists("event_delivery", "project_event_type_id_unique").asserting(_ shouldBe true)
 
-      logger.reset()
-
-      eventTypeAdder.run.unsafeRunSync() shouldBe ()
-
-      logger.loggedOnly(Info("'event_type_id' column adding skipped"))
+        _ <- logger.loggedOnlyF(Info("'event_type_id' column added"))
+      } yield Succeeded
     }
 
-    "add the 'event_type_id' column if does not exist and create the indices and unique keys" in new TestCase {
-
-      verifyColumnExists("event_delivery", "event_type_id") shouldBe false
-
-      eventTypeAdder.run.unsafeRunSync() shouldBe ()
-
-      verifyColumnExists("event_delivery", "event_type_id") shouldBe true
-
-      verifyConstraintExists("event_delivery", "event_delivery_pkey")          shouldBe false
-      verifyConstraintExists("event_delivery", "event_project_id_unique")      shouldBe true
-      verifyConstraintExists("event_delivery", "project_event_type_id_unique") shouldBe true
-
-      eventually {
-        logger.loggedOnly(Info("'event_type_id' column added"))
-      }
-    }
-  }
-
-  private trait TestCase {
-    implicit val logger: TestLogger[IO] = TestLogger[IO]()
-    val eventTypeAdder = new EventDeliveryEventTypeAdderImpl[IO]
-  }
+  private def eventTypeAdder(implicit cfg: DBConfig[EventLogDB]) = new EventDeliveryEventTypeAdderImpl[IO]
 }

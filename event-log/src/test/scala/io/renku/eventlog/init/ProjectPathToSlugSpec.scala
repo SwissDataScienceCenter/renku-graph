@@ -19,70 +19,65 @@
 package io.renku.eventlog.init
 
 import cats.effect.IO
-import io.renku.interpreters.TestLogger
+import cats.effect.testing.scalatest.AsyncIOSpec
+import io.renku.db.DBConfigProvider.DBConfig
+import io.renku.eventlog.EventLogDB
 import io.renku.interpreters.TestLogger.Level.Info
-import io.renku.testtools.IOSpec
-import org.scalatest.concurrent.{Eventually, IntegrationPatience}
-import org.scalatest.flatspec.AnyFlatSpec
+import org.scalatest.Succeeded
+import org.scalatest.flatspec.AsyncFlatSpec
 import org.scalatest.matchers.should
 
-class ProjectPathToSlugSpec
-    extends AnyFlatSpec
-    with should.Matchers
-    with IOSpec
-    with DbInitSpec
-    with Eventually
-    with IntegrationPatience {
+class ProjectPathToSlugSpec extends AsyncFlatSpec with AsyncIOSpec with DbInitSpec with should.Matchers {
 
-  protected[init] override lazy val migrationsToRun: List[DbMigrator[IO]] = allMigrations.takeWhile {
-    case _: ProjectPathToSlugImpl[IO] => false
-    case _ => true
-  }
+  protected[init] override val runMigrationsUpTo: Class[_ <: DbMigrator[IO]] = classOf[ProjectPathToSlug[IO]]
 
   it should "rename the 'project_path' column to 'project_slug' on the project and clean_up_events_queue tables, " +
     "remove the old 'idx_project_path' index and " +
-    "create new 'idx_project_project_slug' and 'idx_clean_up_events_queue_project_slug' indices" in {
+    "create new 'idx_project_project_slug' and 'idx_clean_up_events_queue_project_slug' indices" in testDBResource.use {
+      implicit cfg =>
+        for {
+          _ <- verifyColumnExists("project", "project_path").asserting(_ shouldBe true)
+          _ <- verifyColumnExists("project", "project_slug").asserting(_ shouldBe false)
+          _ <- verifyColumnExists("clean_up_events_queue", "project_path").asserting(_ shouldBe true)
+          _ <- verifyColumnExists("clean_up_events_queue", "project_slug").asserting(_ shouldBe false)
+          _ <- verifyIndexExists("project", "idx_project_path").asserting(_ shouldBe false)
+          _ <- verifyIndexExists("project", "idx_project_project_slug").asserting(_ shouldBe false)
+          _ <- verifyIndexExists("clean_up_events_queue", "idx_project_path").asserting(_ shouldBe true)
+          _ <- verifyIndexExists("clean_up_events_queue", "idx_clean_up_events_queue_project_slug")
+                 .asserting(_ shouldBe false)
 
-      verifyColumnExists("project", "project_path")                                        shouldBe true
-      verifyColumnExists("project", "project_slug")                                        shouldBe false
-      verifyColumnExists("clean_up_events_queue", "project_path")                          shouldBe true
-      verifyColumnExists("clean_up_events_queue", "project_slug")                          shouldBe false
-      verifyIndexExists("project", "idx_project_path")                                     shouldBe false
-      verifyIndexExists("project", "idx_project_project_slug")                             shouldBe false
-      verifyIndexExists("clean_up_events_queue", "idx_project_path")                       shouldBe true
-      verifyIndexExists("clean_up_events_queue", "idx_clean_up_events_queue_project_slug") shouldBe false
+          _ <- projectPathToSlug.run.assertNoException
 
-      projectPathToSlug.run.unsafeRunSync()
+          _ <- logger.loggedOnlyF(
+                 Info("column 'project.project_path' renamed to 'project.project_slug'"),
+                 Info("column 'clean_up_events_queue.project_path' renamed to 'clean_up_events_queue.project_slug'"),
+                 Info("index 'idx_project_path' removed"),
+                 Info("index 'idx_project_project_slug' created"),
+                 Info("index 'idx_clean_up_events_queue_project_slug' created")
+               )
+          _ <- logger.resetF()
 
-      logger.loggedOnly(
-        Info("column 'project.project_path' renamed to 'project.project_slug'"),
-        Info("column 'clean_up_events_queue.project_path' renamed to 'clean_up_events_queue.project_slug'"),
-        Info("index 'idx_project_path' removed"),
-        Info("index 'idx_project_project_slug' created"),
-        Info("index 'idx_clean_up_events_queue_project_slug' created")
-      )
-      logger.reset()
+          _ <- verifyColumnExists("project", "project_path").asserting(_ shouldBe false)
+          _ <- verifyColumnExists("project", "project_slug").asserting(_ shouldBe true)
+          _ <- verifyColumnExists("clean_up_events_queue", "project_path").asserting(_ shouldBe false)
+          _ <- verifyColumnExists("clean_up_events_queue", "project_slug").asserting(_ shouldBe true)
+          _ <- verifyIndexExists("project", "idx_project_path").asserting(_ shouldBe false)
+          _ <- verifyIndexExists("project", "idx_project_project_slug").asserting(_ shouldBe true)
+          _ <- verifyIndexExists("clean_up_events_queue", "idx_project_path").asserting(_ shouldBe false)
+          _ <- verifyIndexExists("clean_up_events_queue", "idx_clean_up_events_queue_project_slug")
+                 .asserting(_ shouldBe true)
 
-      verifyColumnExists("project", "project_path")                                        shouldBe false
-      verifyColumnExists("project", "project_slug")                                        shouldBe true
-      verifyColumnExists("clean_up_events_queue", "project_path")                          shouldBe false
-      verifyColumnExists("clean_up_events_queue", "project_slug")                          shouldBe true
-      verifyIndexExists("project", "idx_project_path")                                     shouldBe false
-      verifyIndexExists("project", "idx_project_project_slug")                             shouldBe true
-      verifyIndexExists("clean_up_events_queue", "idx_project_path")                       shouldBe false
-      verifyIndexExists("clean_up_events_queue", "idx_clean_up_events_queue_project_slug") shouldBe true
+          _ <- projectPathToSlug.run.assertNoException
 
-      projectPathToSlug.run.unsafeRunSync()
-
-      logger.loggedOnly(
-        Info("column 'project.project_slug' existed"),
-        Info("column 'clean_up_events_queue.project_slug' existed"),
-        Info("index 'idx_project_path' not existed"),
-        Info("index 'idx_project_project_slug' existed"),
-        Info("index 'idx_clean_up_events_queue_project_slug' existed")
-      )
+          _ <- logger.loggedOnlyF(
+                 Info("column 'project.project_slug' existed"),
+                 Info("column 'clean_up_events_queue.project_slug' existed"),
+                 Info("index 'idx_project_path' not existed"),
+                 Info("index 'idx_project_project_slug' existed"),
+                 Info("index 'idx_clean_up_events_queue_project_slug' existed")
+               )
+        } yield Succeeded
     }
 
-  private implicit lazy val logger: TestLogger[IO] = TestLogger[IO]()
-  private lazy val projectPathToSlug = new ProjectPathToSlugImpl[IO]
+  private def projectPathToSlug(implicit cfg: DBConfig[EventLogDB]) = new ProjectPathToSlugImpl[IO]
 }

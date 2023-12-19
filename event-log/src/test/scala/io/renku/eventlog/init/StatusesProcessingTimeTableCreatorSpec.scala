@@ -19,57 +19,55 @@
 package io.renku.eventlog.init
 
 import cats.effect.IO
-import io.renku.interpreters.TestLogger
+import cats.effect.testing.scalatest.AsyncIOSpec
+import io.renku.db.DBConfigProvider.DBConfig
+import io.renku.eventlog.EventLogDB
 import io.renku.interpreters.TestLogger.Level.Info
-import io.renku.testtools.IOSpec
+import org.scalatest.Succeeded
+import org.scalatest.flatspec.AsyncFlatSpec
 import org.scalatest.matchers.should
-import org.scalatest.wordspec.AnyWordSpec
-import skunk.implicits._
 
-class StatusesProcessingTimeTableCreatorSpec extends AnyWordSpec with IOSpec with DbInitSpec with should.Matchers {
+class StatusesProcessingTimeTableCreatorSpec
+    extends AsyncFlatSpec
+    with AsyncIOSpec
+    with DbInitSpec
+    with should.Matchers {
 
-  protected[init] override lazy val migrationsToRun: List[DbMigrator[IO]] = allMigrations.takeWhile {
-    case _: StatusesProcessingTimeTableCreatorImpl[IO] => false
-    case _ => true
+  protected[init] override val runMigrationsUpTo: Class[_ <: DbMigrator[IO]] =
+    classOf[StatusesProcessingTimeTableCreator[IO]]
+
+  it should "do nothing if the 'status_transition_time' table already exists" in testDBResource.use { implicit cfg =>
+    for {
+      _ <- tableExists("status_processing_time").asserting(_ shouldBe false)
+
+      _ <- tableCreator.run.assertNoException
+
+      _ <- tableExists("status_processing_time").asserting(_ shouldBe true)
+
+      _ <- logger.loggedOnlyF(Info("'status_processing_time' table created"))
+
+      _ <- logger.resetF()
+
+      _ <- tableCreator.run.assertNoException
+
+      _ <- logger.loggedOnlyF(Info("'status_processing_time' table exists"))
+    } yield Succeeded
   }
 
-  "run" should {
+  it should "create indices for certain columns" in testDBResource.use { implicit cfg =>
+    for {
+      _ <- tableExists("status_processing_time").asserting(_ shouldBe false)
 
-    "do nothing if the 'status_transition_time' table already exists" in new TestCase {
+      _ <- tableCreator.run.assertNoException
 
-      tableExists("status_processing_time") shouldBe false
+      _ <- tableExists("status_processing_time").asserting(_ shouldBe true)
 
-      tableCreator.run.unsafeRunSync() shouldBe ((): Unit)
-
-      tableExists("status_processing_time") shouldBe true
-
-      logger.loggedOnly(Info("'status_processing_time' table created"))
-
-      logger.reset()
-
-      tableCreator.run.unsafeRunSync() shouldBe ((): Unit)
-
-      logger.loggedOnly(Info("'status_processing_time' table exists"))
-
-    }
-
-    "create indices for certain columns" in new TestCase {
-
-      tableExists("status_processing_time") shouldBe false
-
-      tableCreator.run.unsafeRunSync() shouldBe ((): Unit)
-
-      tableExists("status_processing_time") shouldBe true
-
-      verifyTrue(sql"DROP INDEX idx_event_id;".command)
-      verifyTrue(sql"DROP INDEX idx_project_id;".command)
-      verifyTrue(sql"DROP INDEX idx_status;".command)
-
-    }
+      _ <- verifyIndexExists("status_processing_time", "idx_status_processing_time_event_id").asserting(_ shouldBe true)
+      _ <- verifyIndexExists("status_processing_time", "idx_status_processing_time_project_id")
+             .asserting(_ shouldBe true)
+      _ <- verifyIndexExists("status_processing_time", "idx_status_processing_time_status").asserting(_ shouldBe true)
+    } yield Succeeded
   }
 
-  private trait TestCase {
-    implicit val logger: TestLogger[IO] = TestLogger[IO]()
-    val tableCreator = new StatusesProcessingTimeTableCreatorImpl[IO]
-  }
+  private def tableCreator(implicit cfg: DBConfig[EventLogDB]) = new StatusesProcessingTimeTableCreatorImpl[IO]
 }

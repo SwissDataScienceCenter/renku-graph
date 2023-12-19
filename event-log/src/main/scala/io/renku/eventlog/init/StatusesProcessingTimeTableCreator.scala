@@ -45,14 +45,19 @@ private class StatusesProcessingTimeTableCreatorImpl[F[_]: MonadCancelThrow: Log
     }
   }
 
-  private def createTable() = for {
-    _ <- execute(createTableSql)
-    _ <- execute(sql"CREATE INDEX IF NOT EXISTS idx_event_id       ON status_processing_time(event_id)".command)
-    _ <- execute(sql"CREATE INDEX IF NOT EXISTS idx_project_id     ON status_processing_time(project_id)".command)
-    _ <- execute(sql"CREATE INDEX IF NOT EXISTS idx_status         ON status_processing_time(status)".command)
-    _ <- Kleisli.liftF(Logger[F] info "'status_processing_time' table created")
-    _ <- execute(foreignKeySql)
-  } yield ()
+  private def createTable() =
+    execute(createTableSql) >>
+      execute(
+        sql"CREATE INDEX IF NOT EXISTS idx_status_processing_time_event_id ON status_processing_time(event_id)".command
+      ) >>
+      execute(
+        sql"CREATE INDEX IF NOT EXISTS idx_status_processing_time_project_id ON status_processing_time(project_id)".command
+      ) >>
+      execute(
+        sql"CREATE INDEX IF NOT EXISTS idx_status_processing_time_status ON status_processing_time(status)".command
+      ) >>
+      Kleisli.liftF(Logger[F] info "'status_processing_time' table created") >>
+      execute(foreignKeySql)
 
   private lazy val createTableSql: Command[Void] = sql"""
     CREATE TABLE IF NOT EXISTS status_processing_time(

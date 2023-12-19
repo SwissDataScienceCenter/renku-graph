@@ -46,10 +46,7 @@ private class EventLogTableCreatorImpl[F[_]: MonadCancelThrow: Logger: SessionRe
     whenTableExists("event")(
       Kleisli.liftF(Logger[F] info "'event_log' table creation skipped"),
       otherwise = checkTableExists flatMap {
-        case true =>
-          Kleisli.liftF[F, Session[F], Unit](
-            Logger[F] info "'event_log' table exists"
-          )
+        case true  => Kleisli.liftF[F, Session[F], Unit](Logger[F] info "'event_log' table exists")
         case false => createTable
       }
     )
@@ -63,12 +60,12 @@ private class EventLogTableCreatorImpl[F[_]: MonadCancelThrow: Logger: SessionRe
 
   private lazy val createTable: Kleisli[F, Session[F], Unit] = for {
     _ <- execute(createTableSql)
-    _ <- execute(sql"CREATE INDEX IF NOT EXISTS idx_project_id ON event_log(project_id)".command)
-    _ <- execute(sql"CREATE INDEX IF NOT EXISTS idx_event_id ON event_log(event_id)".command)
-    _ <- execute(sql"CREATE INDEX IF NOT EXISTS idx_status ON event_log(status)".command)
-    _ <- execute(sql"CREATE INDEX IF NOT EXISTS idx_execution_date ON event_log(execution_date DESC)".command)
-    _ <- execute(sql"CREATE INDEX IF NOT EXISTS idx_event_date ON event_log(event_date DESC)".command)
-    _ <- execute(sql"CREATE INDEX IF NOT EXISTS idx_created_date ON event_log(created_date DESC)".command)
+    _ <- execute(sql"CREATE INDEX IF NOT EXISTS idx_event_log_project_id ON event_log(project_id)".command)
+    _ <- execute(sql"CREATE INDEX IF NOT EXISTS idx_event_log_event_id ON event_log(event_id)".command)
+    _ <- execute(sql"CREATE INDEX IF NOT EXISTS idx_event_log_status ON event_log(status)".command)
+    _ <- execute(sql"CREATE INDEX IF NOT EXISTS idx_event_log_execution_date ON event_log(execution_date DESC)".command)
+    _ <- execute(sql"CREATE INDEX IF NOT EXISTS idx_event_log_event_date ON event_log(event_date DESC)".command)
+    _ <- execute(sql"CREATE INDEX IF NOT EXISTS idx_event_log_created_date ON event_log(created_date DESC)".command)
     _ <- revertStatusToGenerationRecoverableFailure
     _ <- Kleisli.liftF(Logger[F] info "'event_log' table created")
   } yield ()

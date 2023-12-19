@@ -24,30 +24,23 @@ import io.renku.db.DBConfigProvider.DBConfig
 import io.renku.db.{PostgresServer, PostgresSpec, SessionResource}
 import io.renku.eventlog.init.DbInitializer
 import io.renku.interpreters.TestLogger
-import org.scalamock.scalatest.AsyncMockFactory
-import org.scalatest.{BeforeAndAfterEach, Suite}
+import org.scalatest.Suite
 
 trait EventLogPostgresSpec
     extends PostgresSpec[EventLogDB]
     with TypeSerializers
     with EventLogDBProvisioning
-    with EventLogDBFetching
-    with BeforeAndAfterEach {
-  self: Suite with AsyncMockFactory =>
+    with EventLogDBFetching {
+  self: Suite =>
 
   lazy val server: PostgresServer = EventLogPostgresServer
 
   implicit val logger: TestLogger[IO] = TestLogger()
 
   lazy val migrations: SessionResource[IO, EventLogDB] => IO[Unit] = { implicit sr =>
-    DbInitializer.migrations[IO].traverse_(_.run)
+    DbInitializer.migrations[IO].traverse_(_.run) >> logger.resetF()
   }
 
   implicit def moduleSessionResource(implicit cfg: DBConfig[EventLogDB]): EventLogDB.SessionResource[IO] =
     io.renku.db.SessionResource[IO, EventLogDB](sessionResource(cfg), cfg)
-
-  protected override def beforeEach(): Unit = {
-    super.beforeEach()
-    logger.reset()
-  }
 }

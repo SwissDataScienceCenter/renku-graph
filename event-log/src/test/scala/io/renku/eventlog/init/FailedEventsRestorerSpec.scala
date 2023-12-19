@@ -19,123 +19,112 @@
 package io.renku.eventlog.init
 
 import cats.effect.IO
+import cats.effect.testing.scalatest.AsyncIOSpec
 import cats.syntax.all._
 import eu.timepit.refined.api.Refined
 import eu.timepit.refined.auto._
-import io.renku.eventlog.{EventDataFetching, EventLogDataProvisioning}
+import io.renku.db.DBConfigProvider.DBConfig
+import io.renku.eventlog.{EventLogDB, EventLogDBProvisioning}
+import io.renku.events.consumers.ConsumersModelGenerators.consumerProjects
 import io.renku.generators.Generators.Implicits._
 import io.renku.generators.Generators._
-import io.renku.graph.model.GraphModelGenerators._
 import io.renku.graph.model.events.EventStatus._
 import io.renku.graph.model.events._
-import io.renku.interpreters.TestLogger
 import io.renku.interpreters.TestLogger.Level.Info
-import io.renku.testtools.IOSpec
+import org.scalatest.Succeeded
+import org.scalatest.flatspec.AsyncFlatSpec
 import org.scalatest.matchers.should
-import org.scalatest.wordspec.AnyWordSpec
 
 import java.time.Instant.now
 
 class FailedEventsRestorerSpec
-    extends AnyWordSpec
-    with IOSpec
+    extends AsyncFlatSpec
+    with AsyncIOSpec
     with DbInitSpec
     with should.Matchers
-    with EventLogDataProvisioning
-    with EventDataFetching {
+    with EventLogDBProvisioning {
 
-  protected[init] override lazy val migrationsToRun: List[DbMigrator[IO]] = allMigrations.takeWhile {
-    case _: FailedEventsRestorerImpl[IO] => false
-    case _ => true
-  }
+  protected[init] override val runMigrationsUpTo: Class[_ <: DbMigrator[IO]] = classOf[FailedEventsRestorer[IO]]
 
-  "run" should {
+  it should "change status of events in the given status matching the given message " +
+    "if there are no newer events with successful statues for the project" in testDBResource.use { implicit cfg =>
+      val eventDate = timestampsNotInTheFuture(butYoungerThan = now minusSeconds 60).generateAs(EventDate)
+      for {
+        eventToChange <- storeGeneratedEvent(GenerationNonRecoverableFailure,
+                                             eventDate,
+                                             project,
+                                             message = sentenceContaining(failure).generateAs(EventMessage).some
+                         )
+        olderMatchingEvent <- storeGeneratedEvent(
+                                GenerationNonRecoverableFailure,
+                                timestamps(max = eventDate.value).generateAs(EventDate),
+                                project,
+                                message = sentenceContaining(failure).generateAs(EventMessage).some
+                              )
+        newerMatchingEvent <- storeGeneratedEvent(
+                                GenerationNonRecoverableFailure,
+                                timestampsNotInTheFuture(butYoungerThan = eventDate.value).generateAs(EventDate),
+                                project,
+                                message = sentenceContaining(failure).generateAs(EventMessage).some
+                              )
+        olderNotMatchingEvent <- storeGeneratedEvent(
+                                   TriplesStore,
+                                   timestamps(max = eventDate.value).generateAs(EventDate),
+                                   project
+                                 )
 
-    "change status of events in the given status matching the given message " +
-      "if there are no newer events with successful statues for the project" in new TestCase {
-        val eventDate = timestampsNotInTheFuture(butYoungerThan = now minusSeconds 60).generateAs(EventDate)
-        val eventToChange = storeGeneratedEvent(GenerationNonRecoverableFailure,
-                                                eventDate,
-                                                projectId,
-                                                projectSlug,
-                                                EventMessage(sentenceContaining(failure).generateOne).some
-        )._1
-        val olderMatchingEvent = storeGeneratedEvent(
-          GenerationNonRecoverableFailure,
-          timestamps(max = eventDate.value).generateAs(EventDate),
-          projectId,
-          projectSlug,
-          EventMessage(sentenceContaining(failure).generateOne).some
-        )._1
-        val newerMatchingEvent = storeGeneratedEvent(
-          GenerationNonRecoverableFailure,
-          timestampsNotInTheFuture(butYoungerThan = eventDate.value).generateAs(EventDate),
-          projectId,
-          projectSlug,
-          EventMessage(sentenceContaining(failure).generateOne).some
-        )._1
-        val olderNotMatchingEvent = storeGeneratedEvent(
-          TriplesStore,
-          timestamps(max = eventDate.value).generateAs(EventDate),
-          projectId,
-          projectSlug
-        )._1
+        _ <- restorer.run.assertNoException
 
-        restorer.run.unsafeRunSync() shouldBe ()
+        _ <- findEvent(eventToChange.eventId).asserting(_.map(_.status) shouldBe New.some)
+        _ <- findEvent(olderMatchingEvent.eventId).asserting(_.map(_.status) shouldBe New.some)
+        _ <- findEvent(newerMatchingEvent.eventId).asserting(_.map(_.status) shouldBe New.some)
+        _ <- findEvent(olderNotMatchingEvent.eventId).asserting(_.map(_.status) shouldBe TriplesStore.some)
 
-        findEvent(compoundId(eventToChange)).map(_._2)         shouldBe New.some
-        findEvent(compoundId(olderMatchingEvent)).map(_._2)    shouldBe New.some
-        findEvent(compoundId(newerMatchingEvent)).map(_._2)    shouldBe New.some
-        findEvent(compoundId(olderNotMatchingEvent)).map(_._2) shouldBe TriplesStore.some
+        _ <- logger.loggedOnlyF(Info(s"3 events restored for processing from '$failure'"))
+      } yield Succeeded
+    }
 
-        logger.loggedOnly(Info(s"3 events restored for processing from '$failure'"))
-      }
+  it should "do not change status of events " +
+    "if there are newer events with successful statues" in testDBResource.use { implicit cfg =>
+      val eventDate = timestampsNotInTheFuture(butYoungerThan = now minusSeconds 60).generateAs(EventDate)
+      for {
+        matchingEvent <- storeGeneratedEvent(GenerationNonRecoverableFailure,
+                                             eventDate,
+                                             project,
+                                             message = EventMessage(sentenceContaining(failure).generateOne).some
+                         )
+        olderMatchingEvent <- storeGeneratedEvent(
+                                GenerationNonRecoverableFailure,
+                                timestamps(max = eventDate.value).generateAs(EventDate),
+                                project,
+                                message = EventMessage(sentenceContaining(failure).generateOne).some
+                              )
+        newerInDiscardingStatusEvent <-
+          storeGeneratedEvent(
+            TriplesStore,
+            timestampsNotInTheFuture(butYoungerThan = eventDate.value).generateAs(EventDate),
+            project
+          )
 
-    "do not change status of events " +
-      "if there are newer events with successful statues" in new TestCase {
-        val eventDate = timestampsNotInTheFuture(butYoungerThan = now minusSeconds 60).generateAs(EventDate)
-        val matchingEvent = storeGeneratedEvent(GenerationNonRecoverableFailure,
-                                                eventDate,
-                                                projectId,
-                                                projectSlug,
-                                                EventMessage(sentenceContaining(failure).generateOne).some
-        )._1
-        val olderMatchingEvent = storeGeneratedEvent(
-          GenerationNonRecoverableFailure,
-          timestamps(max = eventDate.value).generateAs(EventDate),
-          projectId,
-          projectSlug,
-          EventMessage(sentenceContaining(failure).generateOne).some
-        )._1
-        val newerInDiscardingStatusEvent = storeGeneratedEvent(
-          TriplesStore,
-          timestampsNotInTheFuture(butYoungerThan = eventDate.value).generateAs(EventDate),
-          projectId,
-          projectSlug
-        )._1
+        _ <- restorer.run.assertNoException
 
-        restorer.run.unsafeRunSync() shouldBe ()
+        _ <- findEvent(matchingEvent.eventId).asserting(_.map(_.status) shouldBe GenerationNonRecoverableFailure.some)
+        _ <- findEvent(olderMatchingEvent.eventId)
+               .asserting(_.map(_.status) shouldBe GenerationNonRecoverableFailure.some)
+        _ <- findEvent(newerInDiscardingStatusEvent.eventId).asserting(_.map(_.status) shouldBe TriplesStore.some)
 
-        findEvent(compoundId(matchingEvent)).map(_._2)                shouldBe GenerationNonRecoverableFailure.some
-        findEvent(compoundId(olderMatchingEvent)).map(_._2)           shouldBe GenerationNonRecoverableFailure.some
-        findEvent(compoundId(newerInDiscardingStatusEvent)).map(_._2) shouldBe TriplesStore.some
+        _ <- logger.loggedOnlyF(Info(s"0 events restored for processing from '$failure'"))
+      } yield Succeeded
+    }
 
-        logger.loggedOnly(Info(s"0 events restored for processing from '$failure'"))
-      }
-  }
+  private lazy val project = consumerProjects.generateOne
+  private lazy val failure: NonBlank = Refined.unsafeApply(s"%${sentenceContaining("%").generateOne}%")
 
-  private trait TestCase {
-    val projectId   = projectIds.generateOne
-    val projectSlug = projectSlugs.generateOne
-    val failure: NonBlank = Refined.unsafeApply(s"%${sentenceContaining("%").generateOne}%")
-
-    def compoundId(eventId: EventId) = CompoundEventId(eventId, projectId)
-
-    implicit val logger: TestLogger[IO] = TestLogger[IO]()
-    val restorer = new FailedEventsRestorerImpl[IO](failure.value,
-                                                    currentStatus = GenerationNonRecoverableFailure,
-                                                    destinationStatus = New,
-                                                    discardingStatuses = TriplesGenerated :: TriplesStore :: Nil
+  private def restorer(implicit cfg: DBConfig[EventLogDB]) =
+    new FailedEventsRestorerImpl[IO](
+      failure.value,
+      currentStatus = GenerationNonRecoverableFailure,
+      destinationStatus = New,
+      discardingStatuses = TriplesGenerated :: TriplesStore :: Nil
     )
-  }
 }

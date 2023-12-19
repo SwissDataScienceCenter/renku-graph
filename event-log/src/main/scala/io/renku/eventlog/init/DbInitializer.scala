@@ -78,7 +78,6 @@ object DbInitializer {
     PayloadTypeChanger[F],
     StatusChangeEventsTableCreator[F],
     EventDeliveryEventTypeAdder[F],
-    EventDeliveryEventTypeAdder[F],
     TSMigrationTableCreator[F],
     CleanUpEventsTableCreator[F],
     ProjectIdOnCleanUpTable[F],

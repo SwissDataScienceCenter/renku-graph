@@ -19,76 +19,72 @@
 package io.renku.eventlog.init
 
 import cats.effect.IO
-import io.renku.interpreters.TestLogger
+import cats.effect.testing.scalatest.AsyncIOSpec
+import io.renku.db.DBConfigProvider.DBConfig
+import io.renku.eventlog.EventLogDB
 import io.renku.interpreters.TestLogger.Level.Info
-import io.renku.testtools.IOSpec
+import org.scalatest.Succeeded
+import org.scalatest.flatspec.AsyncFlatSpec
 import org.scalatest.matchers.should
-import org.scalatest.wordspec.AnyWordSpec
-import skunk.implicits._
 
-class EventPayloadTableCreatorSpec extends AnyWordSpec with IOSpec with DbInitSpec with should.Matchers {
+class EventPayloadTableCreatorSpec extends AsyncFlatSpec with AsyncIOSpec with DbInitSpec with should.Matchers {
 
-  protected[init] override lazy val migrationsToRun: List[DbMigrator[IO]] = allMigrations.takeWhile {
-    case _: EventPayloadTableCreatorImpl[IO] => false
-    case _ => true
+  protected[init] override val runMigrationsUpTo: Class[_ <: DbMigrator[IO]] = classOf[EventPayloadTableCreator[IO]]
+
+  it should "fail if the 'event' table does not exist" in testDBResource.use { implicit cfg =>
+    for {
+      _ <- dropTable("event")
+      _ <- tableExists("event").asserting(_ shouldBe false)
+      _ <- tableExists("event_payload").asserting(_ shouldBe false)
+
+      _ <- tableCreator.run.assertThrowsWithMessage[Exception](
+             "Event table missing; creation of event_payload is not possible"
+           )
+    } yield Succeeded
   }
 
-  "run" should {
-    "fail if the 'event' table does not exist" in new TestCase {
-      dropTable("event")
-      tableExists("event")         shouldBe false
-      tableExists("event_payload") shouldBe false
+  it should "create the 'event_payload' table if it doesn't exist" in testDBResource.use { implicit cfg =>
+    for {
+      _ <- tableExists("event_payload").asserting(_ shouldBe false)
 
-      intercept[Exception] {
+      _ <- tableCreator.run.assertNoException
 
-        tableCreator.run.unsafeRunSync()
-      }.getMessage shouldBe "Event table missing; creation of event_payload is not possible"
-    }
+      _ <- tableExists("event_payload").asserting(_ shouldBe true)
 
-    "create the 'event_payload' table if it doesn't exist" in new TestCase {
-
-      tableExists("event_payload") shouldBe false
-
-      tableCreator.run.unsafeRunSync() shouldBe ((): Unit)
-
-      tableExists("event_payload") shouldBe true
-
-      logger.loggedOnly(Info("'event_payload' table created"))
-    }
-
-    "do nothing if the 'event_payload' table already exists" in new TestCase {
-
-      tableExists("event_payload") shouldBe false
-
-      tableCreator.run.unsafeRunSync() shouldBe ((): Unit)
-
-      tableExists("event_payload") shouldBe true
-
-      logger.loggedOnly(Info("'event_payload' table created"))
-
-      logger.reset()
-
-      tableCreator.run.unsafeRunSync() shouldBe ((): Unit)
-
-      logger.loggedOnly(Info("'event_payload' table exists"))
-    }
-
-    "create indices for certain columns" in new TestCase {
-
-      tableExists("event_payload") shouldBe false
-
-      tableCreator.run.unsafeRunSync() shouldBe ((): Unit)
-
-      tableExists("event_payload") shouldBe true
-
-      verifyTrue(sql"DROP INDEX idx_event_id;".command)
-      verifyTrue(sql"DROP INDEX idx_project_id;".command)
-
-    }
+      _ <- logger.loggedOnlyF(Info("'event_payload' table created"))
+    } yield Succeeded
   }
 
-  private trait TestCase {
-    implicit val logger: TestLogger[IO] = TestLogger[IO]()
-    val tableCreator = new EventPayloadTableCreatorImpl[IO]
+  it should "do nothing if the 'event_payload' table already exists" in testDBResource.use { implicit cfg =>
+    for {
+      _ <- tableExists("event_payload").asserting(_ shouldBe false)
+
+      _ <- tableCreator.run.assertNoException
+
+      _ <- tableExists("event_payload").asserting(_ shouldBe true)
+
+      _ <- logger.loggedOnlyF(Info("'event_payload' table created"))
+
+      _ <- logger.resetF()
+
+      _ <- tableCreator.run.assertNoException
+
+      _ <- logger.loggedOnlyF(Info("'event_payload' table exists"))
+    } yield Succeeded
   }
+
+  it should "create indices for certain columns" in testDBResource.use { implicit cfg =>
+    for {
+      _ <- tableExists("event_payload").asserting(_ shouldBe false)
+
+      _ <- tableCreator.run.assertNoException
+
+      _ <- tableExists("event_payload").asserting(_ shouldBe true)
+
+      _ <- verifyIndexExists("event_payload", "idx_event_payload_event_id").asserting(_ shouldBe true)
+      _ <- verifyIndexExists("event_payload", "idx_event_payload_project_id").asserting(_ shouldBe true)
+    } yield Succeeded
+  }
+
+  private def tableCreator(implicit cfg: DBConfig[EventLogDB]) = new EventPayloadTableCreatorImpl[IO]
 }
