@@ -253,7 +253,10 @@ lazy val tokenRepository = project
   .in(file("token-repository"))
   .withId("token-repository")
   .settings(commonSettings)
-  .dependsOn(tokenRepositoryApi % "compile->compile; test->test")
+  .dependsOn(
+    tokenRepositoryApi % "compile->compile; test->test",
+    eventLogApi        % "compile->compile; test->test"
+  )
   .enablePlugins(
     JavaAppPackaging,
     AutomateHeaderPlugin
