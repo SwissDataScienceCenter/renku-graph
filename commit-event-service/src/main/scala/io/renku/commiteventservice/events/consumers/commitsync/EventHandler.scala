@@ -23,11 +23,10 @@ import cats.syntax.all._
 import eu.timepit.refined.auto._
 import io.circe.Decoder
 import io.renku.commiteventservice.events.consumers.commitsync.eventgeneration.CommitsSynchronizer
-import io.renku.events.{consumers, CategoryName}
 import io.renku.events.consumers._
 import io.renku.events.consumers.subscriptions.SubscriptionMechanism
+import io.renku.events.{CategoryName, consumers}
 import io.renku.graph.model.events.{CommitId, LastSyncedDate}
-import io.renku.graph.tokenrepository.AccessTokenFinder
 import io.renku.http.client.GitLabClient
 import io.renku.logging.ExecutionTimeRecorder
 import io.renku.metrics.MetricsRegistry
@@ -49,8 +48,8 @@ private class EventHandler[F[_]: MonadCancelThrow: Logger](
       onRelease = subscriptionMechanism.renewSubscription()
     )
 
-  import io.renku.tinytypes.json.TinyTypeDecoders._
   import EventDecodingTools._
+  import io.renku.tinytypes.json.TinyTypeDecoders._
 
   private implicit val eventDecoder: Decoder[CommitSyncEvent] = cursor =>
     cursor.downField("id").as[Option[CommitId]] >>= {
@@ -65,7 +64,7 @@ private class EventHandler[F[_]: MonadCancelThrow: Logger](
 }
 
 private object EventHandler {
-  def apply[F[_]: Async: GitLabClient: AccessTokenFinder: Logger: MetricsRegistry: ExecutionTimeRecorder](
+  def apply[F[_]: Async: GitLabClient: Logger: MetricsRegistry: ExecutionTimeRecorder](
       subscriptionMechanism: SubscriptionMechanism[F]
   ): F[consumers.EventHandler[F]] = for {
     commitEventSynchronizer <- CommitsSynchronizer[F]

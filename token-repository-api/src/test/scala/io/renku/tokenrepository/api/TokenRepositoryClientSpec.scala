@@ -55,9 +55,7 @@ class TokenRepositoryClientSpec
           .willReturn(okJson(accessToken.asJson.noSpaces))
       }
 
-      client
-        .findAccessToken(projectId)
-        .asserting(_ shouldBe TokenRepositoryClient.Result.success(accessToken.some))
+      client.findAccessToken(projectId).asserting(_ shouldBe accessToken.some)
     }
 
     "succeed and return None if fetching project access token returns NOT_FOUND" in {
@@ -69,9 +67,7 @@ class TokenRepositoryClientSpec
           .willReturn(notFound())
       }
 
-      client
-        .findAccessToken(projectId)
-        .asserting(_ shouldBe TokenRepositoryClient.Result.success(None))
+      client.findAccessToken(projectId).asserting(_ shouldBe None)
     }
 
     "failed if fetching the payload returns other status" in {
@@ -83,9 +79,7 @@ class TokenRepositoryClientSpec
           .willReturn(badRequest())
       }
 
-      client
-        .findAccessToken(projectId)
-        .asserting(_ shouldBe a[TokenRepositoryClient.Result.Failure])
+      client.findAccessToken(projectId).assertThrows[Exception]
     }
   }
 
@@ -101,9 +95,7 @@ class TokenRepositoryClientSpec
           .willReturn(okJson(accessToken.asJson.noSpaces))
       }
 
-      client
-        .findAccessToken(projectSlug)
-        .asserting(_ shouldBe TokenRepositoryClient.Result.success(accessToken.some))
+      client.findAccessToken(projectSlug).asserting(_ shouldBe accessToken.some)
     }
 
     "succeed and return None if fetching project access token returns NOT_FOUND" in {
@@ -115,9 +107,7 @@ class TokenRepositoryClientSpec
           .willReturn(notFound())
       }
 
-      client
-        .findAccessToken(projectSlug)
-        .asserting(_ shouldBe TokenRepositoryClient.Result.success(None))
+      client.findAccessToken(projectSlug).asserting(_ shouldBe None)
     }
 
     "failed if fetching the payload returns other status" in {
@@ -129,9 +119,7 @@ class TokenRepositoryClientSpec
           .willReturn(badRequest())
       }
 
-      client
-        .findAccessToken(projectSlug)
-        .asserting(_ shouldBe a[TokenRepositoryClient.Result.Failure])
+      client.findAccessToken(projectSlug).assertThrows[Exception]
     }
   }
 }

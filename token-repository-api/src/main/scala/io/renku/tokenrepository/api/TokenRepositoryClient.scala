@@ -18,7 +18,6 @@
 
 package io.renku.tokenrepository.api
 
-import TokenRepositoryClient.Result
 import cats.effect.Async
 import cats.syntax.all._
 import com.typesafe.config.{Config, ConfigFactory}
@@ -34,8 +33,8 @@ import org.http4s.dsl.Http4sDsl
 import org.typelevel.log4cats.Logger
 
 trait TokenRepositoryClient[F[_]] {
-  def findAccessToken(projectId:   projects.GitLabId): F[Result[Option[AccessToken]]]
-  def findAccessToken(projectSlug: projects.Slug):     F[Result[Option[AccessToken]]]
+  def findAccessToken(projectId:   projects.GitLabId): F[Option[AccessToken]]
+  def findAccessToken(projectSlug: projects.Slug):     F[Option[AccessToken]]
 }
 
 object TokenRepositoryClient {
@@ -45,24 +44,6 @@ object TokenRepositoryClient {
   def apply[F[_]: Async: Logger: MetricsRegistry](config: Config = ConfigFactory.load): F[TokenRepositoryClient[F]] =
     TokenRepositoryUrl[F](config)
       .map(url => new TokenRepositoryClientImpl[F](Uri.unsafeFromString(url.value)))
-
-  sealed trait Result[+A] {
-    def toEither: Either[Throwable, A]
-  }
-
-  object Result {
-    final case class Success[+A](value: A) extends Result[A] {
-      def toEither: Either[Throwable, A] = Right(value)
-    }
-
-    final case class Failure(error: String) extends RuntimeException(error) with Result[Nothing] {
-      def toEither: Either[Throwable, Nothing] = Left(this)
-    }
-
-    def success[A](value: A): Result[A] = Success(value)
-
-    def failure[A](error: String): Result[A] = Failure(error)
-  }
 }
 
 private class TokenRepositoryClientImpl[F[_]: Async: Logger](trUri: Uri)
@@ -71,19 +52,15 @@ private class TokenRepositoryClientImpl[F[_]: Async: Logger](trUri: Uri)
     with Http4sDsl[F]
     with Http4sClientDsl[F] {
 
-  override def findAccessToken(projectId: projects.GitLabId): F[Result[Option[AccessToken]]] =
+  override def findAccessToken(projectId: projects.GitLabId): F[Option[AccessToken]] =
     findAccessToken(trUri / "projects" / projectId / "tokens")
 
-  override def findAccessToken(projectSlug: projects.Slug): F[Result[Option[AccessToken]]] =
+  override def findAccessToken(projectSlug: projects.Slug): F[Option[AccessToken]] =
     findAccessToken(trUri / "projects" / projectSlug / "tokens")
 
-  private def findAccessToken(uri: Uri): F[Result[Option[AccessToken]]] =
+  private def findAccessToken(uri: Uri): F[Option[AccessToken]] =
     send(GET(uri)) {
-      case (Ok, _, response) => response.as[Option[AccessToken]].map(Result.success)
-      case (NotFound, _, _)  => Result.success(Option.empty[AccessToken]).pure[F]
-      case (status, req, _) =>
-        Result
-          .failure[Option[AccessToken]](s"Finding project access token failed: ${req.pathInfo.renderString}: $status")
-          .pure[F]
+      case (Ok, _, response) => response.as[Option[AccessToken]]
+      case (NotFound, _, _)  => Option.empty[AccessToken].pure[F]
     }
 }

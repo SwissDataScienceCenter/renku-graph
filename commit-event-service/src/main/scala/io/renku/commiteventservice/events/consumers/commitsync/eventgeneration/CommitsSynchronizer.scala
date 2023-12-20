@@ -30,11 +30,11 @@ import io.renku.eventlog
 import io.renku.eventlog.api.events.GlobalCommitSyncRequest
 import io.renku.events.consumers.Project
 import io.renku.graph.model.events.{BatchDate, CommitId}
-import io.renku.graph.tokenrepository.AccessTokenFinder
 import io.renku.http.client.{AccessToken, GitLabClient}
 import io.renku.logging.ExecutionTimeRecorder
 import io.renku.logging.ExecutionTimeRecorder.ElapsedTime
 import io.renku.metrics.MetricsRegistry
+import io.renku.tokenrepository.api.TokenRepositoryClient
 import org.typelevel.log4cats.Logger
 import org.typelevel.log4cats.syntax._
 
@@ -44,29 +44,28 @@ private[commitsync] trait CommitsSynchronizer[F[_]] {
   def synchronizeEvents(event: CommitSyncEvent): F[Unit]
 }
 
-private[commitsync] class CommitsSynchronizerImpl[F[_]: MonadThrow: Logger: AccessTokenFinder: ExecutionTimeRecorder](
-    latestCommitFinder:  LatestCommitFinder[F],
-    eventDetailsFinder:  EventDetailsFinder[F],
-    commitInfoFinder:    CommitInfoFinder[F],
-    commitToEventLog:    CommitToEventLog[F],
-    commitEventsRemover: CommitEventsRemover[F],
-    elClient:            eventlog.api.events.Client[F],
-    clock:               java.time.Clock = java.time.Clock.systemUTC()
+private[commitsync] class CommitsSynchronizerImpl[F[_]: MonadThrow: Logger: ExecutionTimeRecorder](
+    tokenRepositoryClient: TokenRepositoryClient[F],
+    latestCommitFinder:    LatestCommitFinder[F],
+    eventDetailsFinder:    EventDetailsFinder[F],
+    commitInfoFinder:      CommitInfoFinder[F],
+    commitToEventLog:      CommitToEventLog[F],
+    commitEventsRemover:   CommitEventsRemover[F],
+    elClient:              eventlog.api.events.Client[F],
+    clock:                 java.time.Clock = java.time.Clock.systemUTC()
 ) extends CommitsSynchronizer[F] {
 
-  private val accessTokenFinder: AccessTokenFinder[F] = AccessTokenFinder[F]
-  import accessTokenFinder._
   import commitEventsRemover._
   import commitInfoFinder._
   import commitToEventLog._
   import eventDetailsFinder._
+  import tokenRepositoryClient.findAccessToken
   private val executionTimeRecorder = ExecutionTimeRecorder[F]
   import executionTimeRecorder._
   import latestCommitFinder._
 
   override def synchronizeEvents(event: CommitSyncEvent): F[Unit] = {
-    (Logger[F].info(show"$categoryName: $event accepted") >>
-      findAccessToken(event.project.id)) >>= {
+    (Logger[F].info(show"$categoryName: $event accepted") >> findAccessToken(event.project.id)) >>= {
       case None =>
         info"${logMessageCommon(event)} -> No access token found sending GlobalCommitSyncRequest" >>
           triggerGlobalCommitSync(event)
@@ -215,19 +214,21 @@ private[commitsync] class CommitsSynchronizerImpl[F[_]: MonadThrow: Logger: Acce
 }
 
 private[commitsync] object CommitsSynchronizer {
-  def apply[F[_]: Async: GitLabClient: AccessTokenFinder: Logger: MetricsRegistry: ExecutionTimeRecorder]
-      : F[CommitsSynchronizerImpl[F]] = for {
-    latestCommitFinder  <- LatestCommitFinder[F]
-    eventDetailsFinder  <- EventDetailsFinder[F]
-    commitInfoFinder    <- CommitInfoFinder[F]
-    commitToEventLog    <- CommitToEventLog[F]
-    commitEventsRemover <- CommitEventsRemover[F]
-    elClient            <- eventlog.api.events.Client[F]
-  } yield new CommitsSynchronizerImpl[F](latestCommitFinder,
-                                         eventDetailsFinder,
-                                         commitInfoFinder,
-                                         commitToEventLog,
-                                         commitEventsRemover,
-                                         elClient
-  )
+  def apply[F[_]: Async: GitLabClient: Logger: MetricsRegistry: ExecutionTimeRecorder]: F[CommitsSynchronizerImpl[F]] =
+    for {
+      tokenRepositoryClient <- TokenRepositoryClient[F]
+      latestCommitFinder    <- LatestCommitFinder[F]
+      eventDetailsFinder    <- EventDetailsFinder[F]
+      commitInfoFinder      <- CommitInfoFinder[F]
+      commitToEventLog      <- CommitToEventLog[F]
+      commitEventsRemover   <- CommitEventsRemover[F]
+      elClient              <- eventlog.api.events.Client[F]
+    } yield new CommitsSynchronizerImpl[F](tokenRepositoryClient,
+                                           latestCommitFinder,
+                                           eventDetailsFinder,
+                                           commitInfoFinder,
+                                           commitToEventLog,
+                                           commitEventsRemover,
+                                           elClient
+    )
 }

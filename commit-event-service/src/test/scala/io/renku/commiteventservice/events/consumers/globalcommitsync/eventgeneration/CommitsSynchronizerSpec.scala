@@ -35,8 +35,6 @@ import io.renku.graph.model.EventsGenerators.commitIds
 import io.renku.graph.model.events.CommitId
 import io.renku.graph.model.projects
 import io.renku.graph.model.projects.GitLabId
-import io.renku.graph.tokenrepository.AccessTokenFinder
-import io.renku.graph.tokenrepository.AccessTokenFinder.Implicits.projectIdToPath
 import io.renku.http.client.AccessToken
 import io.renku.http.rest.paging.PagingRequest
 import io.renku.http.rest.paging.model.{Page, PerPage}
@@ -44,6 +42,7 @@ import io.renku.interpreters.TestLogger
 import io.renku.interpreters.TestLogger.Level.{Error, Info}
 import io.renku.logging.ExecutionTimeRecorder.ElapsedTime
 import io.renku.logging.TestExecutionTimeRecorder
+import io.renku.tokenrepository.api.TokenRepositoryClient
 import org.scalamock.scalatest.AsyncMockFactory
 import org.scalatest.BeforeAndAfterEach
 import org.scalatest.flatspec.AsyncFlatSpec
@@ -242,13 +241,14 @@ class CommitsSynchronizerSpec
 
   private implicit lazy val logger:                TestLogger[IO]                = TestLogger()
   private implicit lazy val executionTimeRecorder: TestExecutionTimeRecorder[IO] = TestExecutionTimeRecorder[IO]()
-  private implicit val accessTokenFinder:          AccessTokenFinder[IO]         = mock[AccessTokenFinder[IO]]
+  private implicit val tokenRepositoryClient:      TokenRepositoryClient[IO]     = mock[TokenRepositoryClient[IO]]
   private val gitLabCommitStatFetcher   = mock[GitLabCommitStatFetcher[IO]]
   private val gitLabCommitFetcher       = mock[GitLabCommitFetcher[IO]]
   private val eventLogCommitFetcher     = mock[ELCommitFetcher[IO]]
   private val commitEventDeleter        = mock[CommitEventDeleter[IO]]
   private val missingCommitEventCreator = mock[MissingCommitEventCreator[IO]]
-  private lazy val commitsSynchronizer = new CommitsSynchronizerImpl[IO](gitLabCommitStatFetcher,
+  private lazy val commitsSynchronizer = new CommitsSynchronizerImpl[IO](tokenRepositoryClient,
+                                                                         gitLabCommitStatFetcher,
                                                                          gitLabCommitFetcher,
                                                                          eventLogCommitFetcher,
                                                                          commitEventDeleter,
@@ -258,17 +258,14 @@ class CommitsSynchronizerSpec
 
   private def givenAccessTokenFound(projectId: GitLabId) = {
     val at = accessTokens.generateOne
-    (accessTokenFinder
-      .findAccessToken(_: GitLabId)(_: GitLabId => String))
-      .expects(projectId, projectIdToPath)
-      .returning(at.some.pure[IO])
+    givenAccessTokenFinding(projectId, returning = at.some.pure[IO])
     at
   }
 
   private def givenAccessTokenFinding(projectId: GitLabId, returning: IO[Option[AccessToken]]) =
-    (accessTokenFinder
-      .findAccessToken(_: GitLabId)(_: GitLabId => String))
-      .expects(projectId, projectIdToPath)
+    (tokenRepositoryClient
+      .findAccessToken(_: GitLabId))
+      .expects(projectId)
       .returning(returning)
 
   private def givenProjectDoesntExistInGL(projectId: GitLabId)(implicit at: AccessToken) =
