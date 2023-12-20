@@ -21,20 +21,24 @@ package io.renku.tokenrepository.api
 import cats.effect.Async
 import cats.syntax.all._
 import com.typesafe.config.{Config, ConfigFactory}
+import io.circe.syntax._
 import io.renku.control.Throttler
 import io.renku.graph.model.projects
+import io.renku.graph.model.projects.GitLabId
 import io.renku.http.client.{AccessToken, RestClient}
 import io.renku.http.tinytypes.TinyTypeURIEncoder._
 import io.renku.metrics.MetricsRegistry
 import org.http4s.Uri
-import org.http4s.circe.CirceEntityDecoder._
+import org.http4s.circe.CirceEntityCodec._
 import org.http4s.client.dsl.Http4sClientDsl
 import org.http4s.dsl.Http4sDsl
 import org.typelevel.log4cats.Logger
 
 trait TokenRepositoryClient[F[_]] {
   def findAccessToken(projectId:   projects.GitLabId): F[Option[AccessToken]]
-  def findAccessToken(projectSlug: projects.Slug):     F[Option[AccessToken]]
+  def findAccessToken(projectSlug: projects.Slug): F[Option[AccessToken]]
+  def removeAccessToken(projectId: GitLabId, maybeAccessToken: Option[AccessToken]): F[Unit]
+  def storeAccessToken(projectId:  GitLabId, accessToken:      AccessToken):         F[Unit]
 }
 
 object TokenRepositoryClient {
@@ -63,4 +67,14 @@ private class TokenRepositoryClientImpl[F[_]: Async: Logger](trUri: Uri)
       case (Ok, _, response) => response.as[Option[AccessToken]]
       case (NotFound, _, _)  => Option.empty[AccessToken].pure[F]
     }
+
+  override def removeAccessToken(projectId: GitLabId, maybeAccessToken: Option[AccessToken]): F[Unit] = {
+    val req = secureRequest(DELETE, trUri / "projects" / projectId / "tokens")(maybeAccessToken)
+    send(req) { case (NoContent, _, _) => ().pure[F] }
+  }
+
+  override def storeAccessToken(projectId: GitLabId, accessToken: AccessToken): F[Unit] =
+    send(
+      POST(trUri / "projects" / projectId / "tokens").withEntity(accessToken.asJson)
+    ) { case (NoContent, _, _) => ().pure[F] }
 }

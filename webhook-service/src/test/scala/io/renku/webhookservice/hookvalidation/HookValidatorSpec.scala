@@ -27,15 +27,14 @@ import io.renku.generators.Generators.Implicits._
 import io.renku.generators.Generators.exceptions
 import io.renku.graph.model.GraphModelGenerators.projectIds
 import io.renku.graph.model.projects.GitLabId
-import io.renku.graph.tokenrepository.AccessTokenFinder
 import io.renku.http.client.AccessToken
 import io.renku.interpreters.TestLogger
 import io.renku.interpreters.TestLogger.Level.Error
+import io.renku.tokenrepository.api.TokenRepositoryClient
 import io.renku.webhookservice.WebhookServiceGenerators._
 import io.renku.webhookservice.hookvalidation.HookValidator.HookValidationResult
 import io.renku.webhookservice.hookvalidation.HookValidator.HookValidationResult.{HookExists, HookMissing}
 import io.renku.webhookservice.model.HookIdentifier
-import io.renku.webhookservice.tokenrepository.AccessTokenAssociator
 import org.scalamock.scalatest.AsyncMockFactory
 import org.scalatest.BeforeAndAfterEach
 import org.scalatest.matchers.should
@@ -47,7 +46,6 @@ class HookValidatorSpec
     with AsyncMockFactory
     with should.Matchers
     with BeforeAndAfterEach {
-  import AccessTokenFinder.Implicits._
 
   "validateHook - finding access token" should {
 
@@ -85,7 +83,7 @@ class HookValidatorSpec
                             returning = true.some.pure[IO]
       )
 
-      givenTokenAssociation(givenAccessToken, returning = ().pure[IO])
+      givenTokenStoring(givenAccessToken, returning = ().pure[IO])
 
       validator.validateHook(projectId, givenAccessToken.some).asserting(_ shouldBe HookExists.some) >>
         logger.expectNoLogsF()
@@ -93,7 +91,7 @@ class HookValidatorSpec
 
     "re-associate access token and succeed with HookMissing if there's no hook" in {
 
-      givenTokenAssociation(givenAccessToken, returning = ().pure[IO])
+      givenTokenStoring(givenAccessToken, returning = ().pure[IO])
 
       val storedAccessToken = accessTokens.generateOne
       givenAccessTokenFinding(returning = storedAccessToken.some.pure[IO])
@@ -109,7 +107,7 @@ class HookValidatorSpec
 
     "return None if hook verification cannot determine hook existence" in {
 
-      givenTokenAssociation(givenAccessToken, returning = ().pure[IO])
+      givenTokenStoring(givenAccessToken, returning = ().pure[IO])
 
       val storedAccessToken = accessTokens.generateOne
       givenAccessTokenFinding(returning = storedAccessToken.some.pure[IO])
@@ -122,7 +120,7 @@ class HookValidatorSpec
 
     "fail if hook verification step fails" in {
 
-      givenTokenAssociation(givenAccessToken, returning = ().pure[IO])
+      givenTokenStoring(givenAccessToken, returning = ().pure[IO])
 
       val storedAccessToken = accessTokens.generateOne
       givenAccessTokenFinding(returning = storedAccessToken.some.pure[IO])
@@ -138,7 +136,7 @@ class HookValidatorSpec
     "fail if access token re-association fails" in {
 
       val exception = exceptions.generateOne
-      givenTokenAssociation(givenAccessToken, returning = exception.raiseError[IO, Nothing])
+      givenTokenStoring(givenAccessToken, returning = exception.raiseError[IO, Nothing])
 
       validator.validateHook(projectId, givenAccessToken.some).assertThrowsError[Exception](_ shouldBe exception) >>
         logger.loggedOnlyF(Error(s"Hook validation failed for projectId $projectId", exception))
@@ -207,21 +205,19 @@ class HookValidatorSpec
   private lazy val projectId        = projectIds.generateOne
 
   private val projectHookVerifier   = mock[ProjectHookVerifier[IO]]
-  private val accessTokenFinder     = mock[AccessTokenFinder[IO]]
-  private val accessTokenAssociator = mock[AccessTokenAssociator[IO]]
+  private val tokenRepositoryClient = mock[TokenRepositoryClient[IO]]
   private implicit lazy val logger: TestLogger[IO] = TestLogger[IO]()
   private lazy val validator = new HookValidatorImpl[IO](
     projectHookUrl,
     projectHookVerifier,
-    accessTokenFinder,
-    accessTokenAssociator,
+    tokenRepositoryClient,
     Cache.noop[IO, GitLabId, HookValidationResult]
   )
 
   private def givenAccessTokenFinding(returning: IO[Option[AccessToken]]) =
-    (accessTokenFinder
-      .findAccessToken(_: GitLabId)(_: GitLabId => String))
-      .expects(projectId, projectIdToPath)
+    (tokenRepositoryClient
+      .findAccessToken(_: GitLabId))
+      .expects(projectId)
       .returning(returning)
 
   private def givenHookVerification(identifier:  HookIdentifier,
@@ -232,9 +228,8 @@ class HookValidatorSpec
     .expects(identifier, accessToken)
     .returning(returning)
 
-  private def givenTokenAssociation(accessToken: AccessToken, returning: IO[Unit]) =
-    (accessTokenAssociator
-      .associate(_: GitLabId, _: AccessToken))
+  private def givenTokenStoring(accessToken: AccessToken, returning: IO[Unit]) =
+    (tokenRepositoryClient.storeAccessToken _)
       .expects(projectId, accessToken)
       .returning(returning)
 

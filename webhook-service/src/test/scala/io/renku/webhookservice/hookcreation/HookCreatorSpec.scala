@@ -33,6 +33,7 @@ import io.renku.http.client.AccessToken
 import io.renku.interpreters.TestLogger
 import io.renku.interpreters.TestLogger.Level.{Error, Info}
 import io.renku.testtools.IOSpec
+import io.renku.tokenrepository.api.TokenRepositoryClient
 import io.renku.webhookservice.ProjectInfoFinder
 import io.renku.webhookservice.WebhookServiceGenerators._
 import io.renku.webhookservice.crypto.HookTokenCrypto
@@ -43,7 +44,6 @@ import io.renku.webhookservice.hookvalidation.HookValidator
 import io.renku.webhookservice.hookvalidation.HookValidator.HookValidationResult
 import io.renku.webhookservice.hookvalidation.HookValidator.HookValidationResult.{HookExists, HookMissing}
 import io.renku.webhookservice.model.HookToken
-import io.renku.webhookservice.tokenrepository.AccessTokenAssociator
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.OptionValues
 import org.scalatest.concurrent.Eventually
@@ -65,7 +65,7 @@ class HookCreatorSpec
 
       givenHookValidation(returning = HookMissing.some.pure[IO])
 
-      givenTokenAssociation(returning = IO.unit)
+      givenTokenStoring(returning = IO.unit)
 
       givenTokenEncryption(returning = serializedHookToken.pure[IO])
 
@@ -123,7 +123,7 @@ class HookCreatorSpec
       givenHookValidation(returning = HookMissing.some.pure[IO])
 
       val exception = exceptions.generateOne
-      givenTokenAssociation(returning = exception.raiseError[IO, Unit])
+      givenTokenStoring(returning = exception.raiseError[IO, Unit])
 
       intercept[Exception] {
         hookCreation.createHook(projectId, authUser).unsafeRunSync()
@@ -136,7 +136,7 @@ class HookCreatorSpec
 
       givenHookValidation(returning = HookMissing.some.pure[IO])
 
-      givenTokenAssociation(returning = ().pure[IO])
+      givenTokenStoring(returning = ().pure[IO])
 
       val exception = exceptions.generateOne
       givenTokenEncryption(returning = exception.raiseError[IO, HookTokenCrypto.SerializedHookToken])
@@ -152,7 +152,7 @@ class HookCreatorSpec
 
       givenHookValidation(returning = HookMissing.some.pure[IO])
 
-      givenTokenAssociation(returning = ().pure[IO])
+      givenTokenStoring(returning = ().pure[IO])
 
       givenTokenEncryption(returning = serializedHookToken.pure[IO])
 
@@ -194,7 +194,7 @@ class HookCreatorSpec
 
     implicit val logger: TestLogger[IO] = TestLogger[IO]()
     private val projectHookValidator      = mock[HookValidator[IO]]
-    private val tokenAssociator           = mock[AccessTokenAssociator[IO]]
+    private val tokenRepositoryClient     = mock[TokenRepositoryClient[IO]]
     private val projectHookCreator        = mock[ProjectHookCreator[IO]]
     private val hookTokenCrypto           = mock[HookTokenCrypto[IO]]
     private val projectInfoFinderResponse = Queue.bounded[IO, IO[Option[Project]]](1).unsafeRunSync()
@@ -214,7 +214,7 @@ class HookCreatorSpec
     val hookCreation = new HookCreatorImpl[IO](
       projectHookUrl,
       projectHookValidator,
-      tokenAssociator,
+      tokenRepositoryClient,
       projectInfoFinder,
       hookTokenCrypto,
       projectHookCreator,
@@ -227,9 +227,8 @@ class HookCreatorSpec
         .expects(projectId, Some(accessToken))
         .returning(returning)
 
-    def givenTokenAssociation(returning: IO[Unit]) =
-      (tokenAssociator
-        .associate(_: GitLabId, _: AccessToken))
+    def givenTokenStoring(returning: IO[Unit]) =
+      (tokenRepositoryClient.storeAccessToken _)
         .expects(projectId, accessToken)
         .returning(returning)
 

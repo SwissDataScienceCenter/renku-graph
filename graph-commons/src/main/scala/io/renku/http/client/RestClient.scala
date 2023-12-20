@@ -28,14 +28,11 @@ import fs2.Stream
 import fs2.io.net.Network
 import io.circe.Json
 import io.renku.control.Throttler
-import io.renku.http.client.AccessToken._
 import io.renku.http.client.RestClient._
 import io.renku.http.client.RestClientError._
 import io.renku.logging.ExecutionTimeRecorder
 import io.renku.tinytypes.ByteArrayTinyType
 import io.renku.tinytypes.contenttypes.ZippedContent
-import org.http4s.AuthScheme.Bearer
-import org.http4s.Credentials.Token
 import org.http4s.Status.BadRequest
 import org.http4s._
 import org.http4s.client.{Client, ConnectionFailure}
@@ -74,7 +71,7 @@ abstract class RestClient[F[_]: Async: Logger, ThrottlingTarget](
     Request[F](
       method = method,
       uri = uri,
-      headers = authHeader(accessToken)
+      headers = accessToken.asAuthHeader
     )
 
   protected def request(method: Method, uri: Uri, maybeAccessToken: Option[AccessToken]): Request[F] =
@@ -93,12 +90,6 @@ abstract class RestClient[F[_]: Async: Logger, ThrottlingTarget](
       uri = uri,
       headers = Headers(basicAuthHeader(basicAuth))
     )
-
-  private lazy val authHeader: AccessToken => Headers = {
-    case ProjectAccessToken(token)   => Headers(Authorization(Token(Bearer, token)))
-    case UserOAuthAccessToken(token) => Headers(Authorization(Token(Bearer, token)))
-    case PersonalAccessToken(token)  => Headers(Header.Raw(ci"PRIVATE-TOKEN", token))
-  }
 
   private def basicAuthHeader(basicAuth: BasicAuthCredentials) =
     Authorization(BasicCredentials(basicAuth.username.value, basicAuth.password.value))

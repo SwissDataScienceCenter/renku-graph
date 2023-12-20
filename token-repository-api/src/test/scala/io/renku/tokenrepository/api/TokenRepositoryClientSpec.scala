@@ -21,15 +21,17 @@ package io.renku.tokenrepository.api
 import cats.effect.IO
 import cats.syntax.all._
 import com.github.tomakehurst.wiremock.client.WireMock._
+import eu.timepit.refined.auto._
 import io.circe.syntax._
-import io.renku.generators.CommonGraphGenerators.accessTokens
+import io.renku.data.Message
+import io.renku.generators.CommonGraphGenerators.{accessTokens, personalAccessTokens, projectAccessTokens, userOAuthAccessTokens}
 import io.renku.generators.Generators.Implicits._
 import io.renku.graph.model.RenkuTinyTypeGenerators.{projectIds, projectSlugs}
-import io.renku.http.client.UrlEncoder
+import io.renku.http.client.{AccessToken, UrlEncoder}
 import io.renku.interpreters.TestLogger
 import io.renku.stubbing.ExternalServiceStubbing
 import io.renku.testtools.CustomAsyncIOSpec
-import org.http4s.Uri
+import org.http4s.{Status, Uri}
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AsyncWordSpec
 import org.typelevel.log4cats.Logger
@@ -120,6 +122,82 @@ class TokenRepositoryClientSpec
       }
 
       client.findAccessToken(projectSlug).assertThrows[Exception]
+    }
+  }
+
+  "removeAccessToken" should {
+
+    "succeed if removing token for the given projectId on a remote is successful" in {
+
+      val projectId        = projectIds.generateOne
+      val maybeAccessToken = accessTokens.generateOption
+
+      stubFor {
+        delete(urlEqualTo(s"/projects/$projectId/tokens"))
+          .withAccessToken(maybeAccessToken)
+          .willReturn(noContent())
+      }
+
+      client.removeAccessToken(projectId, maybeAccessToken).assertNoException
+    }
+
+    "return an Exception if remote client responds with a status other than NO_CONTENT" in {
+
+      val projectId        = projectIds.generateOne
+      val maybeAccessToken = accessTokens.generateOption
+      val responseBody     = Message.Error("some error").asJson.noSpaces
+
+      stubFor {
+        delete(urlEqualTo(s"/projects/$projectId/tokens"))
+          .withAccessToken(maybeAccessToken)
+          .willReturn(status(Status.BadGateway.code).withBody(responseBody))
+      }
+
+      client
+        .removeAccessToken(projectId, maybeAccessToken)
+        .assertThrowsWithMessage[Exception](
+          s"DELETE $externalServiceBaseUrl/projects/$projectId/tokens returned ${Status.BadGateway}; body: $responseBody"
+        )
+    }
+  }
+
+  "storeAccessToken" should {
+
+    List[AccessToken](projectAccessTokens.generateOne,
+                      personalAccessTokens.generateOne,
+                      userOAuthAccessTokens.generateOne
+    ) foreach { accessToken =>
+      s"succeed if association projectId with a ${accessToken.getClass.getSimpleName} on a remote is successful" in {
+
+        val projectId = projectIds.generateOne
+
+        stubFor {
+          post(urlEqualTo(s"/projects/$projectId/tokens"))
+            .withRequestBody(equalToJson(accessToken.asJson.noSpaces))
+            .willReturn(noContent())
+        }
+
+        client.storeAccessToken(projectId, accessToken).assertNoException
+      }
+    }
+
+    "return an Exception if remote client responds with a status other than NO_CONTENT" in {
+
+      val accessToken  = accessTokens.generateOne
+      val projectId    = projectIds.generateOne
+      val responseBody = Message.Error("some error").asJson.noSpaces
+
+      stubFor {
+        post(urlEqualTo(s"/projects/$projectId/tokens"))
+          .withRequestBody(equalToJson(accessToken.asJson.noSpaces))
+          .willReturn(badRequest.withBody(responseBody))
+      }
+
+      client
+        .storeAccessToken(projectId, accessToken)
+        .assertThrowsWithMessage[Exception](
+          s"POST $externalServiceBaseUrl/projects/$projectId/tokens returned ${Status.BadRequest}; body: $responseBody"
+        )
     }
   }
 }
