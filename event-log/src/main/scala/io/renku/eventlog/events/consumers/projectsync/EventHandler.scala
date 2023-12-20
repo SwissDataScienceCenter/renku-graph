@@ -25,7 +25,6 @@ import io.renku.eventlog.metrics.QueriesExecutionTimes
 import io.renku.events.{consumers, CategoryName}
 import io.renku.events.consumers.subscriptions.SubscriptionMechanism
 import io.renku.events.consumers.ProcessExecutor
-import io.renku.graph.tokenrepository.AccessTokenFinder
 import io.renku.http.client.GitLabClient
 import io.renku.metrics.MetricsRegistry
 import org.typelevel.log4cats.Logger
@@ -56,9 +55,7 @@ private object EventHandler {
   import eu.timepit.refined.pureconfig._
   import io.renku.config.ConfigLoader.find
 
-  def apply[F[
-      _
-  ]: Async: GitLabClient: AccessTokenFinder: SessionResource: Logger: MetricsRegistry: QueriesExecutionTimes](
+  def apply[F[_]: Async: GitLabClient: SessionResource: Logger: MetricsRegistry: QueriesExecutionTimes](
       subscriptionMechanism: SubscriptionMechanism[F],
       config:                Config = ConfigFactory.load()
   ): F[consumers.EventHandler[F]] = for {

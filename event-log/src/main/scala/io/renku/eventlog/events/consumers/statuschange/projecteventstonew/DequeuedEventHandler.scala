@@ -37,7 +37,6 @@ import io.renku.events.consumers.Project
 import io.renku.graph.model.events.EventStatus.{AwaitingDeletion, Deleting, GeneratingTriples, New, Skipped}
 import io.renku.graph.model.events.{EventDate, EventStatus, ExecutionDate}
 import io.renku.graph.model.projects
-import io.renku.graph.tokenrepository.AccessTokenFinder
 import io.renku.metrics.MetricsRegistry
 import org.typelevel.log4cats.Logger
 import skunk._
@@ -51,8 +50,7 @@ private[statuschange] trait DequeuedEventHandler[F[_]] extends DBUpdater[F, Proj
 
 private[statuschange] object DequeuedEventHandler {
 
-  def apply[F[_]: Async: AccessTokenFinder: Logger: QueriesExecutionTimes: MetricsRegistry]
-      : F[DBUpdater[F, ProjectEventsToNew]] =
+  def apply[F[_]: Async: Logger: QueriesExecutionTimes: MetricsRegistry]: F[DBUpdater[F, ProjectEventsToNew]] =
     ProjectCleaner[F].map(new DequeuedEventHandlerImpl(_))
 
   private[statuschange] class DequeuedEventHandlerImpl[F[_]: Async: Logger: QueriesExecutionTimes](

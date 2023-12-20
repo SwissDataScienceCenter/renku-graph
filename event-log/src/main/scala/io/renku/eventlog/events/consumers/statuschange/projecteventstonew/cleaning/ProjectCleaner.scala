@@ -30,7 +30,6 @@ import io.renku.eventlog.TypeSerializers.{projectIdEncoder, projectSlugEncoder}
 import io.renku.eventlog.metrics.QueriesExecutionTimes
 import io.renku.events.consumers.Project
 import io.renku.graph.model.projects
-import io.renku.graph.tokenrepository.AccessTokenFinder
 import io.renku.metrics.MetricsRegistry
 import io.renku.triplesgenerator
 import io.renku.triplesgenerator.api.events.ProjectViewingDeletion
@@ -44,7 +43,7 @@ private[statuschange] trait ProjectCleaner[F[_]] {
 }
 
 private[statuschange] object ProjectCleaner {
-  def apply[F[_]: Async: AccessTokenFinder: Logger: QueriesExecutionTimes: MetricsRegistry]: F[ProjectCleaner[F]] =
+  def apply[F[_]: Async: Logger: QueriesExecutionTimes: MetricsRegistry]: F[ProjectCleaner[F]] =
     for {
       tgClient                      <- triplesgenerator.api.events.Client[F]
       projectWebhookAndTokenRemover <- ProjectWebhookAndTokenRemover[F]

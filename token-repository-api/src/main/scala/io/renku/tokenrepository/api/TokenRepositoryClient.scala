@@ -27,7 +27,6 @@ import io.renku.graph.model.projects
 import io.renku.graph.model.projects.GitLabId
 import io.renku.http.client.{AccessToken, RestClient}
 import io.renku.http.tinytypes.TinyTypeURIEncoder._
-import io.renku.metrics.MetricsRegistry
 import org.http4s.Uri
 import org.http4s.circe.CirceEntityCodec._
 import org.http4s.client.dsl.Http4sClientDsl
@@ -43,9 +42,9 @@ trait TokenRepositoryClient[F[_]] {
 
 object TokenRepositoryClient {
 
-  def apply[F[_]: Async: Logger: MetricsRegistry]: F[TokenRepositoryClient[F]] = apply()
+  def apply[F[_]: Async: Logger]: F[TokenRepositoryClient[F]] = apply()
 
-  def apply[F[_]: Async: Logger: MetricsRegistry](config: Config = ConfigFactory.load): F[TokenRepositoryClient[F]] =
+  def apply[F[_]: Async: Logger](config: Config = ConfigFactory.load): F[TokenRepositoryClient[F]] =
     TokenRepositoryUrl[F](config)
       .map(url => new TokenRepositoryClientImpl[F](Uri.unsafeFromString(url.value)))
 }

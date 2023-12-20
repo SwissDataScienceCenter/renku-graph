@@ -30,13 +30,12 @@ import io.renku.generators.Generators.Implicits._
 import io.renku.generators.Generators.exceptions
 import io.renku.graph.model.GraphModelGenerators._
 import io.renku.graph.model.projects
-import io.renku.graph.tokenrepository.AccessTokenFinder
-import io.renku.graph.tokenrepository.AccessTokenFinder.Implicits._
 import io.renku.http.client.RestClient.ResponseMappingF
 import io.renku.http.client.RestClientError.UnauthorizedException
 import io.renku.http.client.{AccessToken, GitLabClient}
 import io.renku.http.server.EndpointTester._
 import io.renku.testtools.{GitLabClientTools, IOSpec}
+import io.renku.tokenrepository.api.TokenRepositoryClient
 import org.http4s.Status.{Forbidden, InternalServerError, NotFound, Unauthorized}
 import org.http4s.implicits._
 import org.http4s.{Request, Response, Status, Uri}
@@ -110,9 +109,9 @@ class GitLabProjectFetcherSpec
     implicit val maybeAccessToken: Option[AccessToken] = accessTokens.generateOption
     val projectId = projectIds.generateOne
 
-    implicit val gitLabClient:      GitLabClient[IO]      = mock[GitLabClient[IO]]
-    implicit val accessTokenFinder: AccessTokenFinder[IO] = mock[AccessTokenFinder[IO]]
-    val fetcher = new GitLabProjectFetcherImpl[IO]
+    implicit val gitLabClient: GitLabClient[IO]          = mock[GitLabClient[IO]]
+    implicit val trClient:     TokenRepositoryClient[IO] = mock[TokenRepositoryClient[IO]]
+    val fetcher = new GitLabProjectFetcherImpl[IO](trClient)
 
     lazy val mapResponse = captureMapping(gitLabClient)(
       {
@@ -124,9 +123,9 @@ class GitLabProjectFetcherSpec
     )
 
     def givenFindAccessToken(by: projects.GitLabId, returning: IO[Option[AccessToken]]) =
-      (accessTokenFinder
-        .findAccessToken(_: projects.GitLabId)(_: projects.GitLabId => String))
-        .expects(by, projectIdToPath)
+      (trClient
+        .findAccessToken(_: projects.GitLabId))
+        .expects(by)
         .returning(returning)
   }
 
