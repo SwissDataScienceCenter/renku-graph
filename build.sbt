@@ -280,6 +280,7 @@ lazy val knowledgeGraph = project
   )
   .dependsOn(
     tokenRepositoryApi  % "compile->compile; test->test",
+    eventLogApi         % "compile->compile; test->test",
     entitiesSearch      % "compile->compile; test->test",
     webhookServiceApi   % "compile->compile; test->test",
     triplesGeneratorApi % "compile->compile; test->test",
