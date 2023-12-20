@@ -61,11 +61,11 @@ private[awaitinggeneration] class RemoteTriplesGenerator[F[_]: Async: Logger](
   import org.http4s.dsl.io._
 
   override def generateTriples(
-      commitEvent: CommitEvent
-  )(implicit maybeAccessToken: Option[AccessToken]): EitherT[F, ProcessingRecoverableError, JsonLD] = EitherT {
+      event: CommitEvent
+  )(implicit at: AccessToken): EitherT[F, ProcessingRecoverableError, JsonLD] = EitherT {
     {
       for {
-        uri           <- validateUri(s"$serviceUrl/projects/${commitEvent.project.id}/commits/${commitEvent.commitId}")
+        uri           <- validateUri(s"$serviceUrl/projects/${event.project.id}/commits/${event.commitId}")
         triplesInJson <- send(request(GET, uri))(mapResponse)
         triples       <- MonadThrow[F].fromEither(parse(triplesInJson))
       } yield triples.asRight[ProcessingRecoverableError]

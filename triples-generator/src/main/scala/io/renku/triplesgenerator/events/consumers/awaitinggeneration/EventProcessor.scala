@@ -57,28 +57,30 @@ private class EventProcessorImpl[F[_]: MonadThrow: Logger](
   import trClient.findAccessToken
   import triplesGenerator._
 
-  def process(event: CommitEvent): F[Unit] = allEventsTimeRecorder.measureExecutionTime {
-    for {
-      _                                   <- Logger[F].info(s"${logMessageCommon(event)} accepted")
-      implicit0(mat: Option[AccessToken]) <- findAccessToken(event.project.slug) recoverWith rollbackEvent(event)
-      uploadingResult                     <- generateAndUpdateStatus(event)
-    } yield uploadingResult
-  } flatMap logSummary recoverWith logError(event)
+  def process(event: CommitEvent): F[Unit] =
+    Logger[F].info(s"${logMessageCommon(event)} accepted") >>
+      allEventsTimeRecorder.measureExecutionTime {
+        findAccessToken(event.project.slug)
+          .recoverWith(rollbackEvent(event))
+          .flatMap {
+            case None => RecoverableError(event, SilentRecoverableError("No access token")).widen.pure[F]
+            case Some(implicit0(at: AccessToken)) => generateAndUpdateStatus(event)
+          }
+          .flatTap(updateEventLog)
+      } flatMap logSummary recoverWith logError(event)
 
   private def logError(event: CommitEvent): PartialFunction[Throwable, F[Unit]] = { case NonFatal(exception) =>
     Logger[F].error(exception)(s"${logMessageCommon(event)} processing failure")
   }
 
-  private def generateAndUpdateStatus(
-      commit: CommitEvent
-  )(implicit maybeAccessToken: Option[AccessToken]): F[TriplesGenerationResult] = EitherT {
-    singleEventTimeRecorder
-      .measureExecutionTime(generateTriples(commit).value)
-      .map(toTriplesGenerated(commit))
-  }.leftSemiflatMap(toRecoverableError(commit))
-    .merge
-    .recoverWith(toNonRecoverableFailure(commit))
-    .flatTap(updateEventLog)
+  private def generateAndUpdateStatus(commit: CommitEvent)(implicit at: AccessToken): F[TriplesGenerationResult] =
+    EitherT {
+      singleEventTimeRecorder
+        .measureExecutionTime(generateTriples(commit).value)
+        .map(toTriplesGenerated(commit))
+    }.leftSemiflatMap(toRecoverableError(commit))
+      .merge
+      .recoverWith(toNonRecoverableFailure(commit))
 
   private def toTriplesGenerated(commit: CommitEvent): (
       (ElapsedTime, Either[ProcessingRecoverableError, JsonLD])
@@ -165,6 +167,7 @@ private class EventProcessorImpl[F[_]: MonadThrow: Logger](
 
   private sealed trait TriplesGenerationResult extends Product with Serializable {
     val commit: CommitEvent
+    lazy val widen: TriplesGenerationResult = this
   }
   private sealed trait GenerationError extends TriplesGenerationResult {
     val cause: Throwable

@@ -29,9 +29,9 @@ import io.renku.graph.model.{RenkuUrl, entities, projects}
 import io.renku.http.client.AccessToken
 import io.renku.jsonld.{JsonLD, Property}
 import io.renku.triplesgenerator.errors.{ProcessingNonRecoverableError, ProcessingRecoverableError}
-import io.renku.triplesgenerator.events.consumers.awaitinggeneration.{CommitEvent, logMessageCommon}
 import io.renku.triplesgenerator.events.consumers.awaitinggeneration.triplesgeneration.TriplesGenerator
 import io.renku.triplesgenerator.events.consumers.awaitinggeneration.triplesgeneration.renkulog.Commands.{GitLabRepoUrlFinder, GitLabRepoUrlFinderImpl, RepositoryPath}
+import io.renku.triplesgenerator.events.consumers.awaitinggeneration.{CommitEvent, logMessageCommon}
 import org.typelevel.log4cats.Logger
 
 import java.security.SecureRandom
@@ -57,15 +57,15 @@ private[awaitinggeneration] class RenkuLogTriplesGenerator[F[_]: Async] private[
 
   override def generateTriples(
       commitEvent: CommitEvent
-  )(implicit maybeAccessToken: Option[AccessToken]): EitherT[F, ProcessingRecoverableError, JsonLD] = EitherT {
+  )(implicit at: AccessToken): EitherT[F, ProcessingRecoverableError, JsonLD] = EitherT {
     createRepositoryDirectory(commitEvent.project.slug)
-      .bracket(path => cloneCheckoutGenerate(commitEvent)(maybeAccessToken, RepositoryPath(path)))(deleteDirectory)
-      .recoverWith(meaningfulError(commitEvent, maybeAccessToken))
+      .bracket(path => cloneCheckoutGenerate(commitEvent)(at, RepositoryPath(path)))(deleteDirectory)
+      .recoverWith(meaningfulError(commitEvent, at))
   }
 
   private def cloneCheckoutGenerate(commitEvent: CommitEvent)(implicit
-      maybeAccessToken: Option[AccessToken],
-      repoDirectory:    RepositoryPath
+      at:            AccessToken,
+      repoDirectory: RepositoryPath
   ): F[Either[ProcessingRecoverableError, JsonLD]] = {
     for {
       _ <- prepareRepository(commitEvent)
@@ -77,8 +77,8 @@ private[awaitinggeneration] class RenkuLogTriplesGenerator[F[_]: Async] private[
   }.value
 
   private def prepareRepository(commitEvent: CommitEvent)(implicit
-      maybeAccessToken: Option[AccessToken],
-      repoDirectory:    RepositoryPath
+      at:            AccessToken,
+      repoDirectory: RepositoryPath
   ): EitherT[F, ProcessingRecoverableError, Unit] = for {
     repositoryUrl <- liftF(findRepositoryUrl(commitEvent.project.slug))
     _             <- git clone (repositoryUrl, workDirectory)
@@ -138,20 +138,19 @@ private[awaitinggeneration] class RenkuLogTriplesGenerator[F[_]: Async] private[
     case repositoryDirectoryFinder(folderName) => folderName
   }
 
-  private def meaningfulError(
-      commitEvent:      CommitEvent,
-      maybeAccessToken: Option[AccessToken]
+  private def meaningfulError(commitEvent: CommitEvent,
+                              at:          AccessToken
   ): PartialFunction[Throwable, F[Either[ProcessingRecoverableError, JsonLD]]] = {
     case ProcessingNonRecoverableError.MalformedRepository(message, cause) =>
       ProcessingNonRecoverableError
         .MalformedRepository(s"${logMessageCommon(commitEvent)} $message", cause)
         .raiseError[F, Either[ProcessingRecoverableError, JsonLD]]
     case NonFatal(exception) =>
-      (Option(exception.getMessage) -> maybeAccessToken)
-        .mapN { (message, token) =>
-          if (message contains token.value)
+      Option(exception.getMessage)
+        .map { message =>
+          if (message contains at.value)
             new Exception(
-              s"${logMessageCommon(commitEvent)} triples generation failed: ${message.replaceAll(token.value, token.toString)}"
+              s"${logMessageCommon(commitEvent)} triples generation failed: ${message.replaceAll(at.value, at.toString)}"
             )
           else
             new Exception(s"${logMessageCommon(commitEvent)} triples generation failed", exception)
