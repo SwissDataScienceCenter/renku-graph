@@ -25,7 +25,6 @@ import fs2.io.net.Network
 import io.renku.events.consumers
 import io.renku.events.consumers.subscriptions.SubscriptionMechanism
 import io.renku.events.consumers.subscriptions.SubscriptionPayloadComposer.defaultSubscriptionPayloadComposerFactory
-import io.renku.graph.tokenrepository.AccessTokenFinder
 import io.renku.http.client.GitLabClient
 import io.renku.metrics.MetricsRegistry
 import io.renku.triplesgenerator.Microservice
@@ -36,9 +35,7 @@ import org.typelevel.log4cats.Logger
 
 object SubscriptionFactory {
 
-  def apply[F[
-      _
-  ]: Async: Network: Logger: ReProvisioningStatus: GitLabClient: AccessTokenFinder: MetricsRegistry: SparqlQueryTimeRecorder](
+  def apply[F[_]: Async: Network: Logger: ReProvisioningStatus: GitLabClient: MetricsRegistry: SparqlQueryTimeRecorder](
       tsWriteLock:         TsWriteLock[F],
       projectSparqlClient: ProjectSparqlClient[F],
       config:              Config

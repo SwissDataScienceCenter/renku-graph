@@ -24,7 +24,6 @@ import cats.effect.Async
 import cats.syntax.all._
 import com.typesafe.config.Config
 import io.renku.eventlog.api.EventLogClient.EventPayload
-import io.renku.graph.tokenrepository.AccessTokenFinder
 import io.renku.http.client.GitLabClient
 import io.renku.metrics.MetricsRegistry
 import io.renku.triplesgenerator.api.events.SyncRepoMetadata
@@ -36,13 +35,11 @@ private[syncrepometadata] trait EventProcessor[F[_]] {
 }
 
 private[syncrepometadata] object EventProcessor {
-  def apply[F[
-      _
-  ]: Async: NonEmptyParallel: Logger: AccessTokenFinder: GitLabClient: SparqlQueryTimeRecorder: MetricsRegistry](
+  def apply[F[_]: Async: NonEmptyParallel: Logger: GitLabClient: SparqlQueryTimeRecorder: MetricsRegistry](
       config: Config
   ): F[EventProcessor[F]] =
-    (TSDataFinder[F](config), LatestPayloadFinder[F], UpdateCommandsRunner[F](config))
-      .mapN(new EventProcessorImpl[F](_, GLDataFinder[F], _, PayloadDataExtractor[F], UpdateCommandsCalculator[F](), _))
+    (TSDataFinder[F](config), GLDataFinder[F], LatestPayloadFinder[F], UpdateCommandsRunner[F](config))
+      .mapN(new EventProcessorImpl[F](_, _, _, PayloadDataExtractor[F], UpdateCommandsCalculator[F](), _))
 }
 
 private class EventProcessorImpl[F[_]: Async: NonEmptyParallel: Logger](

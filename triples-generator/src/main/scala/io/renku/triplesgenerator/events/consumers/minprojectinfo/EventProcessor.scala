@@ -22,12 +22,12 @@ import cats.effect.Async
 import cats.syntax.all._
 import cats.{MonadThrow, NonEmptyParallel, Parallel}
 import io.renku.graph.model.{RenkuUrl, datasets}
-import io.renku.graph.tokenrepository.AccessTokenFinder
 import io.renku.http.client.{AccessToken, GitLabClient}
 import io.renku.lock.Lock
 import io.renku.logging.ExecutionTimeRecorder
 import io.renku.logging.ExecutionTimeRecorder.ElapsedTime
 import io.renku.metrics.{Histogram, MetricsRegistry}
+import io.renku.tokenrepository.api.TokenRepositoryClient
 import io.renku.triplesgenerator
 import io.renku.triplesgenerator.api.events.ProjectActivated
 import io.renku.triplesgenerator.errors.ProcessingRecoverableError.{LogWorthyRecoverableError, SilentRecoverableError}
@@ -44,7 +44,8 @@ private trait EventProcessor[F[_]] {
   def process(event: MinProjectInfoEvent): F[Unit]
 }
 
-private class EventProcessorImpl[F[_]: MonadThrow: AccessTokenFinder: Logger](
+private class EventProcessorImpl[F[_]: MonadThrow: Logger](
+    trClient:                TokenRepositoryClient[F],
     tsProvisioner:           TSProvisioner[F],
     entityBuilder:           EntityBuilder[F],
     projectExistenceChecker: ProjectExistenceChecker[F],
@@ -52,9 +53,8 @@ private class EventProcessorImpl[F[_]: MonadThrow: AccessTokenFinder: Logger](
     executionTimeRecorder:   ExecutionTimeRecorder[F]
 ) extends EventProcessor[F] {
 
-  private val accessTokenFinder: AccessTokenFinder[F] = AccessTokenFinder[F]
   import EventUploadingResult._
-  import accessTokenFinder._
+  import trClient._
   import entityBuilder._
   import executionTimeRecorder._
   import projectExistenceChecker._
@@ -164,12 +164,11 @@ private object EventProcessor {
 
   import eu.timepit.refined.auto._
 
-  def apply[F[
-      _
-  ]: Async: NonEmptyParallel: Parallel: GitLabClient: AccessTokenFinder: Logger: MetricsRegistry: SparqlQueryTimeRecorder](
+  def apply[F[_]: Async: NonEmptyParallel: Parallel: GitLabClient: Logger: MetricsRegistry: SparqlQueryTimeRecorder](
       topSameAsLock:       Lock[F, datasets.TopmostSameAs],
       projectSparqlClient: ProjectSparqlClient[F]
   )(implicit renkuUrl: RenkuUrl): F[EventProcessor[F]] = for {
+    trClient                <- TokenRepositoryClient[F]
     tsProvisioner           <- TSProvisioner[F](topSameAsLock, projectSparqlClient)
     entityBuilder           <- EntityBuilder[F]
     projectExistenceChecker <- ProjectExistenceChecker[F]
@@ -181,5 +180,11 @@ private object EventProcessor {
                                              1000000, 5000000, 10000000, 50000000, 100000000, 500000000)
                              )
     executionTimeRecorder <- ExecutionTimeRecorder[F](maybeHistogram = Some(eventsProcessingTimes))
-  } yield new EventProcessorImpl(tsProvisioner, entityBuilder, projectExistenceChecker, tgClient, executionTimeRecorder)
+  } yield new EventProcessorImpl(trClient,
+                                 tsProvisioner,
+                                 entityBuilder,
+                                 projectExistenceChecker,
+                                 tgClient,
+                                 executionTimeRecorder
+  )
 }
