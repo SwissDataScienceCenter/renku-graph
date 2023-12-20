@@ -23,18 +23,18 @@ import cats.data.EitherT
 import cats.effect.Async
 import cats.syntax.all._
 import eu.timepit.refined.auto._
-import io.renku.graph.model.events.{CompoundEventId, EventProcessingTime, EventStatus}
 import io.renku.graph.model.events.EventStatus.{GenerationNonRecoverableFailure, GenerationRecoverableFailure}
-import io.renku.graph.tokenrepository.AccessTokenFinder
+import io.renku.graph.model.events.{CompoundEventId, EventProcessingTime, EventStatus}
 import io.renku.http.client.AccessToken
 import io.renku.jsonld.JsonLD
 import io.renku.logging.ExecutionTimeRecorder
 import io.renku.logging.ExecutionTimeRecorder.ElapsedTime
 import io.renku.metrics.{Histogram, MetricsRegistry}
+import io.renku.tokenrepository.api.TokenRepositoryClient
+import io.renku.triplesgenerator.errors.ProcessingRecoverableError._
 import io.renku.triplesgenerator.errors.{ProcessingNonRecoverableError, ProcessingRecoverableError}
 import io.renku.triplesgenerator.events.consumers.EventStatusUpdater
 import io.renku.triplesgenerator.events.consumers.EventStatusUpdater._
-import io.renku.triplesgenerator.errors.ProcessingRecoverableError._
 import io.renku.triplesgenerator.events.consumers.awaitinggeneration.triplesgeneration.TriplesGenerator
 import org.typelevel.log4cats.Logger
 
@@ -45,16 +45,16 @@ private trait EventProcessor[F[_]] {
   def process(event: CommitEvent): F[Unit]
 }
 
-private class EventProcessorImpl[F[_]: MonadThrow: AccessTokenFinder: Logger](
+private class EventProcessorImpl[F[_]: MonadThrow: Logger](
+    trClient:                TokenRepositoryClient[F],
     triplesGenerator:        TriplesGenerator[F],
     statusUpdater:           EventStatusUpdater[F],
     allEventsTimeRecorder:   ExecutionTimeRecorder[F],
     singleEventTimeRecorder: ExecutionTimeRecorder[F]
 ) extends EventProcessor[F] {
 
-  private val accessTokenFinder: AccessTokenFinder[F] = AccessTokenFinder[F]
   import TriplesGenerationResult._
-  import accessTokenFinder._
+  import trClient.findAccessToken
   import triplesGenerator._
 
   def process(event: CommitEvent): F[Unit] = allEventsTimeRecorder.measureExecutionTime {
@@ -187,7 +187,8 @@ private class EventProcessorImpl[F[_]: MonadThrow: AccessTokenFinder: Logger](
 
 private object EventProcessor {
 
-  def apply[F[_]: Async: Logger: AccessTokenFinder: MetricsRegistry]: F[EventProcessor[F]] = for {
+  def apply[F[_]: Async: Logger: MetricsRegistry]: F[EventProcessor[F]] = for {
+    trClient           <- TokenRepositoryClient[F]
     triplesGenerator   <- TriplesGenerator()
     eventStatusUpdater <- EventStatusUpdater(categoryName)
     histogram <- Histogram[F](
@@ -198,10 +199,10 @@ private object EventProcessor {
                  )
     allEventsTimeRecorder   <- ExecutionTimeRecorder[F](maybeHistogram = Some(histogram))
     singleEventTimeRecorder <- ExecutionTimeRecorder[F](maybeHistogram = None)
-  } yield new EventProcessorImpl(
-    triplesGenerator,
-    eventStatusUpdater,
-    allEventsTimeRecorder,
-    singleEventTimeRecorder
+  } yield new EventProcessorImpl(trClient,
+                                 triplesGenerator,
+                                 eventStatusUpdater,
+                                 allEventsTimeRecorder,
+                                 singleEventTimeRecorder
   )
 }

@@ -36,13 +36,12 @@ import io.renku.graph.model.EventsGenerators.{batchDates, commitIds}
 import io.renku.graph.model.events.CommitId
 import io.renku.graph.model.projects
 import io.renku.graph.model.projects.GitLabId
-import io.renku.graph.tokenrepository.AccessTokenFinder
-import io.renku.graph.tokenrepository.AccessTokenFinder.Implicits._
 import io.renku.http.client.AccessToken
 import io.renku.interpreters.TestLogger
 import io.renku.interpreters.TestLogger.Level._
 import io.renku.logging.ExecutionTimeRecorder.ElapsedTime
 import io.renku.logging.TestExecutionTimeRecorder
+import io.renku.tokenrepository.api.TokenRepositoryClient
 import org.scalamock.scalatest.AsyncMockFactory
 import org.scalatest.BeforeAndAfterEach
 import org.scalatest.flatspec.AsyncFlatSpec
@@ -577,7 +576,7 @@ class CommitsSynchronizerSpec
 
   private implicit lazy val logger:                TestLogger[IO]                = TestLogger[IO]()
   private implicit lazy val executionTimeRecorder: TestExecutionTimeRecorder[IO] = TestExecutionTimeRecorder[IO]()
-  private implicit val accessTokenFinder:          AccessTokenFinder[IO]         = mock[AccessTokenFinder[IO]]
+  private implicit val tokenRepositoryClient:      TokenRepositoryClient[IO]     = mock[TokenRepositoryClient[IO]]
   private lazy val latestCommitFinder  = mock[LatestCommitFinder[IO]]
   private lazy val eventDetailsFinder  = mock[EventDetailsFinder[IO]]
   private lazy val commitInfoFinder    = mock[CommitInfoFinder[IO]]
@@ -586,7 +585,8 @@ class CommitsSynchronizerSpec
   private lazy val elClient            = mock[eventlog.api.events.Client[IO]]
   private val clock                    = Clock.fixed(batchDate.value, ZoneId.of(ZoneOffset.UTC.getId))
 
-  private lazy val commitsSynchronizer = new CommitsSynchronizerImpl[IO](latestCommitFinder,
+  private lazy val commitsSynchronizer = new CommitsSynchronizerImpl[IO](tokenRepositoryClient,
+                                                                         latestCommitFinder,
                                                                          eventDetailsFinder,
                                                                          commitInfoFinder,
                                                                          commitToEventLog,
@@ -597,17 +597,14 @@ class CommitsSynchronizerSpec
 
   private def givenAccessTokenIsFound(projectId: GitLabId): AccessToken = {
     val at = accessTokens.generateOne
-    (accessTokenFinder
-      .findAccessToken(_: GitLabId)(_: GitLabId => String))
-      .expects(projectId, projectIdToPath)
-      .returning(at.some.pure[IO])
+    givenAccessTokenFinding(projectId, returning = at.some.pure[IO])
     at
   }
 
   private def givenAccessTokenFinding(projectId: GitLabId, returning: IO[Option[AccessToken]]) =
-    (accessTokenFinder
-      .findAccessToken(_: GitLabId)(_: GitLabId => String))
-      .expects(projectId, projectIdToPath)
+    (tokenRepositoryClient
+      .findAccessToken(_: GitLabId))
+      .expects(projectId)
       .returning(returning)
 
   private def givenLatestCommitIsFound(commitInfo: CommitInfo, projectId: GitLabId)(implicit at: AccessToken) =

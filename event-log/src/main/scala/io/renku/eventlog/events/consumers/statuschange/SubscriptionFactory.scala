@@ -24,14 +24,11 @@ import io.renku.eventlog.EventLogDB.SessionResource
 import io.renku.eventlog.metrics.{EventStatusGauges, QueriesExecutionTimes}
 import io.renku.events.consumers
 import io.renku.events.consumers.subscriptions.SubscriptionMechanism
-import io.renku.graph.tokenrepository.AccessTokenFinder
 import io.renku.metrics.MetricsRegistry
 import org.typelevel.log4cats.Logger
 
 object SubscriptionFactory {
-  def apply[F[
-      _
-  ]: Async: SessionResource: AccessTokenFinder: Logger: MetricsRegistry: QueriesExecutionTimes: EventStatusGauges](
+  def apply[F[_]: Async: SessionResource: Logger: MetricsRegistry: QueriesExecutionTimes: EventStatusGauges](
       eventsQueue: StatusChangeEventsQueue[F]
   ): F[(consumers.EventHandler[F], SubscriptionMechanism[F])] = for {
     handler <- EventHandler[F](eventsQueue)

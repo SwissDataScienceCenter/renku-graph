@@ -25,7 +25,6 @@ import io.renku.config.renku
 import io.renku.data.Message
 import io.renku.graph.config.GitLabUrlLoader
 import io.renku.graph.model.{GitLabUrl, projects}
-import io.renku.graph.tokenrepository.AccessTokenFinder
 import io.renku.http.client.GitLabClient
 import io.renku.http.rest.Links.Href
 import io.renku.http.server.security.model.AuthUser
@@ -119,8 +118,7 @@ class EndpointImpl[F[_]: MonadThrow: Logger](
 
 object Endpoint {
 
-  def apply[F[_]: Parallel: Async: GitLabClient: AccessTokenFinder: Logger: SparqlQueryTimeRecorder: MetricsRegistry]
-      : F[Endpoint[F]] =
+  def apply[F[_]: Parallel: Async: GitLabClient: Logger: SparqlQueryTimeRecorder: MetricsRegistry]: F[Endpoint[F]] =
     for {
       projectFinder         <- ProjectFinder[F]
       jsonEncoder           <- ProjectJsonEncoder[F]

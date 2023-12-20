@@ -25,7 +25,6 @@ import io.renku.events.Subscription.SubscriberCapacity
 import io.renku.events.consumers
 import io.renku.events.consumers.subscriptions.SubscriptionMechanism
 import io.renku.events.consumers.subscriptions.SubscriptionPayloadComposer.defaultSubscriptionPayloadComposerFactory
-import io.renku.graph.tokenrepository.AccessTokenFinder
 import io.renku.http.client.GitLabClient
 import io.renku.metrics.MetricsRegistry
 import io.renku.triplesgenerator.Microservice
@@ -34,9 +33,7 @@ import io.renku.triplesstore.SparqlQueryTimeRecorder
 import org.typelevel.log4cats.Logger
 
 object SubscriptionFactory {
-  def apply[F[
-      _
-  ]: Async: ReProvisioningStatus: GitLabClient: AccessTokenFinder: Logger: MetricsRegistry: SparqlQueryTimeRecorder](
+  def apply[F[_]: Async: ReProvisioningStatus: GitLabClient: Logger: MetricsRegistry: SparqlQueryTimeRecorder](
       config: Config
   ): F[(consumers.EventHandler[F], SubscriptionMechanism[F])] = for {
     generationProcessesNumber <- GenerationProcessesNumber[F]()

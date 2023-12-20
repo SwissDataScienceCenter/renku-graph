@@ -43,9 +43,10 @@ lazy val root = project
     renkuModel,
     graphCommons,
     eventsQueue,
+    tokenRepositoryApi,
+    tokenRepository,
     eventLogApi,
     eventLog,
-    tokenRepository,
     webhookService,
     commitEventService,
     triplesGeneratorApi,
@@ -136,6 +137,7 @@ lazy val eventLog = project
   .withId("event-log")
   .settings(commonSettings)
   .dependsOn(
+    tokenRepositoryApi  % "compile->compile; test->test",
     eventLogApi         % "compile->compile; test->test",
     triplesGeneratorApi % "compile->compile; test->test"
   )
@@ -156,6 +158,7 @@ lazy val webhookService = project
   .withId("webhook-service")
   .settings(commonSettings)
   .dependsOn(
+    tokenRepositoryApi  % "compile->compile; test->test",
     webhookServiceApi   % "compile->compile; test->test",
     eventLogApi         % "compile->compile; test->test",
     triplesGeneratorApi % "compile->compile; test->test"
@@ -169,7 +172,10 @@ lazy val commitEventService = project
   .in(file("commit-event-service"))
   .withId("commit-event-service")
   .settings(commonSettings)
-  .dependsOn(eventLogApi % "compile->compile; test->test")
+  .dependsOn(
+    tokenRepositoryApi % "compile->compile; test->test",
+    eventLogApi        % "compile->compile; test->test"
+  )
   .enablePlugins(
     JavaAppPackaging,
     AutomateHeaderPlugin
@@ -195,7 +201,7 @@ lazy val triplesGeneratorApi = project
   .in(file("triples-generator-api"))
   .withId("triples-generator-api")
   .settings(commonSettings)
-  .dependsOn(eventLogApi % "compile->compile; test->test")
+  .dependsOn(graphCommons % "compile->compile; test->test")
   .enablePlugins(AutomateHeaderPlugin)
 
 lazy val entitiesViewingsCollector = project
@@ -221,6 +227,8 @@ lazy val triplesGenerator = project
     )
   )
   .dependsOn(
+    tokenRepositoryApi  % "compile->compile; test->test",
+    eventLogApi         % "compile->compile; test->test",
     triplesGeneratorApi % "compile->compile; test->test",
     entitiesSearch,
     entitiesViewingsCollector % "compile->compile; test->test",
@@ -231,11 +239,21 @@ lazy val triplesGenerator = project
     AutomateHeaderPlugin
   )
 
+lazy val tokenRepositoryApi = project
+  .in(file("token-repository-api"))
+  .withId("token-repository-api")
+  .settings(commonSettings)
+  .dependsOn(graphCommons % "compile->compile; test->test")
+  .enablePlugins(AutomateHeaderPlugin)
+
 lazy val tokenRepository = project
   .in(file("token-repository"))
   .withId("token-repository")
   .settings(commonSettings)
-  .dependsOn(eventLogApi % "compile->compile; test->test")
+  .dependsOn(
+    tokenRepositoryApi % "compile->compile; test->test",
+    eventLogApi        % "compile->compile; test->test"
+  )
   .enablePlugins(
     JavaAppPackaging,
     AutomateHeaderPlugin
@@ -261,7 +279,8 @@ lazy val knowledgeGraph = project
     )
   )
   .dependsOn(
-    graphCommons        % "compile->compile; test->test",
+    tokenRepositoryApi  % "compile->compile; test->test",
+    eventLogApi         % "compile->compile; test->test",
     entitiesSearch      % "compile->compile; test->test",
     webhookServiceApi   % "compile->compile; test->test",
     triplesGeneratorApi % "compile->compile; test->test",

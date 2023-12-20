@@ -25,7 +25,6 @@ import io.renku.events.consumers.ProcessExecutor
 import io.renku.events.consumers.subscriptions.SubscriptionMechanism
 import io.renku.events.{CategoryName, consumers}
 import io.renku.graph.model.{RenkuUrl, datasets}
-import io.renku.graph.tokenrepository.AccessTokenFinder
 import io.renku.http.client.GitLabClient
 import io.renku.lock.Lock
 import io.renku.lock.syntax._
@@ -67,7 +66,7 @@ private object EventHandler {
 
   def apply[F[
       _
-  ]: Async: NonEmptyParallel: Parallel: ReProvisioningStatus: GitLabClient: AccessTokenFinder: MetricsRegistry: Logger: SparqlQueryTimeRecorder](
+  ]: Async: NonEmptyParallel: Parallel: ReProvisioningStatus: GitLabClient: MetricsRegistry: Logger: SparqlQueryTimeRecorder](
       subscriptionMechanism: SubscriptionMechanism[F],
       tsWriteLock:           TsWriteLock[F],
       topSameAsLock:         Lock[F, datasets.TopmostSameAs],

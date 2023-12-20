@@ -16,7 +16,7 @@
  * limitations under the License.
  */
 
-package io.renku.graph.tokenrepository
+package io.renku.tokenrepository.api
 
 import cats.MonadThrow
 import com.typesafe.config.{Config, ConfigFactory}

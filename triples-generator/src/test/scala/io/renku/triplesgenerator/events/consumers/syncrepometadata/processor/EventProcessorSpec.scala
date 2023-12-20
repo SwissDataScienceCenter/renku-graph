@@ -29,6 +29,7 @@ import io.renku.generators.Generators.exceptions
 import io.renku.graph.model.projects
 import io.renku.interpreters.TestLogger
 import io.renku.interpreters.TestLogger.Level.Error
+import io.renku.triplesgenerator.Generators.eventPayloads
 import io.renku.triplesgenerator.api.events.Generators._
 import org.scalamock.scalatest.AsyncMockFactory
 import org.scalatest.flatspec.AsyncFlatSpec

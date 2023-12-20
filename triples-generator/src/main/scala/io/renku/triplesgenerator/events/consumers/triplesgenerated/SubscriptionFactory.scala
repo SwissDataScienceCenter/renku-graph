@@ -27,7 +27,6 @@ import io.renku.events.consumers
 import io.renku.events.consumers.subscriptions.SubscriptionMechanism
 import io.renku.events.consumers.subscriptions.SubscriptionPayloadComposer.defaultSubscriptionPayloadComposerFactory
 import io.renku.graph.model.{RenkuUrl, datasets}
-import io.renku.graph.tokenrepository.AccessTokenFinder
 import io.renku.http.client.GitLabClient
 import io.renku.lock.Lock
 import io.renku.metrics.MetricsRegistry
@@ -40,7 +39,7 @@ import org.typelevel.log4cats.Logger
 object SubscriptionFactory {
   def apply[F[
       _
-  ]: Async: NonEmptyParallel: Parallel: ReProvisioningStatus: GitLabClient: AccessTokenFinder: Logger: MetricsRegistry: SparqlQueryTimeRecorder](
+  ]: Async: NonEmptyParallel: Parallel: ReProvisioningStatus: GitLabClient: Logger: MetricsRegistry: SparqlQueryTimeRecorder](
       tsWriteLock:         TsWriteLock[F],
       topSameAsLock:       Lock[F, datasets.TopmostSameAs],
       projectSparqlClient: ProjectSparqlClient[F],

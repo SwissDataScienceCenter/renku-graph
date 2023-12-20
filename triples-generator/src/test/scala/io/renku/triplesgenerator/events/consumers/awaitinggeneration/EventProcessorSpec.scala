@@ -29,20 +29,20 @@ import io.renku.generators.jsonld.JsonLDGenerators.jsonLDEntities
 import io.renku.graph.model.events.EventStatus.{FailureStatus, New}
 import io.renku.graph.model.events._
 import io.renku.graph.model.projects.Slug
-import io.renku.graph.tokenrepository.AccessTokenFinder
 import io.renku.http.client.AccessToken
 import io.renku.interpreters.TestLogger
 import io.renku.interpreters.TestLogger.Level.{Error, Info}
 import io.renku.jsonld.JsonLD
 import io.renku.logging.TestExecutionTimeRecorder
 import io.renku.testtools.IOSpec
-import io.renku.triplesgenerator.events.consumers.EventStatusUpdater.{ExecutionDelay, RollbackStatus}
-import io.renku.triplesgenerator.errors.ProcessingRecoverableError._
+import io.renku.tokenrepository.api.TokenRepositoryClient
+import io.renku.triplesgenerator.errors.ErrorGenerators.{logWorthyRecoverableErrors, nonRecoverableMalformedRepoErrors, silentRecoverableErrors}
 import io.renku.triplesgenerator.errors.ProcessingRecoverableError
+import io.renku.triplesgenerator.errors.ProcessingRecoverableError._
+import io.renku.triplesgenerator.events.consumers.EventStatusUpdater
+import io.renku.triplesgenerator.events.consumers.EventStatusUpdater.{ExecutionDelay, RollbackStatus}
 import io.renku.triplesgenerator.events.consumers.awaitinggeneration.EventProcessingGenerators._
 import io.renku.triplesgenerator.events.consumers.awaitinggeneration.triplesgeneration.TriplesGenerator
-import io.renku.triplesgenerator.events.consumers.EventStatusUpdater
-import io.renku.triplesgenerator.errors.ErrorGenerators.{logWorthyRecoverableErrors, nonRecoverableMalformedRepoErrors, silentRecoverableErrors}
 import org.scalacheck.Gen
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.concurrent.{Eventually, IntegrationPatience}
@@ -58,8 +58,6 @@ class EventProcessorSpec
     with Eventually
     with IntegrationPatience
     with should.Matchers {
-
-  import AccessTokenFinder.Implicits._
 
   "process" should {
 
@@ -180,23 +178,23 @@ class EventProcessorSpec
 
     val maybeAccessToken = Gen.option(accessTokens).generateOne
 
-    implicit val logger:            TestLogger[IO]        = TestLogger[IO]()
-    implicit val accessTokenFinder: AccessTokenFinder[IO] = mock[AccessTokenFinder[IO]]
+    implicit val logger:  TestLogger[IO]            = TestLogger[IO]()
+    private val trClient: TokenRepositoryClient[IO] = mock[TokenRepositoryClient[IO]]
     val triplesFinder           = mock[TriplesGenerator[IO]]
     val eventStatusUpdater      = mock[EventStatusUpdater[IO]]
     val allEventsTimeRecorder   = TestExecutionTimeRecorder[IO](maybeHistogram = None)
     val singleEventTimeRecorder = TestExecutionTimeRecorder[IO](maybeHistogram = None)
-    val eventProcessor = new EventProcessorImpl(
-      triplesFinder,
-      eventStatusUpdater,
-      allEventsTimeRecorder,
-      singleEventTimeRecorder
+    val eventProcessor = new EventProcessorImpl(trClient,
+                                                triplesFinder,
+                                                eventStatusUpdater,
+                                                allEventsTimeRecorder,
+                                                singleEventTimeRecorder
     )
 
     def givenFetchingAccessToken(forProjectSlug: Slug) =
-      (accessTokenFinder
-        .findAccessToken(_: Slug)(_: Slug => String))
-        .expects(forProjectSlug, projectSlugToPath)
+      (trClient
+        .findAccessToken(_: Slug))
+        .expects(forProjectSlug)
 
     def successfulTriplesGeneration(commitAndTriples: (CommitEvent, JsonLD)) = {
       val (commit, payload) = commitAndTriples

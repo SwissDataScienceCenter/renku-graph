@@ -31,7 +31,6 @@ import io.renku.events.producers.EventSender
 import io.renku.events.{CategoryName, EventRequestContent, consumers}
 import io.renku.graph.config.EventLogUrl
 import io.renku.graph.model.events.ZippedEventPayload
-import io.renku.graph.tokenrepository.AccessTokenFinder
 import io.renku.metrics.MetricsRegistry
 import org.typelevel.log4cats.Logger
 
@@ -142,9 +141,7 @@ final class EventHandler[F[_]: Async: SessionResource: Logger: MetricsRegistry: 
 
 object EventHandler {
 
-  def apply[F[
-      _
-  ]: Async: SessionResource: AccessTokenFinder: Logger: MetricsRegistry: QueriesExecutionTimes: EventStatusGauges](
+  def apply[F[_]: Async: SessionResource: Logger: MetricsRegistry: QueriesExecutionTimes: EventStatusGauges](
       eventsQueue: StatusChangeEventsQueue[F]
   ): F[consumers.EventHandler[F]] = for {
     deliveryInfoRemover       <- DeliveryInfoRemover[F]

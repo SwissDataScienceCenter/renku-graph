@@ -24,7 +24,6 @@ import com.typesafe.config.Config
 import io.renku.events.consumers.ProcessExecutor
 import io.renku.events.consumers.subscriptions.SubscriptionMechanism
 import io.renku.events.{CategoryName, consumers}
-import io.renku.graph.tokenrepository.AccessTokenFinder
 import io.renku.metrics.MetricsRegistry
 import io.renku.triplesgenerator.events.consumers.TSReadinessForEventsChecker
 import io.renku.triplesgenerator.events.consumers.tsmigrationrequest.migrations.reprovisioning.ReProvisioningStatus
@@ -53,7 +52,7 @@ private class EventHandler[F[_]: MonadCancelThrow: Logger](
 
 private object EventHandler {
 
-  def apply[F[_]: Async: ReProvisioningStatus: Logger: AccessTokenFinder: MetricsRegistry: SparqlQueryTimeRecorder](
+  def apply[F[_]: Async: ReProvisioningStatus: Logger: MetricsRegistry: SparqlQueryTimeRecorder](
       subscriptionMechanism: SubscriptionMechanism[F],
       generationProcesses:   GenerationProcessesNumber,
       config:                Config

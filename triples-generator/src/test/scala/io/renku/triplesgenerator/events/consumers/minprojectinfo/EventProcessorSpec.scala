@@ -30,18 +30,18 @@ import io.renku.graph.model.entities.Project
 import io.renku.graph.model.projects.Slug
 import io.renku.graph.model.testentities._
 import io.renku.graph.model.{entities, projects}
-import io.renku.graph.tokenrepository.AccessTokenFinder
 import io.renku.http.client.AccessToken
 import io.renku.interpreters.TestLogger
 import io.renku.interpreters.TestLogger.Level.{Error, Info}
 import io.renku.interpreters.TestLogger.Matcher.NotRefEqual
 import io.renku.logging.TestExecutionTimeRecorder
 import io.renku.testtools.IOSpec
+import io.renku.tokenrepository.api.TokenRepositoryClient
 import io.renku.triplesgenerator
 import io.renku.triplesgenerator.api.events.ProjectActivated
+import io.renku.triplesgenerator.errors.ErrorGenerators.{logWorthyRecoverableErrors, nonRecoverableMalformedRepoErrors, silentRecoverableErrors}
 import io.renku.triplesgenerator.errors.ProcessingRecoverableError
 import io.renku.triplesgenerator.errors.ProcessingRecoverableError.{LogWorthyRecoverableError, SilentRecoverableError}
-import io.renku.triplesgenerator.errors.ErrorGenerators.{logWorthyRecoverableErrors, nonRecoverableMalformedRepoErrors, silentRecoverableErrors}
 import io.renku.triplesgenerator.tsprovisioning.TSProvisioner
 import io.renku.triplesgenerator.tsprovisioning.triplesuploading.TriplesUploadResult
 import io.renku.triplesgenerator.tsprovisioning.triplesuploading.TriplesUploadResult._
@@ -52,8 +52,6 @@ import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
 
 class EventProcessorSpec extends AnyWordSpec with IOSpec with MockFactory with should.Matchers {
-
-  import AccessTokenFinder.Implicits._
 
   "process" should {
 
@@ -308,20 +306,25 @@ class EventProcessorSpec extends AnyWordSpec with IOSpec with MockFactory with s
 
     implicit val maybeAccessToken: Option[AccessToken] = Gen.option(accessTokens).generateOne
 
-    implicit val logger:            TestLogger[IO]        = TestLogger[IO]()
-    implicit val accessTokenFinder: AccessTokenFinder[IO] = mock[AccessTokenFinder[IO]]
+    implicit val logger:  TestLogger[IO]            = TestLogger[IO]()
+    private val trClient: TokenRepositoryClient[IO] = mock[TokenRepositoryClient[IO]]
     private val tsProvisioner           = mock[TSProvisioner[IO]]
     private val projectExistenceChecker = mock[ProjectExistenceChecker[IO]]
     private val entityBuilder           = mock[EntityBuilder[IO]]
     private val tgClient                = mock[triplesgenerator.api.events.Client[IO]]
     private val executionTimeRecorder   = TestExecutionTimeRecorder[IO](maybeHistogram = None)
-    val eventProcessor =
-      new EventProcessorImpl[IO](tsProvisioner, entityBuilder, projectExistenceChecker, tgClient, executionTimeRecorder)
+    val eventProcessor = new EventProcessorImpl[IO](trClient,
+                                                    tsProvisioner,
+                                                    entityBuilder,
+                                                    projectExistenceChecker,
+                                                    tgClient,
+                                                    executionTimeRecorder
+    )
 
     def givenFetchingAccessToken(forProjectSlug: Slug) =
-      (accessTokenFinder
-        .findAccessToken(_: Slug)(_: Slug => String))
-        .expects(forProjectSlug, projectSlugToPath)
+      (trClient
+        .findAccessToken(_: Slug))
+        .expects(forProjectSlug)
 
     def givenSuccessfulTSProvisioning(project: Project) =
       givenTSProvisioning(project, returning = DeliverySuccess.pure[IO])

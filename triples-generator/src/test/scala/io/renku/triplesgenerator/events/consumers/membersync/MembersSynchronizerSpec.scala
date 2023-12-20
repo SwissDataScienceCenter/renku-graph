@@ -26,13 +26,12 @@ import io.renku.generators.Generators.Implicits._
 import io.renku.generators.Generators._
 import io.renku.graph.model.GraphModelGenerators._
 import io.renku.graph.model.projects
-import io.renku.graph.tokenrepository.AccessTokenFinder
-import io.renku.graph.tokenrepository.AccessTokenFinder.Implicits.projectSlugToPath
 import io.renku.http.client.AccessToken
 import io.renku.interpreters.TestLogger
 import io.renku.interpreters.TestLogger.Level.{Error, Info}
 import io.renku.projectauth.ProjectAuthData
 import io.renku.testtools.CustomAsyncIOSpec
+import io.renku.tokenrepository.api.TokenRepositoryClient
 import org.scalamock.scalatest.AsyncMockFactory
 import org.scalatest.BeforeAndAfterEach
 import org.scalatest.flatspec.AsyncFlatSpec
@@ -99,18 +98,18 @@ class MembersSynchronizerSpec
       )
   }
 
-  private implicit lazy val logger:       TestLogger[IO]        = TestLogger[IO]()
-  private implicit val accessTokenFinder: AccessTokenFinder[IO] = mock[AccessTokenFinder[IO]]
+  private implicit lazy val logger: TestLogger[IO]            = TestLogger[IO]()
+  private implicit val trClient:    TokenRepositoryClient[IO] = mock[TokenRepositoryClient[IO]]
   private val glProjectMembersFinder    = mock[GLProjectMembersFinder[IO]]
   private val glProjectVisibilityFinder = mock[GLProjectVisibilityFinder[IO]]
   private val projectAuthSync           = mock[ProjectAuthSync[IO]]
   private lazy val synchronizer =
-    new MembersSynchronizerImpl[IO](glProjectMembersFinder, glProjectVisibilityFinder, projectAuthSync)
+    new MembersSynchronizerImpl[IO](trClient, glProjectMembersFinder, glProjectVisibilityFinder, projectAuthSync)
 
   private def givenAccessTokenFinding(projectSlug: projects.Slug, returning: IO[Option[AccessToken]]) =
-    (accessTokenFinder
-      .findAccessToken(_: projects.Slug)(_: projects.Slug => String))
-      .expects(projectSlug, projectSlugToPath)
+    (trClient
+      .findAccessToken(_: projects.Slug))
+      .expects(projectSlug)
       .returning(returning)
 
   private def givenProjectMembersFinding(projectSlug: projects.Slug,

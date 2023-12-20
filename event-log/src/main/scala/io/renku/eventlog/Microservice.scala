@@ -33,7 +33,6 @@ import io.renku.eventlog.metrics._
 import io.renku.events.consumers
 import io.renku.events.consumers.EventConsumersRegistry
 import io.renku.graph.model.projects
-import io.renku.graph.tokenrepository.AccessTokenFinder
 import io.renku.http.client.GitLabClient
 import io.renku.http.server.HttpServer
 import io.renku.logging.ApplicationLogger
@@ -62,7 +61,6 @@ object Microservice extends IOMicroservice {
       for {
         implicit0(mr: MetricsRegistry[IO])                  <- MetricsRegistry[IO]()
         implicit0(gc: GitLabClient[IO])                     <- GitLabClient[IO]()
-        implicit0(acf: AccessTokenFinder[IO])               <- AccessTokenFinder[IO]()
         implicit0(qet: QueriesExecutionTimes[IO])           <- QueriesExecutionTimes[IO]()
         certificateLoader                                   <- CertificateLoader[IO]
         sentryInitializer                                   <- SentryInitializer[IO]

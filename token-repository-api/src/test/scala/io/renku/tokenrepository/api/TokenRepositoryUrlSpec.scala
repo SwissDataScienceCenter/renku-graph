@@ -16,19 +16,20 @@
  * limitations under the License.
  */
 
-package io.renku.graph.tokenrepository
+package io.renku.tokenrepository.api
 
 import com.typesafe.config.ConfigFactory
 import io.renku.config.ConfigLoader.ConfigLoadingException
 import io.renku.generators.Generators.Implicits._
 import io.renku.generators.Generators.httpUrls
+import org.scalatest.TryValues
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
 
 import scala.jdk.CollectionConverters._
-import scala.util.{Failure, Success, Try}
+import scala.util.Try
 
-class TokenRepositoryUrlSpec extends AnyWordSpec with should.Matchers {
+class TokenRepositoryUrlSpec extends AnyWordSpec with should.Matchers with TryValues {
 
   "apply" should {
 
@@ -44,15 +45,11 @@ class TokenRepositoryUrlSpec extends AnyWordSpec with should.Matchers {
         ).asJava
       )
 
-      TokenRepositoryUrl[Try](config) shouldBe Success(TokenRepositoryUrl(url))
+      TokenRepositoryUrl[Try](config).success.value shouldBe TokenRepositoryUrl(url)
     }
 
     "fail if there's no 'services.token-repository.url' entry" in {
-      val config = ConfigFactory.empty()
-
-      val Failure(exception) = TokenRepositoryUrl[Try](config)
-
-      exception shouldBe an[ConfigLoadingException]
+      TokenRepositoryUrl[Try](ConfigFactory.empty()).failure.exception shouldBe an[ConfigLoadingException]
     }
   }
 }

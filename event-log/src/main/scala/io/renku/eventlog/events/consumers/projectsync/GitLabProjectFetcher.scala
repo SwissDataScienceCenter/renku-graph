@@ -18,32 +18,32 @@
 
 package io.renku.eventlog.events.consumers.projectsync
 
-import cats.MonadThrow
 import cats.effect.Async
 import cats.syntax.all._
 import eu.timepit.refined.auto._
 import io.circe.Decoder
 import io.renku.graph.model.projects
-import io.renku.graph.tokenrepository.AccessTokenFinder
 import io.renku.http.client.GitLabClient
 import io.renku.http.client.RestClientError.UnauthorizedException
+import io.renku.tokenrepository.api.TokenRepositoryClient
 import org.http4s.Status.{Forbidden, InternalServerError, NotFound, Ok, Unauthorized}
 import org.http4s.{EntityDecoder, Request, Response, Status}
+import org.typelevel.log4cats.Logger
 
 private trait GitLabProjectFetcher[F[_]] {
   def fetchGitLabProject(projectId: projects.GitLabId): F[Either[UnauthorizedException, Option[projects.Slug]]]
 }
 
 private object GitLabProjectFetcher {
-  def apply[F[_]: Async: GitLabClient: AccessTokenFinder]: F[GitLabProjectFetcher[F]] =
-    MonadThrow[F].catchNonFatal(new GitLabProjectFetcherImpl[F]).widen
+  def apply[F[_]: Async: GitLabClient: Logger]: F[GitLabProjectFetcher[F]] =
+    TokenRepositoryClient[F].map(new GitLabProjectFetcherImpl[F](_))
 }
 
-private class GitLabProjectFetcherImpl[F[_]: Async: GitLabClient: AccessTokenFinder] extends GitLabProjectFetcher[F] {
+private class GitLabProjectFetcherImpl[F[_]: Async: GitLabClient](trClient: TokenRepositoryClient[F])
+    extends GitLabProjectFetcher[F] {
 
-  private val tokenFinder: AccessTokenFinder[F] = AccessTokenFinder[F]
   import org.http4s.implicits._
-  import tokenFinder._
+  import trClient.findAccessToken
 
   override def fetchGitLabProject(
       projectId: projects.GitLabId
