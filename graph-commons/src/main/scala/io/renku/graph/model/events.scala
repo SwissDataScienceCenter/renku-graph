@@ -115,7 +115,7 @@ object events {
 
   final class BatchDate private (val value: Instant) extends AnyVal with InstantTinyType
 
-  implicit object BatchDate extends TinyTypeFactory[BatchDate](new BatchDate(_)) with InstantNotInTheFuture[BatchDate] {
+  implicit object BatchDate extends TinyTypeFactory[BatchDate](new BatchDate(_)) {
     def apply(clock: Clock): BatchDate = apply(clock.instant())
   }
 
