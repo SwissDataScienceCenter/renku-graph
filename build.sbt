@@ -244,10 +244,7 @@ lazy val tokenRepositoryApi = project
   .withId("token-repository-api")
   .settings(commonSettings)
   .dependsOn(graphCommons % "compile->compile; test->test")
-  .enablePlugins(
-    JavaAppPackaging,
-    AutomateHeaderPlugin
-  )
+  .enablePlugins(AutomateHeaderPlugin)
 
 lazy val tokenRepository = project
   .in(file("token-repository"))
