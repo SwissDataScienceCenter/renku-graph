@@ -60,7 +60,7 @@ class EventProcessorSpec
 
   "process" should {
 
-    "mark the event as RecoverableFailure and log an error if no access token found" in new TestCase {
+    "mark the event as RecoverableFailure if no access token found" in new TestCase {
 
       val commitEvent = commitEvents.generateOne
 

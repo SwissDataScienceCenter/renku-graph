@@ -70,7 +70,7 @@ class CommitAuthorFinderSpec
           .expects(uri"projects" / projectSlug.show / "repository" / "commits" / commitId.show,
                    endpointName,
                    *,
-                   maybeAccessToken
+                   accessToken.some
           )
           .returning(expectation.pure[IO])
 
@@ -103,7 +103,7 @@ class CommitAuthorFinderSpec
           .expects(uri"projects" / projectSlug.show / "repository" / "commits" / commitId.show,
                    endpointName,
                    *,
-                   maybeAccessToken
+                   accessToken.some
           )
           .returning(error.raiseError[IO, Option[(persons.Name, persons.Email)]])
 
@@ -144,7 +144,7 @@ class CommitAuthorFinderSpec
   }
 
   private trait TestCase {
-    implicit val maybeAccessToken: Option[AccessToken] = accessTokens.generateOption
+    implicit val accessToken: AccessToken = accessTokens.generateOne
     val projectSlug = projectSlugs.generateOne
     val commitId    = commitIds.generateOne
 

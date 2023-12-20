@@ -30,7 +30,7 @@ import org.typelevel.log4cats.Logger
 
 private trait MemberEmailFinder[F[_]] {
   def findMemberEmail(member: GitLabMember, project: Project)(implicit
-      maybeAccessToken: Option[AccessToken]
+      at: AccessToken
   ): EitherT[F, ProcessingRecoverableError, GitLabMember]
 }
 
@@ -50,7 +50,7 @@ private class MemberEmailFinderImpl[F[_]: Async: Logger](
   import commitAuthorFinder._
 
   override def findMemberEmail(member: GitLabMember, project: Project)(implicit
-      maybeAccessToken: Option[AccessToken]
+      at: AccessToken
   ): EitherT[F, ProcessingRecoverableError, GitLabMember] = EitherT {
     member match {
       case member if member.user.email.isDefined =>
@@ -64,7 +64,7 @@ private class MemberEmailFinderImpl[F[_]: Async: Logger](
   private def findInCommitsAndEvents(member:  GitLabMember,
                                      project: Project,
                                      paging:  PagingInfo = PagingInfo(maybeNextPage = Some(1), maybeTotalPages = None)
-  )(implicit maybeAccessToken: Option[AccessToken]): EitherT[F, ProcessingRecoverableError, GitLabMember] =
+  )(implicit at: AccessToken): EitherT[F, ProcessingRecoverableError, GitLabMember] =
     paging.findNextPage match {
       case None => rightT[F, ProcessingRecoverableError](member)
       case Some(nextPage) =>
@@ -83,7 +83,7 @@ private class MemberEmailFinderImpl[F[_]: Async: Logger](
                                       maybeEmail: Option[persons.Email],
                                       project:    Project,
                                       paging:     PagingInfo
-  )(implicit maybeAccessToken: Option[AccessToken]) = maybeEmail match {
+  )(implicit at: AccessToken) = maybeEmail match {
     case None        => findInCommitsAndEvents(member, project, paging)
     case Some(email) => rightT[F, ProcessingRecoverableError](member withEmail email)
   }
@@ -92,7 +92,7 @@ private class MemberEmailFinderImpl[F[_]: Async: Logger](
                                     project: Project,
                                     maybeEmail: EitherT[F, ProcessingRecoverableError, Option[persons.Email]] =
                                       rightT[F, ProcessingRecoverableError](Option.empty[persons.Email])
-  )(implicit maybeAccessToken: Option[AccessToken]): EitherT[F, ProcessingRecoverableError, Option[persons.Email]] =
+  )(implicit at: AccessToken): EitherT[F, ProcessingRecoverableError, Option[persons.Email]] =
     maybeEmail >>= {
       case someEmail @ Some(_) => rightT[F, ProcessingRecoverableError](someEmail)
       case none =>
@@ -103,7 +103,7 @@ private class MemberEmailFinderImpl[F[_]: Async: Logger](
     }
 
   private def matchEmailOnSingleCommit(event: PushEvent, project: Project, eventsToCheck: List[PushEvent])(implicit
-      maybeAccessToken: Option[AccessToken]
+      at: AccessToken
   ) = findCommitAuthor(project.slug, event.commitId) >>= {
     case Some((event.authorName, email)) => rightT[F, ProcessingRecoverableError](email.some)
     case _ => matchEmailFromCommits(eventsToCheck, project, rightT[F, ProcessingRecoverableError](none))

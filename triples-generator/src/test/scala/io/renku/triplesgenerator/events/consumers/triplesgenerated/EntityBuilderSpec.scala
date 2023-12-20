@@ -275,7 +275,7 @@ class EntityBuilderSpec
   }
 
   private trait TestCase {
-    implicit val maybeAccessToken: Option[AccessToken] = accessTokens.generateOption
+    implicit val accessToken: AccessToken = accessTokens.generateOne
 
     def gitLabProjectInfo(project: Project) = GitLabProjectInfo(
       projectIds.generateOne,
@@ -304,8 +304,8 @@ class EntityBuilderSpec
     def givenFindProjectInfo(projectSlug: projects.Slug) = new {
       def returning(result: EitherT[Try, ProcessingRecoverableError, Option[GitLabProjectInfo]]) =
         (projectInfoFinder
-          .findProjectInfo(_: projects.Slug)(_: Option[AccessToken]))
-          .expects(projectSlug, maybeAccessToken)
+          .findProjectInfo(_: projects.Slug)(_: AccessToken))
+          .expects(projectSlug, accessToken)
           .returning(result)
     }
   }

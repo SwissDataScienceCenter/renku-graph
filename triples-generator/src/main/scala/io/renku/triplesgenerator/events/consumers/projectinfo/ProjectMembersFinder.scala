@@ -38,7 +38,7 @@ import org.typelevel.log4cats.Logger
 
 private trait ProjectMembersFinder[F[_]] {
   def findProjectMembers(slug: projects.Slug)(implicit
-      maybeAccessToken: Option[AccessToken]
+      at: AccessToken
   ): EitherT[F, ProcessingRecoverableError, Set[GitLabMember]]
 }
 
@@ -56,8 +56,8 @@ private class ProjectMembersFinderImpl[F[_]: Async: NonEmptyParallel: GitLabClie
 
   override def findProjectMembers(
       slug: projects.Slug
-  )(implicit mat: Option[AccessToken]): EitherT[F, ProcessingRecoverableError, Set[GitLabMember]] = EitherT {
-    fetch(uri"projects" / slug / "members" / "all")
+  )(implicit at: AccessToken): EitherT[F, ProcessingRecoverableError, Set[GitLabMember]] = EitherT {
+    fetch(uri"projects" / slug / "members" / "all")(at.some)
       .map(_.asRight[ProcessingRecoverableError])
       .recoverWith(recoveryStrategy.maybeRecoverableError)
   }
