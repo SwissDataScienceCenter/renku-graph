@@ -216,7 +216,7 @@ class MicroserviceRoutesSpec
 
         val maybeAuthUser = MaybeAuthUser.apply(authUsers.generateOption)
 
-        val authContext = AuthContext(maybeAuthUser.option, requestedDS, projectSlugs.generateSet())
+        val authContext = AuthContext(maybeAuthUser.option, requestedDS)
         givenDSAuthorizer(
           requestedDS,
           maybeAuthUser.option,
@@ -541,7 +541,7 @@ class MicroserviceRoutesSpec
 
       (projectSlugAuthorizer.authorize _)
         .expects(projectSlug, authUser.option)
-        .returning(rightT[IO, EndpointSecurityException](AuthContext(authUser.option, projectSlug, Set(projectSlug))))
+        .returning(rightT[IO, EndpointSecurityException](AuthContext(authUser.option, projectSlug)))
 
       (projectDeleteEndpoint
         .`DELETE /projects/:slug`(_: model.projects.Slug, _: AuthUser))
@@ -589,7 +589,7 @@ class MicroserviceRoutesSpec
       (projectSlugAuthorizer.authorize _)
         .expects(projectSlug, maybeAuthUser.option)
         .returning(
-          rightT[IO, EndpointSecurityException](AuthContext(maybeAuthUser.option, projectSlug, Set(projectSlug)))
+          rightT[IO, EndpointSecurityException](AuthContext(maybeAuthUser.option, projectSlug))
         )
 
       val request = Request[IO](GET, Uri.unsafeFromString(s"knowledge-graph/projects/$projectSlug"))
@@ -655,7 +655,7 @@ class MicroserviceRoutesSpec
           (projectSlugAuthorizer.authorize _)
             .expects(projectSlug, authUser.option)
             .returning(
-              rightT[IO, EndpointSecurityException](AuthContext(authUser.option, projectSlug, Set(projectSlug)))
+              rightT[IO, EndpointSecurityException](AuthContext(authUser.option, projectSlug))
             )
 
           (projectUpdateEndpoint
@@ -753,7 +753,7 @@ class MicroserviceRoutesSpec
           .expects(criteria.projectSlug, maybeAuthUser.option)
           .returning(
             rightT[IO, EndpointSecurityException](
-              AuthContext(maybeAuthUser.option, criteria.projectSlug, Set(criteria.projectSlug))
+              AuthContext(maybeAuthUser.option, criteria.projectSlug)
             )
           )
 
@@ -830,7 +830,7 @@ class MicroserviceRoutesSpec
 
         (projectSlugAuthorizer.authorize _)
           .expects(projectSlug, None)
-          .returning(rightT[IO, EndpointSecurityException](AuthContext.forUnknownUser(projectSlug, Set(projectSlug))))
+          .returning(rightT[IO, EndpointSecurityException](AuthContext.forUnknownUser(projectSlug)))
 
         val responseBody = jsons.generateOne
         (projectDatasetTagsEndpoint
@@ -865,7 +865,7 @@ class MicroserviceRoutesSpec
       (projectSlugAuthorizer.authorize _)
         .expects(projectSlug, maybeAuthUser.option)
         .returning(
-          rightT[IO, EndpointSecurityException](AuthContext(maybeAuthUser.option, projectSlug, Set(projectSlug)))
+          rightT[IO, EndpointSecurityException](AuthContext(maybeAuthUser.option, projectSlug))
         )
 
       val responseBody = jsons.generateOne
@@ -898,7 +898,7 @@ class MicroserviceRoutesSpec
       (projectSlugAuthorizer.authorize _)
         .expects(projectSlug, maybeAuthUser.option)
         .returning(
-          rightT[IO, EndpointSecurityException](AuthContext(maybeAuthUser.option, projectSlug, Set(projectSlug)))
+          rightT[IO, EndpointSecurityException](AuthContext(maybeAuthUser.option, projectSlug))
         )
 
       (lineageEndpoint.`GET /lineage` _)
@@ -921,7 +921,7 @@ class MicroserviceRoutesSpec
       (projectSlugAuthorizer.authorize _)
         .expects(projectSlug, maybeAuthUser.option)
         .returning(
-          rightT[IO, EndpointSecurityException](AuthContext(maybeAuthUser.option, projectSlug, Set(projectSlug)))
+          rightT[IO, EndpointSecurityException](AuthContext(maybeAuthUser.option, projectSlug))
         )
 
       (lineageEndpoint.`GET /lineage` _)
@@ -945,7 +945,7 @@ class MicroserviceRoutesSpec
       (projectSlugAuthorizer.authorize _)
         .expects(projectSlug, maybeAuthUser.option)
         .returning(
-          rightT[IO, EndpointSecurityException](AuthContext(maybeAuthUser.option, projectSlug, Set(projectSlug)))
+          rightT[IO, EndpointSecurityException](AuthContext(maybeAuthUser.option, projectSlug))
         )
 
       (lineageEndpoint.`GET /lineage` _)

@@ -82,7 +82,7 @@ private class BaseDetailsFinderImpl[F[_]: Async: Logger: SparqlQueryTimeRecorder
                |                   schema:name ?projectName;
                |                   renku:projectVisibility ?projectVisibility;
                |                   renku:projectPath ?projectSlug.
-               |        VALUES (?projectSlug) { ${authContext.allowedProjects.map(_.asObject)} }
+               |
                |        FILTER NOT EXISTS {
                |          ?datasetId prov:invalidatedAtTime ?invalidationTime.
                |        }
@@ -92,6 +92,7 @@ private class BaseDetailsFinderImpl[F[_]: Async: Logger: SparqlQueryTimeRecorder
                |                      ^renku:hasDataset  ?projectId.
                |        }
                |      }
+               |      ${SparqlSnippets.default.visibleProjects(authContext.maybeAuthUser.map(_.id), Visibility.all)}
                |    }
                |    ORDER BY ?dateCreated ?projectName
                |    LIMIT 1
@@ -141,8 +142,8 @@ private class BaseDetailsFinderImpl[F[_]: Async: Logger: SparqlQueryTimeRecorder
                |                   schema:name ?projectName;
                |                   renku:projectVisibility ?projectVisibility;
                |                   renku:projectPath ?projectSlug.
-               |        VALUES (?projectSlug) { ${authContext.allowedProjects.map(_.asObject)} }
                |      }
+               |      ${SparqlSnippets.default.visibleProjects(authContext.maybeAuthUser.map(_.id), Visibility.all)}
                |    }
                |    ORDER BY ?dateCreated ?projectName
                |    LIMIT 1
@@ -175,32 +176,32 @@ private class BaseDetailsFinderImpl[F[_]: Async: Logger: SparqlQueryTimeRecorder
     Prefixes of (renku -> "renku", schema -> "schema"),
     sparql"""|SELECT DISTINCT ?tagName ?maybeTagDesc
              |WHERE {
-             |  GRAPH ${GraphClass.Project.id(ds.project.id)} {
+             |  BIND(${GraphClass.Project.id(ds.project.id)} AS ?dsProjectId)
+             |  GRAPH ?dsProjectId {
              |    ?datasetId schema:identifier ${ds.project.datasetIdentifier.asObject};
              |               schema:version ?version;
              |               schema:sameAs/schema:url ?originalDsId
              |  }
-             |  ${allowedProjectFilterQuery(authContext.maybeAuthUser)}
              |  GRAPH ?originalDsProjId {
              |    ?originalDsProjId renku:hasDataset ?originalDsId;
              |                      renku:projectPath ?projectSlug.
              |    ?originalDsTagId schema:about/schema:url ?originalDsId;
              |                     schema:name ?version
              |  }
-             |  GRAPH ${GraphClass.Project.id(ds.project.id)} {
+             |  GRAPH ?dsProjectId {
              |    ?datasetTagId schema:about/schema:url ?datasetId;
              |                  schema:name ?version.
              |    BIND (?version AS ?tagName)
              |    OPTIONAL { ?datasetTagId schema:description ?maybeTagDesc }
              |  }
+             |  ${allowedProjectFilterQuery(authContext.maybeAuthUser)}
              |}
              |LIMIT 1
              |""".stripMargin
   )
 
-  private lazy val allowedProjectFilterQuery: Option[AuthUser] => Fragment = { user =>
+  private def allowedProjectFilterQuery(user: Option[AuthUser]): Fragment =
     SparqlSnippets(VarName("originalDsProjId")).visibleProjects(user.map(_.id), Visibility.all)
-  }
 
   def findKeywords(dataset: Dataset): F[List[Keyword]] =
     queryExpecting[List[Keyword]](queryKeywords(dataset))
