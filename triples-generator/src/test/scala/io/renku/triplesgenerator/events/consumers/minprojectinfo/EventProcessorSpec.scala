@@ -61,7 +61,10 @@ class EventProcessorSpec extends AnyWordSpec with IOSpec with MockFactory with s
 
       eventProcessor.process(event).unsafeRunSync() shouldBe ()
 
-      logger.logged(Info(s"${commonLogMessage(event)} accepted"))
+      logger.logged(
+        Info(s"${commonLogMessage(event)} accepted"),
+        Error(s"${commonLogMessage(event)} processing failure", SilentRecoverableError("No access token"))
+      )
     }
 
     "succeed and send ProjectActivated event " +

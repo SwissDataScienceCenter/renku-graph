@@ -54,17 +54,19 @@ private class EventProcessorImpl[F[_]: MonadThrow: Logger](
 ) extends EventProcessor[F] {
 
   import EventUploadingResult._
-  import trClient._
   import entityBuilder._
   import executionTimeRecorder._
   import projectExistenceChecker._
+  import trClient._
 
   override def process(event: MinProjectInfoEvent): F[Unit] = {
     Logger[F].info(s"${prefix(event)} accepted") >>
       measureExecutionTime {
         findAccessToken(event.project.slug).flatMap {
-          case None => RecoverableError(event, SilentRecoverableError("No access token")).widen.pure[F]
           case Some(implicit0(at: AccessToken)) => transformAndUpload(event)
+          case None =>
+            val err = SilentRecoverableError("No access token")
+            logError(event)(err).as(RecoverableError(event, err).widen)
         }
       }.flatTap(logSummary(event))
         .flatMap(sendProjectActivatedEvent(event))
