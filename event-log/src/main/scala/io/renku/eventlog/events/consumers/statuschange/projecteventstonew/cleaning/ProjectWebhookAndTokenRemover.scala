@@ -19,6 +19,7 @@
 package io.renku.eventlog.events.consumers.statuschange
 package projecteventstonew.cleaning
 
+import cats.NonEmptyParallel
 import cats.effect.Async
 import cats.syntax.all._
 import io.renku.control.Throttler
@@ -35,13 +36,13 @@ private trait ProjectWebhookAndTokenRemover[F[_]] {
 }
 
 private object ProjectWebhookAndTokenRemover {
-  def apply[F[_]: Async: Logger]: F[ProjectWebhookAndTokenRemover[F]] = for {
+  def apply[F[_]: Async: NonEmptyParallel: Logger]: F[ProjectWebhookAndTokenRemover[F]] = for {
     webhookUrl <- WebhookServiceUrl()
     trClient   <- TokenRepositoryClient[F]
   } yield new ProjectWebhookAndTokenRemoverImpl[F](webhookUrl, trClient)
 }
 
-private class ProjectWebhookAndTokenRemoverImpl[F[_]: Async: Logger](
+private class ProjectWebhookAndTokenRemoverImpl[F[_]: Async: NonEmptyParallel: Logger](
     webhookUrl: WebhookServiceUrl,
     trClient:   TokenRepositoryClient[F]
 ) extends RestClient[F, ProjectWebhookAndTokenRemover[F]](Throttler.noThrottling[F])
@@ -51,8 +52,9 @@ private class ProjectWebhookAndTokenRemoverImpl[F[_]: Async: Logger](
 
   override def removeWebhookAndToken(project: Project): F[Unit] =
     findAccessToken(project.id) >>= {
-      case Some(token) => removeProjectWebhook(project, token) >> removeAccessToken(project.id, maybeAccessToken = None)
-      case None        => ().pure[F]
+      case Some(token) =>
+        (removeProjectWebhook(project, token), removeAccessToken(project.id, maybeAccessToken = None)).parTupled.void
+      case None => ().pure[F]
     }
 
   private def removeProjectWebhook(project: Project, accessToken: AccessToken): F[Unit] = for {
