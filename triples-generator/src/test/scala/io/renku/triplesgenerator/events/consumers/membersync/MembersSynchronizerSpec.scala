@@ -49,14 +49,14 @@ class MembersSynchronizerSpec
 
       val projectSlug = projectSlugs.generateOne
 
-      val maybeAccessToken = accessTokens.generateOption
-      givenAccessTokenFinding(projectSlug, returning = maybeAccessToken.pure[IO])
+      val accessToken = accessTokens.generateOne
+      givenAccessTokenFinding(projectSlug, returning = accessToken.some.pure[IO])
 
       val membersInGitLab = gitLabProjectMembers.generateSet()
-      givenProjectMembersFinding(projectSlug, maybeAccessToken, returning = membersInGitLab.pure[IO])
+      givenProjectMembersFinding(projectSlug, accessToken, returning = membersInGitLab.pure[IO])
 
       val visibility = projectVisibilities.generateOne
-      givenProjectVisibilityFinding(projectSlug, maybeAccessToken, returning = visibility.some.pure[IO])
+      givenProjectVisibilityFinding(projectSlug, accessToken, returning = visibility.some.pure[IO])
 
       givenAuthDataUpdating(projectSlug, membersInGitLab, visibility, returning = ().pure[IO])
 
@@ -68,28 +68,39 @@ class MembersSynchronizerSpec
 
       val projectSlug = projectSlugs.generateOne
 
-      val maybeAccessToken = accessTokens.generateOption
-      givenAccessTokenFinding(projectSlug, returning = maybeAccessToken.pure[IO])
+      val accessToken = accessTokens.generateOne
+      givenAccessTokenFinding(projectSlug, returning = accessToken.some.pure[IO])
 
       val membersInGitLab = gitLabProjectMembers.generateSet()
-      givenProjectMembersFinding(projectSlug, maybeAccessToken, returning = membersInGitLab.pure[IO])
+      givenProjectMembersFinding(projectSlug, accessToken, returning = membersInGitLab.pure[IO])
 
-      givenProjectVisibilityFinding(projectSlug, maybeAccessToken, returning = None.pure[IO])
+      givenProjectVisibilityFinding(projectSlug, accessToken, returning = None.pure[IO])
 
       givenAuthDataRemoval(projectSlug, returning = ().pure[IO])
 
       synchronizer.synchronizeMembers(projectSlug).assertNoException
     }
 
+  it should "remove the Auth data if no access token is found" in {
+
+    val projectSlug = projectSlugs.generateOne
+
+    givenAccessTokenFinding(projectSlug, returning = None.pure[IO])
+
+    givenAuthDataRemoval(projectSlug, returning = ().pure[IO])
+
+    synchronizer.synchronizeMembers(projectSlug).assertNoException
+  }
+
   it should "recover with log statement if collaborator fails" in {
 
     val projectSlug = projectSlugs.generateOne
 
-    val maybeAccessToken = accessTokens.generateOption
-    givenAccessTokenFinding(projectSlug, returning = maybeAccessToken.pure[IO])
+    val accessToken = accessTokens.generateOne
+    givenAccessTokenFinding(projectSlug, returning = accessToken.some.pure[IO])
 
     val exception = exceptions.generateOne
-    givenProjectMembersFinding(projectSlug, maybeAccessToken, returning = exception.raiseError[IO, Nothing])
+    givenProjectMembersFinding(projectSlug, accessToken, returning = exception.raiseError[IO, Nothing])
 
     synchronizer.synchronizeMembers(projectSlug).assertNoException >>
       logger.loggedOnlyF(
@@ -113,19 +124,19 @@ class MembersSynchronizerSpec
       .returning(returning)
 
   private def givenProjectMembersFinding(projectSlug: projects.Slug,
-                                         mat:         Option[AccessToken],
+                                         at:          AccessToken,
                                          returning:   IO[Set[GitLabProjectMember]]
   ) = (glProjectMembersFinder
-    .findProjectMembers(_: projects.Slug)(_: Option[AccessToken]))
-    .expects(projectSlug, mat)
+    .findProjectMembers(_: projects.Slug)(_: AccessToken))
+    .expects(projectSlug, at)
     .returning(returning)
 
   private def givenProjectVisibilityFinding(projectSlug: projects.Slug,
-                                            mat:         Option[AccessToken],
+                                            at:          AccessToken,
                                             returning:   IO[Option[projects.Visibility]]
   ) = (glProjectVisibilityFinder
-    .findVisibility(_: projects.Slug)(_: Option[AccessToken]))
-    .expects(projectSlug, mat)
+    .findVisibility(_: projects.Slug)(_: AccessToken))
+    .expects(projectSlug, at)
     .returning(returning)
 
   private def givenAuthDataUpdating(projectSlug:     projects.Slug,

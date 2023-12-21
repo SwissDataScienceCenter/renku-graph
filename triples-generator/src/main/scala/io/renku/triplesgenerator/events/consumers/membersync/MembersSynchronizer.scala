@@ -41,17 +41,19 @@ private class MembersSynchronizerImpl[F[_]: MonadThrow: Logger](
 ) extends MembersSynchronizer[F] {
 
   override def synchronizeMembers(slug: projects.Slug): F[Unit] = {
-    for {
-      _                                   <- Logger[F].info(show"$categoryName: $slug accepted")
-      implicit0(mat: Option[AccessToken]) <- trClient.findAccessToken(slug)
-      membersInGL                         <- glMembersFinder.findProjectMembers(slug)
-      maybeVisibility                     <- glVisibilityFinder.findVisibility(slug)
-      _ <- maybeVisibility match {
-             case None      => projectAuthSync.removeAuthData(slug)
-             case Some(vis) => projectAuthSync.syncProject(ProjectAuthData(slug, toAuthMembers(membersInGL), vis))
-           }
+    Logger[F].info(show"$categoryName: $slug accepted") >> trClient.findAccessToken(slug) >>= {
+      case None => projectAuthSync.removeAuthData(slug)
+      case Some(implicit0(at: AccessToken)) =>
+        for {
+          membersInGL     <- glMembersFinder.findProjectMembers(slug)
+          maybeVisibility <- glVisibilityFinder.findVisibility(slug)
+          _ <- maybeVisibility match {
+                 case None      => projectAuthSync.removeAuthData(slug)
+                 case Some(vis) => projectAuthSync.syncProject(ProjectAuthData(slug, toAuthMembers(membersInGL), vis))
+               }
 
-    } yield ()
+        } yield ()
+    }
   } handleErrorWith { exception =>
     Logger[F].error(exception)(s"$categoryName: Members synchronized for project $slug failed")
   }
