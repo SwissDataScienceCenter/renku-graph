@@ -49,7 +49,7 @@ private class HookCreatorImpl[F[_]: Spawn: Logger](
     projectInfoFinder:     ProjectInfoFinder[F],
     hookTokenCrypto:       HookTokenCrypto[F],
     projectHookCreator:    ProjectHookCreator[F],
-    elClient:              eventlog.api.events.Client[F]
+    elClient:              eventlog.api.events.CommitSyncRequestSender[F]
 ) extends HookCreator[F] {
 
   import HookCreator.CreationResult._

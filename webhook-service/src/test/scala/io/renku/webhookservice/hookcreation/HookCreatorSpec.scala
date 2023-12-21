@@ -22,7 +22,7 @@ import cats.effect.IO
 import cats.effect.std.Queue
 import cats.syntax.all._
 import io.renku.eventlog
-import io.renku.eventlog.api.events.{CommitSyncRequest, GlobalCommitSyncRequest, StatusChangeEvent}
+import io.renku.eventlog.api.events.CommitSyncRequest
 import io.renku.events.consumers.ConsumersModelGenerators.consumerProjects
 import io.renku.events.consumers.Project
 import io.renku.generators.CommonGraphGenerators._
@@ -203,12 +203,8 @@ class HookCreatorSpec
         projectInfoFinderResponse.take.flatten
     }
     private val commitSyncRequestSenderResponse = Queue.bounded[IO, IO[Unit]](1).unsafeRunSync()
-    private val elClient = new eventlog.api.events.Client[IO] {
+    private val elClient = new eventlog.api.events.CommitSyncRequestSender[IO] {
       override def send(event: CommitSyncRequest): IO[Unit] = commitSyncRequestSenderResponse.take.flatten
-      override def send(event: GlobalCommitSyncRequest): IO[Unit] =
-        sys.error(s"${StatusChangeEvent.RedoProjectTransformation} event shouldn't be sent")
-      override def send(event: StatusChangeEvent.RedoProjectTransformation): IO[Unit] =
-        sys.error(s"${StatusChangeEvent.RedoProjectTransformation} event shouldn't be sent")
     }
 
     val hookCreation = new HookCreatorImpl[IO](

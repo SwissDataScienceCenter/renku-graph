@@ -27,11 +27,14 @@ import io.renku.graph.config.EventLogUrl
 import io.renku.metrics.MetricsRegistry
 import org.typelevel.log4cats.Logger
 
-trait Client[F[_]] {
+trait Client[F[_]] extends CommitSyncRequestSender[F] {
   def send(event: CleanUpRequest):                              F[Unit]
-  def send(event: CommitSyncRequest):                           F[Unit]
   def send(event: GlobalCommitSyncRequest):                     F[Unit]
   def send(event: StatusChangeEvent.RedoProjectTransformation): F[Unit]
+}
+
+trait CommitSyncRequestSender[F[_]] {
+  def send(event: CommitSyncRequest): F[Unit]
 }
 
 object Client {

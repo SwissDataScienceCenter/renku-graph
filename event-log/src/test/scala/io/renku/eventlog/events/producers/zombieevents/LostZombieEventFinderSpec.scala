@@ -82,11 +82,11 @@ class LostZombieEventFinderSpec
         finder.popEvent().asserting(_ shouldBe None)
     }
 
-  private val executionDateThreshold = 5 * 60
+  private val executionDateThreshold = Duration.ofMinutes(5)
   private lazy val activeZombieEventExecutionDate =
-    relativeTimestamps(lessThanAgo = Duration.ofSeconds(executionDateThreshold - 2)).toGeneratorOf(ExecutionDate)
+    relativeTimestamps(lessThanAgo = executionDateThreshold minus Duration.ofSeconds(10)).toGeneratorOf(ExecutionDate)
   private lazy val lostZombieEventExecutionDate =
-    relativeTimestamps(moreThanAgo = Duration.ofSeconds(executionDateThreshold + 2)).toGeneratorOf(ExecutionDate)
+    relativeTimestamps(moreThanAgo = executionDateThreshold plus Duration.ofSeconds(10)).toGeneratorOf(ExecutionDate)
 
   private def finder(implicit cfg: DBConfig[EventLogDB]) = {
     implicit val qet: QueriesExecutionTimes[IO] = TestQueriesExecutionTimes[IO]
