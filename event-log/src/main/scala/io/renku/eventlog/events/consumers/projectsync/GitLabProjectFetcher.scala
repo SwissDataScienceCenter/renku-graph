@@ -23,8 +23,9 @@ import cats.syntax.all._
 import eu.timepit.refined.auto._
 import io.circe.Decoder
 import io.renku.graph.model.projects
-import io.renku.http.client.GitLabClient
 import io.renku.http.client.RestClientError.UnauthorizedException
+import io.renku.http.client.{AccessToken, GitLabClient}
+import io.renku.http.tinytypes.TinyTypeURIEncoder._
 import io.renku.tokenrepository.api.TokenRepositoryClient
 import org.http4s.Status.{Forbidden, InternalServerError, NotFound, Ok, Unauthorized}
 import org.http4s.{EntityDecoder, Request, Response, Status}
@@ -48,10 +49,11 @@ private class GitLabProjectFetcherImpl[F[_]: Async: GitLabClient](trClient: Toke
   override def fetchGitLabProject(
       projectId: projects.GitLabId
   ): F[Either[UnauthorizedException, Option[projects.Slug]]] =
-    findAccessToken(projectId) >>= { implicit accessToken =>
-      GitLabClient[F].get[Either[UnauthorizedException, Option[projects.Slug]]](uri"projects" / projectId.show,
-                                                                                "single-project"
-      )(mapping)
+    findAccessToken(projectId) >>= {
+      case None =>
+        Option.empty[projects.Slug].asRight[UnauthorizedException].pure[F]
+      case implicit0(at: Option[AccessToken]) =>
+        GitLabClient[F].get(uri"projects" / projectId, "single-project")(mapping)
     }
 
   private lazy val mapping

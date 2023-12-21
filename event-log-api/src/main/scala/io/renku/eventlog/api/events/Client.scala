@@ -28,6 +28,7 @@ import io.renku.metrics.MetricsRegistry
 import org.typelevel.log4cats.Logger
 
 trait Client[F[_]] {
+  def send(event: CleanUpRequest):                              F[Unit]
   def send(event: CommitSyncRequest):                           F[Unit]
   def send(event: GlobalCommitSyncRequest):                     F[Unit]
   def send(event: StatusChangeEvent.RedoProjectTransformation): F[Unit]
@@ -47,6 +48,12 @@ private class ClientImpl[F[_]](eventSender: EventSender[F]) extends Client[F] {
   import EventSender.EventContext
   import cats.syntax.all._
   import io.circe.syntax._
+
+  override def send(event: CleanUpRequest): F[Unit] =
+    eventSender.sendEvent(
+      EventRequestContent.NoPayload(event.asJson),
+      EventContext(CleanUpRequest.categoryName, show"${CleanUpRequest.categoryName}: sending event $event failed")
+    )
 
   override def send(event: CommitSyncRequest): F[Unit] =
     eventSender.sendEvent(

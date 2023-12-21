@@ -35,6 +35,18 @@ import scala.util.Try
 
 class ClientSpec extends AnyWordSpec with should.Matchers with MockFactory with TryValues {
 
+  "send CleanUpRequest" should {
+
+    "send the given event through the EventSender" in new TestCase {
+
+      val event = cleanUpRequests.generateOne
+
+      givenSending(event, CleanUpRequest.categoryName, returning = ().pure[Try])
+
+      client.send(event).success.value shouldBe ()
+    }
+  }
+
   "send CommitSyncRequest" should {
 
     "send the given event through the EventSender" in new TestCase {
