@@ -23,7 +23,6 @@ import Generators._
 import cats.effect.IO
 import cats.syntax.all._
 import io.renku.eventlog
-import io.renku.eventlog.api.events.StatusChangeEvent
 import io.renku.generators.Generators.Implicits._
 import io.renku.generators.Generators.exceptions
 import io.renku.interpreters.TestLogger
@@ -49,9 +48,8 @@ class UpdateCommandsRunnerSpec extends AsyncFlatSpec with CustomAsyncIOSpec with
 
     val update = eventUpdateCommands.generateOne
 
-    givenEventSending(update.value, returning = ().pure[IO])
-
-    runner.run(update).assertNoException
+    elClient.expect(update.value, doReturn = ().pure[IO]) >>
+      runner.run(update).assertNoException
   }
 
   it should "succeed even if running the query fails" in {
@@ -71,23 +69,19 @@ class UpdateCommandsRunnerSpec extends AsyncFlatSpec with CustomAsyncIOSpec with
 
     logger.reset()
 
-    val update = eventUpdateCommands.generateOne
-
+    val update    = eventUpdateCommands.generateOne
     val exception = exceptions.generateOne
-    givenEventSending(update.value, returning = exception.raiseError[IO, Unit])
 
-    runner.run(update).assertNoException >>
+    elClient.expect(update.value, doReturn = exception.raiseError[IO, Unit]) >>
+      runner.run(update).assertNoException >>
       logger.loggedOnly(Error(show"$categoryName: sending ${update.value} fails", exception)).pure[IO]
   }
 
   private implicit lazy val logger: TestLogger[IO] = TestLogger()
   private lazy val tsClient = mock[TSClient[IO]]
-  private lazy val elClient = mock[eventlog.api.events.Client[IO]]
+  private lazy val elClient = eventlog.api.events.TestClient.expectingMode[IO]
   private lazy val runner   = new UpdateCommandsRunnerImpl[IO](tsClient, elClient)
 
   private def givenQueryRunning(query: SparqlQuery, returning: IO[Unit]) =
     (tsClient.updateWithNoResult _).expects(query).returning(returning)
-
-  private def givenEventSending(event: StatusChangeEvent.RedoProjectTransformation, returning: IO[Unit]) =
-    (elClient.send(_: StatusChangeEvent.RedoProjectTransformation)).expects(event).returning(returning)
 }

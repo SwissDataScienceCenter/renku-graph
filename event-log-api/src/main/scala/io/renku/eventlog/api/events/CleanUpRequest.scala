@@ -46,6 +46,8 @@ object CleanUpRequest {
   final case class Full(projectId: projects.GitLabId, projectSlug: projects.Slug) extends CleanUpRequest
   final case class Partial(projectSlug: projects.Slug)                            extends CleanUpRequest
 
+  implicit def dispatcher[F[_]]: Dispatcher[F, CleanUpRequest] = Dispatcher.instance(categoryName)
+
   implicit val encoder: Encoder[CleanUpRequest] = Encoder.instance {
     case CleanUpRequest.Full(id, slug) =>
       json"""{

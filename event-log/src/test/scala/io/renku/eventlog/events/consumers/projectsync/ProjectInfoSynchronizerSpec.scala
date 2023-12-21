@@ -69,11 +69,12 @@ class ProjectInfoSynchronizerSpec
 
       givenProjectRemovedFromDB(event.projectId, returning = ().pure[IO])
 
-      givenSendingCleanUpRequest(event, returning = ().pure[IO])
-
-      givenSendingGlobalCommitSyncRequest(event.projectId, newSlug, returning = ().pure[IO])
-
-      synchronizer.syncProjectInfo(event).assertNoException
+      synchronizer.syncProjectInfo(event).assertNoException >>
+        elClient
+          .waitForArrival(
+            List(CleanUpRequest(event.projectId, event.projectSlug), GlobalCommitSyncRequest(event.projectId, newSlug))
+          )
+          .assertNoException
     }
 
   it should "fetch relevant project info from GitLab and " +
@@ -84,9 +85,8 @@ class ProjectInfoSynchronizerSpec
 
       givenGitLabProject(by = event.projectId, returning = Option.empty[projects.Slug].asRight.pure[IO])
 
-      givenSendingGlobalCommitSyncRequest(event.projectId, event.projectSlug, returning = ().pure[IO])
-
-      synchronizer.syncProjectInfo(event).assertNoException
+      synchronizer.syncProjectInfo(event).assertNoException >>
+        elClient.waitForArrival(GlobalCommitSyncRequest(event.projectId, event.projectSlug)).assertNoException
     }
 
   it should "log an error if finding project info in GitLab returns Left" in {
@@ -114,7 +114,7 @@ class ProjectInfoSynchronizerSpec
   private implicit lazy val logger: TestLogger[IO] = TestLogger[IO]()
   private lazy val gitLabProjectFetcher = mock[GitLabProjectFetcher[IO]]
   private lazy val projectRemover       = mock[ProjectRemover[IO]]
-  private lazy val elClient             = mock[eventlog.api.events.Client[IO]]
+  private lazy val elClient             = eventlog.api.events.TestClient.collectingMode[IO]
   private lazy val tgClient             = mock[triplesgenerator.api.events.Client[IO]]
   private lazy val synchronizer =
     new ProjectInfoSynchronizerImpl[IO](gitLabProjectFetcher, projectRemover, elClient, tgClient)
@@ -128,20 +128,6 @@ class ProjectInfoSynchronizerSpec
   private def givenProjectRemovedFromDB(id: projects.GitLabId, returning: IO[Unit]) =
     (projectRemover.removeProject _)
       .expects(id)
-      .returning(returning)
-
-  private def givenSendingGlobalCommitSyncRequest(projectId:   projects.GitLabId,
-                                                  projectSlug: projects.Slug,
-                                                  returning:   IO[Unit]
-  ) = (elClient
-    .send(_: GlobalCommitSyncRequest))
-    .expects(GlobalCommitSyncRequest(projectId, projectSlug))
-    .returning(returning)
-
-  private def givenSendingCleanUpRequest(event: ProjectSyncEvent, returning: IO[Unit]) =
-    (elClient
-      .send(_: CleanUpRequest))
-      .expects(CleanUpRequest(event.projectId, event.projectSlug))
       .returning(returning)
 
   private def givenSendingSyncRepoMetadata(event: ProjectSyncEvent, returning: IO[Unit]) =

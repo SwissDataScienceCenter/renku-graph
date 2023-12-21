@@ -142,9 +142,9 @@ class CommitsSynchronizerSpec
         CommitWithParents(parentCommit.id, event.project.id, parentCommit.parents)
       )
       givenCommitIsInGL(parentCommit, event.project.id)
-      givenGlobalCommitSyncRequestIsSent(event.project)
 
-      commitsSynchronizer.synchronizeEvents(event).assertNoException >>
+      givenGlobalCommitSyncRequestIsSent(event.project) >>
+        commitsSynchronizer.synchronizeEvents(event).assertNoException >>
         logger.loggedF(
           logNewEventFound(latestCommitInfo.id, event.project, executionTimeRecorder.elapsedTime),
           logSummary(latestCommitInfo.id,
@@ -180,9 +180,9 @@ class CommitsSynchronizerSpec
       (commitToEventLog.storeCommitInEventLog _)
         .expects(event.project, parentCommit, batchDate)
         .returning(IO.pure(Created))
-      givenGlobalCommitSyncRequestIsSent(event.project)
 
-      commitsSynchronizer.synchronizeEvents(event).assertNoException >>
+      givenGlobalCommitSyncRequestIsSent(event.project) >>
+        commitsSynchronizer.synchronizeEvents(event).assertNoException >>
         logger.loggedF(
           logNewEventFound(latestCommitInfo.id, event.project, executionTimeRecorder.elapsedTime),
           logNewEventFound(parentCommit.id, event.project, executionTimeRecorder.elapsedTime),
@@ -224,9 +224,9 @@ class CommitsSynchronizerSpec
       (commitEventsRemover.removeDeletedEvent _)
         .expects(event.project, parentCommit.id)
         .returning(UpdateResult.Deleted.pure[IO])
-      givenGlobalCommitSyncRequestIsSent(event.project)
 
-      commitsSynchronizer.synchronizeEvents(event).assertNoException >>
+      givenGlobalCommitSyncRequestIsSent(event.project) >>
+        commitsSynchronizer.synchronizeEvents(event).assertNoException >>
         logger.loggedF(
           logEventFoundForDeletion(event.id, event.project, executionTimeRecorder.elapsedTime),
           logEventFoundForDeletion(parentCommit.id, event.project, executionTimeRecorder.elapsedTime),
@@ -264,9 +264,9 @@ class CommitsSynchronizerSpec
       (commitEventsRemover.removeDeletedEvent _)
         .expects(event.project, parentCommit.id)
         .returning(UpdateResult.Deleted.pure[IO])
-      givenGlobalCommitSyncRequestIsSent(event.project)
 
-      commitsSynchronizer.synchronizeEvents(event).assertNoException >>
+      givenGlobalCommitSyncRequestIsSent(event.project) >>
+        commitsSynchronizer.synchronizeEvents(event).assertNoException >>
         logger.loggedF(
           logNewEventFound(latestCommitInfo.id, event.project, executionTimeRecorder.elapsedTime),
           logEventFoundForDeletion(parentCommit.id, event.project, executionTimeRecorder.elapsedTime),
@@ -308,9 +308,9 @@ class CommitsSynchronizerSpec
       (commitToEventLog.storeCommitInEventLog _)
         .expects(event.project, parent2Commit, batchDate)
         .returning(IO.pure(Created))
-      givenGlobalCommitSyncRequestIsSent(event.project)
 
-      commitsSynchronizer.synchronizeEvents(event).assertNoException >>
+      givenGlobalCommitSyncRequestIsSent(event.project) >>
+        commitsSynchronizer.synchronizeEvents(event).assertNoException >>
         logger.loggedF(
           logNewEventFound(parent2Commit.id, event.project, executionTimeRecorder.elapsedTime),
           logErrorSynchronization(parent1Commit.id, event.project, executionTimeRecorder.elapsedTime, exception),
@@ -356,9 +356,9 @@ class CommitsSynchronizerSpec
       (commitToEventLog.storeCommitInEventLog _)
         .expects(event.project, parent2Commit, batchDate)
         .returning(IO.pure(Created))
-      givenGlobalCommitSyncRequestIsSent(event.project)
 
-      commitsSynchronizer.synchronizeEvents(event).assertNoException >>
+      givenGlobalCommitSyncRequestIsSent(event.project) >>
+        commitsSynchronizer.synchronizeEvents(event).assertNoException >>
         logger.loggedF(
           logNewEventFound(latestCommitInfo.id, event.project, executionTimeRecorder.elapsedTime),
           logErrorSynchronization(parent1Commit.id, event.project, executionTimeRecorder.elapsedTime, exception),
@@ -397,9 +397,9 @@ class CommitsSynchronizerSpec
       (commitToEventLog.storeCommitInEventLog _)
         .expects(event.project, parent1Commit, batchDate)
         .returning(IO.pure(Created))
-      givenGlobalCommitSyncRequestIsSent(event.project)
 
-      commitsSynchronizer.synchronizeEvents(event).assertNoException >>
+      givenGlobalCommitSyncRequestIsSent(event.project) >>
+        commitsSynchronizer.synchronizeEvents(event).assertNoException >>
         logger.loggedF(
           logErrorSynchronization(latestCommitInfo.id,
                                   event.project,
@@ -444,9 +444,9 @@ class CommitsSynchronizerSpec
       (commitToEventLog.storeCommitInEventLog _)
         .expects(event.project, parent1Commit, batchDate)
         .returning(IO.pure(Created))
-      givenGlobalCommitSyncRequestIsSent(event.project)
 
-      commitsSynchronizer.synchronizeEvents(event).assertNoException >>
+      givenGlobalCommitSyncRequestIsSent(event.project) >>
+        commitsSynchronizer.synchronizeEvents(event).assertNoException >>
         logger.loggedF(
           logErrorSynchronization(latestCommitInfo.id,
                                   event.project,
@@ -490,9 +490,9 @@ class CommitsSynchronizerSpec
       (commitToEventLog.storeCommitInEventLog _)
         .expects(event.project, parent1Commit, batchDate)
         .returning(IO.pure(Created))
-      givenGlobalCommitSyncRequestIsSent(event.project)
 
-      commitsSynchronizer.synchronizeEvents(event).assertNoException >>
+      givenGlobalCommitSyncRequestIsSent(event.project) >>
+        commitsSynchronizer.synchronizeEvents(event).assertNoException >>
         logger.loggedF(
           logErrorSynchronization(latestCommitInfo.id,
                                   event.project,
@@ -532,12 +532,8 @@ class CommitsSynchronizerSpec
     givenCommitIsInGL(parentCommit, event.project.id)
 
     val exception = exceptions.generateOne
-    (elClient
-      .send(_: GlobalCommitSyncRequest))
-      .expects(GlobalCommitSyncRequest(event.project))
-      .returning(exception.raiseError[IO, Unit])
-
-    commitsSynchronizer.synchronizeEvents(event).assertNoException >>
+    elClient.expect(GlobalCommitSyncRequest(event.project), doReturn = exception.raiseError[IO, Unit]) >>
+      commitsSynchronizer.synchronizeEvents(event).assertNoException >>
       logger.loggedF(
         logNewEventFound(latestCommitInfo.id, event.project, executionTimeRecorder.elapsedTime),
         logSummary(latestCommitInfo.id,
@@ -566,9 +562,8 @@ class CommitsSynchronizerSpec
 
     givenAccessTokenFinding(event.project.id, returning = Option.empty[AccessToken].pure[IO])
 
-    givenGlobalCommitSyncRequestIsSent(event.project)
-
-    commitsSynchronizer.synchronizeEvents(event).assertNoException >>
+    givenGlobalCommitSyncRequestIsSent(event.project) >>
+      commitsSynchronizer.synchronizeEvents(event).assertNoException >>
       logger.loggedF(Info(s"${logMessageCommon(event)} -> No access token found sending GlobalCommitSyncRequest"))
   }
 
@@ -582,7 +577,7 @@ class CommitsSynchronizerSpec
   private lazy val commitInfoFinder    = mock[CommitInfoFinder[IO]]
   private lazy val commitToEventLog    = mock[CommitToEventLog[IO]]
   private lazy val commitEventsRemover = mock[CommitEventsRemover[IO]]
-  private lazy val elClient            = mock[eventlog.api.events.Client[IO]]
+  private lazy val elClient            = eventlog.api.events.TestClient.expectingMode[IO]
   private val clock                    = Clock.fixed(batchDate.value, ZoneId.of(ZoneOffset.UTC.getId))
 
   private lazy val commitsSynchronizer = new CommitsSynchronizerImpl[IO](tokenRepositoryClient,
@@ -634,10 +629,7 @@ class CommitsSynchronizerSpec
       .returning(IO.pure(None))
 
   private def givenGlobalCommitSyncRequestIsSent(project: Project) =
-    (elClient
-      .send(_: GlobalCommitSyncRequest))
-      .expects(GlobalCommitSyncRequest(project))
-      .returning(IO.unit)
+    elClient.expect(GlobalCommitSyncRequest(project), doReturn = IO.unit)
 
   private def logSummary(commitId:    CommitId,
                          project:     Project,

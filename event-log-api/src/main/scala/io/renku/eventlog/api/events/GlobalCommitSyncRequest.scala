@@ -36,6 +36,8 @@ object GlobalCommitSyncRequest {
   def apply(projectId: projects.GitLabId, projectSlug: projects.Slug): GlobalCommitSyncRequest =
     GlobalCommitSyncRequest(Project(projectId, projectSlug))
 
+  implicit def dispatcher[F[_]]: Dispatcher[F, GlobalCommitSyncRequest] = Dispatcher.instance(categoryName)
+
   implicit val encoder: Encoder[GlobalCommitSyncRequest] = Encoder.instance { case GlobalCommitSyncRequest(project) =>
     json"""{
       "categoryName": $categoryName,

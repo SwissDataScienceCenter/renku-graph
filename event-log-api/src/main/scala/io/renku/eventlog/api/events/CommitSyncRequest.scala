@@ -32,6 +32,8 @@ object CommitSyncRequest {
 
   val categoryName: CategoryName = CategoryName("COMMIT_SYNC_REQUEST")
 
+  implicit def dispatcher[F[_]]: Dispatcher[F, CommitSyncRequest] = Dispatcher.instance(categoryName)
+
   implicit val encoder: Encoder[CommitSyncRequest] = Encoder.instance { case CommitSyncRequest(project) =>
     json"""{
       "categoryName": $categoryName,

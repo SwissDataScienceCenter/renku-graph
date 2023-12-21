@@ -101,7 +101,6 @@ class EndpointSpec
 
         val project = consumerProjects.generateOne.copy(id = projectId)
         givenProjectInfoFinding(projectId, authUser, returning = project.some.pure[IO])
-        givenCommitSyncRequestSent
 
         val response = endpoint.fetchProcessingStatus(projectId, authUser).unsafeRunSync()
 
@@ -109,7 +108,7 @@ class EndpointSpec
         response.contentType              shouldBe Some(`Content-Type`(application.json))
         response.as[Json].unsafeRunSync() shouldBe StatusInfo.webhookReady.asJson
 
-        verifyCommitSyncRequestSent(project)
+        elClient.waitForArrival(CommitSyncRequest(project)).unsafeRunSync()
 
         logger.loggedOnly(
           Warn(s"Finding status info for project '$projectId' finished${executionTimeRecorder.executionTimeInfo}")
@@ -213,7 +212,7 @@ class EndpointSpec
     private val hookValidator     = mock[HookValidator[IO]]
     private val statusInfoFinder  = mock[StatusInfoFinder[IO]]
     private val projectInfoFinder = mock[ProjectInfoFinder[IO]]
-    private val elClient          = mock[eventlog.api.events.Client[IO]]
+    val elClient                  = eventlog.api.events.TestClient.collectingMode[IO]
     private val tgClient          = mock[triplesgenerator.api.events.Client[IO]]
     implicit val logger:                TestLogger[IO]                = TestLogger[IO]()
     implicit val executionTimeRecorder: TestExecutionTimeRecorder[IO] = TestExecutionTimeRecorder[IO]()
@@ -245,21 +244,11 @@ class EndpointSpec
 
     private val sentEvents: Ref[IO, List[AnyRef]] = Ref.unsafe(Nil)
 
-    def givenCommitSyncRequestSent =
-      (elClient
-        .send(_: CommitSyncRequest))
-        .expects(*)
-        .onCall((ev: CommitSyncRequest) => sentEvents.update(ev :: _))
-
     def givenProjectViewedEventSent =
       (tgClient
         .send(_: ProjectViewedEvent))
         .expects(*)
         .onCall((ev: ProjectViewedEvent) => sentEvents.update(ev :: _))
-
-    def verifyCommitSyncRequestSent(project: Project) = eventually {
-      sentEvents.get.unsafeRunSync() should contain(CommitSyncRequest(project))
-    }
 
     def verifyProjectViewedEventSent(project: Project, authUser: Option[AuthUser]) = eventually {
       sentEvents.get.unsafeRunSync().collect { case e: ProjectViewedEvent => e.slug -> e.maybeUserId } shouldBe

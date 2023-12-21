@@ -54,11 +54,6 @@ class EndpointSpec extends AnyWordSpec with MockFactory with should.Matchers wit
 
     "return ACCEPTED for valid push event payload which are accepted" in new TestCase {
 
-      (elClient
-        .send(_: CommitSyncRequest))
-        .expects(syncRequest)
-        .returning(().pure[IO])
-
       expectDecryptionOf(serializedHookToken, returning = HookToken(syncRequest.project.id))
 
       val request = Request(Method.POST, uri"/webhooks" / "events")
@@ -70,6 +65,8 @@ class EndpointSpec extends AnyWordSpec with MockFactory with should.Matchers wit
       response.status                      shouldBe Accepted
       response.contentType                 shouldBe Some(`Content-Type`(MediaType.application.json))
       response.as[Message].unsafeRunSync() shouldBe Message.Info("Event accepted")
+
+      elClient.waitForArrival(syncRequest).unsafeRunSync()
 
       logger.loggedOnly(
         Info(
@@ -154,7 +151,7 @@ class EndpointSpec extends AnyWordSpec with MockFactory with should.Matchers wit
     }.generateOne
 
     implicit val logger: TestLogger[IO] = TestLogger[IO]()
-    val elClient        = mock[eventlog.api.events.Client[IO]]
+    val elClient        = eventlog.api.events.TestClient.collectingMode[IO]
     val hookTokenCrypto = mock[HookTokenCrypto[IO]]
     val endpoint        = new EndpointImpl[IO](hookTokenCrypto, elClient)
 
