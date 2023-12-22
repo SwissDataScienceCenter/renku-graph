@@ -22,9 +22,7 @@ package projectsync
 import Generators._
 import cats.effect._
 import cats.syntax.all._
-import io.circe.literal._
-import io.renku.events.producers.EventSender
-import io.renku.events.{CategoryName, EventRequestContent}
+import io.renku.eventlog.api.events.{CleanUpRequest, GlobalCommitSyncRequest}
 import io.renku.generators.Generators.Implicits._
 import io.renku.generators.Generators.exceptions
 import io.renku.graph.model.GraphModelGenerators._
@@ -33,8 +31,8 @@ import io.renku.http.client.RestClientError.UnauthorizedException
 import io.renku.interpreters.TestLogger
 import io.renku.interpreters.TestLogger.Level.Info
 import io.renku.testtools.CustomAsyncIOSpec
-import io.renku.triplesgenerator
 import io.renku.triplesgenerator.api.events.SyncRepoMetadata
+import io.renku.{eventlog, triplesgenerator}
 import org.scalamock.scalatest.AsyncMockFactory
 import org.scalatest.flatspec.AsyncFlatSpec
 import org.scalatest.matchers.should
@@ -60,7 +58,7 @@ class ProjectInfoSynchronizerSpec
   it should "fetch relevant project info from GitLab and " +
     "if GitLab returns a different slug " +
     "project info in the project table is changed " +
-    "and a COMMIT_SYNC_REQUEST event with the updated project info " +
+    "and a GLOBAL_COMMIT_SYNC_REQUEST event with the updated project info " +
     "and a CLEAN_UP_REQUEST event with the old project info " +
     "are sent" in {
 
@@ -71,24 +69,24 @@ class ProjectInfoSynchronizerSpec
 
       givenProjectRemovedFromDB(event.projectId, returning = ().pure[IO])
 
-      givenSending(cleanUpRequestEvent(event), returning = ().pure[IO])
-
-      givenSending(commitSyncRequestEvent(event.projectId, newSlug), returning = ().pure[IO])
-
-      synchronizer.syncProjectInfo(event).assertNoException
+      synchronizer.syncProjectInfo(event).assertNoException >>
+        elClient
+          .waitForArrival(
+            List(CleanUpRequest(event.projectId, event.projectSlug), GlobalCommitSyncRequest(event.projectId, newSlug))
+          )
+          .assertNoException
     }
 
   it should "fetch relevant project info from GitLab and " +
     "if GitLab returns no slug " +
-    "only a CLEAN_UP_REQUEST event with the old project info is sent" in {
+    "only a GLOBAL_COMMIT_SYNC_REQUEST event with the old project info is sent" in {
 
       val event = projectSyncEvents.generateOne
 
       givenGitLabProject(by = event.projectId, returning = Option.empty[projects.Slug].asRight.pure[IO])
 
-      givenSending(cleanUpRequestEvent(event), returning = ().pure[IO])
-
-      synchronizer.syncProjectInfo(event).assertNoException
+      synchronizer.syncProjectInfo(event).assertNoException >>
+        elClient.waitForArrival(GlobalCommitSyncRequest(event.projectId, event.projectSlug)).assertNoException
     }
 
   it should "log an error if finding project info in GitLab returns Left" in {
@@ -116,10 +114,10 @@ class ProjectInfoSynchronizerSpec
   private implicit lazy val logger: TestLogger[IO] = TestLogger[IO]()
   private lazy val gitLabProjectFetcher = mock[GitLabProjectFetcher[IO]]
   private lazy val projectRemover       = mock[ProjectRemover[IO]]
-  private lazy val eventSender          = mock[EventSender[IO]]
+  private lazy val elClient             = eventlog.api.events.TestClient.collectingMode[IO]
   private lazy val tgClient             = mock[triplesgenerator.api.events.Client[IO]]
   private lazy val synchronizer =
-    new ProjectInfoSynchronizerImpl[IO](gitLabProjectFetcher, projectRemover, eventSender, tgClient)
+    new ProjectInfoSynchronizerImpl[IO](gitLabProjectFetcher, projectRemover, elClient, tgClient)
 
   private def givenGitLabProject(by:        projects.GitLabId,
                                  returning: IO[Either[UnauthorizedException, Option[projects.Slug]]]
@@ -132,41 +130,6 @@ class ProjectInfoSynchronizerSpec
       .expects(id)
       .returning(returning)
 
-  private def givenSending(categoryAndRequest: (CategoryName, EventRequestContent.NoPayload), returning: IO[Unit]) =
-    (eventSender
-      .sendEvent(_: EventRequestContent.NoPayload, _: EventSender.EventContext))
-      .expects(
-        categoryAndRequest._2,
-        EventSender.EventContext(categoryAndRequest._1, show"$categoryName: sending ${categoryAndRequest._1} failed")
-      )
-      .returning(returning)
-
   private def givenSendingSyncRepoMetadata(event: ProjectSyncEvent, returning: IO[Unit]) =
     (tgClient.send(_: SyncRepoMetadata)).expects(SyncRepoMetadata(event.projectSlug)).returning(returning)
-
-  private def commitSyncRequestEvent(id:   projects.GitLabId,
-                                     slug: projects.Slug
-  ): (CategoryName, EventRequestContent.NoPayload) = {
-    val category = commitsyncrequest.categoryName
-    val payload = json"""{
-      "categoryName": ${category.show},
-      "project": {
-        "id":   $id,
-        "slug": $slug
-      }
-    }"""
-    category -> EventRequestContent.NoPayload(payload)
-  }
-
-  private def cleanUpRequestEvent(event: ProjectSyncEvent): (CategoryName, EventRequestContent.NoPayload) = {
-    val category = cleanuprequest.categoryName
-    val payload = json"""{
-      "categoryName": $category,
-      "project": {
-        "id":   ${event.projectId},
-        "slug": ${event.projectSlug}
-      }
-    }"""
-    category -> EventRequestContent.NoPayload(payload)
-  }
 }

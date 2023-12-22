@@ -19,6 +19,7 @@
 package io.renku.eventlog.api.events
 
 import io.renku.events.consumers.ConsumersModelGenerators.consumerProjects
+import io.renku.graph.model.RenkuTinyTypeGenerators.projectSlugs
 import org.scalacheck.Gen
 
 object Generators extends StatusChangeGenerators {
@@ -28,4 +29,10 @@ object Generators extends StatusChangeGenerators {
 
   val globalCommitSyncRequests: Gen[GlobalCommitSyncRequest] =
     consumerProjects.map(GlobalCommitSyncRequest.apply)
+
+  val cleanUpRequests: Gen[CleanUpRequest] =
+    Gen.oneOf(
+      consumerProjects.map(CleanUpRequest.apply),
+      projectSlugs.map(CleanUpRequest.apply)
+    )
 }

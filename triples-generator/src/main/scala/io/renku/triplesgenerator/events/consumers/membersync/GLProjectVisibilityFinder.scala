@@ -32,7 +32,7 @@ import org.http4s.{EntityDecoder, Request, Response, Status}
 import org.typelevel.log4cats.Logger
 
 private trait GLProjectVisibilityFinder[F[_]] {
-  def findVisibility(slug: projects.Slug)(implicit mat: Option[AccessToken]): F[Option[projects.Visibility]]
+  def findVisibility(slug: projects.Slug)(implicit at: AccessToken): F[Option[projects.Visibility]]
 }
 
 private object GLProjectVisibilityFinder {
@@ -41,8 +41,8 @@ private object GLProjectVisibilityFinder {
 
 private class GLProjectVisibilityFinderImpl[F[_]: Async: GitLabClient] extends GLProjectVisibilityFinder[F] {
 
-  override def findVisibility(slug: projects.Slug)(implicit mat: Option[AccessToken]): F[Option[projects.Visibility]] =
-    GitLabClient[F].get(uri"projects" / slug, "single-project")(mapResponse)(mat)
+  override def findVisibility(slug: projects.Slug)(implicit at: AccessToken): F[Option[projects.Visibility]] =
+    GitLabClient[F].get(uri"projects" / slug, "single-project")(mapResponse)(at.some)
 
   private lazy val mapResponse: PartialFunction[(Status, Request[F], Response[F]), F[Option[projects.Visibility]]] = {
     case (Ok, _, response)                           => response.as[Option[projects.Visibility]]

@@ -22,11 +22,12 @@ import cats.MonadThrow
 import cats.effect.Async
 import cats.syntax.all._
 import io.renku.eventlog.EventLogDB.SessionResource
+import io.renku.eventlog.api.events.CleanUpRequest
 import io.renku.eventlog.metrics.QueriesExecutionTimes
 import org.typelevel.log4cats.Logger
 
 private trait EventProcessor[F[_]] {
-  def process(event: CleanUpRequestEvent): F[Unit]
+  def process(event: CleanUpRequest): F[Unit]
 }
 
 private object EventProcessor {
@@ -42,13 +43,13 @@ private class EventProcessorImpl[F[_]: MonadThrow: Logger](projectIdFinder: Proj
 
   import projectIdFinder._
 
-  override def process(event: CleanUpRequestEvent): F[Unit] =
+  override def process(event: CleanUpRequest): F[Unit] =
     Logger[F].info(show"$categoryName: $event accepted") >>
       enqueue(event)
 
-  private def enqueue(event: CleanUpRequestEvent) = event match {
-    case CleanUpRequestEvent.Full(id, slug) => queue.offer(id, slug)
-    case CleanUpRequestEvent.Partial(slug) =>
+  private def enqueue(event: CleanUpRequest) = event match {
+    case CleanUpRequest.Full(id, slug) => queue.offer(id, slug)
+    case CleanUpRequest.Partial(slug) =>
       findProjectId(slug) >>= {
         case Some(id) => queue.offer(id, slug)
         case None     => Logger[F].warn(show"Cannot find projectId for $slug")

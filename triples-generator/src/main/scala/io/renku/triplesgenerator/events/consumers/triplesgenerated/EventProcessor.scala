@@ -63,22 +63,22 @@ private class EventProcessorImpl[F[_]: MonadThrow: Logger](
   import tsProvisioner.provisionTS
 
   def process(event: TriplesGeneratedEvent): F[Unit] = {
-    for {
-      _                                   <- Logger[F].info(s"${logMessageCommon(event)} accepted")
-      implicit0(mat: Option[AccessToken]) <- findAccessToken(event.project.slug) recoverWith rollback(event)
-      results                             <- measureExecutionTime(transformAndUpload(event))
-      _                                   <- updateEventLog(results)
-      _                                   <- logSummary(event)(results)
-    } yield ()
+    Logger[F].info(s"${logMessageCommon(event)} accepted") >>
+      measureExecutionTime {
+        findAccessToken(event.project.slug).recoverWith(rollback(event)).flatMap {
+          case None =>
+            RecoverableError(event, SilentRecoverableError("No access token")).pure[F].widen[EventUploadingResult]
+          case Some(implicit0(at: AccessToken)) =>
+            transformAndUpload(event)
+        }
+      }.flatTap(updateEventLog).flatMap(logSummary(event))
   } recoverWith logError(event)
 
   private def logError(event: TriplesGeneratedEvent): PartialFunction[Throwable, F[Unit]] = { case exception =>
     Logger[F].error(exception)(show"$categoryName: $event processing failure")
   }
 
-  private def transformAndUpload(
-      event: TriplesGeneratedEvent
-  )(implicit mat: Option[AccessToken]): F[EventUploadingResult] = {
+  private def transformAndUpload(event: TriplesGeneratedEvent)(implicit at: AccessToken): F[EventUploadingResult] = {
     for {
       project <- buildEntity(event) leftSemiflatMap toRecoverableError(event)
       result  <- right[EventUploadingResult](provisionTS(project) >>= toUploadingResult(event))

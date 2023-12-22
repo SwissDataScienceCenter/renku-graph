@@ -114,6 +114,7 @@ class ProjectWebhookAndTokenRemoverSpec
     "fail when the webhook deletion fails" in new TestCase {
 
       givenAccessTokenFinding(project.id, returning = accessToken.some.pure[IO])
+      givenAccessTokenRemoving(project.id, returning = ().pure[IO])
 
       stubFor {
         delete(s"/projects/${project.id}/webhooks")

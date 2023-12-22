@@ -51,7 +51,7 @@ class GLProjectVisibilityFinderSpec
   it should s"return fetched Project's visibility if GL responds with OK and a valid body" in {
 
     val projectSlug = projectSlugs.generateOne
-    implicit val mat: Option[AccessToken] = accessTokens.generateOption
+    implicit val at: AccessToken = accessTokens.generateOne
 
     val maybeVisibility = projectVisibilities.generateOption
     val endpointName: String Refined NonEmpty = "single-project"
@@ -59,7 +59,7 @@ class GLProjectVisibilityFinderSpec
       .get(_: Uri, _: String Refined NonEmpty)(_: ResponseMappingF[IO, Option[projects.Visibility]])(
         _: Option[AccessToken]
       ))
-      .expects(uri"projects" / projectSlug, endpointName, *, mat)
+      .expects(uri"projects" / projectSlug, endpointName, *, at.some)
       .returning(maybeVisibility.pure[IO])
 
     visibilityFinder.findVisibility(projectSlug).asserting(_ shouldBe maybeVisibility)
@@ -99,8 +99,7 @@ class GLProjectVisibilityFinderSpec
   private lazy val visibilityFinder = new GLProjectVisibilityFinderImpl[IO]
 
   private lazy val mapResponse = captureMapping(gitLabClient)(
-    findingMethod =
-      visibilityFinder.findVisibility(projectSlugs.generateOne)(accessTokens.generateOption).unsafeRunSync(),
+    findingMethod = visibilityFinder.findVisibility(projectSlugs.generateOne)(accessTokens.generateOne).unsafeRunSync(),
     resultGenerator = projectVisibilities.generateOption,
     underlyingMethod = Get
   )

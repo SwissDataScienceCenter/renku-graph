@@ -23,15 +23,12 @@ import cats.MonadThrow
 import cats.effect.Async
 import cats.syntax.all._
 import io.renku.eventlog.EventLogDB.SessionResource
+import io.renku.eventlog.api.events.{CleanUpRequest, GlobalCommitSyncRequest}
 import io.renku.eventlog.metrics.QueriesExecutionTimes
-import io.renku.events.EventRequestContent
-import io.renku.events.producers.EventSender
-import io.renku.graph.config.EventLogUrl
-import io.renku.graph.model.projects
 import io.renku.http.client.GitLabClient
 import io.renku.metrics.MetricsRegistry
-import io.renku.triplesgenerator
 import io.renku.triplesgenerator.api.events.SyncRepoMetadata
+import io.renku.{eventlog, triplesgenerator}
 import org.typelevel.log4cats.Logger
 
 private trait ProjectInfoSynchronizer[F[_]] {
@@ -41,54 +38,23 @@ private trait ProjectInfoSynchronizer[F[_]] {
 private class ProjectInfoSynchronizerImpl[F[_]: MonadThrow: Logger](
     gitLabProjectFetcher: GitLabProjectFetcher[F],
     projectRemover:       ProjectRemover[F],
-    eventSender:          EventSender[F],
+    elClient:             eventlog.api.events.Client[F],
     tgClient:             triplesgenerator.api.events.Client[F]
 ) extends ProjectInfoSynchronizer[F] {
 
-  import eventSender._
   import gitLabProjectFetcher._
-  import io.circe.literal._
   import projectRemover._
 
-  override def syncProjectInfo(event: ProjectSyncEvent): F[Unit] = fetchGitLabProject(event.projectId) >>= {
-    case Right(Some(event.`projectSlug`)) => tgClient.send(SyncRepoMetadata(event.projectSlug))
-    case Right(Some(newSlug)) =>
-      removeProject(event.projectId) >>
-        send(cleanUpRequest(event)) >>
-        send(commitSyncRequest(event.projectId, newSlug))
-    case Right(None)     => send(cleanUpRequest(event))
-    case Left(exception) => Logger[F].info(show"$categoryName: $event failed: $exception")
-  }
-
-  private def send: ((EventRequestContent.NoPayload, EventSender.EventContext)) => F[Unit] = {
-    case (payload, eventCtx) => sendEvent(payload, eventCtx)
-  }
-
-  private def commitSyncRequest(projectId: projects.GitLabId, newSlug: projects.Slug) = {
-    val category = commitsyncrequest.categoryName
-    val payload = EventRequestContent.NoPayload(json"""{
-      "categoryName": $category,
-      "project": {
-        "id":   $projectId,
-        "slug": $newSlug
-      }
-    }""")
-    val context = EventSender.EventContext(category, errorMessage = show"$categoryName: sending $category failed")
-    payload -> context
-  }
-
-  private def cleanUpRequest(event: ProjectSyncEvent) = {
-    val category = cleanuprequest.categoryName
-    val payload = EventRequestContent.NoPayload(json"""{
-      "categoryName": $category,
-      "project": {
-        "id":   ${event.projectId},
-        "slug": ${event.projectSlug}
-      }
-    }""")
-    val context = EventSender.EventContext(category, errorMessage = show"$categoryName: sending $category failed")
-    payload -> context
-  }
+  override def syncProjectInfo(event: ProjectSyncEvent): F[Unit] =
+    fetchGitLabProject(event.projectId) >>= {
+      case Right(Some(event.`projectSlug`)) => tgClient.send(SyncRepoMetadata(event.projectSlug))
+      case Right(Some(newSlug)) =>
+        removeProject(event.projectId) >>
+          elClient.send(CleanUpRequest(event.projectId, event.projectSlug)) >>
+          elClient.send(GlobalCommitSyncRequest(event.projectId, newSlug))
+      case Right(None)     => elClient.send(GlobalCommitSyncRequest(event.projectId, event.projectSlug))
+      case Left(exception) => Logger[F].info(show"$categoryName: $event failed: $exception")
+    }
 }
 
 private object ProjectInfoSynchronizer {
@@ -96,7 +62,7 @@ private object ProjectInfoSynchronizer {
       : F[ProjectInfoSynchronizer[F]] = for {
     gitLabProjectFetcher <- GitLabProjectFetcher[F]
     projectRemover       <- ProjectRemover[F]
-    eventSender          <- EventSender[F](EventLogUrl)
+    elClient             <- eventlog.api.events.Client[F]
     tgClient             <- triplesgenerator.api.events.Client[F]
-  } yield new ProjectInfoSynchronizerImpl(gitLabProjectFetcher, projectRemover, eventSender, tgClient)
+  } yield new ProjectInfoSynchronizerImpl(gitLabProjectFetcher, projectRemover, elClient, tgClient)
 }

@@ -31,7 +31,7 @@ import org.typelevel.log4cats.Logger
 
 private[consumers] trait ProjectInfoFinder[F[_]] {
   def findProjectInfo(slug: projects.Slug)(implicit
-      maybeAccessToken: Option[AccessToken]
+      at: AccessToken
   ): EitherT[F, ProcessingRecoverableError, Option[GitLabProjectInfo]]
 }
 
@@ -54,16 +54,16 @@ private class ProjectInfoFinderImpl[F[_]: Async: MonadThrow: Parallel: Logger](
 
   override def findProjectInfo(
       slug: projects.Slug
-  )(implicit maybeAccessToken: Option[AccessToken]): EitherT[F, ProcessingRecoverableError, Option[GitLabProjectInfo]] =
+  )(implicit at: AccessToken): EitherT[F, ProcessingRecoverableError, Option[GitLabProjectInfo]] =
     findProject(slug) >>= {
       case None          => EitherT.rightT[F, ProcessingRecoverableError](Option.empty[GitLabProjectInfo])
       case Some(project) => (addMembers(project) >>= addEmails).map(_.some)
     }
 
-  private def addMembers(project: GitLabProjectInfo)(implicit maybeAccessToken: Option[AccessToken]) =
+  private def addMembers(project: GitLabProjectInfo)(implicit at: AccessToken) =
     findProjectMembers(project.slug).map(members => project.copy(members = members))
 
-  private def addEmails(project: GitLabProjectInfo)(implicit maybeAccessToken: Option[AccessToken]) = EitherT {
+  private def addEmails(project: GitLabProjectInfo)(implicit at: AccessToken) = EitherT {
     val allMembers = (project.members ++ project.maybeCreator.map(_.toMember(Role.Owner))).toList
     allMembers
       .map { member =>

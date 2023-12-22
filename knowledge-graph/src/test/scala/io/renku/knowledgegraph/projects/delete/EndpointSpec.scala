@@ -55,7 +55,6 @@ class EndpointSpec extends AnyWordSpec with should.Matchers with IOSpec with Moc
         givenProjectFindingInGL(project.slug, returning = project.some.pure[IO])
         givenProjectDelete(project.id, returning = ().pure[IO])
         givenProjectFindingInGL(project.slug, returning = None.pure[IO])
-        givenCommitSyncRequestSent(project, returning = ().pure[IO])
         givenCleanUpRequestSent(project, returning = ().pure[IO])
 
         val response = endpoint.`DELETE /projects/:slug`(project.slug, authUser).unsafeRunSync()
@@ -64,8 +63,8 @@ class EndpointSpec extends AnyWordSpec with should.Matchers with IOSpec with Moc
         response.contentType                 shouldBe `Content-Type`(application.json).some
         response.as[Message].unsafeRunSync() shouldBe Message.Info("Project deleted")
 
-        ensureCommitSyncSent.get.unsafeRunSync() shouldBe true
-        ensureCleanUpSent.get.unsafeRunSync()    shouldBe true
+        elClient.waitForArrival(classOf[CommitSyncRequest]).unsafeRunSync().nonEmpty shouldBe true
+        ensureCleanUpSent.get.unsafeRunSync()                                        shouldBe true
       }
 
     "fetch project details from EL if it cannot be found in GL, " +
@@ -77,7 +76,6 @@ class EndpointSpec extends AnyWordSpec with should.Matchers with IOSpec with Moc
         givenProjectFindingInGL(project.slug, returning = None.pure[IO]).atLeastOnce()
         givenProjectFindingInEL(project.slug, returning = project.some.pure[IO])
         givenProjectDelete(project.id, returning = ().pure[IO])
-        givenCommitSyncRequestSent(project, returning = ().pure[IO])
         givenCleanUpRequestSent(project, returning = ().pure[IO])
 
         val response = endpoint.`DELETE /projects/:slug`(project.slug, authUser).unsafeRunSync()
@@ -86,8 +84,8 @@ class EndpointSpec extends AnyWordSpec with should.Matchers with IOSpec with Moc
         response.contentType                 shouldBe `Content-Type`(application.json).some
         response.as[Message].unsafeRunSync() shouldBe Message.Info("Project deleted")
 
-        ensureCommitSyncSent.get.unsafeRunSync() shouldBe true
-        ensureCleanUpSent.get.unsafeRunSync()    shouldBe true
+        elClient.waitForArrival(classOf[CommitSyncRequest]).unsafeRunSync().nonEmpty shouldBe true
+        ensureCleanUpSent.get.unsafeRunSync()                                        shouldBe true
       }
 
     "return 404 Not Found in case the project does not exist in GL" in new TestCase {
@@ -108,13 +106,12 @@ class EndpointSpec extends AnyWordSpec with should.Matchers with IOSpec with Moc
       givenProjectDelete(project.id, returning = ().pure[IO])
       givenProjectFindingInGL(project.slug, returning = project.some.pure[IO])
       givenProjectFindingInGL(project.slug, returning = None.pure[IO])
-      givenCommitSyncRequestSent(project, returning = ().pure[IO])
       givenCleanUpRequestSent(project, returning = ().pure[IO])
 
       endpoint.`DELETE /projects/:slug`(project.slug, authUser).unsafeRunSync().status shouldBe Accepted
 
-      ensureCommitSyncSent.get.unsafeRunSync() shouldBe true
-      ensureCleanUpSent.get.unsafeRunSync()    shouldBe true
+      elClient.waitForArrival(classOf[CommitSyncRequest]).unsafeRunSync().nonEmpty shouldBe true
+      ensureCleanUpSent.get.unsafeRunSync()                                        shouldBe true
     }
 
     "return 500 Internal Server Error in case any of the operations fails" in new TestCase {
@@ -143,7 +140,7 @@ class EndpointSpec extends AnyWordSpec with should.Matchers with IOSpec with Moc
     private val glProjectFinder = mock[GLProjectFinder[IO]]
     private val elProjectFinder = mock[ELProjectFinder[IO]]
     private val projectRemover  = mock[ProjectRemover[IO]]
-    private val elClient        = mock[eventlog.api.events.Client[IO]]
+    val elClient                = eventlog.api.events.TestClient.collectingMode[IO]
     private val tgClient        = mock[triplesgenerator.api.events.Client[IO]]
     val endpoint = new EndpointImpl[IO](glProjectFinder, elProjectFinder, projectRemover, elClient, tgClient)
 
@@ -164,13 +161,6 @@ class EndpointSpec extends AnyWordSpec with should.Matchers with IOSpec with Moc
         .deleteProject(_: projects.GitLabId)(_: AccessToken))
         .expects(id, authUser.accessToken)
         .returning(returning)
-
-    val ensureCommitSyncSent = Deferred.unsafe[IO, Boolean]
-    def givenCommitSyncRequestSent(project: Project, returning: IO[Unit]) =
-      (elClient
-        .send(_: CommitSyncRequest))
-        .expects(CommitSyncRequest(project))
-        .onCall((_: CommitSyncRequest) => returning >> ensureCommitSyncSent.complete(true).void)
 
     val ensureCleanUpSent = Deferred.unsafe[IO, Boolean]
     def givenCleanUpRequestSent(project: Project, returning: IO[Unit]) =

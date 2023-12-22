@@ -25,12 +25,18 @@ import io.circe.literal._
 import io.circe.{Decoder, DecodingFailure, Encoder}
 import io.renku.events.CategoryName
 import io.renku.events.consumers.Project
+import io.renku.graph.model.projects
 
 final case class GlobalCommitSyncRequest(project: Project)
 
 object GlobalCommitSyncRequest {
 
   val categoryName: CategoryName = CategoryName("GLOBAL_COMMIT_SYNC_REQUEST")
+
+  def apply(projectId: projects.GitLabId, projectSlug: projects.Slug): GlobalCommitSyncRequest =
+    GlobalCommitSyncRequest(Project(projectId, projectSlug))
+
+  implicit def dispatcher[F[_]]: Dispatcher[F, GlobalCommitSyncRequest] = Dispatcher.instance(categoryName)
 
   implicit val encoder: Encoder[GlobalCommitSyncRequest] = Encoder.instance { case GlobalCommitSyncRequest(project) =>
     json"""{

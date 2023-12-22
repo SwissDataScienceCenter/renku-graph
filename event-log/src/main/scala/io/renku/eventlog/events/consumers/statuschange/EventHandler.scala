@@ -18,6 +18,7 @@
 
 package io.renku.eventlog.events.consumers.statuschange
 
+import cats.NonEmptyParallel
 import cats.effect.Async
 import cats.syntax.all._
 import eu.timepit.refined.auto._
@@ -34,12 +35,13 @@ import io.renku.graph.model.events.ZippedEventPayload
 import io.renku.metrics.MetricsRegistry
 import org.typelevel.log4cats.Logger
 
-final class EventHandler[F[_]: Async: SessionResource: Logger: MetricsRegistry: QueriesExecutionTimes](
-    processExecutor:     ProcessExecutor[F],
-    statusChanger:       StatusChanger[F],
-    eventSender:         EventSender[F],
-    eventsQueue:         StatusChangeEventsQueue[F],
-    deliveryInfoRemover: DeliveryInfoRemover[F]
+final class EventHandler[
+    F[_]: Async: NonEmptyParallel: SessionResource: Logger: MetricsRegistry: QueriesExecutionTimes
+](processExecutor:     ProcessExecutor[F],
+  statusChanger:       StatusChanger[F],
+  eventSender:         EventSender[F],
+  eventsQueue:         StatusChangeEventsQueue[F],
+  deliveryInfoRemover: DeliveryInfoRemover[F]
 ) extends consumers.EventHandlerWithProcessLimiter[F](processExecutor) {
 
   override val categoryName: CategoryName = io.renku.eventlog.events.consumers.statuschange.categoryName
@@ -141,7 +143,9 @@ final class EventHandler[F[_]: Async: SessionResource: Logger: MetricsRegistry: 
 
 object EventHandler {
 
-  def apply[F[_]: Async: SessionResource: Logger: MetricsRegistry: QueriesExecutionTimes: EventStatusGauges](
+  def apply[F[
+      _
+  ]: Async: NonEmptyParallel: SessionResource: Logger: MetricsRegistry: QueriesExecutionTimes: EventStatusGauges](
       eventsQueue: StatusChangeEventsQueue[F]
   ): F[consumers.EventHandler[F]] = for {
     deliveryInfoRemover       <- DeliveryInfoRemover[F]

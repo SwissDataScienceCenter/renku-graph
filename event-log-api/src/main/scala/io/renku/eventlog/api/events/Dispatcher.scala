@@ -18,29 +18,24 @@
 
 package io.renku.eventlog.api.events
 
-import cats.effect.Async
+import cats.Show
 import cats.syntax.all._
-import com.typesafe.config.Config
+import io.circe.Encoder
+import io.circe.syntax._
 import io.renku.events.producers.EventSender
-import io.renku.graph.config.EventLogUrl
-import io.renku.metrics.MetricsRegistry
-import org.typelevel.log4cats.Logger
+import io.renku.events.producers.EventSender.EventContext
+import io.renku.events.{CategoryName, EventRequestContent}
 
-trait Client[F[_]] {
-  def send[E](event: E)(implicit dispatcher: Dispatcher[F, E]): F[Unit]
+class Dispatcher[F[_], E](categoryName: CategoryName)(implicit enc: Encoder[E], show: Show[E]) {
+
+  def dispatch(event: E, eventSender: EventSender[F]): F[Unit] =
+    eventSender.sendEvent(
+      EventRequestContent.NoPayload(event.asJson),
+      EventContext(categoryName, show"$categoryName: sending event $event failed")
+    )
 }
 
-object Client {
-
-  def apply[F[_]: Async: Logger: MetricsRegistry](config: Config): F[Client[F]] =
-    EventSender[F](EventLogUrl, config).map(new ClientImpl[F](_))
-
-  def apply[F[_]: Async: Logger: MetricsRegistry]: F[Client[F]] =
-    EventSender[F](EventLogUrl).map(new ClientImpl[F](_))
-}
-
-private class ClientImpl[F[_]](eventSender: EventSender[F]) extends Client[F] {
-
-  override def send[E](event: E)(implicit dispatcher: Dispatcher[F, E]): F[Unit] =
-    dispatcher.dispatch(event, eventSender)
+object Dispatcher {
+  def instance[F[_], E](categoryName: CategoryName)(implicit enc: Encoder[E], show: Show[E]) =
+    new Dispatcher[F, E](categoryName)
 }

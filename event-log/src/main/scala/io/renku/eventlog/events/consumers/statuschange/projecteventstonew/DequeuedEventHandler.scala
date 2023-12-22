@@ -19,6 +19,7 @@
 package io.renku.eventlog.events.consumers.statuschange
 package projecteventstonew
 
+import cats.NonEmptyParallel
 import cats.data.Kleisli
 import cats.effect.Async
 import cats.syntax.all._
@@ -50,7 +51,8 @@ private[statuschange] trait DequeuedEventHandler[F[_]] extends DBUpdater[F, Proj
 
 private[statuschange] object DequeuedEventHandler {
 
-  def apply[F[_]: Async: Logger: QueriesExecutionTimes: MetricsRegistry]: F[DBUpdater[F, ProjectEventsToNew]] =
+  def apply[F[_]: Async: NonEmptyParallel: Logger: QueriesExecutionTimes: MetricsRegistry]
+      : F[DBUpdater[F, ProjectEventsToNew]] =
     ProjectCleaner[F].map(new DequeuedEventHandlerImpl(_))
 
   private[statuschange] class DequeuedEventHandlerImpl[F[_]: Async: Logger: QueriesExecutionTimes](

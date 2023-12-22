@@ -43,7 +43,6 @@ import io.renku.triplesgenerator.events.consumers.EventStatusUpdater
 import io.renku.triplesgenerator.events.consumers.EventStatusUpdater.{ExecutionDelay, RollbackStatus}
 import io.renku.triplesgenerator.events.consumers.awaitinggeneration.EventProcessingGenerators._
 import io.renku.triplesgenerator.events.consumers.awaitinggeneration.triplesgeneration.TriplesGenerator
-import org.scalacheck.Gen
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.concurrent.{Eventually, IntegrationPatience}
 import org.scalatest.matchers.should
@@ -61,12 +60,25 @@ class EventProcessorSpec
 
   "process" should {
 
+    "mark the event as RecoverableFailure if no access token found" in new TestCase {
+
+      val commitEvent = commitEvents.generateOne
+
+      givenFetchingAccessToken(commitEvent.project.slug).returning(None.pure[IO])
+
+      expectEventMarkedAsRecoverableFailure(commitEvent, SilentRecoverableError("No access token"))
+
+      eventProcessor.process(commitEvent).unsafeRunSync() shouldBe ()
+
+      logger.loggedOnly(Info(s"${commonLogMessage(commitEvent)} accepted"))
+    }
+
     "succeed if event is successfully turned into triples" in new TestCase {
 
       val commitEvent = commitEvents.generateOne
 
       givenFetchingAccessToken(commitEvent.project.slug)
-        .returning(maybeAccessToken.pure[IO])
+        .returning(accessToken.some.pure[IO])
 
       successfulTriplesGeneration(commitEvent -> jsonLDEntities.generateOne)
 
@@ -83,12 +95,12 @@ class EventProcessorSpec
       val commitEvent = commitEvents.generateOne
 
       givenFetchingAccessToken(forProjectSlug = commitEvent.project.slug)
-        .returning(maybeAccessToken.pure[IO])
+        .returning(accessToken.some.pure[IO])
 
       val exception = nonRecoverableMalformedRepoErrors.generateOne
       (triplesFinder
-        .generateTriples(_: CommitEvent)(_: Option[AccessToken]))
-        .expects(commitEvent, maybeAccessToken)
+        .generateTriples(_: CommitEvent)(_: AccessToken))
+        .expects(commitEvent, accessToken)
         .returning(EitherT.liftF(exception.raiseError[IO, JsonLD]))
 
       expectEventMarkedAsNonRecoverableFailure(commitEvent, exception)
@@ -102,12 +114,12 @@ class EventProcessorSpec
         val commitEvent = commitEvents.generateOne
 
         givenFetchingAccessToken(forProjectSlug = commitEvent.project.slug)
-          .returning(maybeAccessToken.pure[IO])
+          .returning(accessToken.some.pure[IO])
 
         val exception = exceptions.generateOne
         (triplesFinder
-          .generateTriples(_: CommitEvent)(_: Option[AccessToken]))
-          .expects(commitEvent, maybeAccessToken)
+          .generateTriples(_: CommitEvent)(_: AccessToken))
+          .expects(commitEvent, accessToken)
           .returning(EitherT.liftF(exception.raiseError[IO, JsonLD]))
 
         expectEventMarkedAsNonRecoverableFailure(commitEvent, exception)
@@ -122,12 +134,12 @@ class EventProcessorSpec
       val commitEvent = commitEvents.generateOne
 
       givenFetchingAccessToken(commitEvent.project.slug)
-        .returning(maybeAccessToken.pure[IO])
+        .returning(accessToken.some.pure[IO])
 
       val exception = logWorthyRecoverableErrors.generateOne
       (triplesFinder
-        .generateTriples(_: CommitEvent)(_: Option[AccessToken]))
-        .expects(commitEvent, maybeAccessToken)
+        .generateTriples(_: CommitEvent)(_: AccessToken))
+        .expects(commitEvent, accessToken)
         .returning(leftT[IO, JsonLD](exception))
 
       expectEventMarkedAsRecoverableFailure(commitEvent, exception)
@@ -143,12 +155,12 @@ class EventProcessorSpec
         val commitEvent = commitEvents.generateOne
 
         givenFetchingAccessToken(commitEvent.project.slug)
-          .returning(maybeAccessToken.pure[IO])
+          .returning(accessToken.some.pure[IO])
 
         val exception = silentRecoverableErrors.generateOne
         (triplesFinder
-          .generateTriples(_: CommitEvent)(_: Option[AccessToken]))
-          .expects(commitEvent, maybeAccessToken)
+          .generateTriples(_: CommitEvent)(_: AccessToken))
+          .expects(commitEvent, accessToken)
           .returning(leftT[IO, JsonLD](exception))
 
         expectEventMarkedAsRecoverableFailure(commitEvent, exception)
@@ -176,14 +188,14 @@ class EventProcessorSpec
 
   private trait TestCase {
 
-    val maybeAccessToken = Gen.option(accessTokens).generateOne
+    val accessToken = accessTokens.generateOne
 
     implicit val logger:  TestLogger[IO]            = TestLogger[IO]()
     private val trClient: TokenRepositoryClient[IO] = mock[TokenRepositoryClient[IO]]
-    val triplesFinder           = mock[TriplesGenerator[IO]]
-    val eventStatusUpdater      = mock[EventStatusUpdater[IO]]
-    val allEventsTimeRecorder   = TestExecutionTimeRecorder[IO](maybeHistogram = None)
-    val singleEventTimeRecorder = TestExecutionTimeRecorder[IO](maybeHistogram = None)
+    val triplesFinder                   = mock[TriplesGenerator[IO]]
+    private val eventStatusUpdater      = mock[EventStatusUpdater[IO]]
+    val allEventsTimeRecorder           = TestExecutionTimeRecorder[IO](maybeHistogram = None)
+    private val singleEventTimeRecorder = TestExecutionTimeRecorder[IO](maybeHistogram = None)
     val eventProcessor = new EventProcessorImpl(trClient,
                                                 triplesFinder,
                                                 eventStatusUpdater,
@@ -199,8 +211,8 @@ class EventProcessorSpec
     def successfulTriplesGeneration(commitAndTriples: (CommitEvent, JsonLD)) = {
       val (commit, payload) = commitAndTriples
       (triplesFinder
-        .generateTriples(_: CommitEvent)(_: Option[AccessToken]))
-        .expects(commit, maybeAccessToken)
+        .generateTriples(_: CommitEvent)(_: AccessToken))
+        .expects(commit, accessToken)
         .returning(rightT[IO, ProcessingRecoverableError](payload))
 
       expectEventMarkedAsTriplesGenerated(CompoundEventId(commit.eventId, commit.project.id),

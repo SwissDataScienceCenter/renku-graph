@@ -54,19 +54,22 @@ private class EventProcessorImpl[F[_]: MonadThrow: Logger](
 ) extends EventProcessor[F] {
 
   import EventUploadingResult._
-  import trClient._
   import entityBuilder._
   import executionTimeRecorder._
   import projectExistenceChecker._
+  import trClient._
 
   override def process(event: MinProjectInfoEvent): F[Unit] = {
-    for {
-      _                                   <- Logger[F].info(s"${prefix(event)} accepted")
-      implicit0(mat: Option[AccessToken]) <- findAccessToken(event.project.slug)
-      result                              <- measureExecutionTime(transformAndUpload(event))
-      _                                   <- logSummary(event)(result)
-      _                                   <- sendProjectActivatedEvent(event)(result)
-    } yield ()
+    Logger[F].info(s"${prefix(event)} accepted") >>
+      measureExecutionTime {
+        findAccessToken(event.project.slug).flatMap {
+          case Some(implicit0(at: AccessToken)) => transformAndUpload(event)
+          case None =>
+            val err = SilentRecoverableError("No access token")
+            logError(event)(err).as(RecoverableError(event, err).widen)
+        }
+      }.flatTap(logSummary(event))
+        .flatMap(sendProjectActivatedEvent(event))
   } recoverWith logError(event)
 
   private def logError(event: MinProjectInfoEvent): PartialFunction[Throwable, F[Unit]] = { case NonFatal(exception) =>
@@ -75,7 +78,7 @@ private class EventProcessorImpl[F[_]: MonadThrow: Logger](
 
   private def transformAndUpload(
       event: MinProjectInfoEvent
-  )(implicit mat: Option[AccessToken]): F[EventUploadingResult] =
+  )(implicit at: AccessToken): F[EventUploadingResult] =
     (buildEntity(event) leftSemiflatMap toUploadingError(event)).semiflatMap { project =>
       checkProjectExists(project.resourceId) >>= {
         case true  => Skipped(event).widen.pure[F]

@@ -34,6 +34,7 @@ import io.renku.http.client.RestClient.ResponseMappingF
 import io.renku.http.client.RestClientError.UnauthorizedException
 import io.renku.http.client.{AccessToken, GitLabClient}
 import io.renku.http.server.EndpointTester._
+import io.renku.http.tinytypes.TinyTypeURIEncoder._
 import io.renku.testtools.{GitLabClientTools, IOSpec}
 import io.renku.tokenrepository.api.TokenRepositoryClient
 import org.http4s.Status.{Forbidden, InternalServerError, NotFound, Unauthorized}
@@ -50,25 +51,34 @@ class GitLabProjectFetcherSpec
     with should.Matchers
     with GitLabClientTools[IO] {
 
+  private val apiName: String Refined NonEmpty = "single-project"
+
   "fetchGitLabProject" should {
 
     "fetches relevant project info from GitLab" in new TestCase {
 
-      givenFindAccessToken(by = projectId, returning = maybeAccessToken.pure[IO])
+      givenFindAccessToken(by = projectId, returning = accessToken.some.pure[IO])
 
       val projectSlug = projectSlugs.generateSome
-      val singleProjectEndpoint: String Refined NonEmpty = "single-project"
       (gitLabClient
         .get(_: Uri, _: String Refined NonEmpty)(
           _: ResponseMappingF[IO, Either[UnauthorizedException, Option[projects.Slug]]]
         )(_: Option[AccessToken]))
-        .expects(uri"projects" / projectId.show, singleProjectEndpoint, *, maybeAccessToken)
+        .expects(uri"projects" / projectId, apiName, *, accessToken.some)
         .returning(projectSlug.asRight.pure[IO])
 
       fetcher.fetchGitLabProject(projectId).unsafeRunSync() shouldBe projectSlug.asRight
     }
 
+    "return None if no access token found for the project" in new TestCase {
+
+      givenFindAccessToken(by = projectId, returning = None.pure[IO])
+
+      fetcher.fetchGitLabProject(projectId).unsafeRunSync() shouldBe None.asRight
+    }
+
     "fail if finding access token fails" in new TestCase {
+
       val exception = exceptions.generateOne
       givenFindAccessToken(by = projectId, returning = exception.raiseError[IO, Option[AccessToken]])
 
@@ -106,8 +116,8 @@ class GitLabProjectFetcherSpec
   }
 
   private trait TestCase {
-    implicit val maybeAccessToken: Option[AccessToken] = accessTokens.generateOption
-    val projectId = projectIds.generateOne
+    val accessToken = accessTokens.generateOne
+    val projectId   = projectIds.generateOne
 
     implicit val gitLabClient: GitLabClient[IO]          = mock[GitLabClient[IO]]
     implicit val trClient:     TokenRepositoryClient[IO] = mock[TokenRepositoryClient[IO]]
@@ -115,7 +125,7 @@ class GitLabProjectFetcherSpec
 
     lazy val mapResponse = captureMapping(gitLabClient)(
       {
-        givenFindAccessToken(by = projectId, returning = maybeAccessToken.pure[IO])
+        givenFindAccessToken(by = projectId, returning = accessToken.some.pure[IO])
         fetcher.fetchGitLabProject(projectId).unsafeRunSync()
       },
       projectSlugs.generateOption.asRight[UnauthorizedException],

@@ -18,43 +18,40 @@
 
 package io.renku.eventlog.api.events
 
-import Generators.globalCommitSyncRequests
+import Generators.cleanUpRequests
+import cats.syntax.all._
 import io.circe.literal._
 import io.circe.syntax._
 import io.renku.events.consumers.Project
 import io.renku.generators.Generators.Implicits._
 import io.renku.generators.Generators.nonEmptyStrings
-import io.renku.graph.model.RenkuTinyTypeGenerators.{projectIds, projectSlugs}
+import io.renku.graph.model.GraphModelGenerators.{projectIds, projectSlugs}
 import io.renku.graph.model.projects
 import org.scalatest.EitherValues
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
 import org.scalatestplus.scalacheck.ScalaCheckPropertyChecks
 
-class GlobalCommitSyncRequestSpec
-    extends AnyWordSpec
-    with should.Matchers
-    with EitherValues
-    with ScalaCheckPropertyChecks {
+class CleanUpRequestSpec extends AnyWordSpec with should.Matchers with EitherValues with ScalaCheckPropertyChecks {
 
   "json codec" should {
 
     "encode and decode" in {
 
-      val event = globalCommitSyncRequests.generateOne
+      val event = cleanUpRequests.generateOne
 
-      event.asJson.hcursor.as[GlobalCommitSyncRequest].value shouldBe event
+      event.asJson.hcursor.as[CleanUpRequest].value shouldBe event
     }
 
     "be able to decode json valid from the contract point of view" in {
       json"""{
-        "categoryName": "GLOBAL_COMMIT_SYNC_REQUEST",
+        "categoryName": "CLEAN_UP_REQUEST",
         "project": {
           "id":   1,
           "slug": "project/path"
         }
-      }""".hcursor.as[GlobalCommitSyncRequest].value shouldBe
-        GlobalCommitSyncRequest(
+      }""".hcursor.as[CleanUpRequest].value shouldBe
+        CleanUpRequest(
           Project(
             projects.GitLabId(1),
             projects.Slug("project/path")
@@ -71,9 +68,26 @@ class GlobalCommitSyncRequestSpec
           "id":   ${projectIds.generateOne},
           "slug": ${projectSlugs.generateOne}
         }
-      }""".hcursor.as[GlobalCommitSyncRequest]
+      }""".hcursor.as[CleanUpRequest]
 
-      result.left.value.getMessage() should include(s"Expected GLOBAL_COMMIT_SYNC_REQUEST but got $otherCategory")
+      result.left.value.getMessage() should include(s"Expected CLEAN_UP_REQUEST but got $otherCategory")
+    }
+  }
+
+  "Full.show" should {
+    "return String representation of the underlying project id and slug" in {
+      val id   = projectIds.generateOne
+      val slug = projectSlugs.generateOne
+
+      CleanUpRequest(id, slug).show shouldBe show"projectId = $id, projectSlug = $slug"
+    }
+  }
+
+  "Partial.show" should {
+    "return String representation of the underlying project slug" in {
+      val slug = projectSlugs.generateOne
+
+      CleanUpRequest(slug).show shouldBe show"projectSlug = $slug"
     }
   }
 }

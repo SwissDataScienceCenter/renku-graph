@@ -19,7 +19,7 @@
 package io.renku.eventlog.events.consumers.statuschange
 package projecteventstonew.cleaning
 
-import cats.Applicative
+import cats.{Applicative, NonEmptyParallel}
 import cats.data.Kleisli
 import cats.data.Kleisli.liftF
 import cats.effect.Async
@@ -43,7 +43,7 @@ private[statuschange] trait ProjectCleaner[F[_]] {
 }
 
 private[statuschange] object ProjectCleaner {
-  def apply[F[_]: Async: Logger: QueriesExecutionTimes: MetricsRegistry]: F[ProjectCleaner[F]] =
+  def apply[F[_]: Async: NonEmptyParallel: Logger: QueriesExecutionTimes: MetricsRegistry]: F[ProjectCleaner[F]] =
     for {
       tgClient                      <- triplesgenerator.api.events.Client[F]
       projectWebhookAndTokenRemover <- ProjectWebhookAndTokenRemover[F]
