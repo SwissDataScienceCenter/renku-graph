@@ -66,15 +66,22 @@ private class EventProcessorImpl[F[_]: MonadThrow: Logger](
           case Some(implicit0(at: AccessToken)) => transformAndUpload(event)
           case None =>
             val err = SilentRecoverableError("No access token")
-            logError(event)(err).as(RecoverableError(event, err).widen)
+            logError(event)(maybeMessage = err.getMessage.some).as(RecoverableError(event, err).widen)
         }
       }.flatTap(logSummary(event))
         .flatMap(sendProjectActivatedEvent(event))
-  } recoverWith logError(event)
+  } recoverWith errorLogging(event)
 
-  private def logError(event: MinProjectInfoEvent): PartialFunction[Throwable, F[Unit]] = { case NonFatal(exception) =>
-    Logger[F].error(exception)(show"$categoryName: $event processing failure")
+  private def errorLogging(event: MinProjectInfoEvent): PartialFunction[Throwable, F[Unit]] = { case exception =>
+    logError(event)(maybeCause = exception.some)
   }
+
+  private def logError(
+      event: MinProjectInfoEvent
+  )(maybeMessage: Option[String] = None, maybeCause: Option[Throwable] = None): F[Unit] =
+    (maybeMessage map (m => Logger[F].error(show"$categoryName: $event processing failure -> $m")))
+      .orElse(maybeCause map (Logger[F].error(_)(show"$categoryName: $event processing failure")))
+      .getOrElse(Logger[F].error(show"$categoryName: $event processing failure"))
 
   private def transformAndUpload(
       event: MinProjectInfoEvent

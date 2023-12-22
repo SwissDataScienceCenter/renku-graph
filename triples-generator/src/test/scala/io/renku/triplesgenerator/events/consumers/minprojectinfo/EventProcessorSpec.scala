@@ -63,7 +63,7 @@ class EventProcessorSpec extends AnyWordSpec with IOSpec with MockFactory with s
 
       logger.logged(
         Info(s"${commonLogMessage(event)} accepted"),
-        Error(s"${commonLogMessage(event)} processing failure", SilentRecoverableError("No access token"))
+        Error(s"${commonLogMessage(event)} processing failure -> No access token")
       )
     }
 
