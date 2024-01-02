@@ -45,7 +45,8 @@ class JenaServer(module: String, port: Int) {
                              |-d $image""".stripMargin
   private val isRunningCmd = s"docker container ls --filter 'name=$containerName'"
   private val stopCmd      = s"docker stop -t5 $containerName"
-  private val isReadyCmd   = s"docker exec curl http://localhost:3030/$$/ping --fail"
+  private val readyCmd     = "curl http://localhost:3030/$/ping --no-progress-meter --fail 1> /dev/null"
+  private val isReadyCmd   = s"docker exec $containerName sh -c '$readyCmd'"
   private var wasRunning: Boolean = false
 
   def start(): Unit =
@@ -58,6 +59,7 @@ class JenaServer(module: String, port: Int) {
       while (rc != 0) {
         Thread.sleep(500)
         rc = isReadyCmd.!
+        if (rc == 0) println(s"Jena container for module '$module' started on port $port")
       }
     }
 
