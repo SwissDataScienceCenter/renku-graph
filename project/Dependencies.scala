@@ -37,7 +37,7 @@ object Dependencies {
     val skunk                  = "0.6.2"
     val swaggerParser          = "2.1.19"
     val testContainersScala    = "0.41.0"
-    val widoco                 = "1.4.20"
+    val widoco                 = "1.4.21"
     val wiremock               = "3.3.1"
   }
 
