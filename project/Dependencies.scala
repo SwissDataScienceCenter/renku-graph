@@ -21,7 +21,7 @@ object Dependencies {
     val ip4s                   = "3.4.0"
     val jsonld4s               = "0.13.0"
     val log4cats               = "2.6.0"
-    val log4jCore              = "2.22.0"
+    val log4jCore              = "2.22.1"
     val logback                = "1.4.14"
     val luceneQueryParser      = "9.9.1"
     val owlapi                 = "5.5.0"
