@@ -27,7 +27,7 @@ import io.renku.graph.model.events.EventStatus.{GenerationNonRecoverableFailure,
 import io.renku.graph.model.events.{CompoundEventId, EventProcessingTime, EventStatus}
 import io.renku.http.client.AccessToken
 import io.renku.jsonld.JsonLD
-import io.renku.logging.ExecutionTimeRecorder
+import io.renku.logging.{ExecutionTimeRecorder, ExecutionTimeRecorderLoader}
 import io.renku.logging.ExecutionTimeRecorder.ElapsedTime
 import io.renku.metrics.{Histogram, MetricsRegistry}
 import io.renku.tokenrepository.api.TokenRepositoryClient
@@ -200,8 +200,8 @@ private object EventProcessor {
                    buckets = Seq(.1, .5, 1, 5, 10, 50, 100, 500, 1000, 5000, 10000, 50000, 100000, 500000, 1000000,
                                  5000000, 10000000, 50000000, 100000000, 500000000)
                  )
-    allEventsTimeRecorder   <- ExecutionTimeRecorder[F](maybeHistogram = Some(histogram))
-    singleEventTimeRecorder <- ExecutionTimeRecorder[F](maybeHistogram = None)
+    allEventsTimeRecorder   <- ExecutionTimeRecorderLoader[F](maybeHistogram = Some(histogram))
+    singleEventTimeRecorder <- ExecutionTimeRecorderLoader[F](maybeHistogram = None)
   } yield new EventProcessorImpl(trClient,
                                  triplesGenerator,
                                  eventStatusUpdater,

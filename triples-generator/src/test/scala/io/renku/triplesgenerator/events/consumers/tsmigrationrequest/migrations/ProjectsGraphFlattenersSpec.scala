@@ -38,6 +38,7 @@ import org.scalatest.flatspec.AsyncFlatSpec
 import org.scalatest.matchers.should
 import org.typelevel.log4cats.Logger
 import tooling.RegisteredUpdateQueryMigration
+import io.renku.graph.model.views.TinyTypeToObject._
 
 class ProjectsGraphFlattenersSpec
     extends AsyncFlatSpec

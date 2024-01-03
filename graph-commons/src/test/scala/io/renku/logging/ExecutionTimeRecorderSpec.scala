@@ -220,7 +220,7 @@ class ExecutionTimeRecorderSpec
       )
 
       implicit val logger: TestLogger[IO] = TestLogger[IO]()
-      val executionTimeRecorder = ExecutionTimeRecorder[IO](config).unsafeRunSync()
+      val executionTimeRecorder = ExecutionTimeRecorderLoader[IO](config).unsafeRunSync()
 
       val elapsedTime           = ElapsedTime(threshold.toMillis)
       val blockOut              = nonEmptyStrings().generateOne

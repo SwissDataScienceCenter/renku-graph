@@ -24,7 +24,6 @@ import eu.timepit.refined.api.Refined
 import eu.timepit.refined.auto._
 import eu.timepit.refined.collection.NonEmpty
 import io.prometheus.client.{Gauge => LibGauge}
-import io.renku.config.MetricsConfigProvider
 import io.renku.generators.Generators.Implicits._
 import io.renku.generators.Generators.exceptions
 import io.renku.interpreters.TestLogger
@@ -96,15 +95,12 @@ class GaugeResetSchedulerSpec
   private trait TestCase {
 
     implicit val logger: TestLogger[IO] = TestLogger[IO]()
-    val gauge1                = new TestLabeledGauge
-    val gauge2                = new TestLabeledGauge
-    val interval              = 100 millis
-    val metricsConfigProvider = mock[MetricsConfigProvider[IO]]
+    val gauge1   = new TestLabeledGauge
+    val gauge2   = new TestLabeledGauge
+    val interval = 100 millis
 
     def newGaugeScheduler(refreshing: LabeledGauge[IO, Double]*) =
-      new GaugeResetSchedulerImpl[IO, Double](refreshing.toList, metricsConfigProvider)
-
-    (metricsConfigProvider.getInterval _).expects().returning(interval.pure[IO]).once()
+      new GaugeResetSchedulerImpl[IO, Double](refreshing.toList, interval.pure[IO])
 
     class TestLabeledGauge extends LabeledGauge[IO, Double] with PrometheusCollector {
 

@@ -27,12 +27,13 @@ import io.renku.db.{SessionPoolResource, SessionResource}
 import io.renku.http.client.GitLabClient
 import io.renku.http.server.HttpServer
 import io.renku.logging.ApplicationLogger
-import io.renku.metrics.MetricsRegistry
-import io.renku.microservices.{IOMicroservice, ResourceUse}
+import io.renku.metrics.{MetricsRegistry, MetricsRegistryLoader}
+import io.renku.microservices.IOMicroservice
 import io.renku.tokenrepository.repository.cleanup.ExpiringTokensRemover
 import io.renku.tokenrepository.repository.init.DbInitializer
 import io.renku.tokenrepository.repository.metrics.QueriesExecutionTimes
 import io.renku.tokenrepository.repository.{ProjectsTokensDB, ProjectsTokensDbConfigProvider}
+import io.renku.utils.common.ResourceUse
 import natchez.Trace.Implicits.noop
 import org.http4s.server.Server
 import org.typelevel.log4cats.Logger
@@ -51,7 +52,7 @@ object Microservice extends IOMicroservice {
   private def runMicroservice(sessionPoolResource: Resource[IO, SessionResource[IO, ProjectsTokensDB]]) =
     sessionPoolResource.use { implicit sr =>
       for {
-        implicit0(mr: MetricsRegistry[IO])        <- MetricsRegistry[IO]()
+        implicit0(mr: MetricsRegistry[IO])        <- MetricsRegistryLoader[IO]()
         implicit0(qet: QueriesExecutionTimes[IO]) <- QueriesExecutionTimes[IO]()
         implicit0(gc: GitLabClient[IO])           <- GitLabClient[IO]()
         certificateLoader                         <- CertificateLoader[IO]

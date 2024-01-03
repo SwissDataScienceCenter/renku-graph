@@ -22,6 +22,7 @@ import ReProvisioningInfo.Status.Running
 import io.renku.graph.model.RenkuUrl
 import io.renku.graph.model.Schemas.renku
 import io.renku.graph.model.views.TinyTypeJsonLDOps
+import io.renku.util.jsonld.TinyTypeJsonLDCodec._
 import io.renku.jsonld._
 import io.renku.microservices.MicroserviceBaseUrl
 import io.renku.tinytypes.{StringTinyType, TinyTypeFactory}

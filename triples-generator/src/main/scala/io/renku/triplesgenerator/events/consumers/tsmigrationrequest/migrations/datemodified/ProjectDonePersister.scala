@@ -24,6 +24,7 @@ import io.renku.graph.config.RenkuUrlLoader
 import io.renku.graph.model.{RenkuUrl, projects}
 import io.renku.triplesstore.{MigrationsConnectionConfig, SparqlQueryTimeRecorder, TSClient}
 import org.typelevel.log4cats.Logger
+import io.renku.graph.model.views.TinyTypeToObject._
 
 private trait ProjectDonePersister[F[_]] {
   def noteDone(slug: projects.Slug): F[Unit]

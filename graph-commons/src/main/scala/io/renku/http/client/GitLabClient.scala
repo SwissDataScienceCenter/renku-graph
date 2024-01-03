@@ -32,6 +32,7 @@ import io.renku.graph.model.GitLabApiUrl
 import io.renku.http.client.HttpRequest.NamedRequest
 import io.renku.http.client.RestClient.ResponseMappingF
 import io.renku.http.rest.paging.model.{Page, Total}
+import io.renku.logging.ExecutionTimeRecorderLoader
 import io.renku.metrics.{GitLabApiCallRecorder, MetricsRegistry}
 import org.http4s.Method.{DELETE, GET, HEAD, POST, PUT}
 import org.http4s.circe.{jsonEncoder, jsonEncoderOf}
@@ -171,7 +172,7 @@ object GitLabClient {
     gitLabRateLimit <- RateLimit.fromConfig[F, GitLab]("services.gitlab.rate-limit")
     gitLabThrottler <- Throttler[F, GitLab](gitLabRateLimit)
     gitLabUrl       <- GitLabUrlLoader[F]()
-    apiCallRecorder <- GitLabApiCallRecorder[F]
+    apiCallRecorder <- GitLabApiCallRecorder[F](hg => ExecutionTimeRecorderLoader[F](maybeHistogram = Some(hg)))
   } yield new GitLabClientImpl[F](gitLabUrl.apiV4,
                                   apiCallRecorder,
                                   gitLabThrottler,

@@ -29,6 +29,7 @@ import io.renku.triplesstore.SparqlQuery.Prefixes
 import io.renku.triplesstore.client.syntax._
 import io.renku.triplesstore.{ProjectsConnectionConfig, SparqlQuery, SparqlQueryTimeRecorder, TSClient}
 import org.typelevel.log4cats.Logger
+import io.renku.graph.model.views.TinyTypeToObject._
 
 private trait SlugPersister[F[_]] {
   def persistSlug(projectInfo: ProjectInfo): F[Unit]

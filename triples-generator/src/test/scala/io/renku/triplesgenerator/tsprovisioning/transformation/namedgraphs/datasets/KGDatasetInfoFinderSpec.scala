@@ -39,6 +39,7 @@ import io.renku.triplesstore.client.model.Quad
 import io.renku.triplesstore.client.syntax._
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
+import io.renku.graph.model.views.TinyTypeToObject._
 
 class KGDatasetInfoFinderSpec
     extends AnyWordSpec

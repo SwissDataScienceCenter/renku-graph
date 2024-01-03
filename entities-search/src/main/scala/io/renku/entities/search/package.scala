@@ -25,6 +25,7 @@ import io.renku.graph.model.projects
 import io.renku.tinytypes._
 import io.renku.triplesstore.client.sparql.{Fragment, LuceneQuery, VarName}
 import io.renku.triplesstore.client.syntax._
+import io.renku.graph.model.views.TinyTypeToObject._
 
 import java.time.{Instant, ZoneOffset}
 

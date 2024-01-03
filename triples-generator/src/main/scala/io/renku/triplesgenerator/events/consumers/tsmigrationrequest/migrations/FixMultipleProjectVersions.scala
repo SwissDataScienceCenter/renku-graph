@@ -32,6 +32,7 @@ import io.renku.triplesstore.SparqlQuery.Prefixes
 import io.renku.triplesstore.client.syntax._
 import io.renku.triplesstore.{SparqlQuery, SparqlQueryTimeRecorder}
 import org.typelevel.log4cats.Logger
+import io.renku.graph.model.views.TinyTypeToObject._
 
 private object FixMultipleProjectVersions {
 

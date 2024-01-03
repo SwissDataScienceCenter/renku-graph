@@ -27,6 +27,7 @@ import io.renku.entities.viewings.collector.persons.{GLUserViewedProject, Person
 import io.renku.triplesgenerator.api.events.ProjectViewedEvent
 import io.renku.triplesstore._
 import org.typelevel.log4cats.Logger
+import io.renku.graph.model.views.TinyTypeToObject._
 
 trait EventPersister[F[_]] {
   def persist(event: ProjectViewedEvent): F[Unit]

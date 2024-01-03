@@ -31,6 +31,7 @@ import io.renku.triplesstore.SparqlQuery.Prefixes
 import io.renku.triplesstore._
 import io.renku.triplesstore.client.syntax._
 import org.typelevel.log4cats.Logger
+import io.renku.graph.model.views.TinyTypeToObject._
 
 private trait ProjectFetcher[F[_]] {
   def fetchProject(slug: projects.Slug): F[Option[Project]]

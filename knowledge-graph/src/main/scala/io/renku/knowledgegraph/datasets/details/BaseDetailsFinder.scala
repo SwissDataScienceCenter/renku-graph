@@ -38,6 +38,7 @@ import io.renku.triplesstore._
 import io.renku.triplesstore.client.sparql.{Fragment, VarName}
 import io.renku.triplesstore.client.syntax._
 import org.typelevel.log4cats.Logger
+import io.renku.graph.model.views.TinyTypeToObject._
 
 private trait BaseDetailsFinder[F[_]] {
   def findBaseDetails(identifier: RequestedDataset, authContext: AuthContext[RequestedDataset]): F[Option[Dataset]]

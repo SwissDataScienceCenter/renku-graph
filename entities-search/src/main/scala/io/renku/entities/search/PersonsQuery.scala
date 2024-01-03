@@ -26,6 +26,7 @@ import io.renku.graph.model.{GraphClass, persons, projects}
 import io.renku.http.server.security.model.AuthUser
 import io.renku.triplesstore.client.sparql.{Fragment, VarName}
 import io.renku.triplesstore.client.syntax._
+import io.renku.graph.model.views.TinyTypeToObject._
 
 private case object PersonsQuery extends EntityQuery[model.Entity.Person] {
 

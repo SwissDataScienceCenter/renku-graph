@@ -34,14 +34,15 @@ import io.renku.graph.model.{RenkuUrl, datasets, projects}
 import io.renku.http.client.GitLabClient
 import io.renku.http.server.HttpServer
 import io.renku.logging.ApplicationLogger
-import io.renku.metrics.MetricsRegistry
-import io.renku.microservices.{IOMicroservice, ResourceUse, ServiceReadinessChecker}
+import io.renku.metrics.{MetricsRegistry, MetricsRegistryLoader}
+import io.renku.microservices.{IOMicroservice, ServiceReadinessChecker}
 import io.renku.triplesgenerator.config.certificates.GitCertificateInstaller
 import io.renku.triplesgenerator.events.consumers._
 import io.renku.triplesgenerator.events.consumers.tsmigrationrequest.migrations.reprovisioning.ReProvisioningStatus
 import io.renku.triplesgenerator.init.{CliVersionCompatibilityChecker, CliVersionCompatibilityVerifier}
 import io.renku.triplesgenerator.metrics.MetricsService
 import io.renku.triplesstore.{ProjectSparqlClient, ProjectsConnectionConfig, SparqlQueryTimeRecorder}
+import io.renku.utils.common.ResourceUse
 import natchez.Trace.Implicits.noop
 import org.http4s.server.Server
 import org.typelevel.log4cats.Logger
@@ -67,7 +68,7 @@ object Microservice extends IOMicroservice {
       dbSessionPool <- Resource
                          .eval(new TgDbConfigProvider[IO].map(SessionPoolResource[IO, TgDB]))
                          .flatMap(identity)
-      implicit0(mr: MetricsRegistry[IO])           <- Resource.eval(MetricsRegistry[IO]())
+      implicit0(mr: MetricsRegistry[IO])           <- Resource.eval(MetricsRegistryLoader[IO]())
       implicit0(sqtr: SparqlQueryTimeRecorder[IO]) <- Resource.eval(SparqlQueryTimeRecorder.create[IO]())
 
       projectConnConfig <- Resource.eval(ProjectsConnectionConfig[IO](config))

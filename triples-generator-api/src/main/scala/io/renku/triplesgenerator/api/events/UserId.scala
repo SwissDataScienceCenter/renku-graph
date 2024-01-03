@@ -25,6 +25,7 @@ import io.circe.literal._
 import io.renku.graph.model.persons
 import io.renku.triplesstore.client.model.TripleObjectEncoder
 import io.renku.triplesstore.client.syntax._
+import io.renku.graph.model.views.TinyTypeToObject._
 
 sealed trait UserId extends Product {
   lazy val widen: UserId = this
