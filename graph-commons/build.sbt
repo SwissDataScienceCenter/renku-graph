@@ -18,11 +18,24 @@
 
 name := "graph-commons"
 
-Test / testOptions += Tests.Setup(postgresServer("start"))
-Test / testOptions += Tests.Cleanup(postgresServer("forceStop"))
+Test / testOptions += Tests.Setup { cl =>
+  postgresServer("start")(cl)
+  jenaServer("start")(cl)
+}
+Test / testOptions += Tests.Cleanup { cl =>
+  postgresServer("forceStop")(cl)
+  jenaServer("forceStop")(cl)
+}
 
 def postgresServer(methodName: String): ClassLoader => Unit = classLoader => {
   val clazz    = classLoader.loadClass("io.renku.db.CommonsPostgresServer$")
+  val method   = clazz.getMethod(methodName)
+  val instance = clazz.getField("MODULE$").get(null)
+  method.invoke(instance)
+}
+
+def jenaServer(methodName: String): ClassLoader => Unit = classLoader => {
+  val clazz    = classLoader.loadClass("io.renku.triplesstore.CommonsJenaServer$")
   val method   = clazz.getMethod(methodName)
   val instance = clazz.getField("MODULE$").get(null)
   method.invoke(instance)

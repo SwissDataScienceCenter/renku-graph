@@ -18,16 +18,6 @@
 
 package io.renku.triplesstore
 
-import eu.timepit.refined.auto._
-import io.renku.triplesstore.client.util.JenaRunMode
-import org.scalatest.Suite
+import io.renku.triplesstore.client.util.JenaServer
 
-/** Use this trait as a replacement for [[InMemoryJenaForSpec]] to connect to a locally/externally running Jena without 
- * starting a container.  
- */
-trait ExternalJenaForSpec extends InMemoryJenaForSpec {
-  self: Suite =>
-
-  /** Expect the external Jena instance to accept connections on the default port. */
-  override val jenaRunMode: JenaRunMode = JenaRunMode.Local(3030)
-}
+object CommonsJenaServer extends JenaServer(module = "graph_commons", port = 3042)

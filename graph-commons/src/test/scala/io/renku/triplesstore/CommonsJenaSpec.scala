@@ -16,22 +16,12 @@
  * limitations under the License.
  */
 
-package io.renku.graph.triplesstore
+package io.renku.triplesstore
 
-import cats.syntax.all._
-import io.renku.graph.triplesstore.DatasetTTLs._
-import org.scalatest.matchers.should
-import org.scalatest.wordspec.AnyWordSpec
+import io.renku.triplesstore.client.util.JenaServer
+import org.scalatest.Suite
 
-class DatasetTTLsSpec extends AnyWordSpec with should.Matchers {
-
-  "allNamesAndConfigs" should {
-
-    "return a List comprised of Renku and Migrations datasets" in {
-      DatasetTTLs.allConfigs shouldBe List(
-        ProjectsTTL.fromTtlFile(),
-        MigrationsTTL.fromTtlFile()
-      ).sequence
-    }
-  }
+trait CommonsJenaSpec extends LegacyJenaSpec {
+  self: Suite =>
+  lazy val server: JenaServer = CommonsJenaServer
 }

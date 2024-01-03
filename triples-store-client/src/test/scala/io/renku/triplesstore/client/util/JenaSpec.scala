@@ -47,12 +47,14 @@ trait JenaSpec extends BeforeAndAfterAll {
       .toResource
       .flatMap(withDS(_))
 
-  def withDS(name: String)(implicit L: Logger[IO]): Resource[IO, SparqlClient[IO]] = {
-    def datasetResource(c: FusekiClient[IO]) =
-      Resource.make(c.createDataset(DatasetDefinition.inMemory(name)))(_ => c.deleteDataset(name))
+  def withDS(name: String)(implicit L: Logger[IO]): Resource[IO, SparqlClient[IO]] =
+    withDS(DatasetDefinition.inMemory(name))
 
-    clientResource.flatMap(c => datasetResource(c).as(c.sparql(name)))
-  }
+  def withDS(dsDefinition: DatasetDefinition)(implicit L: Logger[IO]): Resource[IO, SparqlClient[IO]] =
+    clientResource.flatMap(c => datasetResource(dsDefinition)(c).as(c.sparql(dsDefinition.name)))
+
+  def datasetResource(dsDefinition: DatasetDefinition)(c: FusekiClient[IO]) =
+    Resource.make(c.createDataset(dsDefinition))(_ => c.deleteDataset(dsDefinition.name))
 
   protected override def beforeAll(): Unit = {
     super.beforeAll()

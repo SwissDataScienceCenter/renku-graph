@@ -20,8 +20,14 @@ package io.renku.http.client
 
 import io.renku.tinytypes.constraints.NonBlank
 import io.renku.tinytypes.{StringTinyType, TinyTypeFactory}
+import org.http4s.BasicCredentials
 
-case class BasicAuthCredentials(username: BasicAuthUsername, password: BasicAuthPassword)
+final case class BasicAuthCredentials(username: BasicAuthUsername, password: BasicAuthPassword)
+
+object BasicAuthCredentials {
+  def from(bac: BasicCredentials): BasicAuthCredentials =
+    BasicAuthCredentials(BasicAuthUsername(bac.username), BasicAuthPassword(bac.password))
+}
 
 class BasicAuthUsername private (val value: String) extends AnyVal with StringTinyType
 object BasicAuthUsername

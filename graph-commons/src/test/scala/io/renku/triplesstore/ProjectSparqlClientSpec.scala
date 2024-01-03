@@ -30,31 +30,30 @@ import io.renku.logging.TestExecutionTimeRecorder
 import io.renku.metrics.MetricsTools._
 import io.renku.metrics._
 import io.renku.triplesstore.client.syntax._
-import io.renku.triplesstore.client.util.JenaContainerSupport
 import org.scalatest.flatspec.AsyncFlatSpec
 import org.scalatest.matchers.should
 import org.typelevel.log4cats.Logger
 
-class ProjectSparqlClientSpec extends AsyncFlatSpec with AsyncIOSpec with JenaContainerSupport with should.Matchers {
+class ProjectSparqlClientSpec extends AsyncFlatSpec with AsyncIOSpec with CommonsJenaSpec with should.Matchers {
   implicit val logger: Logger[IO] = TestLogger()
 
   private val makeHistogram: IO[LabeledHistogram[IO] with PrometheusCollector] = IO {
     new LabeledHistogramImpl[IO]("test", "test", "update", Seq(0.5d, 0.8d).some, maybeThreshold = None)
   }
 
-  def makeSparqlQueryTimeRecorder(h: Histogram[IO]): SparqlQueryTimeRecorder[IO] =
+  private def makeSparqlQueryTimeRecorder(h: Histogram[IO]): SparqlQueryTimeRecorder[IO] =
     new SparqlQueryTimeRecorder[IO](TestExecutionTimeRecorder[IO](Some(h)))
 
-  def withProjectClient(implicit sqr: SparqlQueryTimeRecorder[IO]) =
-    withDataset("projects").map(ProjectSparqlClient.apply(_))
+  private def withProjectsDSClient(implicit sqr: SparqlQueryTimeRecorder[IO]) =
+    projectsDSResource.map(ProjectSparqlClient.apply(_))
 
-  def assertSampled(histogram: PrometheusCollector) =
+  private def assertSampled(histogram: PrometheusCollector) =
     histogram.collectAllSamples.size should be > 0
 
-  def assertNotSampled(histogram: PrometheusCollector) =
+  private def assertNotSampled(histogram: PrometheusCollector) =
     histogram.collectAllSamples.size shouldBe 0
 
-  def resetHistogram(histogram: PrometheusCollector) = {
+  private def resetHistogram(histogram: PrometheusCollector) = {
     histogram.clear()
     assertNotSampled(histogram)
   }
@@ -62,7 +61,7 @@ class ProjectSparqlClientSpec extends AsyncFlatSpec with AsyncIOSpec with JenaCo
   it should "measure execution time for named queries" in {
     val histogram = makeHistogram.unsafeRunSync()
     implicit val sr: SparqlQueryTimeRecorder[IO] = makeSparqlQueryTimeRecorder(histogram)
-    withProjectClient.use { c =>
+    withProjectsDSClient.use { c =>
       for {
         _ <- IO(assertNotSampled(histogram))
         up = SparqlQuery.apply(
@@ -102,7 +101,7 @@ class ProjectSparqlClientSpec extends AsyncFlatSpec with AsyncIOSpec with JenaCo
     val histogram = makeHistogram.unsafeRunSync()
     implicit val sr: SparqlQueryTimeRecorder[IO] = makeSparqlQueryTimeRecorder(histogram)
 
-    withProjectClient.use { c =>
+    withProjectsDSClient.use { c =>
       for {
         _ <- IO(assertNotSampled(histogram))
 

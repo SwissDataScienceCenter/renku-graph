@@ -36,7 +36,7 @@ private trait DatasetsCreator[F[_]] extends Migration[F]
 private object DatasetsCreator {
   def apply[F[_]: Async: Logger: SparqlQueryTimeRecorder]: F[Migration[F]] = for {
     tsAdminClient  <- TSAdminClient[F]
-    datasetConfigs <- MonadThrow[F].fromEither(DatasetTTLs.allNamesAndConfigs)
+    datasetConfigs <- MonadThrow[F].fromEither(DatasetTTLs.allConfigs)
   } yield new DatasetsCreatorImpl[F](datasetConfigs, tsAdminClient)
 }
 

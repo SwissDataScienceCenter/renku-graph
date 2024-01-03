@@ -26,7 +26,7 @@ import io.renku.interpreters.TestLogger
 import io.renku.logging.TestSparqlQueryTimeRecorder
 import io.renku.projectauth.{Generators, ProjectAuthServiceSupport}
 import io.renku.testtools.CustomAsyncIOSpec
-import io.renku.triplesstore.SparqlQueryTimeRecorder
+import io.renku.triplesstore.{CommonsJenaSpec, SparqlQueryTimeRecorder}
 import org.scalatest.flatspec.AsyncFlatSpec
 import org.scalatest.matchers.should
 import org.typelevel.log4cats.Logger
@@ -34,6 +34,7 @@ import org.typelevel.log4cats.Logger
 class ProjectAuthRecordsFinderSpec
     extends AsyncFlatSpec
     with CustomAsyncIOSpec
+    with CommonsJenaSpec
     with ProjectAuthServiceSupport
     with should.Matchers {
   implicit val logger:   Logger[IO]                  = TestLogger[IO]()

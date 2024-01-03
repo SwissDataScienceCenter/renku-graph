@@ -142,7 +142,7 @@ class DatasetConnectionConfigSpec extends AnyWordSpec with ScalaCheckPropertyChe
           ).asJava
         )
 
-        val Success(actual) = ProjectsConnectionConfig[Try](config)
+        val Success(actual) = ProjectsConnectionConfig.fromConfig[Try](config)
 
         actual.fusekiUrl                shouldBe storeConfig.fusekiUrl
         actual.datasetName              shouldBe DatasetName("projects")
@@ -166,7 +166,7 @@ class DatasetConnectionConfigSpec extends AnyWordSpec with ScalaCheckPropertyChe
         ).asJava
       )
 
-      val Failure(exception) = ProjectsConnectionConfig[Try](config)
+      val Failure(exception) = ProjectsConnectionConfig.fromConfig[Try](config)
 
       exception shouldBe an[ConfigLoadingException]
     }
@@ -186,7 +186,7 @@ class DatasetConnectionConfigSpec extends AnyWordSpec with ScalaCheckPropertyChe
         ).asJava
       )
 
-      val Failure(exception) = ProjectsConnectionConfig[Try](config)
+      val Failure(exception) = ProjectsConnectionConfig.fromConfig[Try](config)
 
       exception shouldBe an[ConfigLoadingException]
     }
@@ -206,7 +206,7 @@ class DatasetConnectionConfigSpec extends AnyWordSpec with ScalaCheckPropertyChe
         ).asJava
       )
 
-      val Failure(exception) = ProjectsConnectionConfig[Try](config)
+      val Failure(exception) = ProjectsConnectionConfig.fromConfig[Try](config)
 
       exception shouldBe an[ConfigLoadingException]
     }
