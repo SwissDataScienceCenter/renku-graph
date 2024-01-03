@@ -30,6 +30,8 @@ trait FusekiClient[F[_]] {
 
   def createDataset(name: String, persistent: Boolean): F[Unit]
 
+  def createDataset(definition: DatasetDefinition): F[Unit]
+
   def deleteDataset(name: String): F[Unit]
 
   def datasetExists(name: String): F[Boolean]

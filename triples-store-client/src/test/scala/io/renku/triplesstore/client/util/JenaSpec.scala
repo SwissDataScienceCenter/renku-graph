@@ -18,38 +18,49 @@
 
 package io.renku.triplesstore.client.util
 
-import cats.effect.IO
-import cats.effect.kernel.Resource
+import cats.effect.std.Random
+import cats.effect.{IO, Resource}
 import cats.syntax.all._
-import com.dimafeng.testcontainers.ForAllTestContainer
-import io.renku.triplesstore.client.http.{ConnectionConfig, FusekiClient, SparqlClient}
-import org.http4s.{BasicCredentials, Uri}
-import org.scalatest.Suite
+import io.renku.triplesstore.client.http.{ConnectionConfig, DatasetDefinition, FusekiClient, SparqlClient}
+import org.http4s.BasicCredentials
+import org.scalatest.{BeforeAndAfterAll, Suite}
 import org.typelevel.log4cats.Logger
 
 import scala.concurrent.duration._
 
-trait JenaContainerSupport extends ForAllTestContainer { self: Suite =>
+trait JenaSpec extends BeforeAndAfterAll {
+  self: Suite =>
 
-  protected val runMode: JenaRunMode = JenaRunMode.GenericContainer
-  protected val timeout: Duration    = 2.minutes
-
-  lazy val container = JenaContainer.create(runMode)
-
-  protected lazy val jenaUri: Uri = JenaContainer.fusekiUri(runMode, container)
+  def server:            JenaServer
+  protected val timeout: Duration = 2.minutes
 
   def clientResource(implicit L: Logger[IO]): Resource[IO, FusekiClient[IO]] = {
-    val cc = ConnectionConfig(jenaUri, Some(BasicCredentials("admin", "admin")), None)
+    val cc = ConnectionConfig(server.ccConfig.baseUrl, Some(BasicCredentials("admin", "admin")), retry = None)
     FusekiClient[IO](cc, timeout)
   }
 
-  def sparqlResource(datasetName: String)(implicit L: Logger[IO]): Resource[IO, SparqlClient[IO]] =
-    clientResource.map(_.sparql(datasetName))
+  def testDSResource(implicit L: Logger[IO]): Resource[IO, SparqlClient[IO]] =
+    Random
+      .scalaUtilRandom[IO]
+      .flatMap(_.nextIntBounded(1000))
+      .map(v => s"${getClass.getSimpleName.toLowerCase}_$v")
+      .toResource
+      .flatMap(withDS(_))
 
-  def withDataset(name: String)(implicit L: Logger[IO]): Resource[IO, SparqlClient[IO]] = {
+  def withDS(name: String)(implicit L: Logger[IO]): Resource[IO, SparqlClient[IO]] = {
     def datasetResource(c: FusekiClient[IO]) =
-      Resource.make(c.createDataset(name, persistent = false))(_ => c.deleteDataset(name))
+      Resource.make(c.createDataset(DatasetDefinition.inMemory(name)))(_ => c.deleteDataset(name))
 
     clientResource.flatMap(c => datasetResource(c).as(c.sparql(name)))
+  }
+
+  protected override def beforeAll(): Unit = {
+    super.beforeAll()
+    server.start()
+  }
+
+  protected override def afterAll(): Unit = {
+    server.stop()
+    super.afterAll()
   }
 }
