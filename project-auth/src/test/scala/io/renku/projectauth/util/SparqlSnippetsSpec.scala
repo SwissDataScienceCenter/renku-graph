@@ -33,12 +33,10 @@ import org.scalatest.matchers.should
 import org.typelevel.log4cats.Logger
 import org.typelevel.log4cats.slf4j.Slf4jLogger
 
-class SparqlSnippetsSpec extends AsyncFlatSpec with AsyncIOSpec with ProjectAuthServiceSupport with should.Matchers {
+class SparqlSnippetsSpec extends AsyncFlatSpec with AsyncIOSpec with ProjectAuthJenaSpec with should.Matchers {
 
   implicit val logger:   Logger[IO] = Slf4jLogger.getLogger[IO]
   implicit val renkuUrl: RenkuUrl   = RenkuUrl("http://localhost/renku")
-
-  override val datasetName = "sparqlsnippetspec"
 
   def randomData(num: Int) = Generators.projectAuthDataGen.asStream.take(num)
 
@@ -63,7 +61,7 @@ class SparqlSnippetsSpec extends AsyncFlatSpec with AsyncIOSpec with ProjectAuth
             |ORDER BY ?slug
             |""".stripMargin
 
-  def clientAndData = withDataset(datasetName).evalMap { sc =>
+  private def clientAndData = testDSResource.evalMap { sc =>
     val pa = ProjectAuthService(sc, renkuUrl)
     insertData(pa, randomData(10)).map(data => (sc, data))
   }
@@ -148,7 +146,7 @@ class SparqlSnippetsSpec extends AsyncFlatSpec with AsyncIOSpec with ProjectAuth
   }
 
   it should "select possible projects when no members exist" in {
-    def clientAndData = withDataset(datasetName).evalMap { sc =>
+    def clientAndData = testDSResource.evalMap { sc =>
       val pa = ProjectAuthService(sc, renkuUrl)
       insertData(pa, randomData(10).map(_.copy(members = Set.empty))).map(data => (sc, data))
     }
