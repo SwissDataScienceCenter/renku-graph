@@ -35,6 +35,7 @@ import org.scalatest.matchers.should
 import org.typelevel.log4cats.Logger
 
 class ProjectSparqlClientSpec extends AsyncFlatSpec with AsyncIOSpec with CommonsJenaSpec with should.Matchers {
+
   implicit val logger: Logger[IO] = TestLogger()
 
   private val makeHistogram: IO[LabeledHistogram[IO] with PrometheusCollector] = IO {

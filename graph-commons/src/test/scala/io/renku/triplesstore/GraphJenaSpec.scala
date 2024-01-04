@@ -18,10 +18,9 @@
 
 package io.renku.triplesstore
 
-import io.renku.triplesstore.client.util.JenaServer
+import io.renku.triplesstore.client.util.JenaSpec
 import org.scalatest.Suite
 
-trait CommonsJenaSpec extends GraphJenaSpec {
+trait GraphJenaSpec extends JenaSpec with TSProjectsDataset with TSMigrationsDataset {
   self: Suite =>
-  lazy val server: JenaServer = CommonsJenaServer
 }
