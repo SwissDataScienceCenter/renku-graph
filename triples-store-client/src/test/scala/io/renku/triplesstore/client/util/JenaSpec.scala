@@ -21,23 +21,12 @@ package io.renku.triplesstore.client.util
 import cats.effect.std.Random
 import cats.effect.{IO, Resource}
 import cats.syntax.all._
-import io.renku.triplesstore.client.http.{ConnectionConfig, DatasetDefinition, FusekiClient, SparqlClient}
-import org.http4s.BasicCredentials
+import io.renku.triplesstore.client.http.{DatasetDefinition, FusekiClient, SparqlClient}
 import org.scalatest.{BeforeAndAfterAll, Suite}
 import org.typelevel.log4cats.Logger
 
-import scala.concurrent.duration._
-
-trait JenaSpec extends BeforeAndAfterAll {
+trait JenaSpec extends BeforeAndAfterAll with JenaServerSupport {
   self: Suite =>
-
-  def server:            JenaServer
-  protected val timeout: Duration = 2.minutes
-
-  def clientResource(implicit L: Logger[IO]): Resource[IO, FusekiClient[IO]] = {
-    val cc = ConnectionConfig(server.ccConfig.baseUrl, Some(BasicCredentials("admin", "admin")), retry = None)
-    FusekiClient[IO](cc, timeout)
-  }
 
   def testDSResource(implicit L: Logger[IO]): Resource[IO, SparqlClient[IO]] =
     Random
