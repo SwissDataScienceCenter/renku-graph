@@ -99,7 +99,7 @@ private[migrations] object AddProjectSlug {
     projectsFinder       <- ProjectsPageFinder[F]
     progressFinder       <- ProgressFinder[F]
     projectFetcher       <- ProjectFetcher[F]
-    datePersister        <- ProjectsConnectionConfig[F]().map(SlugPersister[F](_))
+    datePersister        <- ProjectsConnectionConfig.fromConfig[F]().map(SlugPersister[F](_))
     projectDonePersister <- ProjectDonePersister[F]
     executionRegister    <- MigrationExecutionRegister[F]
   } yield new AddProjectSlug(checkMigrationNeeded,

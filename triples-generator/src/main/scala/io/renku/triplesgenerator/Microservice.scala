@@ -70,7 +70,7 @@ object Microservice extends IOMicroservice {
       implicit0(mr: MetricsRegistry[IO])           <- Resource.eval(MetricsRegistry[IO]())
       implicit0(sqtr: SparqlQueryTimeRecorder[IO]) <- Resource.eval(SparqlQueryTimeRecorder.create[IO]())
 
-      projectConnConfig <- Resource.eval(ProjectsConnectionConfig[IO](config))
+      projectConnConfig <- Resource.eval(ProjectsConnectionConfig.fromConfig[IO](config))
       projectsSparql    <- ProjectSparqlClient[IO](projectConnConfig)
     } yield (config, dbSessionPool, projectsSparql, mr, sqtr)
 
@@ -97,7 +97,7 @@ object Microservice extends IOMicroservice {
     tsWriteLock   = TgDB.createLock[IO, projects.Slug](sessionResource, 0.5.seconds)
     categoryLock  = TgDB.createLock[IO, CategoryName](sessionResource, 0.5.seconds)
     topSameAsLock = TgDB.createLock[IO, datasets.TopmostSameAs](sessionResource, 0.5.seconds)
-    projectConnConfig              <- ProjectsConnectionConfig[IO](config)
+    projectConnConfig              <- ProjectsConnectionConfig.fromConfig[IO](config)
     certificateLoader              <- CertificateLoader[IO]
     gitCertificateInstaller        <- GitCertificateInstaller[IO]
     sentryInitializer              <- SentryInitializer[IO]

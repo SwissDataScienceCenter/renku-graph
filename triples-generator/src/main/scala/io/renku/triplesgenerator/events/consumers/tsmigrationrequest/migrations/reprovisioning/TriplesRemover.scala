@@ -75,5 +75,5 @@ private object TriplesRemoverImpl {
 
   def apply[F[_]: Async: Logger: SparqlQueryTimeRecorder](
       config: Config = ConfigFactory.load()
-  ): F[TriplesRemover[F]] = ProjectsConnectionConfig[F](config).map(new TriplesRemoverImpl(_))
+  ): F[TriplesRemover[F]] = ProjectsConnectionConfig.fromConfig[F](config).map(new TriplesRemoverImpl(_))
 }

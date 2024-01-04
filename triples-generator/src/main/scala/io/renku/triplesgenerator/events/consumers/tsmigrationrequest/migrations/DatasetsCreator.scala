@@ -41,7 +41,7 @@ private object DatasetsCreator {
 }
 
 private class DatasetsCreatorImpl[F[_]: MonadThrow: Logger](
-    datasets:         List[(DatasetName, DatasetConfigFile)],
+    datasets:         List[DatasetConfigFile],
     tsAdminClient:    TSAdminClient[F],
     recoveryStrategy: RecoverableErrorsRecovery = RecoverableErrorsRecovery
 ) extends DatasetsCreator[F] {
@@ -57,8 +57,8 @@ private class DatasetsCreatorImpl[F[_]: MonadThrow: Logger](
 
   override def run(): EitherT[F, ProcessingRecoverableError, Unit] = EitherT {
     datasets
-      .map { case (datasetName, datasetConfig) =>
-        createDataset(datasetConfig) >>= logSuccess(datasetName)
+      .map { datasetConfig =>
+        createDataset(datasetConfig) >>= logSuccess(datasetConfig.datasetName)
       }
       .sequence
       .void

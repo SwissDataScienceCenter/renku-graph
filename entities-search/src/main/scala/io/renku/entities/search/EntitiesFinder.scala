@@ -39,7 +39,7 @@ object EntitiesFinder {
   private[search] val finders = List(ProjectsQuery, DatasetsQuery, WorkflowsQuery, PersonsQuery)
 
   def apply[F[_]: Async: NonEmptyParallel: Logger: SparqlQueryTimeRecorder]: F[EntitiesFinder[F]] =
-    ProjectsConnectionConfig[F]().map(new EntitiesFinderImpl(_, finders))
+    ProjectsConnectionConfig.fromConfig[F]().map(new EntitiesFinderImpl(_, finders))
 }
 
 private class EntitiesFinderImpl[F[_]: Async: NonEmptyParallel: Logger: SparqlQueryTimeRecorder](

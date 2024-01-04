@@ -44,7 +44,7 @@ private object SearchGraphsProvisioner {
   def default[F[_]: Async: Logger: SparqlQueryTimeRecorder](
       topSameAsLock: Lock[F, datasets.TopmostSameAs]
   ): F[SearchGraphsProvisioner[F]] =
-    ProjectsConnectionConfig[F]().map(apply(topSameAsLock, _))
+    ProjectsConnectionConfig.fromConfig[F]().map(apply(topSameAsLock, _))
 }
 
 private class SearchGraphsProvisionerImpl[F[_]: MonadThrow](

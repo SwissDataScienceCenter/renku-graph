@@ -137,5 +137,5 @@ private class KGProjectFinderImpl[F[_]: Async: Logger: SparqlQueryTimeRecorder](
 
 private object KGProjectFinder {
   def apply[F[_]: Async: Logger: SparqlQueryTimeRecorder]: F[KGProjectFinder[F]] =
-    ProjectsConnectionConfig[F]().map(new KGProjectFinderImpl(_))
+    ProjectsConnectionConfig.fromConfig[F]().map(new KGProjectFinderImpl(_))
 }

@@ -45,7 +45,7 @@ object DatasetsGraphProvisioner {
   def default[F[_]: Async: Logger: SparqlQueryTimeRecorder](
       lock: Lock[F, datasets.TopmostSameAs]
   ): F[DatasetsGraphProvisioner[F]] =
-    ProjectsConnectionConfig[F]().map(apply(lock, _))
+    ProjectsConnectionConfig.fromConfig[F]().map(apply(lock, _))
 }
 
 private class DatasetsGraphProvisionerImpl[F[_]: Async](tsSearchInfoFetcher: TSSearchInfoFetcher[F],

@@ -42,7 +42,7 @@ private object ProjectCreator {
       projectSparqlClient: ProjectSparqlClient[F]
   )(implicit renkuUrl: RenkuUrl): F[ProjectCreator[F]] =
     for {
-      connectionConfig <- ProjectsConnectionConfig[F]()
+      connectionConfig <- ProjectsConnectionConfig.fromConfig[F]()
       payloadConverter <- PayloadConverter[F]
       tsProvisioner    <- TSProvisioner[F](topSameAsLock, projectSparqlClient)
     } yield new ProjectCreatorImpl[F](ProjectExistenceChecker[F](connectionConfig),

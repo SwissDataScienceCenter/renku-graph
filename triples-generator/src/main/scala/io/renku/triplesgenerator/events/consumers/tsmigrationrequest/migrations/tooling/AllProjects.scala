@@ -37,7 +37,7 @@ trait AllProjects[F[_]] {
 
 object AllProjects {
   def create[F[_]: Async: Logger: SparqlQueryTimeRecorder]: F[AllProjects[F]] =
-    ProjectsConnectionConfig[F]().map(apply[F])
+    ProjectsConnectionConfig.fromConfig[F]().map(apply[F])
 
   final case class ProjectMetadata(slug: ProjectSlug)
 

@@ -119,5 +119,5 @@ private object EntityCount {
 
 private object StatsFinder {
   def apply[F[_]: Async: Logger: SparqlQueryTimeRecorder]: F[StatsFinder[F]] =
-    ProjectsConnectionConfig[F]().map(new StatsFinderImpl[F](_))
+    ProjectsConnectionConfig.fromConfig[F]().map(new StatsFinderImpl[F](_))
 }

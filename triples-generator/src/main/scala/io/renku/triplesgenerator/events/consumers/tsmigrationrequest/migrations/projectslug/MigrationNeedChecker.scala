@@ -37,7 +37,7 @@ private trait MigrationNeedChecker[F[_]] {
 
 private object MigrationNeedChecker {
   def apply[F[_]: Async: Logger: SparqlQueryTimeRecorder]: F[MigrationNeedChecker[F]] =
-    ProjectsConnectionConfig[F]().map(TSClient[F](_)).map(new MigrationNeedCheckerImpl[F](_))
+    ProjectsConnectionConfig.fromConfig[F]().map(TSClient[F](_)).map(new MigrationNeedCheckerImpl[F](_))
 }
 
 private class MigrationNeedCheckerImpl[F[_]: MonadThrow](tsClient: TSClient[F]) extends MigrationNeedChecker[F] {

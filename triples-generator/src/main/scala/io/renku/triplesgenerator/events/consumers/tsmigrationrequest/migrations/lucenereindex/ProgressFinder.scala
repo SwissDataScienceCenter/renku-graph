@@ -39,7 +39,7 @@ private trait ProgressFinder[F[_]] {
 private object ProgressFinder {
   def apply[F[_]: Async: Logger: SparqlQueryTimeRecorder](migrationName: Migration.Name): F[ProgressFinder[F]] = for {
     implicit0(ru: RenkuUrl) <- RenkuUrlLoader[F]()
-    migrationsDSClient      <- MigrationsConnectionConfig[F]().map(TSClient[F](_))
+    migrationsDSClient      <- MigrationsConnectionConfig.fromConfig[F]().map(TSClient[F](_))
   } yield new ProgressFinderImpl[F](migrationName, migrationsDSClient)
 }
 

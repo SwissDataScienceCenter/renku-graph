@@ -39,7 +39,7 @@ private trait TSDataFinder[F[_]] {
 
 private object TSDataFinder {
   def apply[F[_]: Async: Logger: SparqlQueryTimeRecorder](config: Config): F[TSDataFinder[F]] =
-    ProjectsConnectionConfig[F](config).map(TSClient[F](_)).map(new TSDataFinderImpl(_))
+    ProjectsConnectionConfig.fromConfig[F](config).map(TSClient[F](_)).map(new TSDataFinderImpl(_))
 }
 
 private class TSDataFinderImpl[F[_]: MonadThrow](tsClient: TSClient[F]) extends TSDataFinder[F] {

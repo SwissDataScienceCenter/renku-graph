@@ -100,7 +100,7 @@ private[migrations] object ProvisionProjectsGraph {
     projectsFinder           <- ProjectsPageFinder[F]
     progressFinder           <- ProgressFinder[F]
     projectFetcher           <- ProjectFetcher[F]
-    projectsGraphProvisioner <- ProjectsConnectionConfig[F]().map(ProjectsGraphProvisioner[F](_))
+    projectsGraphProvisioner <- ProjectsConnectionConfig.fromConfig[F]().map(ProjectsGraphProvisioner[F](_))
     projectDonePersister     <- ProjectDonePersister[F]
     executionRegister        <- MigrationExecutionRegister[F]
   } yield new ProvisionProjectsGraph(checkMigrationNeeded,

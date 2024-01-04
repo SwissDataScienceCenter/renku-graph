@@ -223,6 +223,6 @@ private object KGProjectFinder {
 
   def apply[F[_]: Async: Logger: SparqlQueryTimeRecorder]: F[KGProjectFinder[F]] = for {
     implicit0(renkuUrl: RenkuUrl) <- RenkuUrlLoader[F]()
-    storeConfig                   <- ProjectsConnectionConfig[F]()
+    storeConfig                   <- ProjectsConnectionConfig.fromConfig[F]()
   } yield new KGProjectFinderImpl(storeConfig)
 }

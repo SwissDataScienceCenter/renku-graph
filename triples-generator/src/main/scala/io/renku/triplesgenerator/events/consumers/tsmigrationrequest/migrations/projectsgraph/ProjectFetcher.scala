@@ -38,7 +38,7 @@ private trait ProjectFetcher[F[_]] {
 
 private object ProjectFetcher {
   def apply[F[_]: Async: Logger: SparqlQueryTimeRecorder]: F[ProjectFetcher[F]] =
-    ProjectsConnectionConfig[F]().map(TSClient[F](_)).map(new ProjectFetcherImpl[F](_))
+    ProjectsConnectionConfig.fromConfig[F]().map(TSClient[F](_)).map(new ProjectFetcherImpl[F](_))
 }
 
 private class ProjectFetcherImpl[F[_]: Async](tsClient: TSClient[F]) extends ProjectFetcher[F] {

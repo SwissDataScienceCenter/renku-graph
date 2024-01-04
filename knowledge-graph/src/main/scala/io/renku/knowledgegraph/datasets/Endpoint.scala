@@ -106,7 +106,7 @@ class EndpointImpl[F[_]: Parallel: MonadThrow: Logger](
 object Endpoint {
 
   def apply[F[_]: Parallel: Async: Logger: SparqlQueryTimeRecorder]: F[Endpoint[F]] = for {
-    storeConfig           <- ProjectsConnectionConfig[F]()
+    storeConfig           <- ProjectsConnectionConfig.fromConfig[F]()
     renkuResourceUrl      <- renku.ApiUrl[F]()
     gitLabUrl             <- GitLabUrlLoader[F]()
     executionTimeRecorder <- ExecutionTimeRecorder[F]()

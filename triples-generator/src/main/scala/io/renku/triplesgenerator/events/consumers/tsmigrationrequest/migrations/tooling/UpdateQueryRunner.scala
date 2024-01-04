@@ -38,7 +38,7 @@ private class UpdateQueryRunnerImpl[F[_]: Async: Logger: SparqlQueryTimeRecorder
 private[migrations] object UpdateQueryRunner {
 
   def apply[F[_]: Async: Logger: SparqlQueryTimeRecorder]: F[UpdateQueryRunner[F]] =
-    ProjectsConnectionConfig[F]().map(new UpdateQueryRunnerImpl(_))
+    ProjectsConnectionConfig.fromConfig[F]().map(new UpdateQueryRunnerImpl(_))
 
   def apply[F[_]: Async: Logger: SparqlQueryTimeRecorder](
       storeConfig: ProjectsConnectionConfig

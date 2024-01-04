@@ -235,7 +235,7 @@ class DatasetConnectionConfigSpec extends AnyWordSpec with ScalaCheckPropertyChe
           ).asJava
         )
 
-        val Success(actual) = MigrationsConnectionConfig[Try](config)
+        val Success(actual) = MigrationsConnectionConfig.fromConfig[Try](config)
 
         actual.fusekiUrl                shouldBe storeConfig.fusekiUrl
         actual.datasetName              shouldBe DatasetName("migrations")

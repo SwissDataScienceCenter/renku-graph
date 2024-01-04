@@ -30,7 +30,7 @@ private trait ProjectExistenceChecker[F[_]] {
 
 private object ProjectExistenceChecker {
   def apply[F[_]: Async: Logger: SparqlQueryTimeRecorder]: F[ProjectExistenceChecker[F]] =
-    ProjectsConnectionConfig[F]().map(TSClient[F](_)).map(new ProjectExistenceCheckerImpl[F](_))
+    ProjectsConnectionConfig.fromConfig[F]().map(TSClient[F](_)).map(new ProjectExistenceCheckerImpl[F](_))
 }
 
 private class ProjectExistenceCheckerImpl[F[_]](tsClient: TSClient[F]) extends ProjectExistenceChecker[F] {

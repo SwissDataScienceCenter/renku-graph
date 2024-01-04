@@ -30,7 +30,7 @@ private trait KGInfoFinder[F[_]] {
 
 private object KGInfoFinder {
   def apply[F[_]: Async: Logger: SparqlQueryTimeRecorder]: F[KGInfoFinder[F]] =
-    ProjectsConnectionConfig[F]().map(new KGInfoFinderImpl(_))
+    ProjectsConnectionConfig.fromConfig[F]().map(new KGInfoFinderImpl(_))
 }
 
 private class KGInfoFinderImpl[F[_]: Async: Logger: SparqlQueryTimeRecorder](storeConfig: ProjectsConnectionConfig)

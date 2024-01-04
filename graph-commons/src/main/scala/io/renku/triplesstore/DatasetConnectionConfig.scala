@@ -80,19 +80,16 @@ object ProjectsConnectionConfig {
 
 final case class MigrationsConnectionConfig(
     fusekiUrl:       FusekiUrl,
-    authCredentials: BasicAuthCredentials
-) extends DatasetConnectionConfig {
-  val datasetName: DatasetName = MigrationsConnectionConfig.MigrationsDS
-}
+    authCredentials: BasicAuthCredentials,
+    datasetName:     DatasetName = DatasetName("migrations")
+) extends DatasetConnectionConfig
 
 object MigrationsConnectionConfig {
-
-  val MigrationsDS: DatasetName = DatasetName("migrations")
 
   import io.renku.config.ConfigLoader._
   import io.renku.http.client.BasicAuthConfigReaders._
 
-  def apply[F[_]: MonadThrow](config: Config = ConfigFactory.load()): F[MigrationsConnectionConfig] = for {
+  def fromConfig[F[_]: MonadThrow](config: Config = ConfigFactory.load()): F[MigrationsConnectionConfig] = for {
     url      <- find[F, FusekiUrl]("services.fuseki.url", config)
     username <- find[F, BasicAuthUsername]("services.fuseki.admin.username", config)
     password <- find[F, BasicAuthPassword]("services.fuseki.admin.password", config)

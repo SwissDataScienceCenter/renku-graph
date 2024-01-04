@@ -40,7 +40,7 @@ private trait ProjectsPageFinder[F[_]] {
 private object ProjectsPageFinder {
   def apply[F[_]: Async: Logger: SparqlQueryTimeRecorder]: F[ProjectsPageFinder[F]] = for {
     implicit0(ru: RenkuUrl) <- RenkuUrlLoader[F]()
-    recordsFinder           <- MigrationsConnectionConfig[F]().map(RecordsFinder[F](_))
+    recordsFinder           <- MigrationsConnectionConfig.fromConfig[F]().map(RecordsFinder[F](_))
   } yield new ProjectsPageFinderImpl(recordsFinder)
 }
 

@@ -161,7 +161,7 @@ object ReProvisioningStatus {
   def apply[F[_]](implicit ev: ReProvisioningStatus[F]): ReProvisioningStatus[F] = ev
 
   def apply[F[_]: Async: Parallel: Logger: SparqlQueryTimeRecorder](): F[ReProvisioningStatus[F]] = for {
-    storeConfig                   <- MigrationsConnectionConfig[F]()
+    storeConfig                   <- MigrationsConnectionConfig.fromConfig[F]()
     implicit0(renkuUrl: RenkuUrl) <- RenkuUrlLoader[F]()
     subscriptionsRegistry         <- Ref.of(List.empty[SubscriptionMechanism[F]])
     lastCacheCheckTimeRef         <- Ref.of[F, Long](0)

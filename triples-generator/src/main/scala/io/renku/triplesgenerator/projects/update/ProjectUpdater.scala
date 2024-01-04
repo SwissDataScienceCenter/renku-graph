@@ -45,7 +45,7 @@ private object ProjectUpdater {
   }
 
   def apply[F[_]: Async: Logger: SparqlQueryTimeRecorder](tsWriteLock: TsWriteLock[F]): F[ProjectUpdater[F]] = for {
-    connectionConfig <- ProjectsConnectionConfig[F]()
+    connectionConfig <- ProjectsConnectionConfig.fromConfig[F]()
     projectExistenceChecker = ProjectExistenceChecker[F](connectionConfig)
     updateQueriesCalculator <- UpdateQueriesCalculator[F]()
   } yield new ProjectUpdaterImpl[F](projectExistenceChecker,

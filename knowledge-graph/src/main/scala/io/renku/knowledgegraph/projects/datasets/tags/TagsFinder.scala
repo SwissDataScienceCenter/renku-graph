@@ -35,7 +35,7 @@ private trait TagsFinder[F[_]] {
 
 private object TagsFinder {
   def apply[F[_]: Async: NonEmptyParallel: Logger: SparqlQueryTimeRecorder](implicit ru: RenkuUrl): F[TagsFinder[F]] =
-    ProjectsConnectionConfig[F]().map(new TagsFinderImpl(_))
+    ProjectsConnectionConfig.fromConfig[F]().map(new TagsFinderImpl(_))
 }
 
 private class TagsFinderImpl[F[_]: Async: NonEmptyParallel: Logger: SparqlQueryTimeRecorder](
