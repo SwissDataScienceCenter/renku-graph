@@ -22,7 +22,6 @@ import cats.syntax.all._
 import cats.{MonadThrow, Order, Show}
 import io.circe.{Encoder, Json}
 import io.renku.tinytypes.constraints.PathSegment
-import io.renku.triplesstore.client.model.{TripleObject, TripleObjectEncoder}
 
 import java.time.{Duration, Instant, LocalDate}
 
@@ -81,7 +80,7 @@ abstract class TinyTypeFactory[TT <: TinyType](instantiate: TT#V => TT)
     with Constraints[TT]
     with ValueTransformation[TT#V]
     with TinyTypeOrdering[TT]
-    with TypeName {
+    with TypeName { self =>
 
   import scala.util.Try
 
@@ -96,6 +95,10 @@ abstract class TinyTypeFactory[TT <: TinyType](instantiate: TT#V => TT)
     transformed <- transform(value) leftMap flattenErrors
     validated   <- validate(transformed)
   } yield validated
+
+  implicit val ttFrom: From[TT] = new From[TT] {
+    override def from(value: TT#V): Either[IllegalArgumentException, TT] = self.from(value)
+  }
 
   private def validate(value: TT#V): Either[IllegalArgumentException, TT] = {
     val maybeErrors = validateConstraints(value)
@@ -117,6 +120,7 @@ trait Renderer[View, -T] {
   def render(value: T): String
 }
 
+//TODO maybe its better (more flexible) to use this as a type class instead of inheriting it into the companion objects
 trait From[TT <: TinyType] {
   def from(value: TT#V): Either[IllegalArgumentException, TT]
 }
@@ -133,8 +137,6 @@ trait TinyTypeConversions[TT <: TinyType] {
 
     def showAs[View](implicit renderer: Renderer[View, TT]): String = renderer.render(tinyType)
 
-    def asObject(implicit valueEncoder: TripleObjectEncoder[TT#V]): TripleObject =
-      valueEncoder(tinyType.value)
   }
 }
 

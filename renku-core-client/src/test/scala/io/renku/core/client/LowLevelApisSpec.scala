@@ -29,6 +29,7 @@ import io.renku.generators.CommonGraphGenerators.userAccessTokens
 import io.renku.generators.Generators.Implicits._
 import io.renku.graph.model.GraphModelGenerators.{cliVersions, projectSchemaVersions}
 import io.renku.graph.model.RenkuTinyTypeGenerators.projectGitHttpUrls
+import io.renku.http.client.GitLabClientMappings
 import io.renku.interpreters.TestLogger
 import io.renku.stubbing.ExternalServiceStubbing
 import io.renku.testtools.CustomAsyncIOSpec
@@ -46,7 +47,8 @@ class LowLevelApisSpec
     with OptionValues
     with EitherValues
     with ExternalServiceStubbing
-    with AsyncMockFactory {
+    with AsyncMockFactory
+    with GitLabClientMappings {
 
   "getApiVersion" should {
 

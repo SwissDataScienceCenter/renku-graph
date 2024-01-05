@@ -29,7 +29,7 @@ import io.renku.graph.config.{GitLabUrlLoader, RenkuUrlLoader}
 import io.renku.graph.http.server.security.Authorizer.AuthContext
 import io.renku.graph.model.{GitLabUrl, RenkuUrl}
 import io.renku.http.rest.Links.Href
-import io.renku.logging.ExecutionTimeRecorder
+import io.renku.logging.{ExecutionTimeRecorder, ExecutionTimeRecorderLoader}
 import io.renku.metrics.MetricsRegistry
 import io.renku.triplesgenerator
 import io.renku.triplesgenerator.api.events.DatasetViewedEvent
@@ -97,7 +97,7 @@ object Endpoint {
   def apply[F[_]: Async: Logger: SparqlQueryTimeRecorder: MetricsRegistry]: F[Endpoint[F]] = for {
     datasetFinder                        <- DatasetFinder[F]
     tgClient                             <- triplesgenerator.api.events.Client[F]
-    executionTimeRecorder                <- ExecutionTimeRecorder[F]()
+    executionTimeRecorder                <- ExecutionTimeRecorderLoader[F]()
     implicit0(renkuApiUrl: renku.ApiUrl) <- renku.ApiUrl[F]()
     implicit0(renkuUrl: RenkuUrl)        <- RenkuUrlLoader[F]()
     implicit0(gitLabUrl: GitLabUrl)      <- GitLabUrlLoader[F]()

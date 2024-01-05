@@ -26,17 +26,18 @@ import eu.timepit.refined.collection.NonEmpty
 import eu.timepit.refined.numeric.NonNegative
 import io.circe.Json
 import io.renku.config.GitLab
-import io.renku.control.{RateLimit, Throttler}
+import io.renku.control.{RateLimitLoader, Throttler}
 import io.renku.graph.config.GitLabUrlLoader
 import io.renku.graph.model.GitLabApiUrl
 import io.renku.http.client.HttpRequest.NamedRequest
 import io.renku.http.client.RestClient.ResponseMappingF
 import io.renku.http.rest.paging.model.{Page, Total}
+import io.renku.logging.ExecutionTimeRecorderLoader
 import io.renku.metrics.{GitLabApiCallRecorder, MetricsRegistry}
 import org.http4s.Method.{DELETE, GET, HEAD, POST, PUT}
 import org.http4s.circe.{jsonEncoder, jsonEncoderOf}
 import org.http4s.multipart.Multipart
-import org.http4s.{EntityEncoder, Method, Response, Uri}
+import org.http4s.{EntityEncoder, Method, Request, Response, Uri}
 import org.typelevel.ci._
 import org.typelevel.log4cats.Logger
 
@@ -136,7 +137,7 @@ final class GitLabClientImpl[F[_]: Async: Logger](
   private def secureNamedRequest(method: Method, uri: Uri, endpointName: String Refined NonEmpty)(implicit
       maybeAccessToken: Option[AccessToken]
   ): F[NamedRequest[F]] = HttpRequest(
-    super.secureRequest(method, uri),
+    secureRequest(method, uri),
     endpointName
   ).pure[F]
 
@@ -157,6 +158,10 @@ final class GitLabClientImpl[F[_]: Async: Logger](
       .map(originalRequest =>
         originalRequest.copy(request = originalRequest.request.withEntity(payload).putHeaders(payload.headers))
       )
+
+  def secureRequest(method: Method, uri: Uri)(implicit
+      maybeAccessToken: Option[AccessToken]
+  ): Request[F] = GitLabClient.request[F](method, uri, maybeAccessToken)
 }
 
 object GitLabClient {
@@ -168,10 +173,10 @@ object GitLabClient {
       maxRetries:             Int Refined NonNegative = RestClient.MaxRetriesAfterConnectionTimeout,
       requestTimeoutOverride: Option[Duration] = None
   ): F[GitLabClientImpl[F]] = for {
-    gitLabRateLimit <- RateLimit.fromConfig[F, GitLab]("services.gitlab.rate-limit")
+    gitLabRateLimit <- RateLimitLoader.fromConfig[F, GitLab]("services.gitlab.rate-limit")
     gitLabThrottler <- Throttler[F, GitLab](gitLabRateLimit)
     gitLabUrl       <- GitLabUrlLoader[F]()
-    apiCallRecorder <- GitLabApiCallRecorder[F]
+    apiCallRecorder <- GitLabApiCallRecorder[F](hg => ExecutionTimeRecorderLoader[F](maybeHistogram = Some(hg)))
   } yield new GitLabClientImpl[F](gitLabUrl.apiV4,
                                   apiCallRecorder,
                                   gitLabThrottler,
@@ -197,4 +202,24 @@ object GitLabClient {
       .map(MonadThrow[F].fromEither(_))
       .sequence
   }
+
+  // --- intermediate place
+
+  private def request[F[_]](method: Method, uri: Uri, accessToken: AccessToken): Request[F] =
+    Request[F](
+      method = method,
+      uri = uri,
+      headers = accessToken.asAuthHeader
+    )
+
+  def request[F[_]](method: Method, uri: Uri, maybeAccessToken: Option[AccessToken]): Request[F] =
+    maybeAccessToken match {
+      case Some(accessToken) => request[F](method, uri, accessToken)
+      case _ =>
+        Request[F](
+          method = method,
+          uri = uri
+        )
+    }
+
 }

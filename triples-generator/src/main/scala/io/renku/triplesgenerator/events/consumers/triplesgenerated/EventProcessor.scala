@@ -27,7 +27,7 @@ import io.renku.graph.model.events.{EventProcessingTime, EventStatus}
 import io.renku.graph.model.{RenkuUrl, datasets}
 import io.renku.http.client.{AccessToken, GitLabClient}
 import io.renku.lock.Lock
-import io.renku.logging.ExecutionTimeRecorder
+import io.renku.logging.{ExecutionTimeRecorder, ExecutionTimeRecorderLoader}
 import io.renku.logging.ExecutionTimeRecorder.ElapsedTime
 import io.renku.metrics.{Histogram, MetricsRegistry}
 import io.renku.tokenrepository.api.TokenRepositoryClient
@@ -208,7 +208,7 @@ private object EventProcessor {
                                buckets = Seq(.1, .5, 1, 5, 10, 50, 100, 500, 1000, 5000, 10000, 50000, 100000, 500000,
                                              1000000, 5000000, 10000000, 50000000, 100000000, 500000000)
                              )
-    executionTimeRecorder <- ExecutionTimeRecorder[F](maybeHistogram = Some(eventsProcessingTimes))
+    executionTimeRecorder <- ExecutionTimeRecorderLoader[F](maybeHistogram = Some(eventsProcessingTimes))
     entityBuilder         <- EntityBuilder[F]
   } yield new EventProcessorImpl(trClient, tsProvisioner, eventStatusUpdater, entityBuilder, executionTimeRecorder)
 }

@@ -99,8 +99,6 @@ private class EdgesFinderImpl[F[_]: Async: Logger: SparqlQueryTimeRecorder](
   private implicit val edgesDecoder: Decoder[Set[EdgeData]] = {
     import io.renku.tinytypes.json.TinyTypeDecoders._
 
-    implicit val locationDecoder: Decoder[Node.Location] = stringDecoder(Node.Location)
-
     implicit lazy val edgeDecoder: Decoder[EdgeData] = { cursor =>
       for {
         activityId     <- cursor.downField("activity").downField("value").as[EntityId]

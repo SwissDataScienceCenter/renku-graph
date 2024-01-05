@@ -18,6 +18,7 @@
 
 package io.renku.triplesstore.client
 
+import io.renku.tinytypes.TinyType
 import io.renku.triplesstore.client.model._
 import io.renku.triplesstore.client.sparql.{Fragment, SparqlEncoder, StringInterpolator}
 
@@ -33,4 +34,9 @@ object syntax extends TripleObjectEncoder.Instances with SparqlEncoder.Instances
   }
 
   final implicit class FragmentStringContext(private val sc: StringContext) extends StringInterpolator(sc)
+
+  final implicit class TinyTypeAsObject[TT <: TinyType](self: TT) {
+    def asObject(implicit valueEncoder: TripleObjectEncoder[TT#V]): TripleObject =
+      valueEncoder(self.value)
+  }
 }

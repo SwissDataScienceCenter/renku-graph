@@ -32,7 +32,7 @@ import io.renku.http.rest.Links._
 import io.renku.http.rest.SortBy.Direction
 import io.renku.http.rest.Sorting
 import io.renku.http.rest.paging.{PagingHeaders, PagingRequest, PagingResponse}
-import io.renku.logging.ExecutionTimeRecorder
+import io.renku.logging.{ExecutionTimeRecorder, ExecutionTimeRecorderLoader}
 import io.renku.triplesstore.{ProjectsConnectionConfig, SparqlQueryTimeRecorder}
 import org.http4s.dsl.Http4sDsl
 import org.http4s.{Header, Request, Response}
@@ -114,7 +114,7 @@ object Endpoint {
     implicit0(gitLabUrl: GitLabUrl)      <- GitLabUrlLoader[F]()
     implicit0(renkuApiUrl: renku.ApiUrl) <- renku.ApiUrl[F]()
     renkuConnectionConfig                <- ProjectsConnectionConfig[F]()
-    executionTimeRecorder                <- ExecutionTimeRecorder[F]()
+    executionTimeRecorder                <- ExecutionTimeRecorderLoader[F]()
   } yield new EndpointImpl[F](ProjectDatasetsFinder(renkuConnectionConfig), executionTimeRecorder)
 
   def href(renkuApiUrl: renku.ApiUrl, projectSlug: projects.Slug): Href =
