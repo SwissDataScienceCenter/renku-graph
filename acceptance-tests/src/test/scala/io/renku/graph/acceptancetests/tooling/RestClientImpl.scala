@@ -22,7 +22,7 @@ import cats.effect.IO
 import cats.effect.unsafe.IORuntime
 import eu.timepit.refined.auto._
 import io.renku.control.Throttler
-import io.renku.http.client.{AccessToken, RestClient}
+import io.renku.http.client.{AccessToken, GitLabClient, RestClient}
 import org.http4s._
 import org.typelevel.log4cats.Logger
 
@@ -38,7 +38,7 @@ class RestClientImpl(implicit logger: Logger[IO])
 
   def GET(url: String, accessToken: AccessToken)(implicit ioRuntime: IORuntime): IO[Response[IO]] = for {
     uri      <- validateUri(url)
-    response <- send(request(Method.GET, uri, accessToken))(mapResponse)
+    response <- send(GitLabClient.request[IO](Method.GET, uri, Some(accessToken)))(mapResponse)
   } yield response
 
   private lazy val mapResponse: PartialFunction[(Status, Request[IO], Response[IO]), IO[Response[IO]]] = {

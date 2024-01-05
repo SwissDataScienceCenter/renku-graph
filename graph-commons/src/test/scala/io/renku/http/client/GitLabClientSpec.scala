@@ -60,7 +60,8 @@ class GitLabClientSpec
     with should.Matchers
     with TryValues
     with TableDrivenPropertyChecks
-    with MockFactory {
+    with MockFactory
+    with GitLabClientMappings {
 
   "get" should {
 

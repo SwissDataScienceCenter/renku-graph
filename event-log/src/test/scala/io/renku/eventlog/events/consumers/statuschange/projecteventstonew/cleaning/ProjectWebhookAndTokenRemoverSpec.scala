@@ -28,7 +28,7 @@ import io.renku.generators.Generators.Implicits._
 import io.renku.generators.Generators.exceptions
 import io.renku.graph.model.projects
 import io.renku.graph.webhookservice.WebhookServiceUrl
-import io.renku.http.client.AccessToken
+import io.renku.http.client.{AccessToken, GitLabClientMappings}
 import io.renku.interpreters.TestLogger
 import io.renku.interpreters.TestLogger.Level.Warn
 import io.renku.stubbing.ExternalServiceStubbing
@@ -44,6 +44,7 @@ class ProjectWebhookAndTokenRemoverSpec
     with ExternalServiceStubbing
     with IOSpec
     with MockFactory
+    with GitLabClientMappings
     with should.Matchers {
 
   "removeWebhookAndToken" should {

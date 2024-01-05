@@ -71,7 +71,9 @@ lazy val commonUtils = project
         Dependencies.refined ++
         Dependencies.log4Cats ++
         Dependencies.monocle ++
-        Dependencies.ip4s
+        Dependencies.ip4s,
+    libraryDependencies ++=
+      Dependencies.scalamock.map(_ % Test)
   )
   .dependsOn(tinyTypes % "compile->compile;test->test")
 
@@ -119,9 +121,14 @@ lazy val http4sClientUtils = project
     libraryDependencies ++=
       Dependencies.http4sClient ++
         Dependencies.http4sCirce ++
-        Dependencies.http4sDsl
+        Dependencies.http4sDsl,
+    libraryDependencies ++=
+      (Dependencies.wiremock ++ Dependencies.scalamock).map(_ % Test)
   )
-  .dependsOn(commonUtils % "compile->compile;test->test")
+  .dependsOn(
+    commonUtils % "compile->compile;test->test",
+    metricUtils % "compile->compile;test->test"
+  )
 
 lazy val http4sServerUtils = project
   .in(file("utils/http4s-server"))

@@ -25,7 +25,7 @@ import io.renku.control.Throttler
 import io.renku.data.Message
 import io.renku.data.MessageCodecs._
 import io.renku.graph.model.projects
-import io.renku.http.client.{AccessToken, RestClient}
+import io.renku.http.client.{AccessToken, GitLabClient, RestClient}
 import io.renku.http.tinytypes.TinyTypeURIEncoder._
 import io.renku.metrics.MetricsRegistry
 import io.renku.webhookservice.api.WebhookServiceClient.Result
@@ -71,7 +71,7 @@ private class WebhookServiceClientImpl[F[_]: Async: Logger](wsUri: Uri)
     with Http4sClientDsl[F] {
 
   override def createHook(projectId: projects.GitLabId, accessToken: AccessToken): F[Result[HookCreationResult]] =
-    send(request(POST, wsUri / "projects" / projectId / "webhooks", accessToken)) {
+    send(GitLabClient.request[F](POST, wsUri / "projects" / projectId / "webhooks", accessToken.some)) {
       case (Ok, _, _)       => Result.success(HookCreationResult.Existed.widen).pure[F]
       case (Created, _, _)  => Result.success(HookCreationResult.Created.widen).pure[F]
       case (NotFound, _, _) => Result.success(HookCreationResult.NotFound.widen).pure[F]

@@ -32,12 +32,3 @@ class BasicAuthPassword private (val value: String) extends AnyVal with StringTi
 object BasicAuthPassword
     extends TinyTypeFactory[BasicAuthPassword](new BasicAuthPassword(_))
     with NonBlank[BasicAuthPassword]
-
-object BasicAuthConfigReaders {
-
-  import io.renku.config.ConfigLoader._
-  import pureconfig.ConfigReader
-
-  implicit val usernameReader: ConfigReader[BasicAuthUsername] = stringTinyTypeReader(BasicAuthUsername)
-  implicit val passwordReader: ConfigReader[BasicAuthPassword] = stringTinyTypeReader(BasicAuthPassword)
-}

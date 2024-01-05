@@ -32,7 +32,7 @@ import io.renku.control.Throttler
 import io.renku.graph.acceptancetests.tooling.ServiceClient.ClientResponse
 import io.renku.graph.model.events.{EventId, EventStatus}
 import io.renku.graph.model.projects
-import io.renku.http.client.{AccessToken, BasicAuthCredentials, RestClient}
+import io.renku.http.client.{AccessToken, BasicAuthCredentials, GitLabClient, RestClient}
 import io.renku.http.tinytypes.TinyTypeURIEncoder._
 import io.renku.webhookservice.crypto.HookTokenCrypto
 import io.renku.webhookservice.model.HookToken
@@ -203,7 +203,7 @@ abstract class ServiceClient(implicit logger: Logger[IO])
   def POST(url: String, accessToken: AccessToken)(implicit ioRuntime: IORuntime): ClientResponse = {
     for {
       uri      <- validateUri(s"$baseUrl/$url")
-      response <- send(request(Method.POST, uri, accessToken))(mapResponse)
+      response <- send(GitLabClient.request[IO](Method.POST, uri, accessToken.some))(mapResponse)
     } yield response
   }.unsafeRunSync()
 
@@ -212,7 +212,7 @@ abstract class ServiceClient(implicit logger: Logger[IO])
   ): Status = {
     validateUri(s"$baseUrl/$url") >>=
       (url =>
-        send(request(Method.POST, url, maybeAccessToken).withEntity(payload)) { case (status, _, _) =>
+        send(GitLabClient.request[IO](Method.POST, url, maybeAccessToken).withEntity(payload)) { case (status, _, _) =>
           status.pure[IO]
         }
       )
@@ -223,8 +223,9 @@ abstract class ServiceClient(implicit logger: Logger[IO])
   ): Status = {
     for {
       uri <- validateUri(s"$baseUrl/$url")
-      status <- send(request(Method.PUT, uri, maybeAccessToken) withEntity payload) { case (status, _, _) =>
-                  status.pure[IO]
+      status <- send(GitLabClient.request[IO](Method.PUT, uri, maybeAccessToken) withEntity payload) {
+                  case (status, _, _) =>
+                    status.pure[IO]
                 }
     } yield status
   }.unsafeRunSync()
@@ -239,14 +240,14 @@ abstract class ServiceClient(implicit logger: Logger[IO])
   def DELETE(url: String, accessToken: AccessToken)(implicit ioRuntime: IORuntime): ClientResponse = {
     for {
       uri      <- validateUri(s"$baseUrl/$url")
-      response <- send(request(Method.DELETE, uri, accessToken.some))(mapResponse)
+      response <- send(GitLabClient.request[IO](Method.DELETE, uri, accessToken.some))(mapResponse)
     } yield response
   }.unsafeRunSync()
 
   def GET(url: String, accessToken: AccessToken)(implicit ioRuntime: IORuntime): ClientResponse = {
     for {
       uri      <- validateUri(s"$baseUrl/$url")
-      response <- send(request(Method.GET, uri, accessToken.some))(mapResponse)
+      response <- send(GitLabClient.request[IO](Method.GET, uri, accessToken.some))(mapResponse)
     } yield response
   }.unsafeRunSync()
 

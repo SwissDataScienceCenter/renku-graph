@@ -25,7 +25,7 @@ import io.circe.syntax._
 import io.renku.control.Throttler
 import io.renku.graph.model.projects
 import io.renku.graph.model.projects.GitLabId
-import io.renku.http.client.{AccessToken, RestClient}
+import io.renku.http.client.{AccessToken, GitLabClient, RestClient}
 import io.renku.http.tinytypes.TinyTypeURIEncoder._
 import org.http4s.Uri
 import org.http4s.circe.CirceEntityCodec._
@@ -68,7 +68,7 @@ private class TokenRepositoryClientImpl[F[_]: Async: Logger](trUri: Uri)
     }
 
   override def removeAccessToken(projectId: GitLabId, maybeAccessToken: Option[AccessToken]): F[Unit] = {
-    val req = secureRequest(DELETE, trUri / "projects" / projectId / "tokens")(maybeAccessToken)
+    val req = GitLabClient.request[F](DELETE, trUri / "projects" / projectId / "tokens", maybeAccessToken)
     send(req) { case (NoContent, _, _) => ().pure[F] }
   }
 

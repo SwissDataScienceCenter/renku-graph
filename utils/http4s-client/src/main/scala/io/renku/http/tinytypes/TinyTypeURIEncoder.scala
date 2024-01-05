@@ -19,8 +19,8 @@
 package io.renku.http.tinytypes
 
 import io.renku.tinytypes.TinyType
-import org.http4s.{QueryParamEncoder, Uri}
 import org.http4s.Uri.Path.SegmentEncoder
+import org.http4s.{QueryParamEncoder, Uri}
 
 object TinyTypeURIEncoder extends TinyTypeURIEncoder
 

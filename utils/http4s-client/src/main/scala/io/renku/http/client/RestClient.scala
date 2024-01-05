@@ -67,23 +67,6 @@ abstract class RestClient[F[_]: Async: Logger, ThrottlingTarget](
     uri = uri
   )
 
-  protected def request(method: Method, uri: Uri, accessToken: AccessToken): Request[F] =
-    Request[F](
-      method = method,
-      uri = uri,
-      headers = accessToken.asAuthHeader
-    )
-
-  protected def request(method: Method, uri: Uri, maybeAccessToken: Option[AccessToken]): Request[F] =
-    maybeAccessToken match {
-      case Some(accessToken) => request(method, uri, accessToken)
-      case _                 => request(method, uri)
-    }
-
-  protected def secureRequest(method: Method, uri: Uri)(implicit
-      maybeAccessToken: Option[AccessToken]
-  ): Request[F] = request(method, uri, maybeAccessToken)
-
   protected def request(method: Method, uri: Uri, basicAuth: BasicAuthCredentials): Request[F] =
     Request[F](
       method = method,

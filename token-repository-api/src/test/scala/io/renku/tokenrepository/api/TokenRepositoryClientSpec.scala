@@ -27,7 +27,7 @@ import io.renku.data.Message
 import io.renku.generators.CommonGraphGenerators.{accessTokens, personalAccessTokens, projectAccessTokens, userOAuthAccessTokens}
 import io.renku.generators.Generators.Implicits._
 import io.renku.graph.model.RenkuTinyTypeGenerators.{projectIds, projectSlugs}
-import io.renku.http.client.{AccessToken, UrlEncoder}
+import io.renku.http.client.{AccessToken, GitLabClientMappings, UrlEncoder}
 import io.renku.interpreters.TestLogger
 import io.renku.stubbing.ExternalServiceStubbing
 import io.renku.testtools.CustomAsyncIOSpec
@@ -40,7 +40,8 @@ class TokenRepositoryClientSpec
     extends AsyncWordSpec
     with CustomAsyncIOSpec
     with should.Matchers
-    with ExternalServiceStubbing {
+    with ExternalServiceStubbing
+    with GitLabClientMappings {
 
   private implicit val logger: Logger[IO] = TestLogger()
   private val client = new TokenRepositoryClientImpl[IO](Uri.unsafeFromString(externalServiceBaseUrl))

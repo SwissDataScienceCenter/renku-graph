@@ -23,7 +23,7 @@ import cats.effect.Clock
 import cats.syntax.all._
 import eu.timepit.refined.api.Refined
 import eu.timepit.refined.collection.NonEmpty
-import io.renku.generators.CommonGraphGenerators.elapsedTimes
+import io.renku.CommonGenerators
 import io.renku.generators.Generators.Implicits._
 import io.renku.logging.ExecutionTimeRecorder.ElapsedTime
 import io.renku.metrics.Histogram
@@ -34,7 +34,7 @@ object TestExecutionTimeRecorder {
   def apply[F[_]: MonadThrow: Logger: Clock](
       maybeHistogram: Option[Histogram[F]] = None
   ): TestExecutionTimeRecorder[F] =
-    new TestExecutionTimeRecorder[F](threshold = elapsedTimes.generateOne, maybeHistogram)
+    new TestExecutionTimeRecorder[F](threshold = CommonGenerators.elapsedTimes.generateOne, maybeHistogram)
 }
 
 class TestExecutionTimeRecorder[F[_]: MonadThrow: Clock: Logger](

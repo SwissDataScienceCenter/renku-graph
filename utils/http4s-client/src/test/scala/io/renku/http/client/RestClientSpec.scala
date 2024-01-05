@@ -27,7 +27,6 @@ import eu.timepit.refined.api.Refined
 import eu.timepit.refined.auto._
 import eu.timepit.refined.collection.NonEmpty
 import io.circe.{Decoder, DecodingFailure, Json}
-import io.renku.config.ServiceUrl
 import io.renku.control.Throttler
 import io.renku.generators.Generators.Implicits._
 import io.renku.generators.Generators._
@@ -44,6 +43,7 @@ import io.renku.tinytypes.contenttypes.ZippedContent
 import org.http4s.MediaType._
 import org.http4s.Method.{GET, POST}
 import org.http4s.circe.jsonOf
+import org.http4s.implicits._
 import org.http4s.{multipart => _, _}
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.OptionValues
@@ -250,7 +250,7 @@ class RestClientSpec
       val exceptionMessage = "Connection refused"
 
       val exception = intercept[ConnectivityException] {
-        new TestRestClient(ServiceUrl("http://localhost:1024"), Throttler.noThrottling, None)
+        new TestRestClient(uri"http://localhost:1024", Throttler.noThrottling, None)
           .callRemote(mapResponseToInt)
           .unsafeRunSync()
       }
@@ -400,13 +400,13 @@ class RestClientSpec
         .returning(().pure[IO])
   }
 
-  private lazy val hostUrl = ServiceUrl(externalServiceBaseUrl)
+  private lazy val hostUrl = Uri.unsafeFromString(externalServiceBaseUrl)
 
   lazy val mapResponseToInt: PartialFunction[(Status, Request[IO], Response[IO]), IO[Int]] = {
     case (Status.Ok, _, response) => response.as[String].map(_.toInt)
   }
 
-  private class TestRestClient(hostUrl:                     ServiceUrl,
+  private class TestRestClient(hostUrl:                     Uri,
                                throttler:                   Throttler[IO, Any],
                                maybeTimeRecorder:           Option[ExecutionTimeRecorder[IO]],
                                idleTimeoutOverride:         Option[Duration] = None,
@@ -421,12 +421,12 @@ class RestClientSpec
       ) {
 
     def callRemote[O](mapping: PartialFunction[(Status, Request[IO], Response[IO]), IO[O]]): IO[O] = for {
-      uri         <- validateUri(s"$hostUrl/resource")
+      uri         <- validateUri(s"${hostUrl.renderString}/resource")
       accessToken <- send(request(GET, uri))(mapping)
     } yield accessToken
 
     def callRemote(requestName: String Refined NonEmpty): IO[Int] = for {
-      uri         <- validateUri(s"$hostUrl/resource")
+      uri         <- validateUri(s"${hostUrl.renderString}/resource")
       accessToken <- send(HttpRequest(request(GET, uri), requestName))(mapResponseToInt)
     } yield accessToken
 

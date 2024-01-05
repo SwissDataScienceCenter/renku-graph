@@ -20,11 +20,10 @@ package io.renku.logging
 
 import cats.effect.{IO, Temporal}
 import cats.syntax.all._
-import com.typesafe.config.ConfigFactory
 import eu.timepit.refined.api.Refined
 import eu.timepit.refined.auto._
 import eu.timepit.refined.collection.NonEmpty
-import io.renku.generators.CommonGraphGenerators._
+import io.renku.CommonGenerators
 import io.renku.generators.Generators.Implicits._
 import io.renku.generators.Generators._
 import io.renku.interpreters.TestLogger
@@ -32,14 +31,12 @@ import io.renku.interpreters.TestLogger.Level.Warn
 import io.renku.logging.ExecutionTimeRecorder.ElapsedTime
 import io.renku.metrics.Histogram
 import io.renku.testtools.CustomAsyncIOSpec
-import org.scalacheck.Gen.finiteDuration
 import org.scalamock.scalatest.AsyncMockFactory
 import org.scalatest.BeforeAndAfterEach
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AsyncWordSpec
 
 import scala.concurrent.duration._
-import scala.jdk.CollectionConverters._
 
 class ExecutionTimeRecorderSpec
     extends AsyncWordSpec
@@ -126,15 +123,14 @@ class ExecutionTimeRecorderSpec
 
     "log warning with the phrase returned from the given partial function if it gets applied " +
       "and the elapsed time is >= threshold" in {
-        import executionTimeRecorder._
 
-        val elapsedTime           = elapsedTimes.retryUntil(_.value >= loggingThreshold.value).generateOne
-        val blockOut              = nonEmptyStrings().generateOne
+        val elapsedTime = CommonGenerators.elapsedTimes.retryUntil(_.value >= loggingThreshold.value).generateOne
+        val blockOut    = nonEmptyStrings().generateOne
         val blockExecutionMessage = "block executed"
 
         (elapsedTime -> blockOut)
           .pure[IO]
-          .flatMap(logExecutionTimeWhen { case _ =>
+          .flatMap(executionTimeRecorder.logExecutionTimeWhen { case _ =>
             blockExecutionMessage
           })
           .asserting(_ shouldBe blockOut) >>
@@ -143,7 +139,6 @@ class ExecutionTimeRecorderSpec
 
     "not log a message if the given partial function does get applied " +
       "but the elapsed time is < threshold" in {
-        import executionTimeRecorder._
 
         val elapsedTime           = ElapsedTime(loggingThreshold.value - 1)
         val blockOut              = nonEmptyStrings().generateOne
@@ -151,7 +146,7 @@ class ExecutionTimeRecorderSpec
 
         (elapsedTime -> blockOut)
           .pure[IO]
-          .flatMap(logExecutionTimeWhen { case _ =>
+          .flatMap(executionTimeRecorder.logExecutionTimeWhen { case _ =>
             blockExecutionMessage
           })
           .asserting(_ shouldBe blockOut) >>
@@ -159,15 +154,14 @@ class ExecutionTimeRecorderSpec
       }
 
     "not log a message if the given partial function does not get applied" in {
-      import executionTimeRecorder._
 
-      val elapsedTime           = elapsedTimes.generateOne
+      val elapsedTime           = CommonGenerators.elapsedTimes.generateOne
       val blockOut              = nonEmptyStrings().generateOne
       val blockExecutionMessage = "block executed"
 
       (elapsedTime -> blockOut)
         .pure[IO]
-        .flatMap(logExecutionTimeWhen { case "" =>
+        .flatMap(executionTimeRecorder.logExecutionTimeWhen { case "" =>
           blockExecutionMessage
         })
         .asserting(_ shouldBe blockOut) >>
@@ -178,21 +172,19 @@ class ExecutionTimeRecorderSpec
   "logExecutionTime" should {
 
     "log warning with the given phrase when elapsed time is >= threshold" in {
-      import executionTimeRecorder._
 
-      val elapsedTime           = elapsedTimes.retryUntil(_.value >= loggingThreshold.value).generateOne
-      val blockOut              = nonEmptyStrings().generateOne
+      val elapsedTime = CommonGenerators.elapsedTimes.retryUntil(_.value >= loggingThreshold.value).generateOne
+      val blockOut    = nonEmptyStrings().generateOne
       val blockExecutionMessage = "block executed"
 
       (elapsedTime -> blockOut)
         .pure[IO]
-        .flatMap(logExecutionTime(blockExecutionMessage))
+        .flatMap(executionTimeRecorder.logExecutionTime(blockExecutionMessage))
         .asserting(_ shouldBe blockOut) >>
         logger.loggedOnlyF(Warn(s"$blockExecutionMessage in ${elapsedTime}ms"))
     }
 
     "not log a message if the elapsed time is < threshold" in {
-      import executionTimeRecorder._
 
       val elapsedTime           = ElapsedTime(loggingThreshold.value - 1)
       val blockOut              = nonEmptyStrings().generateOne
@@ -200,37 +192,9 @@ class ExecutionTimeRecorderSpec
 
       (elapsedTime -> blockOut)
         .pure[IO]
-        .flatMap(logExecutionTime(blockExecutionMessage))
+        .flatMap(executionTimeRecorder.logExecutionTime(blockExecutionMessage))
         .asserting(_ shouldBe blockOut) >>
         logger.expectNoLogsF()
-    }
-  }
-
-  "apply" should {
-
-    "read the logging threshold from 'logging.elapsed-time-threshold' and instantiate the recorder with it" in {
-
-      val threshold = finiteDuration.retryUntil(_.toMillis > 0).generateOne
-      val config = ConfigFactory.parseMap(
-        Map(
-          "logging" -> Map(
-            "elapsed-time-threshold" -> threshold.toString
-          ).asJava
-        ).asJava
-      )
-
-      implicit val logger: TestLogger[IO] = TestLogger[IO]()
-      val executionTimeRecorder = ExecutionTimeRecorderLoader[IO](config).unsafeRunSync()
-
-      val elapsedTime           = ElapsedTime(threshold.toMillis)
-      val blockOut              = nonEmptyStrings().generateOne
-      val blockExecutionMessage = "block executed"
-
-      (elapsedTime -> blockOut)
-        .pure[IO]
-        .flatMap(executionTimeRecorder.logExecutionTimeWhen { case _ => blockExecutionMessage })
-        .asserting(_ shouldBe blockOut) >>
-        logger.loggedOnlyF(Warn(s"$blockExecutionMessage in ${elapsedTime}ms"))
     }
   }
 

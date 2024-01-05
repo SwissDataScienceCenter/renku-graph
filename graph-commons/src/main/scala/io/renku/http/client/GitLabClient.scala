@@ -37,7 +37,7 @@ import io.renku.metrics.{GitLabApiCallRecorder, MetricsRegistry}
 import org.http4s.Method.{DELETE, GET, HEAD, POST, PUT}
 import org.http4s.circe.{jsonEncoder, jsonEncoderOf}
 import org.http4s.multipart.Multipart
-import org.http4s.{EntityEncoder, Method, Response, Uri}
+import org.http4s.{EntityEncoder, Method, Request, Response, Uri}
 import org.typelevel.ci._
 import org.typelevel.log4cats.Logger
 
@@ -137,7 +137,7 @@ final class GitLabClientImpl[F[_]: Async: Logger](
   private def secureNamedRequest(method: Method, uri: Uri, endpointName: String Refined NonEmpty)(implicit
       maybeAccessToken: Option[AccessToken]
   ): F[NamedRequest[F]] = HttpRequest(
-    super.secureRequest(method, uri),
+    secureRequest(method, uri),
     endpointName
   ).pure[F]
 
@@ -158,6 +158,10 @@ final class GitLabClientImpl[F[_]: Async: Logger](
       .map(originalRequest =>
         originalRequest.copy(request = originalRequest.request.withEntity(payload).putHeaders(payload.headers))
       )
+
+  def secureRequest(method: Method, uri: Uri)(implicit
+      maybeAccessToken: Option[AccessToken]
+  ): Request[F] = GitLabClient.request[F](method, uri, maybeAccessToken)
 }
 
 object GitLabClient {
@@ -198,4 +202,24 @@ object GitLabClient {
       .map(MonadThrow[F].fromEither(_))
       .sequence
   }
+
+  // --- intermediate place
+
+  private def request[F[_]](method: Method, uri: Uri, accessToken: AccessToken): Request[F] =
+    Request[F](
+      method = method,
+      uri = uri,
+      headers = accessToken.asAuthHeader
+    )
+
+  def request[F[_]](method: Method, uri: Uri, maybeAccessToken: Option[AccessToken]): Request[F] =
+    maybeAccessToken match {
+      case Some(accessToken) => request[F](method, uri, accessToken)
+      case _ =>
+        Request[F](
+          method = method,
+          uri = uri
+        )
+    }
+
 }

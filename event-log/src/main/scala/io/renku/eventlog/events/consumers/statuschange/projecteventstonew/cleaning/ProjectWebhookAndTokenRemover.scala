@@ -25,7 +25,7 @@ import cats.syntax.all._
 import io.renku.control.Throttler
 import io.renku.events.consumers.Project
 import io.renku.graph.webhookservice.WebhookServiceUrl
-import io.renku.http.client.{AccessToken, RestClient}
+import io.renku.http.client.{AccessToken, GitLabClient, RestClient}
 import io.renku.tokenrepository.api.TokenRepositoryClient
 import org.http4s.Method.DELETE
 import org.http4s.Status.{Forbidden, InternalServerError, NotFound, Ok, Unauthorized}
@@ -59,7 +59,7 @@ private class ProjectWebhookAndTokenRemoverImpl[F[_]: Async: NonEmptyParallel: L
 
   private def removeProjectWebhook(project: Project, accessToken: AccessToken): F[Unit] = for {
     validatedUrl <- validateUri(s"$webhookUrl/projects/${project.id}/webhooks")
-    _            <- send(request(DELETE, validatedUrl, accessToken))(mapWebhookResponse(project))
+    _            <- send(GitLabClient.request[F](DELETE, validatedUrl, accessToken.some))(mapWebhookResponse(project))
   } yield ()
 
   private def mapWebhookResponse(project: Project): ResponseMapping[Unit] = {
