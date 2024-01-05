@@ -18,23 +18,17 @@
 
 package io.renku.control
 
-import com.typesafe.config.ConfigFactory
 import eu.timepit.refined.api.Refined
 import eu.timepit.refined.auto._
-import io.renku.config.ConfigLoader.ConfigLoadingException
 import io.renku.control.RateLimitUnit._
-import io.renku.generators.CommonGraphGenerators._
-import io.renku.generators.Generators.Implicits._
 import io.renku.generators.Generators._
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
 import org.scalatestplus.scalacheck.ScalaCheckPropertyChecks
 
 import scala.concurrent.duration._
-import scala.jdk.CollectionConverters._
-import scala.util.{Failure, Success, Try}
 
-class RateLimitSpec extends AnyWordSpec with ScalaCheckPropertyChecks with should.Matchers {
+class RateLimitSpec extends AnyWordSpec with RateLimitGenerators with ScalaCheckPropertyChecks with should.Matchers {
 
   private type EitherWithThrowable[T] = Either[Throwable, T]
   private trait Target
@@ -91,28 +85,6 @@ class RateLimitSpec extends AnyWordSpec with ScalaCheckPropertyChecks with shoul
 
       exception            shouldBe an[IllegalArgumentException]
       exception.getMessage shouldBe "Unknown 'month' for io.renku.control.RateLimitUnit"
-    }
-  }
-
-  "fromConfig" should {
-
-    "return RateLimit if there's valid value for the given key" in {
-      val rateLimit = rateLimits[Target].generateOne
-      val configKey = nonEmptyStrings().generateOne
-      val config = ConfigFactory.parseMap(
-        Map(configKey -> rateLimit.toString).asJava
-      )
-
-      RateLimit.fromConfig[Try, Target](configKey, config) shouldBe Success(rateLimit)
-    }
-
-    "fail if there is no valid value for the given key in the config" in {
-      val configKey = nonEmptyStrings().generateOne
-      val config    = ConfigFactory.empty
-
-      val Failure(exception) = RateLimit.fromConfig[Try, Target](configKey, config)
-
-      exception shouldBe a[ConfigLoadingException]
     }
   }
 

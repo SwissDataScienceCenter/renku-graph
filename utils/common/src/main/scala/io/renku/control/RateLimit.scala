@@ -20,10 +20,8 @@ package io.renku.control
 
 import cats.MonadThrow
 import cats.syntax.all._
-import com.typesafe.config.{Config, ConfigFactory}
 import eu.timepit.refined.api.{RefType, Refined}
 import eu.timepit.refined.numeric.Positive
-import io.renku.config.ConfigLoader
 import io.renku.tinytypes.TypeName
 
 import scala.concurrent.duration._
@@ -77,25 +75,6 @@ object RateLimit extends TypeName {
     case RateExtractor(rate, unit) =>
       (toPositiveLong[F](rate), RateLimitUnit.from[F](unit)) mapN RateLimit[Target]
     case other => MonadThrow[F].raiseError(new IllegalArgumentException(s"Invalid value for $typeName: '$other'"))
-  }
-
-  def fromConfig[F[_]: MonadThrow, Target](
-      key:    String,
-      config: Config = ConfigFactory.load()
-  ): F[RateLimit[Target]] = {
-    import ConfigLoader._
-    import pureconfig.ConfigReader
-    import pureconfig.error.CannotConvert
-
-    implicit val rateLimitReader: ConfigReader[RateLimit[Target]] =
-      ConfigReader.fromString[RateLimit[Target]] { value =>
-        RateLimit
-          .from[Try, Target](value)
-          .toEither
-          .leftMap(exception => CannotConvert(value, RateLimit.getClass.toString, exception.getMessage))
-      }
-
-    find[F, RateLimit[Target]](key, config)
   }
 
   private def toPositiveLong[F[_]: MonadThrow](rate: String): F[Long Refined Positive] = for {

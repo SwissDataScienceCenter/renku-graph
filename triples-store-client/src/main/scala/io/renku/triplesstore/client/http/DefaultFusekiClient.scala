@@ -33,6 +33,8 @@ final class DefaultFusekiClient[F[_]: Async: Logger](
 ) extends FusekiClient[F]
     with Http4sClientDsl[F]
     with MoreClientDsl[F] {
+val s: fs2.Stream[cats.effect.IO, Int] = null
+  s.
 
   private[this] val retry       = cc.retry.map(Retry.apply[F])
   private[this] val datasetsUri = cc.baseUrl / "$" / "datasets"

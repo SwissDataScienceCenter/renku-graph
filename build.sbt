@@ -151,6 +151,7 @@ lazy val gitlabUtils = project
   )
   .dependsOn(
     commonUtils % "compile->compile;test->test",
+    metricUtils % "compile->compile;test->test",
     http4sClientUtils % "compile->compile;test->test"
   )
 
