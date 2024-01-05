@@ -219,7 +219,10 @@ lazy val triplesStoreClient = project
     libraryDependencies ++=
       Dependencies.testContainersScalaTest.map(_ % Test)
   )
-  .dependsOn(generators % "test->test")
+  .dependsOn(
+    generators % "test->test",
+    tinyTypes % "compile->compile; test->test"
+  )
   .enablePlugins(AutomateHeaderPlugin)
 
 lazy val tinyTypes = project

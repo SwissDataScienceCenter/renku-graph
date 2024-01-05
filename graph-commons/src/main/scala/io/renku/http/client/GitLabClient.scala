@@ -26,7 +26,7 @@ import eu.timepit.refined.collection.NonEmpty
 import eu.timepit.refined.numeric.NonNegative
 import io.circe.Json
 import io.renku.config.GitLab
-import io.renku.control.{RateLimit, Throttler}
+import io.renku.control.{RateLimitLoader, Throttler}
 import io.renku.graph.config.GitLabUrlLoader
 import io.renku.graph.model.GitLabApiUrl
 import io.renku.http.client.HttpRequest.NamedRequest
@@ -169,7 +169,7 @@ object GitLabClient {
       maxRetries:             Int Refined NonNegative = RestClient.MaxRetriesAfterConnectionTimeout,
       requestTimeoutOverride: Option[Duration] = None
   ): F[GitLabClientImpl[F]] = for {
-    gitLabRateLimit <- RateLimit.fromConfig[F, GitLab]("services.gitlab.rate-limit")
+    gitLabRateLimit <- RateLimitLoader.fromConfig[F, GitLab]("services.gitlab.rate-limit")
     gitLabThrottler <- Throttler[F, GitLab](gitLabRateLimit)
     gitLabUrl       <- GitLabUrlLoader[F]()
     apiCallRecorder <- GitLabApiCallRecorder[F](hg => ExecutionTimeRecorderLoader[F](maybeHistogram = Some(hg)))

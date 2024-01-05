@@ -23,7 +23,7 @@ import io.renku.generators.Generators.Implicits._
 import org.scalacheck.Gen
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
-import TinyTypeToObject._
+import io.renku.triplesstore.client.syntax._
 
 class TinyTypeToObjectSpec extends AnyWordSpec with should.Matchers {
 

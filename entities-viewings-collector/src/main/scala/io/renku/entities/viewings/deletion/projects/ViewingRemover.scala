@@ -24,7 +24,6 @@ import cats.effect.Async
 import io.renku.triplesgenerator.api.events.ProjectViewingDeletion
 import io.renku.triplesstore.{ProjectsConnectionConfig, SparqlQueryTimeRecorder, TSClient}
 import org.typelevel.log4cats.Logger
-import io.renku.graph.model.views.TinyTypeToObject._
 
 private trait ViewingRemover[F[_]] {
   def removeViewing(event: ProjectViewingDeletion): F[Unit]

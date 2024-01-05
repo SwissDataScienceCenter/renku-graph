@@ -24,7 +24,6 @@ import cats.syntax.all._
 import io.renku.graph.model.projects
 import io.renku.triplesstore.{ProjectsConnectionConfig, SparqlQueryTimeRecorder, TSClientImpl}
 import org.typelevel.log4cats.Logger
-import io.renku.graph.model.views.TinyTypeToObject._
 
 private object ProjectHierarchyFixer {
   def relinkProjectHierarchy[F[_]: Async: Logger: SparqlQueryTimeRecorder](slug: projects.Slug)(implicit

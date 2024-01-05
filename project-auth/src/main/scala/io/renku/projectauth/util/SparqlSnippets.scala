@@ -24,7 +24,6 @@ import io.renku.graph.model.{persons, projects}
 import io.renku.projectauth.{ProjectAuth, ProjectMember}
 import io.renku.triplesstore.client.sparql.{Fragment, VarName}
 import io.renku.triplesstore.client.syntax._
-import io.renku.graph.model.views.TinyTypeToObject._
 
 final class SparqlSnippets(val projectId: VarName) {
 

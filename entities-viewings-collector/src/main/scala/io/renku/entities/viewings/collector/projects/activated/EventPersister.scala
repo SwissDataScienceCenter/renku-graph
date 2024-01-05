@@ -25,7 +25,6 @@ import cats.syntax.all._
 import io.renku.triplesgenerator.api.events.ProjectActivated
 import io.renku.triplesstore._
 import org.typelevel.log4cats.Logger
-import io.renku.graph.model.views.TinyTypeToObject._
 
 private trait EventPersister[F[_]] {
   def persist(event: ProjectActivated): F[Unit]

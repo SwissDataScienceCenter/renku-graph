@@ -23,7 +23,6 @@ import io.renku.graph.model.entities.Person
 import io.renku.graph.model.persons
 import io.renku.triplesgenerator.api.events.UserId
 import io.renku.triplesstore.TSClient
-import io.renku.graph.model.views.TinyTypeToObject._
 
 private trait PersonFinder[F[_]] {
   def findPersonId(userId: UserId): F[Option[persons.ResourceId]]

@@ -29,7 +29,6 @@ import io.renku.jsonld.Property
 import io.renku.jsonld.syntax._
 import io.renku.triplesstore.client.model.{Quad, QuadsEncoder, TripleObject}
 import io.renku.triplesstore.client.syntax._
-import io.renku.graph.model.views.TinyTypeToObject._
 
 object Encoders {
 

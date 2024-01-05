@@ -28,7 +28,6 @@ import io.renku.triplesstore.SparqlQuery.Prefixes
 import io.renku.triplesstore._
 import io.renku.triplesstore.client.model.Quad
 import io.renku.triplesstore.client.syntax._
-import io.renku.graph.model.views.TinyTypeToObject._
 
 import java.time.Instant
 

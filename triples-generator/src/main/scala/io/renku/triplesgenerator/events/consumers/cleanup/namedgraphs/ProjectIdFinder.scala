@@ -25,7 +25,6 @@ import io.renku.graph.model.projects
 import io.renku.triplesstore._
 import io.renku.triplesstore.ResultsDecoder._
 import org.typelevel.log4cats.Logger
-import io.renku.graph.model.views.TinyTypeToObject._
 
 private trait ProjectIdFinder[F[_]] {
   def findProjectId(slug: projects.Slug): F[Option[ProjectIdentification]]

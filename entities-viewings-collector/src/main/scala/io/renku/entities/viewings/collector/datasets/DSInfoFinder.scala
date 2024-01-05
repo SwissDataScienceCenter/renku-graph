@@ -27,7 +27,6 @@ import io.renku.entities.viewings.collector.persons.Dataset
 import io.renku.graph.model.{datasets, projects}
 import io.renku.triplesstore.{ProjectsConnectionConfig, SparqlQueryTimeRecorder, TSClient}
 import org.typelevel.log4cats.Logger
-import io.renku.graph.model.views.TinyTypeToObject._
 
 private trait DSInfoFinder[F[_]] {
   def findDSInfo(identifier: datasets.Identifier): F[Option[DSInfo]]
