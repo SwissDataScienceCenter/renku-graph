@@ -113,7 +113,7 @@ object Endpoint {
     implicit0(renkuUrl: RenkuUrl)        <- RenkuUrlLoader()
     implicit0(gitLabUrl: GitLabUrl)      <- GitLabUrlLoader[F]()
     implicit0(renkuApiUrl: renku.ApiUrl) <- renku.ApiUrl[F]()
-    renkuConnectionConfig                <- ProjectsConnectionConfig[F]()
+    renkuConnectionConfig                <- ProjectsConnectionConfig.fromConfig[F]()
     executionTimeRecorder                <- ExecutionTimeRecorderLoader[F]()
   } yield new EndpointImpl[F](ProjectDatasetsFinder(renkuConnectionConfig), executionTimeRecorder)
 

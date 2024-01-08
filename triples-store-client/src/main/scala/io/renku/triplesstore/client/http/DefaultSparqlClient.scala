@@ -23,6 +23,7 @@ import cats.syntax.all._
 import io.circe.Json
 import io.renku.jsonld.JsonLD
 import org.http4s.MediaType
+import org.http4s.MediaType.application.`ld+json`
 import org.http4s.Method.POST
 import org.http4s.circe.CirceEntityCodec._
 import org.http4s.client.Client
@@ -64,7 +65,7 @@ final class DefaultSparqlClient[F[_]: Async: Logger](client: Client[F], config: 
         .putHeaders(Accept(sparqlResultsJson))
         .withBasicAuth(config.basicAuth)
         .withEntity(data.toJson)
-        .withContentType(`Content-Type`(MediaType.application.`ld+json`))
+        .withContentType(`Content-Type`(`ld+json`))
 
     client.run(req).use { resp =>
       if (resp.status.isSuccess) ().pure[F]

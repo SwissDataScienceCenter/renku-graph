@@ -19,14 +19,15 @@
 package io.renku.entities.viewings.search
 
 import cats.effect.IO
+import cats.effect.testing.scalatest.AsyncIOSpec
 import cats.syntax.all._
 import com.softwaremill.diffx.Diff
 import io.circe.Decoder
-import io.renku.entities.search.FinderSpecOps
+import io.renku.entities.search.FinderSpec
 import io.renku.entities.search.diff.SearchDiffInstances
 import io.renku.entities.search.model.{Entity => SearchEntity}
-import io.renku.entities.searchgraphs.SearchInfoDatasets
-import io.renku.entities.viewings.EntityViewings
+import io.renku.entities.searchgraphs.TestSearchInfoDatasets
+import io.renku.entities.viewings.TestEntityViewings
 import io.renku.entities.viewings.search.RecentEntitiesFinder.EntityType
 import io.renku.graph.model.persons.GitLabId
 import io.renku.graph.model.testentities.generators.EntitiesGenerators
@@ -34,41 +35,38 @@ import io.renku.graph.model.testentities.{Person => TestPerson}
 import io.renku.graph.model.tools.AdditionalMatchers
 import io.renku.graph.model.{datasets, projects}
 import io.renku.http.client.{AccessToken, UserAccessToken}
-import io.renku.logging.TestSparqlQueryTimeRecorder
-import io.renku.testtools.IOSpec
 import io.renku.triplesgenerator.api.events.{DatasetViewedEvent, ProjectViewedEvent, UserId}
 import io.renku.triplesstore._
+import ResultsDecoder._
 import org.scalacheck.Gen
-import org.scalatest.flatspec.AnyFlatSpec
+import org.scalatest.flatspec.AsyncFlatSpec
 import org.scalatest.matchers.should
 
 import java.time.Instant
 
-abstract class SearchTestBase
-    extends AnyFlatSpec
-    with should.Matchers
+abstract class SearchSpec
+    extends AsyncFlatSpec
+    with AsyncIOSpec
+    with FinderSpec
+    with TestSearchInfoDatasets
+    with TestEntityViewings
     with EntitiesGenerators
-    with FinderSpecOps
-    with InMemoryJenaForSpec
-    with ProjectsDataset
-    with SearchInfoDatasets
     with AdditionalMatchers
     with SearchDiffInstances
-    with EntityViewings
-    with IOSpec {
-
-  implicit val queryTimeRecorder: SparqlQueryTimeRecorder[IO] =
-    TestSparqlQueryTimeRecorder[IO].unsafeRunSync()
-
-  lazy val tsClient = tsClientIO.unsafeRunSync()
+    with should.Matchers {
+  self: GraphJenaSpec =>
 
   val token: UserAccessToken = AccessToken.PersonalAccessToken("nonblank")
 
-  def storeProjectViewed(userId: GitLabId, dateViewed: Instant, slug: projects.Slug): Unit =
-    provision(ProjectViewedEvent(slug, dateViewed, UserId.GLId(userId).some)).unsafeRunSync()
+  def storeProjectViewed(userId: GitLabId, dateViewed: Instant, slug: projects.Slug)(implicit
+      pcc: ProjectsConnectionConfig
+  ): IO[Unit] =
+    provision(ProjectViewedEvent(slug, dateViewed, UserId.GLId(userId).some))
 
-  def storeDatasetViewed(userId: GitLabId, dateViewed: Instant, ident: datasets.Identifier): Unit =
-    provision(DatasetViewedEvent(ident, dateViewed, userId.some)).unsafeRunSync()
+  def storeDatasetViewed(userId: GitLabId, dateViewed: Instant, ident: datasets.Identifier)(implicit
+      pcc: ProjectsConnectionConfig
+  ): IO[Unit] =
+    provision(DatasetViewedEvent(ident, dateViewed, userId.some))
 
   def personGen: Gen[TestPerson] =
     personEntities(maybeGitLabIds = personGitLabIds.map(Some(_)))

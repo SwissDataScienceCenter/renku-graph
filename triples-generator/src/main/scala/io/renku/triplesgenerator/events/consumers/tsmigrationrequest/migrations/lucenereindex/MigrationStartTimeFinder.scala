@@ -44,7 +44,7 @@ private object MigrationStartTimeFinder {
       migrationName: Migration.Name
   ): F[MigrationStartTimeFinder[F]] = for {
     implicit0(ru: RenkuUrl) <- RenkuUrlLoader[F]()
-    tsClient                <- MigrationsConnectionConfig[F]().map(TSClient[F](_))
+    tsClient                <- MigrationsConnectionConfig.fromConfig[F]().map(TSClient[F](_))
   } yield new MigrationStartTimeFinderImpl[F](migrationName, tsClient)
 }
 

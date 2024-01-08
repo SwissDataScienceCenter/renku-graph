@@ -18,36 +18,45 @@
 
 package io.renku.graph.acceptancetests.db
 
-import cats.effect.{IO, Temporal}
-import cats.{Applicative, Monad}
-import eu.timepit.refined.auto._
+import cats.effect.IO
 import io.renku.graph.model.{RenkuUrl, projects}
+import io.renku.graph.triplesstore.DatasetTTLs.ProjectsTTL
+import io.renku.http.client.BasicAuthCredentials
 import io.renku.projectauth.{ProjectAuthData, QueryFilter}
 import io.renku.triplesstore._
-import io.renku.triplesstore.client.util.JenaRunMode
+import io.renku.triplesstore.client.util.{JenaServer, JenaServerSupport}
 import org.typelevel.log4cats.Logger
 
-import scala.concurrent.duration._
+object TriplesStore extends JenaServerSupport {
 
-object TriplesStore extends InMemoryJena with ProjectsDataset with MigrationsDataset {
+  override lazy val server: JenaServer = new JenaServer("acceptance_tests", port = 3030)
 
-  protected override val jenaRunMode: JenaRunMode = JenaRunMode.FixedPortContainer(3030)
+  lazy val fusekiUrl: FusekiUrl = FusekiUrl(server.conConfig.baseUrl.renderString)
 
-  def start()(implicit logger: Logger[IO]): IO[Unit] = for {
-    _ <- Applicative[IO].unlessA(isRunning)(IO(container.start()))
-    _ <- waitForReadiness
-    _ <- logger.info("Triples Store started")
-  } yield ()
-
-  private def isRunning: Boolean = Option(container.containerInfo).exists(_.getState.getRunning)
-
-  private def waitForReadiness(implicit logger: Logger[IO]): IO[Unit] =
-    Monad[IO].whileM_(IO(!isRunning))(logger.info("Waiting for TS") >> (Temporal[IO] sleep (500 millis)))
+  def start(): IO[Unit] =
+    IO(server.start())
 
   def findProjectAuth(
       slug: projects.Slug
   )(implicit renkuUrl: RenkuUrl, sqtr: SparqlQueryTimeRecorder[IO], L: Logger[IO]): IO[Option[ProjectAuthData]] =
-    ProjectSparqlClient[IO](projectsDSConnectionInfo)
+    projectsTtlDSName
+      .flatMap(projectSparqlClient)
       .map(_.asProjectAuthService)
       .use(_.getAll(QueryFilter.all.withSlug(slug)).compile.last)
+
+  private lazy val projectsTtlDSName =
+    IO.fromEither(ProjectsTTL.fromTtlFile())
+      .map(_.datasetName)
+      .toResource
+
+  private def projectSparqlClient(dsName: DatasetName)(implicit sqtr: SparqlQueryTimeRecorder[IO], L: Logger[IO]) =
+    ProjectSparqlClient[IO](
+      ProjectsConnectionConfig(
+        fusekiUrl,
+        BasicAuthCredentials.from(
+          server.conConfig.basicAuth.getOrElse(throw new Exception("No AuthCredentials for 'project' dataset"))
+        ),
+        dsName
+      )
+    )
 }

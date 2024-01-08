@@ -77,7 +77,7 @@ private[tsmigrationrequest] object MigrationExecutionRegister {
   def apply[F[_]: Async: Logger: SparqlQueryTimeRecorder]: F[MigrationExecutionRegister[F]] = for {
     implicit0(renkuUrl: RenkuUrl) <- RenkuUrlLoader[F]()
     serviceVersion                <- ServiceVersion.readFromConfig[F]()
-    storeConfig                   <- MigrationsConnectionConfig[F]()
+    storeConfig                   <- MigrationsConnectionConfig.fromConfig[F]()
   } yield new MigrationExecutionRegisterImpl[F](serviceVersion, storeConfig)
 
   private[migrations] final case class MigrationExecution(migrationName: Migration.Name, serviceVersion: ServiceVersion)

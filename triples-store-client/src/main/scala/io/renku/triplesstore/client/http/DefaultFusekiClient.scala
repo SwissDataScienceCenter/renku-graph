@@ -21,10 +21,9 @@ package io.renku.triplesstore.client.http
 import cats.effect._
 import cats.syntax.all._
 import org.http4s.Method.{DELETE, GET, POST}
+import org.http4s.Status
 import org.http4s.client.Client
 import org.http4s.client.dsl.Http4sClientDsl
-import org.http4s.headers.Accept
-import org.http4s.{MediaType, Status, UrlForm}
 import org.typelevel.log4cats.Logger
 
 final class DefaultFusekiClient[F[_]: Async: Logger](
@@ -51,19 +50,19 @@ final class DefaultFusekiClient[F[_]: Async: Logger](
   }
 
   override def createDataset(name: String, persistent: Boolean): F[Unit] =
-    retry.fold(createDataset0(name, persistent))(_.retryConnectionError(createDataset0(name, persistent)))
+    createDataset(SimpleDatasetDefinition(name, persistent))
 
-  private def createDataset0(name: String, persistent: Boolean): F[Unit] = {
-    val dbType = if (persistent) "tdb" else "mem"
-    val req =
-      POST(datasetsUri)
-        .putHeaders(Accept(MediaType.application.json))
-        .withBasicAuth(cc.basicAuth)
-        .withEntity(UrlForm("dbType" -> dbType, "dbName" -> name))
+  override def createDataset(definition: DatasetDefinition): F[Unit] =
+    retry.fold(createDataset0(definition))(_.retryConnectionError(createDataset0(definition)))
+
+  private def createDataset0(definition: DatasetDefinition): F[Unit] = {
+    val req = definition.putToRequest(
+      POST(datasetsUri).withBasicAuth(cc.basicAuth)
+    )
 
     client.run(req).use { resp =>
       if (resp.status.isSuccess) ().pure[F]
-      else SparqlRequestError(s"createDataset($name)", resp).flatMap(Async[F].raiseError)
+      else SparqlRequestError(s"createDataset(${definition.name})", resp).flatMap(Async[F].raiseError)
     }
   }
 

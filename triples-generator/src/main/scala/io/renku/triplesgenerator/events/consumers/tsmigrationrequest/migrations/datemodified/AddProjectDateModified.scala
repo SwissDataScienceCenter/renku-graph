@@ -99,7 +99,7 @@ private[migrations] object AddProjectDateModified {
     projectsFinder       <- ProjectsPageFinder[F]
     progressFinder       <- ProgressFinder[F]
     projectFetcher       <- ProjectFetcher[F]
-    datePersister        <- ProjectsConnectionConfig[F]().map(DatePersister[F](_))
+    datePersister        <- ProjectsConnectionConfig.fromConfig[F]().map(DatePersister[F](_))
     projectDonePersister <- ProjectDonePersister[F]
     executionRegister    <- MigrationExecutionRegister[F]
   } yield new AddProjectDateModified(checkMigrationNeeded,

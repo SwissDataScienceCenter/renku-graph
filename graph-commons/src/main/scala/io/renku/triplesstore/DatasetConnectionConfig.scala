@@ -61,19 +61,17 @@ trait DatasetConnectionConfig extends FusekiConnectionConfig {
     )
 }
 
-final case class ProjectsConnectionConfig(fusekiUrl: FusekiUrl, authCredentials: BasicAuthCredentials)
-    extends DatasetConnectionConfig {
-  val datasetName: DatasetName = ProjectsConnectionConfig.ProjectsDS
-}
+final case class ProjectsConnectionConfig(fusekiUrl:       FusekiUrl,
+                                          authCredentials: BasicAuthCredentials,
+                                          datasetName:     DatasetName = DatasetName("projects")
+) extends DatasetConnectionConfig
 
 object ProjectsConnectionConfig {
-
-  val ProjectsDS: DatasetName = DatasetName("projects")
 
   import io.renku.config.ConfigLoader._
   import BasicAuthConfigReaders._
 
-  def apply[F[_]: MonadThrow](config: Config = ConfigFactory.load()): F[ProjectsConnectionConfig] = for {
+  def fromConfig[F[_]: MonadThrow](config: Config = ConfigFactory.load()): F[ProjectsConnectionConfig] = for {
     url      <- find[F, FusekiUrl]("services.fuseki.url", config)
     username <- find[F, BasicAuthUsername]("services.fuseki.renku.username", config)
     password <- find[F, BasicAuthPassword]("services.fuseki.renku.password", config)
@@ -82,19 +80,16 @@ object ProjectsConnectionConfig {
 
 final case class MigrationsConnectionConfig(
     fusekiUrl:       FusekiUrl,
-    authCredentials: BasicAuthCredentials
-) extends DatasetConnectionConfig {
-  val datasetName: DatasetName = MigrationsConnectionConfig.MigrationsDS
-}
+    authCredentials: BasicAuthCredentials,
+    datasetName:     DatasetName = DatasetName("migrations")
+) extends DatasetConnectionConfig
 
 object MigrationsConnectionConfig {
-
-  val MigrationsDS: DatasetName = DatasetName("migrations")
 
   import io.renku.config.ConfigLoader._
   import BasicAuthConfigReaders._
 
-  def apply[F[_]: MonadThrow](config: Config = ConfigFactory.load()): F[MigrationsConnectionConfig] = for {
+  def fromConfig[F[_]: MonadThrow](config: Config = ConfigFactory.load()): F[MigrationsConnectionConfig] = for {
     url      <- find[F, FusekiUrl]("services.fuseki.url", config)
     username <- find[F, BasicAuthUsername]("services.fuseki.admin.username", config)
     password <- find[F, BasicAuthPassword]("services.fuseki.admin.password", config)

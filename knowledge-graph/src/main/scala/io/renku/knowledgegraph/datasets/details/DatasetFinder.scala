@@ -108,7 +108,7 @@ private class DatasetFinderImpl[F[_]: Spawn](
 private object DatasetFinder {
 
   def apply[F[_]: Async: Logger: SparqlQueryTimeRecorder]: F[DatasetFinder[F]] = for {
-    storeConfig      <- ProjectsConnectionConfig[F]()
+    storeConfig      <- ProjectsConnectionConfig.fromConfig[F]()
     baseDetailFinder <- BaseDetailsFinder[F](storeConfig)
     creatorsFinder   <- CreatorsFinder[F](storeConfig)
     partsFinder      <- PartsFinder[F](storeConfig)

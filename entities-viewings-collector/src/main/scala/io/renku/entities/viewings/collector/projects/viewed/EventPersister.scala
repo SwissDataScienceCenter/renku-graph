@@ -34,7 +34,7 @@ trait EventPersister[F[_]] {
 
 object EventPersister {
   def apply[F[_]: Async: Logger: SparqlQueryTimeRecorder]: F[EventPersister[F]] =
-    ProjectsConnectionConfig[F]().map(TSClient[F](_)).map(apply(_))
+    ProjectsConnectionConfig.fromConfig[F]().map(TSClient[F](_)).map(apply(_))
 
   def apply[F[_]: MonadThrow](tsClient: TSClient[F]): EventPersister[F] =
     new EventPersisterImpl[F](tsClient,

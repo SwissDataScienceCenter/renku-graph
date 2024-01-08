@@ -18,6 +18,7 @@
 
 package io.renku.generators
 
+import cats.syntax.all._
 import eu.timepit.refined.api.Refined
 import eu.timepit.refined.auto._
 import eu.timepit.refined.collection.NonEmpty
@@ -104,11 +105,13 @@ object CommonGraphGenerators {
     unit  <- Gen.oneOf(RateLimitUnit.Second, RateLimitUnit.Minute, RateLimitUnit.Hour, RateLimitUnit.Day)
   } yield RateLimit[Target](items, per = unit)
 
-  val datasetConfigFiles: Gen[DatasetConfigFile] = nonEmptyStrings().map { v =>
-    new DatasetConfigFile {
-      override lazy val value: String = v
+  val datasetConfigFiles: Gen[DatasetConfigFile] =
+    (nonEmptyStrings(), nonEmptyStrings()).mapN { case (dsName, body) =>
+      new DatasetConfigFile {
+        override val datasetName: DatasetName = DatasetName(dsName)
+        override val value:       String      = body
+      }
     }
-  }
 
   implicit val adminConnectionConfigs: Gen[AdminConnectionConfig] = for {
     url         <- httpUrls() map FusekiUrl.apply

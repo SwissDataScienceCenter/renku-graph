@@ -113,7 +113,7 @@ private class NodeDetailsFinderImpl[F[_]: Async: Parallel: Logger: SparqlQueryTi
 private object NodeDetailsFinder {
 
   def apply[F[_]: Async: Parallel: Logger: SparqlQueryTimeRecorder]: F[NodeDetailsFinder[F]] = for {
-    config                        <- ProjectsConnectionConfig[F]()
+    config                        <- ProjectsConnectionConfig.fromConfig[F]()
     implicit0(renkuUrl: RenkuUrl) <- RenkuUrlLoader[F]()
   } yield new NodeDetailsFinderImpl[F](config)
 

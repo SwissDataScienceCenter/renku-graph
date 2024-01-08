@@ -41,7 +41,7 @@ private trait MigrationStartTimeFinder[F[_]] {
 private object MigrationStartTimeFinder {
   def apply[F[_]: Async: Logger: SparqlQueryTimeRecorder]: F[MigrationStartTimeFinder[F]] = for {
     implicit0(ru: RenkuUrl) <- RenkuUrlLoader[F]()
-    tsClient                <- MigrationsConnectionConfig[F]().map(TSClient[F](_))
+    tsClient                <- MigrationsConnectionConfig.fromConfig[F]().map(TSClient[F](_))
   } yield new MigrationStartTimeFinderImpl[F](tsClient)
 }
 

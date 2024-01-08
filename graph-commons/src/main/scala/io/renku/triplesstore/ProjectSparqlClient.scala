@@ -25,6 +25,7 @@ import eu.timepit.refined.api.Refined
 import eu.timepit.refined.auto._
 import eu.timepit.refined.collection.NonEmpty
 import fs2.io.net.Network
+import io.circe.Json
 import io.renku.graph.model.RenkuUrl
 import io.renku.jsonld.JsonLD
 import io.renku.projectauth.ProjectAuthService
@@ -45,7 +46,7 @@ object ProjectSparqlClient {
       def asProjectAuthService(implicit renkuUrl: RenkuUrl): ProjectAuthService[F] =
         ProjectAuthService(self, renkuUrl)
 
-      override def update(request: SparqlUpdate) = {
+      override def update(request: SparqlUpdate): F[Unit] = {
         val label = histogramLabel(request)
         val work  = c.update(request)
         rec
@@ -53,7 +54,7 @@ object ProjectSparqlClient {
           .flatMap(rec.logExecutionTime(s"Execute sparql update '$label'"))
       }
 
-      override def upload(data: JsonLD) = {
+      override def upload(data: JsonLD): F[Unit] = {
         val label: String Refined NonEmpty = "jsonld upload"
         val work = c.upload(data)
         rec
@@ -61,7 +62,7 @@ object ProjectSparqlClient {
           .flatMap(rec.logExecutionTime("Execute JSONLD upload"))
       }
 
-      override def query(request: SparqlQuery) = {
+      override def query(request: SparqlQuery): F[Json] = {
         val label = histogramLabel(request)
         val work  = c.query(request)
         rec

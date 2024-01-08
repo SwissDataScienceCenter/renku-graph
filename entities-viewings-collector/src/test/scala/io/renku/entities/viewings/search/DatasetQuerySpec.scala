@@ -19,18 +19,19 @@
 package io.renku.entities.viewings.search
 
 import io.renku.entities.search.model.{MatchingScore, Entity => SearchEntity}
+import io.renku.entities.viewings.ViewingsCollectorJenaSpec
 import io.renku.entities.viewings.search.RecentEntitiesFinder.Criteria
 import io.renku.generators.Generators.Implicits._
 import io.renku.graph.model.entities
 import io.renku.http.server.security.model.AuthUser
-import org.scalatest.OptionValues
+import org.scalatest.{OptionValues, Succeeded}
 
 import java.time.Instant
 import java.time.temporal.ChronoUnit
 
-class DatasetQuerySpec extends SearchTestBase with OptionValues {
+class DatasetQuerySpec extends SearchSpec with ViewingsCollectorJenaSpec with OptionValues {
 
-  it should "return multiple datasets" in {
+  it should "return multiple datasets" in projectsDSConfig.use { implicit pcc =>
     val project1 = renkuProjectEntities(visibilityPublic)
       .withDatasets(datasetEntities(provenanceNonModified))
       .generateOne
@@ -44,23 +45,22 @@ class DatasetQuerySpec extends SearchTestBase with OptionValues {
     val person = personGen.generateOne
     val userId = person.maybeGitLabId.value
 
-    upload(projectsDataset, person)
-    provisionTestProjects(project1, project2).unsafeRunSync()
+    for {
+      _ <- uploadToProjects(person)
+      _ <- provisionTestProjects(project1, project2)
 
-    storeProjectViewed(userId, Instant.now().minus(1, ChronoUnit.DAYS), project1.slug)
-    storeDatasetViewed(userId, Instant.now().minus(2, ChronoUnit.DAYS), dataset1.identification.identifier)
-    storeProjectViewed(userId, Instant.now().minus(3, ChronoUnit.DAYS), project2.slug)
-    storeDatasetViewed(userId, Instant.now().minus(4, ChronoUnit.DAYS), dataset2.identification.identifier)
+      _ <- storeProjectViewed(userId, Instant.now().minus(1, ChronoUnit.DAYS), project1.slug)
+      _ <- storeDatasetViewed(userId, Instant.now().minus(2, ChronoUnit.DAYS), dataset1.identification.identifier)
+      _ <- storeProjectViewed(userId, Instant.now().minus(3, ChronoUnit.DAYS), project2.slug)
+      _ <- storeDatasetViewed(userId, Instant.now().minus(4, ChronoUnit.DAYS), dataset2.identification.identifier)
 
-    val query = DatasetQuery.makeQuery(Criteria(Set.empty, AuthUser(userId, token), 5))
+      query = DatasetQuery.makeQuery(Criteria(Set.empty, AuthUser(userId, token), 5))
 
-    val decoded = tsClient.queryExpecting[List[SearchEntity.Dataset]](query)(datasetDecoder).unsafeRunSync()
-
-    decoded.size shouldBe 2
+      _ <- tsClient.queryExpecting[List[SearchEntity.Dataset]](query)(datasetDecoder).asserting(_.size shouldBe 2)
+    } yield Succeeded
   }
 
-  it should "find and decode datasets" in {
-
+  it should "find and decode datasets" in projectsDSConfig.use { implicit pcc =>
     val project = renkuProjectEntities(visibilityPublic)
       .withDatasets(datasetEntities(provenanceNonModified))
       .generateOne
@@ -68,34 +68,37 @@ class DatasetQuerySpec extends SearchTestBase with OptionValues {
     val dataset = project.to[entities.RenkuProject.WithoutParent].datasets.head
 
     val person = personGen.generateOne
-    upload(projectsDataset, person)
+    for {
+      _ <- uploadToProjects(person)
 
-    val userId = person.maybeGitLabId.get
+      userId = person.maybeGitLabId.get
 
-    provisionTestProjects(project).unsafeRunSync()
-    storeDatasetViewed(userId, Instant.now(), dataset.identification.identifier)
+      _ <- provisionTestProjects(project)
+      _ <- storeDatasetViewed(userId, Instant.now(), dataset.identification.identifier)
 
-    val query = DatasetQuery.makeQuery(Criteria(Set.empty, AuthUser(userId, token), 5))
+      query = DatasetQuery.makeQuery(Criteria(Set.empty, AuthUser(userId, token), 5))
 
-    val decoded = tsClient.queryExpecting[List[SearchEntity.Dataset]](query)(datasetDecoder).unsafeRunSync()
-    decoded.head shouldMatchTo
-      SearchEntity.Dataset(
-        matchingScore = MatchingScore(1f),
-        sameAs = dataset.provenance.topmostSameAs,
-        slug = dataset.identification.slug,
-        name = dataset.identification.name,
-        visibility = project.visibility,
-        date = dataset.provenance.date,
-        dateModified = None,
-        keywords = dataset.additionalInfo.keywords.sorted,
-        maybeDescription = dataset.additionalInfo.maybeDescription,
-        images = dataset.additionalInfo.images.map(_.uri),
-        creators = dataset.provenance.creators.toList.map(_.name),
-        exemplarProjectSlug = project.slug
-      )
+      _ <- tsClient.queryExpecting[List[SearchEntity.Dataset]](query)(datasetDecoder).asserting {
+             _.head shouldMatchTo
+               SearchEntity.Dataset(
+                 matchingScore = MatchingScore(1f),
+                 sameAs = dataset.provenance.topmostSameAs,
+                 slug = dataset.identification.slug,
+                 name = dataset.identification.name,
+                 visibility = project.visibility,
+                 date = dataset.provenance.date,
+                 dateModified = None,
+                 keywords = dataset.additionalInfo.keywords.sorted,
+                 maybeDescription = dataset.additionalInfo.maybeDescription,
+                 images = dataset.additionalInfo.images.map(_.uri),
+                 creators = dataset.provenance.creators.toList.map(_.name),
+                 exemplarProjectSlug = project.slug
+               )
+           }
+    } yield Succeeded
   }
 
-  it should "return datasets for the given user only" in {
+  it should "return datasets for the given user only" in projectsDSConfig.use { implicit pcc =>
     val project1 = renkuProjectEntities(visibilityPublic)
       .withDatasets(datasetEntities(provenanceNonModified))
       .generateOne
@@ -105,34 +108,37 @@ class DatasetQuerySpec extends SearchTestBase with OptionValues {
 
     val person1 = personGen.generateOne
     val person2 = personGen.generateOne
-    upload(projectsDataset, person1, person2)
-    provisionTestProjects(project1, project2).unsafeRunSync()
+    for {
+      _ <- uploadToProjects(person1, person2)
+      _ <- provisionTestProjects(project1, project2)
 
-    val dataset1 = project1.to[entities.RenkuProject.WithoutParent].datasets.head
-    val dataset2 = project2.to[entities.RenkuProject.WithoutParent].datasets.head
-    val userId1  = person1.maybeGitLabId.value
-    val userId2  = person2.maybeGitLabId.value
+      dataset1 = project1.to[entities.RenkuProject.WithoutParent].datasets.head
+      dataset2 = project2.to[entities.RenkuProject.WithoutParent].datasets.head
+      userId1  = person1.maybeGitLabId.value
+      userId2  = person2.maybeGitLabId.value
 
-    storeDatasetViewed(userId1, Instant.now(), dataset1.identification.identifier)
-    storeDatasetViewed(userId2, Instant.now(), dataset2.identification.identifier)
+      _ <- storeDatasetViewed(userId1, Instant.now(), dataset1.identification.identifier)
+      _ <- storeDatasetViewed(userId2, Instant.now(), dataset2.identification.identifier)
 
-    val query = DatasetQuery.makeQuery(Criteria(Set.empty, AuthUser(userId1, token), 5))
+      query = DatasetQuery.makeQuery(Criteria(Set.empty, AuthUser(userId1, token), 5))
 
-    val decoded = tsClient.queryExpecting[List[SearchEntity.Dataset]](query)(datasetDecoder).unsafeRunSync()
-    decoded.head shouldMatchTo
-      SearchEntity.Dataset(
-        matchingScore = MatchingScore(1f),
-        sameAs = dataset1.provenance.topmostSameAs,
-        slug = dataset1.identification.slug,
-        name = dataset1.identification.name,
-        visibility = project1.visibility,
-        date = dataset1.provenance.date,
-        dateModified = None,
-        keywords = dataset1.additionalInfo.keywords.sorted,
-        maybeDescription = dataset1.additionalInfo.maybeDescription,
-        images = dataset1.additionalInfo.images.map(_.uri),
-        creators = dataset1.provenance.creators.toList.map(_.name),
-        exemplarProjectSlug = project1.slug
-      )
+      _ <- tsClient.queryExpecting[List[SearchEntity.Dataset]](query)(datasetDecoder).asserting {
+             _.head shouldMatchTo
+               SearchEntity.Dataset(
+                 matchingScore = MatchingScore(1f),
+                 sameAs = dataset1.provenance.topmostSameAs,
+                 slug = dataset1.identification.slug,
+                 name = dataset1.identification.name,
+                 visibility = project1.visibility,
+                 date = dataset1.provenance.date,
+                 dateModified = None,
+                 keywords = dataset1.additionalInfo.keywords.sorted,
+                 maybeDescription = dataset1.additionalInfo.maybeDescription,
+                 images = dataset1.additionalInfo.images.map(_.uri),
+                 creators = dataset1.provenance.creators.toList.map(_.name),
+                 exemplarProjectSlug = project1.slug
+               )
+           }
+    } yield Succeeded
   }
 }

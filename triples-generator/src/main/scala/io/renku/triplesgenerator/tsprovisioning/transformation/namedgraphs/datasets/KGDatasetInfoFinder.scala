@@ -261,5 +261,5 @@ private class KGDatasetInfoFinderImpl[F[_]: Async: Logger: SparqlQueryTimeRecord
 
 private object KGDatasetInfoFinder {
   def apply[F[_]: Async: Logger: SparqlQueryTimeRecorder]: F[KGDatasetInfoFinder[F]] =
-    ProjectsConnectionConfig[F]().map(new KGDatasetInfoFinderImpl(_))
+    ProjectsConnectionConfig.fromConfig[F]().map(new KGDatasetInfoFinderImpl(_))
 }

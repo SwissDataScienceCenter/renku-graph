@@ -43,8 +43,8 @@ private object BacklogCreator {
   def apply[F[_]: Async: Logger: SparqlQueryTimeRecorder]: F[BacklogCreator[F]] = for {
     implicit0(ru: RenkuUrl) <- RenkuUrlLoader[F]()
     startTimeFinder         <- MigrationStartTimeFinder[F]
-    recordsFinder           <- ProjectsConnectionConfig[F]().map(RecordsFinder[F](_))
-    migrationsDSClient      <- MigrationsConnectionConfig[F]().map(TSClient[F](_))
+    recordsFinder           <- ProjectsConnectionConfig.fromConfig[F]().map(RecordsFinder[F](_))
+    migrationsDSClient      <- MigrationsConnectionConfig.fromConfig[F]().map(TSClient[F](_))
   } yield new BacklogCreatorImpl[F](startTimeFinder, recordsFinder, migrationsDSClient)
 
   def asToBeMigratedInserts(implicit ru: RenkuUrl): List[projects.Slug] => Option[SparqlQuery] =

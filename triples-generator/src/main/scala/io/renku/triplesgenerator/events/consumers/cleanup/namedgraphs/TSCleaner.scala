@@ -57,7 +57,7 @@ private[cleanup] object TSCleaner {
   def default[F[_]: Async: Logger: SparqlQueryTimeRecorder](topSameAsLock:       Lock[F, datasets.TopmostSameAs],
                                                             projectSparqlClient: ProjectSparqlClient[F]
   )(implicit renkuUrl: RenkuUrl): F[TSCleaner[F]] =
-    ProjectsConnectionConfig[F]().map(apply(ProjectAuthSync(projectSparqlClient), topSameAsLock, _))
+    ProjectsConnectionConfig.fromConfig[F]().map(apply(ProjectAuthSync(projectSparqlClient), topSameAsLock, _))
 }
 
 private class TSCleanerImpl[F[_]: Async: Logger: SparqlQueryTimeRecorder](

@@ -59,8 +59,9 @@ private[migrations] object V10VersionUpdater {
 
   def apply[F[_]: Async: Logger: SparqlQueryTimeRecorder]: F[Migration[F]] = for {
     implicit0(ru: RenkuUrl)    <- RenkuUrlLoader[F]()
-    compatibility              <- VersionCompatibilityConfig.fromConfigF[F](ConfigFactory.load())
-    migrationsConnectionConfig <- MigrationsConnectionConfig[F]()
+    config                     <- MonadThrow[F].catchNonFatal(ConfigFactory.load())
+    compatibility              <- VersionCompatibilityConfig.fromConfigF[F](config)
+    migrationsConnectionConfig <- MigrationsConnectionConfig.fromConfig[F](config)
     executionRegister          <- MigrationExecutionRegister[F]
   } yield new V10VersionUpdater(compatibility.asVersionPair,
                                 RenkuVersionPairUpdater(migrationsConnectionConfig),

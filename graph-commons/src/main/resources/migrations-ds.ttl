@@ -24,7 +24,7 @@ ja:RDFDatasetZero  rdfs:subClassOf  ja:RDFDataset .
 <http://jena.apache.org/text#TextDataset>
   rdfs:subClassOf  ja:RDFDataset .
 
-:service_tdb_all  a                 fuseki:Service ;
+:service_migrations a               fuseki:Service ;
   rdfs:label                        "TDB2 migrations" ;
   fuseki:dataset                    :tdb_migrations ;
   fuseki:name                       "migrations" ;
@@ -36,9 +36,8 @@ ja:RDFDatasetZero  rdfs:subClassOf  ja:RDFDataset .
   fuseki:serviceUpdate              "" , "update" ;
   fuseki:serviceUpload              "upload" .
 
-:tdb_migrations
-  a              tdb2:DatasetTDB2 ;
-  tdb2:location  "/fuseki/databases/migrations" .
+:tdb_migrations a tdb2:DatasetTDB2 ;
+  tdb2:location   "/fuseki/databases/migrations" .
 
 tdb2:GraphTDB  rdfs:subClassOf  ja:Model .
 

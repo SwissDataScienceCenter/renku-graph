@@ -129,7 +129,7 @@ private[migrations] object ReProvisioning {
   ): F[Migration[F]] = RenkuUrlLoader[F]().flatMap { implicit renkuUrl =>
     for {
       retryDelay                 <- find[F, FiniteDuration]("re-provisioning-retry-delay", config)
-      migrationsConnectionConfig <- MigrationsConnectionConfig[F](config)
+      migrationsConnectionConfig <- MigrationsConnectionConfig.fromConfig[F](config)
       eventSender                <- EventSender[F](EventLogUrl)
       microserviceUrlFinder      <- MicroserviceUrlFinder[F](Microservice.ServicePort)
       compatibility              <- VersionCompatibilityConfig.fromConfigF[F](config)

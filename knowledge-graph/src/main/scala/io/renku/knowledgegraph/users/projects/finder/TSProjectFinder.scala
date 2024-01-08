@@ -38,7 +38,7 @@ private trait TSProjectFinder[F[_]] {
 
 private object TSProjectFinder {
   def apply[F[_]: Async: Logger: SparqlQueryTimeRecorder]: F[TSProjectFinder[F]] =
-    ProjectsConnectionConfig[F]().map(new TSProjectFinderImpl(_))
+    ProjectsConnectionConfig.fromConfig[F]().map(new TSProjectFinderImpl(_))
 }
 
 private class TSProjectFinderImpl[F[_]: Async: Logger: SparqlQueryTimeRecorder](storeConfig: ProjectsConnectionConfig)

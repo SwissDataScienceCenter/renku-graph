@@ -65,7 +65,7 @@ object Microservice extends IOMicroservice {
 
   private object Setup {
     val resource: Resource[IO, Setup] = for {
-      pcc <- Resource.eval(ProjectsConnectionConfig[IO]())
+      pcc <- Resource.eval(ProjectsConnectionConfig.fromConfig[IO]())
 
       implicit0(mr: MetricsRegistry[IO])           <- Resource.eval(MetricsRegistryLoader[IO]())
       implicit0(sqtr: SparqlQueryTimeRecorder[IO]) <- Resource.eval(SparqlQueryTimeRecorder.create[IO]())

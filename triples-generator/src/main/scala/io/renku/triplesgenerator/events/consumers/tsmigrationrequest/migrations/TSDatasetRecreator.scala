@@ -38,8 +38,8 @@ private object TSDatasetRecreator {
   ): F[Migration[F]] =
     (MonadThrow[F].fromEither(dsConfigFactory.fromTtlFile()), TSAdminClient[F], MigrationExecutionRegister[F])
       .mapN((ttlFile, tsAdmin, execRegister) =>
-        new TSDatasetRecreatorImpl[F](Migration.Name(show"Recreate ${dsConfigFactory.datasetName} dataset $suffix"),
-                                      dsConfigFactory.datasetName,
+        new TSDatasetRecreatorImpl[F](Migration.Name(show"Recreate ${ttlFile.datasetName} dataset $suffix"),
+                                      ttlFile.datasetName,
                                       ttlFile,
                                       tsAdmin,
                                       execRegister

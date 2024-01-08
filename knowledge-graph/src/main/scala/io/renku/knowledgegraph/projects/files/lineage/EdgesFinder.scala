@@ -153,7 +153,7 @@ private class EdgesFinderImpl[F[_]: Async: Logger: SparqlQueryTimeRecorder](
 private object EdgesFinder {
 
   def apply[F[_]: Async: Logger: SparqlQueryTimeRecorder]: F[EdgesFinder[F]] = for {
-    config   <- ProjectsConnectionConfig[F]()
+    config   <- ProjectsConnectionConfig.fromConfig[F]()
     renkuUrl <- RenkuUrlLoader[F]()
   } yield new EdgesFinderImpl[F](config, renkuUrl)
 }

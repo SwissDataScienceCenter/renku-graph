@@ -37,9 +37,12 @@ class PostgresClient[DB](server: PostgresServer, migrations: SessionResource[IO,
     Random
       .scalaUtilRandom[IO]
       .flatMap(_.nextIntBounded(1000))
-      .map(v => s"${prefix}_$v")
+      .map(differentiator => s"${prefix}_$differentiator")
       .toResource >>= dbResource
-  }.recoverWith { case SqlState.DuplicateDatabase(_) => randomizedDBResource(prefix) }
+  }.recoverWith {
+    case SqlState.DuplicateDatabase(_)  => randomizedDBResource(prefix)
+    case SqlState.InvalidCatalogName(_) => randomizedDBResource(prefix)
+  }
 
   def dbResource(dbName: String): Resource[IO, DBConfig[DB]] =
     Resource

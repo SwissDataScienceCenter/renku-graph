@@ -19,19 +19,24 @@
 package io.renku.entities.viewings.search
 
 import cats.effect.IO
-import io.renku.graph.model.entities
 import io.renku.entities.search.model.{MatchingScore, Entity => SearchEntity}
+import io.renku.entities.viewings.ViewingsCollectorJenaSpec
 import io.renku.entities.viewings.search.RecentEntitiesFinder.{Criteria, EntityType}
 import io.renku.generators.Generators.Implicits._
+import io.renku.graph.model.entities
 import io.renku.http.server.security.model.AuthUser
+import io.renku.triplesstore.ProjectsConnectionConfig
+import org.scalatest.Succeeded
 
 import java.time.Instant
 import java.time.temporal.ChronoUnit
 
-class RecentEntitiesFinderSpec extends SearchTestBase {
-  def finder = new RecentEntitiesFinderImpl[IO](projectsDSConnectionInfo)
+class RecentEntitiesFinderSpec extends SearchSpec with ViewingsCollectorJenaSpec {
 
-  it should "datasets and projects in one result" in {
+  private def recentEntitiesFinder(implicit pcc: ProjectsConnectionConfig) =
+    new RecentEntitiesFinderImpl[IO](tsClient)
+
+  it should "datasets and projects in one result" in projectsDSConfig.use { implicit pcc =>
     val project1 = renkuProjectEntities(visibilityPublic)
       .withActivities(activityEntities(stepPlanEntities()))
       .withDatasets(datasetEntities(provenanceNonModified))
@@ -46,40 +51,41 @@ class RecentEntitiesFinderSpec extends SearchTestBase {
 
     val person = personGen.generateOne
 
-    upload(projectsDataset, person)
-    provisionTestProjects(project1, project2).unsafeRunSync()
+    for {
+      _ <- uploadToProjects(person.to[entities.Person])
+      _ <- provisionTestProjects(project1, project2)
 
-    storeProjectViewed(person.maybeGitLabId.get, Instant.now().minus(1, ChronoUnit.DAYS), project1.slug)
-    storeDatasetViewed(person.maybeGitLabId.get,
-                       Instant.now().minus(2, ChronoUnit.DAYS),
-                       dataset1.identification.identifier
-    )
-    storeProjectViewed(person.maybeGitLabId.get, Instant.now().minus(3, ChronoUnit.DAYS), project2.slug)
-    storeDatasetViewed(person.maybeGitLabId.get,
-                       Instant.now().minus(4, ChronoUnit.DAYS),
-                       dataset2.identification.identifier
-    )
+      _ <- storeProjectViewed(person.maybeGitLabId.get, Instant.now().minus(1, ChronoUnit.DAYS), project1.slug)
+      _ <- storeDatasetViewed(person.maybeGitLabId.get,
+                              Instant.now().minus(2, ChronoUnit.DAYS),
+                              dataset1.identification.identifier
+           )
+      _ <- storeProjectViewed(person.maybeGitLabId.get, Instant.now().minus(3, ChronoUnit.DAYS), project2.slug)
+      _ <- storeDatasetViewed(person.maybeGitLabId.get,
+                              Instant.now().minus(4, ChronoUnit.DAYS),
+                              dataset2.identification.identifier
+           )
 
-    val criteria = Criteria(Set(EntityType.Project, EntityType.Dataset), AuthUser(person.maybeGitLabId.get, token), 5)
-    val result   = finder.findRecentlyViewedEntities(criteria).unsafeRunSync()
+      criteria = Criteria(Set(EntityType.Project, EntityType.Dataset), AuthUser(person.maybeGitLabId.get, token), 5)
+      result <- recentEntitiesFinder.findRecentlyViewedEntities(criteria)
 
-    val expect = List(
-      EntityType.Project -> project1.slug.value,
-      EntityType.Dataset -> dataset1.provenance.topmostSameAs.value,
-      EntityType.Project -> project2.slug.value,
-      EntityType.Dataset -> dataset2.provenance.topmostSameAs.value
-    )
+      _ = result.pagingInfo.total.value shouldBe 4
 
-    result.pagingInfo.total.value shouldBe 4
-
-    result.results
-      .collect {
-        case e: SearchEntity.Dataset => EntityType.Dataset -> e.sameAs.value
-        case e: SearchEntity.Project => EntityType.Project -> e.slug.value
-      } shouldBe expect
+      expect = List(
+                 EntityType.Project -> project1.slug.value,
+                 EntityType.Dataset -> dataset1.provenance.topmostSameAs.value,
+                 EntityType.Project -> project2.slug.value,
+                 EntityType.Dataset -> dataset2.provenance.topmostSameAs.value
+               )
+      _ = result.results
+            .collect {
+              case e: SearchEntity.Dataset => EntityType.Dataset -> e.sameAs.value
+              case e: SearchEntity.Project => EntityType.Project -> e.slug.value
+            } shouldBe expect
+    } yield Succeeded
   }
 
-  it should "return projects in most recently viewed order" in {
+  it should "return projects in most recently viewed order" in projectsDSConfig.use { implicit pcc =>
     val project1 = renkuProjectEntities(visibilityPublic)
       .withActivities(activityEntities(stepPlanEntities()))
       .withDatasets(datasetEntities(provenanceNonModified))
@@ -91,32 +97,34 @@ class RecentEntitiesFinderSpec extends SearchTestBase {
 
     val person = personGen.generateOne
 
-    upload(projectsDataset, person)
-    provisionTestProjects(project1, project2).unsafeRunSync()
+    for {
+      _ <- uploadToProjects(person)
+      _ <- provisionTestProjects(project1, project2)
 
-    storeProjectViewed(person.maybeGitLabId.get, Instant.now().minus(1, ChronoUnit.DAYS), project1.slug)
-    storeProjectViewed(person.maybeGitLabId.get, Instant.now(), project2.slug)
+      _ <- storeProjectViewed(person.maybeGitLabId.get, Instant.now().minus(1, ChronoUnit.DAYS), project1.slug)
+      _ <- storeProjectViewed(person.maybeGitLabId.get, Instant.now(), project2.slug)
 
-    val criteria = Criteria(Set(EntityType.Project), AuthUser(person.maybeGitLabId.get, token), 5)
-    val result   = finder.findRecentlyViewedEntities(criteria).unsafeRunSync()
+      criteria = Criteria(Set(EntityType.Project), AuthUser(person.maybeGitLabId.get, token), 5)
+      result <- recentEntitiesFinder.findRecentlyViewedEntities(criteria)
 
-    result.pagingInfo.total.value shouldBe 2
-    result.results.head shouldMatchTo
-      SearchEntity.Project(
-        matchingScore = MatchingScore(1f),
-        slug = project2.slug,
-        name = project2.name,
-        visibility = project2.visibility,
-        date = project2.dateCreated,
-        dateModified = project2.dateModified,
-        maybeCreator = project2.maybeCreator.map(_.name),
-        keywords = project2.keywords.toList.sorted,
-        maybeDescription = project2.maybeDescription,
-        images = project2.images
-      )
+      _ = result.pagingInfo.total.value shouldBe 2
+      _ = result.results.head shouldMatchTo
+            SearchEntity.Project(
+              matchingScore = MatchingScore(1f),
+              slug = project2.slug,
+              name = project2.name,
+              visibility = project2.visibility,
+              date = project2.dateCreated,
+              dateModified = project2.dateModified,
+              maybeCreator = project2.maybeCreator.map(_.name),
+              keywords = project2.keywords.toList.sorted,
+              maybeDescription = project2.maybeDescription,
+              images = project2.images
+            )
+    } yield Succeeded
   }
 
-  it should "return apply limit when returning projects" in {
+  it should "return apply limit when returning projects" in projectsDSConfig.use { implicit pcc =>
     val project1 = renkuProjectEntities(visibilityPublic)
       .withActivities(activityEntities(stepPlanEntities()))
       .withDatasets(datasetEntities(provenanceNonModified))
@@ -128,33 +136,35 @@ class RecentEntitiesFinderSpec extends SearchTestBase {
 
     val person = personGen.generateOne
 
-    upload(projectsDataset, person)
-    provisionTestProjects(project1, project2).unsafeRunSync()
+    for {
+      _ <- uploadToProjects(person)
+      _ <- provisionTestProjects(project1, project2)
 
-    storeProjectViewed(person.maybeGitLabId.get, Instant.now().minus(1, ChronoUnit.DAYS), project1.slug)
-    storeProjectViewed(person.maybeGitLabId.get, Instant.now(), project2.slug)
+      _ <- storeProjectViewed(person.maybeGitLabId.get, Instant.now().minus(1, ChronoUnit.DAYS), project1.slug)
+      _ <- storeProjectViewed(person.maybeGitLabId.get, Instant.now(), project2.slug)
 
-    val criteria = Criteria(Set(EntityType.Project), AuthUser(person.maybeGitLabId.get, token), 1)
-    val result   = finder.findRecentlyViewedEntities(criteria).unsafeRunSync()
+      criteria = Criteria(Set(EntityType.Project), AuthUser(person.maybeGitLabId.get, token), 1)
+      result <- recentEntitiesFinder.findRecentlyViewedEntities(criteria)
 
-    result.results.size         shouldBe 1
-    result.pagingInfo.total.value should (be >= 1)
-    result.results.head shouldMatchTo
-      SearchEntity.Project(
-        matchingScore = MatchingScore(1f),
-        slug = project2.slug,
-        name = project2.name,
-        visibility = project2.visibility,
-        date = project2.dateCreated,
-        dateModified = project2.dateModified,
-        maybeCreator = project2.maybeCreator.map(_.name),
-        keywords = project2.keywords.toList.sorted,
-        maybeDescription = project2.maybeDescription,
-        images = project2.images
-      )
+      _ = result.results.size         shouldBe 1
+      _ = result.pagingInfo.total.value should (be >= 1)
+      _ = result.results.head shouldMatchTo
+            SearchEntity.Project(
+              matchingScore = MatchingScore(1f),
+              slug = project2.slug,
+              name = project2.name,
+              visibility = project2.visibility,
+              date = project2.dateCreated,
+              dateModified = project2.dateModified,
+              maybeCreator = project2.maybeCreator.map(_.name),
+              keywords = project2.keywords.toList.sorted,
+              maybeDescription = project2.maybeDescription,
+              images = project2.images
+            )
+    } yield Succeeded
   }
 
-  it should "return only public projects visible to the caller" in {
+  it should "return only public projects visible to the caller" in projectsDSConfig.use { implicit pcc =>
     val project1 = renkuProjectEntities(visibilityPublic)
       .withActivities(activityEntities(stepPlanEntities()))
       .withDatasets(datasetEntities(provenanceNonModified))
@@ -166,33 +176,35 @@ class RecentEntitiesFinderSpec extends SearchTestBase {
 
     val person = personGen.generateOne
 
-    upload(projectsDataset, person)
-    provisionTestProjects(project1, project2).unsafeRunSync()
+    for {
+      _ <- uploadToProjects(person)
+      _ <- provisionTestProjects(project1, project2)
 
-    storeProjectViewed(person.maybeGitLabId.get, Instant.now().minus(1, ChronoUnit.DAYS), project1.slug)
-    storeProjectViewed(person.maybeGitLabId.get, Instant.now(), project2.slug)
+      _ <- storeProjectViewed(person.maybeGitLabId.get, Instant.now().minus(1, ChronoUnit.DAYS), project1.slug)
+      _ <- storeProjectViewed(person.maybeGitLabId.get, Instant.now(), project2.slug)
 
-    val criteria = Criteria(Set(EntityType.Project), AuthUser(person.maybeGitLabId.get, token), 10)
-    val result   = finder.findRecentlyViewedEntities(criteria).unsafeRunSync()
+      criteria = Criteria(Set(EntityType.Project), AuthUser(person.maybeGitLabId.get, token), 10)
+      result <- recentEntitiesFinder.findRecentlyViewedEntities(criteria)
 
-    result.results.size           shouldBe 1
-    result.pagingInfo.total.value shouldBe 1
-    result.results.head shouldMatchTo
-      SearchEntity.Project(
-        matchingScore = MatchingScore(1f),
-        slug = project1.slug,
-        name = project1.name,
-        visibility = project1.visibility,
-        date = project1.dateCreated,
-        dateModified = project1.dateModified,
-        maybeCreator = project1.maybeCreator.map(_.name),
-        keywords = project1.keywords.toList.sorted,
-        maybeDescription = project1.maybeDescription,
-        images = project1.images
-      )
+      _ = result.results.size           shouldBe 1
+      _ = result.pagingInfo.total.value shouldBe 1
+      _ = result.results.head shouldMatchTo
+            SearchEntity.Project(
+              matchingScore = MatchingScore(1f),
+              slug = project1.slug,
+              name = project1.name,
+              visibility = project1.visibility,
+              date = project1.dateCreated,
+              dateModified = project1.dateModified,
+              maybeCreator = project1.maybeCreator.map(_.name),
+              keywords = project1.keywords.toList.sorted,
+              maybeDescription = project1.maybeDescription,
+              images = project1.images
+            )
+    } yield Succeeded
   }
 
-  it should "return only projects visible to the caller" in {
+  it should "return only projects visible to the caller" in projectsDSConfig.use { implicit pcc =>
     val project1 = renkuProjectEntities(visibilityPublic)
       .withActivities(activityEntities(stepPlanEntities()))
       .withDatasets(datasetEntities(provenanceNonModified))
@@ -205,29 +217,31 @@ class RecentEntitiesFinderSpec extends SearchTestBase {
 
     val person = project2.maybeCreator.get
 
-    upload(projectsDataset, person)
-    provisionTestProjects(project1, project2).unsafeRunSync()
+    for {
+      _ <- uploadToProjects(person)
+      _ <- provisionTestProjects(project1, project2)
 
-    storeProjectViewed(person.maybeGitLabId.get, Instant.now().minus(1, ChronoUnit.DAYS), project1.slug)
-    storeProjectViewed(person.maybeGitLabId.get, Instant.now(), project2.slug)
+      _ <- storeProjectViewed(person.maybeGitLabId.get, Instant.now().minus(1, ChronoUnit.DAYS), project1.slug)
+      _ <- storeProjectViewed(person.maybeGitLabId.get, Instant.now(), project2.slug)
 
-    val criteria = Criteria(Set(EntityType.Project), AuthUser(person.maybeGitLabId.get, token), 10)
-    val result   = finder.findRecentlyViewedEntities(criteria).unsafeRunSync()
+      criteria = Criteria(Set(EntityType.Project), AuthUser(person.maybeGitLabId.get, token), 10)
+      result <- recentEntitiesFinder.findRecentlyViewedEntities(criteria)
 
-    result.results.size           shouldBe 2
-    result.pagingInfo.total.value shouldBe 2
-    result.results.head shouldMatchTo
-      SearchEntity.Project(
-        matchingScore = MatchingScore(1f),
-        slug = project2.slug,
-        name = project2.name,
-        visibility = project2.visibility,
-        date = project2.dateCreated,
-        dateModified = project2.dateModified,
-        maybeCreator = project2.maybeCreator.map(_.name),
-        keywords = project2.keywords.toList.sorted,
-        maybeDescription = project2.maybeDescription,
-        images = project2.images
-      )
+      _ = result.results.size           shouldBe 2
+      _ = result.pagingInfo.total.value shouldBe 2
+      _ = result.results.head shouldMatchTo
+            SearchEntity.Project(
+              matchingScore = MatchingScore(1f),
+              slug = project2.slug,
+              name = project2.name,
+              visibility = project2.visibility,
+              date = project2.dateCreated,
+              dateModified = project2.dateModified,
+              maybeCreator = project2.maybeCreator.map(_.name),
+              keywords = project2.keywords.toList.sorted,
+              maybeDescription = project2.maybeDescription,
+              images = project2.images
+            )
+    } yield Succeeded
   }
 }

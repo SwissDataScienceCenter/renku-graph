@@ -18,58 +18,71 @@
 
 package io.renku.triplesgenerator.events.consumers.tsmigrationrequest.migrations
 
-import io.renku.entities.viewings.EntityViewings
+import cats.effect.IO
+import cats.effect.testing.scalatest.AsyncIOSpec
+import cats.syntax.all._
+import io.renku.entities.searchgraphs.TestSearchInfoDatasets
+import io.renku.entities.viewings.TestEntityViewings
 import io.renku.entities.viewings.collector.projects.EventPersisterSpecTools
 import io.renku.generators.Generators.Implicits._
 import io.renku.generators.Generators.timestamps
 import io.renku.graph.model.testentities._
 import io.renku.graph.model.{entities, projects}
-import io.renku.testtools.IOSpec
+import io.renku.interpreters.TestLogger
+import io.renku.triplesgenerator.TriplesGeneratorJenaSpec
 import io.renku.triplesgenerator.api.events.Generators.projectViewedEvents
-import io.renku.triplesstore.{InMemoryJenaForSpec, ProjectsDataset}
+import org.scalatest.Succeeded
 import org.scalatest.matchers.should
-import org.scalatest.wordspec.AnyWordSpec
+import org.scalatest.wordspec.AsyncWordSpec
 
 class ProjectDateViewedDeduplicatorSpec
-    extends AnyWordSpec
-    with should.Matchers
-    with IOSpec
-    with InMemoryJenaForSpec
+    extends AsyncWordSpec
+    with AsyncIOSpec
+    with TriplesGeneratorJenaSpec
+    with TestSearchInfoDatasets
     with EventPersisterSpecTools
-    with ProjectsDataset
-    with EntityViewings {
+    with TestEntityViewings
+    with should.Matchers {
 
   "run" should {
 
-    "remove obsolete project viewing dates when multiple exist for a single project" in {
+    "remove obsolete project viewing dates when multiple exist for a single project" in projectsDSConfig.use {
+      implicit pcc =>
+        for {
+          project1 <- anyProjectEntities.generateOne.to[entities.Project].pure[IO]
+          _        <- provisionProject(project1)
 
-      val project1 = anyProjectEntities.generateOne.to[entities.Project]
-      upload(to = projectsDataset, project1)
+          eventProject1 = projectViewedEvents.generateOne.copy(slug = project1.slug)
+          _ <- provision(eventProject1)
 
-      val eventProject1 = projectViewedEvents.generateOne.copy(slug = project1.slug)
-      provision(eventProject1).unsafeRunSync()
+          otherProject1Date = timestamps(max = eventProject1.dateViewed.value).generateAs(projects.DateViewed)
+          _ <- insertOtherDate(project1, otherProject1Date)
 
-      val otherProject1Date = timestamps(max = eventProject1.dateViewed.value).generateAs(projects.DateViewed)
-      insertOtherDate(project1, otherProject1Date)
+          project2 = anyProjectEntities.generateOne.to[entities.Project]
+          _ <- provisionProject(project2)
 
-      val project2 = anyProjectEntities.generateOne.to[entities.Project]
-      upload(to = projectsDataset, project2)
+          eventProject2 = projectViewedEvents.generateOne.copy(slug = project2.slug)
+          _ <- provision(eventProject2)
 
-      val eventProject2 = projectViewedEvents.generateOne.copy(slug = project2.slug)
-      provision(eventProject2).unsafeRunSync()
+          _ <- findAllViewings.asserting {
+                 _ shouldBe Set(
+                   project1.resourceId -> eventProject1.dateViewed,
+                   project1.resourceId -> otherProject1Date,
+                   project2.resourceId -> eventProject2.dateViewed
+                 )
+               }
 
-      findAllViewings shouldBe Set(
-        project1.resourceId -> eventProject1.dateViewed,
-        project1.resourceId -> otherProject1Date,
-        project2.resourceId -> eventProject2.dateViewed
-      )
+          _ <- runUpdate(ProjectDateViewedDeduplicator.query)
 
-      runUpdate(projectsDataset, ProjectDateViewedDeduplicator.query).unsafeRunSync()
-
-      findAllViewings shouldBe Set(
-        project1.resourceId -> eventProject1.dateViewed,
-        project2.resourceId -> eventProject2.dateViewed
-      )
+          _ <- findAllViewings.asserting {
+                 _ shouldBe Set(
+                   project1.resourceId -> eventProject1.dateViewed,
+                   project2.resourceId -> eventProject2.dateViewed
+                 )
+               }
+        } yield Succeeded
     }
   }
+
+  implicit lazy val ioLogger: TestLogger[IO] = TestLogger()
 }

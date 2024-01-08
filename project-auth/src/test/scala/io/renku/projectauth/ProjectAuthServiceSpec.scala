@@ -30,11 +30,7 @@ import org.scalatest.matchers.should
 import org.typelevel.log4cats.Logger
 import org.typelevel.log4cats.slf4j.Slf4jLogger
 
-class ProjectAuthServiceSpec
-    extends AsyncFlatSpec
-    with AsyncIOSpec
-    with ProjectAuthServiceSupport
-    with should.Matchers {
+class ProjectAuthServiceSpec extends AsyncFlatSpec with AsyncIOSpec with ProjectAuthJenaSpec with should.Matchers {
   implicit val logger:   Logger[IO] = Slf4jLogger.getLogger[IO]
   implicit val renkuUrl: RenkuUrl   = RenkuUrl("http://localhost/renku")
 

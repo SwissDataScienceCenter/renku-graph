@@ -28,7 +28,7 @@ import org.testcontainers.containers
 import org.testcontainers.utility.DockerImageName
 
 object JenaContainer {
-  val version   = "0.0.22"
+  val version   = "0.0.23"
   val imageName = s"renku/renku-jena:$version"
   val image     = DockerImageName.parse(imageName)
 

@@ -144,8 +144,8 @@ lazy val http4sServerUtils = project
         Dependencies.http4sPrometheus
   )
   .dependsOn(
-    commonUtils % "compile->compile;test->test",
-    metricUtils % "compile->compile;test->test",
+    commonUtils       % "compile->compile;test->test",
+    metricUtils       % "compile->compile;test->test",
     http4sClientUtils % "compile->compile;test->test"
   )
 
@@ -157,8 +157,8 @@ lazy val gitlabUtils = project
     name := "gitlab-utils"
   )
   .dependsOn(
-    commonUtils % "compile->compile;test->test",
-    metricUtils % "compile->compile;test->test",
+    commonUtils       % "compile->compile;test->test",
+    metricUtils       % "compile->compile;test->test",
     http4sClientUtils % "compile->compile;test->test"
   )
 
@@ -215,6 +215,8 @@ lazy val triplesStoreClient = project
   .settings(commonSettings)
   .settings(
     name := "triples-store-client",
+    Test / testOptions += Tests.Setup(JenaServer.triplesStoreClient("start")),
+    Test / testOptions += Tests.Cleanup(JenaServer.triplesStoreClient("forceStop")),
     libraryDependencies ++=
       Dependencies.jsonld4s ++
         Dependencies.luceneQueryParser ++
@@ -228,7 +230,7 @@ lazy val triplesStoreClient = project
   )
   .dependsOn(
     generators % "test->test",
-    tinyTypes % "compile->compile; test->test"
+    tinyTypes  % "compile->compile; test->test"
   )
   .enablePlugins(AutomateHeaderPlugin)
 
@@ -299,8 +301,14 @@ lazy val graphCommons = project
   .settings(commonSettings)
   .settings(
     name := "graph-commons",
-    Test / testOptions += Tests.Setup(PostgresServer.commons("start")),
-    Test / testOptions += Tests.Cleanup(PostgresServer.commons("forceStop")),
+    Test / testOptions += Tests.Setup { cl =>
+      PostgresServer.commons("start")
+      JenaServer.commons("start")
+    },
+    Test / testOptions += Tests.Cleanup { cl =>
+      PostgresServer.commons("forceStop")
+      JenaServer.commons("forceStop")
+    },
     libraryDependencies ++=
       Dependencies.pureconfig ++
         Dependencies.refinedPureconfig ++
@@ -326,14 +334,14 @@ lazy val graphCommons = project
   )
   .enablePlugins(AutomateHeaderPlugin)
   .dependsOn(
-    commonUtils % "compile->compile; test->test",
-    configUtils % "compile->compile; test->test",
-    sentryUtils % "compile->compile; test->test",
+    commonUtils       % "compile->compile; test->test",
+    configUtils       % "compile->compile; test->test",
+    sentryUtils       % "compile->compile; test->test",
     http4sClientUtils % "compile->compile; test->test",
     http4sServerUtils % "compile->compile; test->test",
-    jsonldUtils % "compile->compile; test->test",
-    metricUtils % "compile->compile; test->test",
-    gitlabUtils % "compile->compile; test->test"
+    jsonldUtils       % "compile->compile; test->test",
+    metricUtils       % "compile->compile; test->test",
+    gitlabUtils       % "compile->compile; test->test"
   )
 
 lazy val eventsQueue = project
@@ -441,9 +449,12 @@ lazy val entitiesSearch = project
 
 lazy val projectAuth = project
   .in(file("project-auth"))
+  .withId("project-auth")
   .settings(commonSettings)
   .settings(
     name := "project-auth",
+    Test / testOptions += Tests.Setup(JenaServer.projectAuth("start")),
+    Test / testOptions += Tests.Cleanup(JenaServer.projectAuth("forceStop")),
     libraryDependencies ++= Dependencies.http4sClient
   )
   .dependsOn(
@@ -467,7 +478,9 @@ lazy val entitiesViewingsCollector = project
   .withId("entities-viewings-collector")
   .settings(commonSettings)
   .settings(
-    name := "entities-viewings-collector"
+    name := "entities-viewings-collector",
+    Test / testOptions += Tests.Setup(JenaServer.viewingsCollector("start")),
+    Test / testOptions += Tests.Cleanup(JenaServer.viewingsCollector("forceStop"))
   )
   .dependsOn(
     eventsQueue         % "compile->compile; test->test",
@@ -482,7 +495,8 @@ lazy val triplesGenerator = project
   .settings(commonSettings)
   .settings(
     name := "triples-generator",
-    Test / fork := true,
+    Test / testOptions += Tests.Setup(JenaServer.triplesGenerator("start")),
+    Test / testOptions += Tests.Cleanup(JenaServer.triplesGenerator("forceStop")),
     libraryDependencies ++=
       Dependencies.logbackClassic ++
         Dependencies.ammoniteOps,
