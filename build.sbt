@@ -495,7 +495,6 @@ lazy val triplesGenerator = project
   .settings(commonSettings)
   .settings(
     name := "triples-generator",
-    Test / fork := true,
     Test / testOptions += Tests.Setup(JenaServer.triplesGenerator("start")),
     Test / testOptions += Tests.Cleanup(JenaServer.triplesGenerator("forceStop")),
     libraryDependencies ++=
