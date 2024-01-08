@@ -54,7 +54,7 @@ trait TestProjectsDataset extends TestDataset {
 
   def projectsDSResource(implicit L: Logger[IO]): Resource[IO, SparqlClient[IO]] =
     projectsDSConfig
-      .flatMap(conf => SparqlClient[IO](conf.toCC()))
+      .flatMap(pcc => SparqlClient[IO](pcc.toCC()))
 
   private lazy val ttlResource =
     loadTtl(ProjectsTTL)

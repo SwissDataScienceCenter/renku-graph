@@ -38,9 +38,8 @@ class ProjectSparqlClientSpec extends AsyncFlatSpec with AsyncIOSpec with Common
 
   implicit val logger: Logger[IO] = TestLogger()
 
-  private val makeHistogram: IO[LabeledHistogram[IO] with PrometheusCollector] = IO {
+  private def makeHistogram: LabeledHistogram[IO] with PrometheusCollector =
     new LabeledHistogramImpl[IO]("test", "test", "update", Seq(0.5d, 0.8d).some, maybeThreshold = None)
-  }
 
   private def makeSparqlQueryTimeRecorder(h: Histogram[IO]): SparqlQueryTimeRecorder[IO] =
     new SparqlQueryTimeRecorder[IO](TestExecutionTimeRecorder[IO](Some(h)))
@@ -60,9 +59,10 @@ class ProjectSparqlClientSpec extends AsyncFlatSpec with AsyncIOSpec with Common
   }
 
   it should "measure execution time for named queries" in {
-    val histogram = makeHistogram.unsafeRunSync()
+    val histogram = makeHistogram
     implicit val sr: SparqlQueryTimeRecorder[IO] = makeSparqlQueryTimeRecorder(histogram)
-    withProjectsDSClient.use { c =>
+
+    withProjectsDSClient.use { client =>
       for {
         _ <- IO(assertNotSampled(histogram))
         up = SparqlQuery.apply(
@@ -78,7 +78,7 @@ class ProjectSparqlClientSpec extends AsyncFlatSpec with AsyncIOSpec with Common
                               |        p:hasChild p:roxy, p:chip.
                               |}""".stripMargin
              )
-        _ <- c.update(up)
+        _ <- client.update(up)
         _ = assertSampled(histogram)
 
         _ <- IO(resetHistogram(histogram))
@@ -87,22 +87,22 @@ class ProjectSparqlClientSpec extends AsyncFlatSpec with AsyncIOSpec with Common
               prefixes = Set.empty,
               body = sparql"SELECT * WHERE { ?s ?p ?o } LIMIT 1"
             )
-        _ <- c.query(q)
+        _ <- client.query(q)
         _ = assertSampled(histogram)
 
         _ <- IO(resetHistogram(histogram))
         data = CliSoftwareAgent(agents.ResourceId("http://u.rl"), agents.Name("test")).asJsonLD
-        _ <- c.upload(data)
+        _ <- client.upload(data)
         _ = assertSampled(histogram)
       } yield ()
     }
   }
 
   it should "not measure execution time for un-named queries" in {
-    val histogram = makeHistogram.unsafeRunSync()
+    val histogram = makeHistogram
     implicit val sr: SparqlQueryTimeRecorder[IO] = makeSparqlQueryTimeRecorder(histogram)
 
-    withProjectsDSClient.use { c =>
+    withProjectsDSClient.use { client =>
       for {
         _ <- IO(assertNotSampled(histogram))
 
@@ -116,7 +116,7 @@ class ProjectSparqlClientSpec extends AsyncFlatSpec with AsyncIOSpec with Common
                     |        p:hasChild p:roxy, p:chip.
                     |}""".stripMargin
 
-        _ <- c.update(q)
+        _ <- client.update(q)
 
         _ = assertNotSampled(histogram)
       } yield ()

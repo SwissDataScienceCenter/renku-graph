@@ -43,9 +43,9 @@ private object TestDatasetCreation {
       factory: (DatasetName, String) => C
   ): C = {
     val newBody =
-      (updateDSName(config.name, newName) >>>
+      (updateResourceIds(config.name, newName) >>>
         updateDSLocation(config.name, newName) >>>
-        updateResourceIds(config.name, newName))(config.value)
+        updateDSName(config.name, newName))(config.value)
     factory(DatasetName(newName), newBody)
   }
 
