@@ -75,8 +75,9 @@ class JenaServer(module: String, port: Int) {
       stopCmd.!!
     }
 
-  def forceStop(): Any = {
-    println(s"Stopping Jena container for module '$module'")
-    stopCmd.!!
-  }
+  def forceStop(): Any =
+    if (!skipServer) {
+      println(s"Stopping Jena container for module '$module'")
+      stopCmd.!!
+    }
 }
