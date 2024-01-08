@@ -31,7 +31,8 @@ object DatasetTTLs {
   object MigrationsTTL
       extends DatasetConfigFileFactory[MigrationsTTL](new MigrationsTTL(_, _), ttlFileName = "migrations-ds.ttl")
 
-  val allFactories: List[DatasetConfigFileFactory[_ <: DatasetConfigFile]] = List(ProjectsTTL, MigrationsTTL)
+  val allFactories: List[DatasetConfigFileFactory[_ <: DatasetConfigFile]] =
+    List(ProjectsTTL, MigrationsTTL)
 
   val allConfigs: Either[Exception, List[DatasetConfigFile]] =
     allFactories.map(factory => factory.fromTtlFile()).sequence

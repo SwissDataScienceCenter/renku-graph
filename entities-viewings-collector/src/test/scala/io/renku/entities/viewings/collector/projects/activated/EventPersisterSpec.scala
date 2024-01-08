@@ -20,77 +20,85 @@ package io.renku.entities.viewings.collector.projects
 package activated
 
 import cats.effect.IO
+import cats.effect.testing.scalatest.AsyncIOSpec
 import cats.syntax.all._
+import io.renku.entities.searchgraphs.TestSearchInfoDatasets
+import io.renku.entities.viewings.ViewingsCollectorJenaSpec
 import io.renku.generators.Generators.Implicits._
 import io.renku.generators.Generators.timestampsNotInTheFuture
 import io.renku.graph.model.projects
 import io.renku.graph.model.testentities._
 import io.renku.interpreters.TestLogger
-import io.renku.logging.TestSparqlQueryTimeRecorder
-import io.renku.testtools.IOSpec
 import io.renku.triplesgenerator.api.events.Generators._
 import io.renku.triplesgenerator.api.events.ProjectActivated
 import io.renku.triplesstore._
-import org.scalamock.scalatest.MockFactory
+import org.scalamock.scalatest.AsyncMockFactory
+import org.scalatest.Succeeded
 import org.scalatest.matchers.should
-import org.scalatest.wordspec.AnyWordSpec
+import org.scalatest.wordspec.AsyncWordSpec
 
 class EventPersisterSpec
-    extends AnyWordSpec
-    with should.Matchers
+    extends AsyncWordSpec
+    with AsyncIOSpec
+    with ViewingsCollectorJenaSpec
+    with TestSearchInfoDatasets
     with EventPersisterSpecTools
-    with MockFactory
-    with IOSpec
-    with InMemoryJenaForSpec
-    with ProjectsDataset {
+    with AsyncMockFactory
+    with should.Matchers {
 
   "persist" should {
 
     "insert the given ProjectActivated event into the TS and run the deduplication query " +
-      "if there's no event for the project yet" in new TestCase {
-
+      "if there's no event for the project yet" in projectsDSConfig.use { implicit pcc =>
         val project = anyProjectEntities.generateOne
-        upload(to = projectsDataset, project)
+        for {
+          _ <- provisionTestProject(project)
 
-        val event = projectActivatedEvents.generateOne.copy(slug = project.slug)
+          event = projectActivatedEvents.generateOne.copy(slug = project.slug)
 
-        givenEventDeduplication(project, returning = ().pure[IO])
+          _ = givenEventDeduplication(project, returning = ().pure[IO])
 
-        persister.persist(event).unsafeRunSync() shouldBe ()
+          _ <- persister.persist(event).assertNoException
 
-        findAllViewings shouldBe Set(project.resourceId -> projects.DateViewed(event.dateActivated.value))
+          _ <- findAllViewings.asserting(
+                 _ shouldBe Set(project.resourceId -> projects.DateViewed(event.dateActivated.value))
+               )
+        } yield Succeeded
       }
 
-    "do nothing if there's already an event for the project in the TS" in new TestCase {
-
+    "do nothing if there's already an event for the project in the TS" in projectsDSConfig.use { implicit pcc =>
       val project = anyProjectEntities.generateOne
-      upload(to = projectsDataset, project)
+      for {
+        _ <- provisionTestProject(project)
 
-      val event = projectActivatedEvents.generateOne.copy(slug = project.slug)
+        event = projectActivatedEvents.generateOne.copy(slug = project.slug)
 
-      givenEventDeduplication(project, returning = ().pure[IO])
+        _ = givenEventDeduplication(project, returning = ().pure[IO])
 
-      persister.persist(event).unsafeRunSync() shouldBe ()
+        _ <- persister.persist(event).assertNoException
 
-      findAllViewings shouldBe Set(project.resourceId -> projects.DateViewed(event.dateActivated.value))
+        _ <- findAllViewings.asserting(
+               _ shouldBe Set(project.resourceId -> projects.DateViewed(event.dateActivated.value))
+             )
 
-      val otherEvent = event.copy(dateActivated = timestampsNotInTheFuture.generateAs(ProjectActivated.DateActivated))
+        otherEvent = event.copy(dateActivated = timestampsNotInTheFuture.generateAs(ProjectActivated.DateActivated))
 
-      persister.persist(otherEvent).unsafeRunSync() shouldBe ()
+        _ <- persister.persist(otherEvent).assertNoException
 
-      findAllViewings shouldBe Set(project.resourceId -> projects.DateViewed(event.dateActivated.value))
+        _ <- findAllViewings.asserting(
+               _ shouldBe Set(project.resourceId -> projects.DateViewed(event.dateActivated.value))
+             )
+      } yield Succeeded
     }
   }
 
-  private trait TestCase {
-    private implicit val logger: TestLogger[IO]              = TestLogger[IO]()
-    private implicit val sqtr:   SparqlQueryTimeRecorder[IO] = TestSparqlQueryTimeRecorder[IO].unsafeRunSync()
-    private val eventDeduplicator = mock[EventDeduplicator[IO]]
-    val persister = new EventPersisterImpl[IO](TSClient[IO](projectsDSConnectionInfo), eventDeduplicator)
+  implicit val ioLogger: TestLogger[IO] = TestLogger[IO]()
+  private val eventDeduplicator = mock[EventDeduplicator[IO]]
+  private def persister(implicit pcc: ProjectsConnectionConfig) =
+    new EventPersisterImpl[IO](tsClient, eventDeduplicator)
 
-    def givenEventDeduplication(project: Project, returning: IO[Unit]) =
-      (eventDeduplicator.deduplicate _)
-        .expects(project.resourceId)
-        .returning(returning)
-  }
+  private def givenEventDeduplication(project: Project, returning: IO[Unit]) =
+    (eventDeduplicator.deduplicate _)
+      .expects(project.resourceId)
+      .returning(returning)
 }

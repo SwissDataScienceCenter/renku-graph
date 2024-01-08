@@ -26,7 +26,7 @@ import scala.sys.process._
 
 class JenaServer(module: String, port: Int) {
 
-  val ccConfig: ConnectionConfig = ConnectionConfig(
+  val conConfig: ConnectionConfig = ConnectionConfig(
     Uri.unsafeFromString(s"http://localhost:$port"),
     BasicCredentials(username = "admin", password = "admin").some,
     retry = None

@@ -18,9 +18,28 @@
 
 package io.renku.triplesstore
 
+import cats.effect.IO
+import cats.effect.unsafe.IORuntime
+import io.renku.generators.Generators.Implicits._
+import io.renku.graph.model.GraphModelGenerators.projectSlugs
+import io.renku.graph.model.RenkuUrl
+import io.renku.graph.model.projects.Slug
+import io.renku.jsonld.EntityId
+import io.renku.logging.TestSparqlQueryTimeRecorder
 import io.renku.triplesstore.client.util.JenaSpec
 import org.scalatest.Suite
+import org.typelevel.log4cats.Logger
 
-trait GraphJenaSpec extends JenaSpec with TSProjectsDataset with TSMigrationsDataset {
+trait GraphJenaSpec extends JenaSpec with TestProjectsDataset with TestMigrationsDataset {
   self: Suite =>
+
+  private lazy val defaultProjectForGraph: Slug = projectSlugs.generateOne
+
+  def defaultProjectGraphId(implicit renkuUrl: RenkuUrl): EntityId =
+    io.renku.graph.model.testentities.Project.toEntityId(defaultProjectForGraph)
+
+  def tsClient(implicit cc: DatasetConnectionConfig, L: Logger[IO], ioRuntime: IORuntime) = {
+    implicit val sqtr: SparqlQueryTimeRecorder[IO] = TestSparqlQueryTimeRecorder.createUnsafe
+    TSClient[IO](cc)
+  }
 }

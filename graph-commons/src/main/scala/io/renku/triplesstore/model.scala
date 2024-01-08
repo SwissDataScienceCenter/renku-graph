@@ -45,7 +45,7 @@ trait DatasetConfigFile extends StringTinyType with DatasetDefinition {
 
   override def putToRequest[F[_]]: Request[F] => Request[F] =
     _.withEntity(value.show)
-      .putHeaders(`Content-Type`(`text/turtle`))
+      .withContentType(`Content-Type`(`text/turtle`))
 }
 
 object DatasetConfigFile {

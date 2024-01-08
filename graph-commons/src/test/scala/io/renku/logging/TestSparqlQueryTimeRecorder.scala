@@ -30,6 +30,6 @@ object TestSparqlQueryTimeRecorder {
     SparqlQueryTimeRecorder.create[F]()
   }
 
-  def createUnsafe(implicit logger: Logger[IO], IORuntime: IORuntime): SparqlQueryTimeRecorder[IO] =
+  def createUnsafe(implicit logger: Logger[IO], ioRuntime: IORuntime): SparqlQueryTimeRecorder[IO] =
     apply[IO].unsafeRunSync()
 }

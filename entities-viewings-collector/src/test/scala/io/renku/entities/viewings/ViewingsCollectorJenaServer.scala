@@ -1,5 +1,5 @@
 /*
- * Copyright 2019 Swiss Data Science Center (SDSC)
+ * Copyright 2024 Swiss Data Science Center (SDSC)
  * A partnership between École Polytechnique Fédérale de Lausanne (EPFL) and
  * Eidgenössische Technische Hochschule Zürich (ETHZ).
  *
@@ -16,14 +16,8 @@
  * limitations under the License.
  */
 
-name := "entities-viewings-collector"
+package io.renku.entities.viewings
 
-Test / testOptions += Tests.Setup(jenaServer("start"))
-Test / testOptions += Tests.Cleanup(jenaServer("forceStop"))
+import io.renku.triplesstore.client.util.JenaServer
 
-def jenaServer(methodName: String): ClassLoader => Unit = classLoader => {
-  val clazz    = classLoader.loadClass("io.renku.entities.viewings.ViewingsCollectorJenaServer$")
-  val method   = clazz.getMethod(methodName)
-  val instance = clazz.getField("MODULE$").get(null)
-  method.invoke(instance)
-}
+object ViewingsCollectorJenaServer extends JenaServer(module = "entities_viewings_collector", port = 3043)

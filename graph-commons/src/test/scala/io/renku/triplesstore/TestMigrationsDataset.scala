@@ -18,19 +18,20 @@
 
 package io.renku.triplesstore
 
+import TestDatasetCreation._
 import cats.effect.{IO, Resource}
 import cats.syntax.all._
 import io.renku.graph.triplesstore.DatasetTTLs.MigrationsTTL
 import io.renku.triplesstore.client.http.SparqlClient
 import org.typelevel.log4cats.Logger
 
-trait TSMigrationsDataset extends TSDataset {
+trait TestMigrationsDataset extends TestDataset {
   self: GraphJenaSpec =>
 
   def migrationsDSConfig(implicit L: Logger[IO]): Resource[IO, MigrationsConnectionConfig] =
     ttlResource >>= { ttl =>
       (clientResource >>= datasetResource(ttl))
-        .as(dsConnectionConfig(ttl)(MigrationsConnectionConfig.apply))
+        .as(dsConnectionConfig(ttl, server.conConfig, MigrationsConnectionConfig.apply))
     }
 
   def migrationsDSResource(implicit L: Logger[IO]): Resource[IO, SparqlClient[IO]] =
@@ -38,7 +39,8 @@ trait TSMigrationsDataset extends TSDataset {
       .flatMap(conf => SparqlClient[IO](conf.toCC()))
 
   private lazy val ttlResource =
-    (loadTtl(MigrationsTTL) -> generateName)
-      .mapN((origTtl, newName) => updateDSName(origTtl, newName, new MigrationsTTL(_, _)))
+    loadTtl(MigrationsTTL)
+      .flatMap(ttl => generateName(ttl, getClass).tupleLeft(ttl))
+      .map { case (origTtl, newName) => updateDSConfig(origTtl, newName, new MigrationsTTL(_, _)) }
       .toResource
 }

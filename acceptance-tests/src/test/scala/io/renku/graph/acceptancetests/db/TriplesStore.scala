@@ -31,7 +31,7 @@ object TriplesStore extends JenaServerSupport {
 
   override lazy val server: JenaServer = new JenaServer("acceptance_tests", port = 3030)
 
-  lazy val fusekiUrl: FusekiUrl = FusekiUrl(server.ccConfig.baseUrl.renderString)
+  lazy val fusekiUrl: FusekiUrl = FusekiUrl(server.conConfig.baseUrl.renderString)
 
   def start(): IO[Unit] =
     IO(server.start())
@@ -54,7 +54,7 @@ object TriplesStore extends JenaServerSupport {
       ProjectsConnectionConfig(
         fusekiUrl,
         BasicAuthCredentials.from(
-          server.ccConfig.basicAuth.getOrElse(throw new Exception("No AuthCredentials for 'project' dataset"))
+          server.conConfig.basicAuth.getOrElse(throw new Exception("No AuthCredentials for 'project' dataset"))
         ),
         dsName
       )

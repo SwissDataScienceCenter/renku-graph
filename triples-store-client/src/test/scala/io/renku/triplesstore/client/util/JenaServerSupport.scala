@@ -34,5 +34,5 @@ trait JenaServerSupport {
     FusekiClient[IO](connectionConfig, timeout)
 
   lazy val connectionConfig =
-    ConnectionConfig(server.ccConfig.baseUrl, Some(BasicCredentials("admin", "admin")), retry = None)
+    ConnectionConfig(server.conConfig.baseUrl, Some(BasicCredentials("admin", "admin")), retry = None)
 }
