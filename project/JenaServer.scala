@@ -27,4 +27,11 @@ object JenaServer {
     val instance = clazz.getField("MODULE$").get(null)
     method.invoke(instance)
   }
+
+  def triplesGenerator(methodName: String): ClassLoader => Unit = classLoader => {
+    val clazz    = classLoader.loadClass("io.renku.triplesgenerator.TriplesGeneratorJenaServer$")
+    val method   = clazz.getMethod(methodName)
+    val instance = clazz.getField("MODULE$").get(null)
+    method.invoke(instance)
+  }
 }
