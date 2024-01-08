@@ -32,6 +32,7 @@ import io.renku.tokenrepository.api.TokenRepositoryClient
 import io.renku.webhookservice.hookvalidation.HookValidator.HookValidationResult
 import io.renku.webhookservice.model.{HookIdentifier, ProjectHookUrl}
 import org.typelevel.log4cats.Logger
+import io.renku.metrics.syntax.all._
 
 trait HookValidator[F[_]] {
   def validateHook(projectId: GitLabId, maybeAccessToken: Option[AccessToken]): F[Option[HookValidationResult]]

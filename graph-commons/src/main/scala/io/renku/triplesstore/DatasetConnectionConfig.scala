@@ -39,7 +39,7 @@ final case class AdminConnectionConfig(fusekiUrl: FusekiUrl, authCredentials: Ba
 
 object AdminConnectionConfig {
   import io.renku.config.ConfigLoader._
-  import io.renku.http.client.BasicAuthConfigReaders._
+  import BasicAuthConfigReaders._
 
   def apply[F[_]: MonadThrow](config: Config = ConfigFactory.load()): F[AdminConnectionConfig] = for {
     url      <- find[F, FusekiUrl]("services.fuseki.url", config)
@@ -69,7 +69,7 @@ final case class ProjectsConnectionConfig(fusekiUrl:       FusekiUrl,
 object ProjectsConnectionConfig {
 
   import io.renku.config.ConfigLoader._
-  import io.renku.http.client.BasicAuthConfigReaders._
+  import BasicAuthConfigReaders._
 
   def fromConfig[F[_]: MonadThrow](config: Config = ConfigFactory.load()): F[ProjectsConnectionConfig] = for {
     url      <- find[F, FusekiUrl]("services.fuseki.url", config)
@@ -87,7 +87,7 @@ final case class MigrationsConnectionConfig(
 object MigrationsConnectionConfig {
 
   import io.renku.config.ConfigLoader._
-  import io.renku.http.client.BasicAuthConfigReaders._
+  import BasicAuthConfigReaders._
 
   def fromConfig[F[_]: MonadThrow](config: Config = ConfigFactory.load()): F[MigrationsConnectionConfig] = for {
     url      <- find[F, FusekiUrl]("services.fuseki.url", config)

@@ -20,7 +20,7 @@ package io.renku.eventlog.metrics
 
 import cats.MonadThrow
 import com.typesafe.config.{Config, ConfigFactory}
-import io.renku.config.MetricsConfigProvider
+import io.renku.metrics.MetricsConfigProvider
 
 import scala.concurrent.duration.FiniteDuration
 

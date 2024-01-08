@@ -37,7 +37,8 @@ import io.renku.http.client.GitLabClient
 import io.renku.http.server.HttpServer
 import io.renku.logging.ApplicationLogger
 import io.renku.metrics._
-import io.renku.microservices.{IOMicroservice, ResourceUse, ServiceReadinessChecker}
+import io.renku.microservices.{IOMicroservice, ServiceReadinessChecker}
+import io.renku.utils.common.ResourceUse
 import natchez.Trace.Implicits.noop
 import org.http4s.server.Server
 import org.typelevel.log4cats.Logger
@@ -59,7 +60,7 @@ object Microservice extends IOMicroservice {
   ) =
     sessionPoolResource.use { implicit sessionResource =>
       for {
-        implicit0(mr: MetricsRegistry[IO])                  <- MetricsRegistry[IO]()
+        implicit0(mr: MetricsRegistry[IO])                  <- MetricsRegistryLoader[IO]()
         implicit0(gc: GitLabClient[IO])                     <- GitLabClient[IO]()
         implicit0(qet: QueriesExecutionTimes[IO])           <- QueriesExecutionTimes[IO]()
         certificateLoader                                   <- CertificateLoader[IO]
@@ -71,7 +72,7 @@ object Microservice extends IOMicroservice {
         eventLogMetrics                                     <- EventLogMetrics(statsFinder)
         implicit0(eventStatusGauges: EventStatusGauges[IO]) <- EventStatusGauges[IO](statsFinder)
         metricsResetScheduler <-
-          GaugeResetScheduler[IO, projects.Slug](eventStatusGauges.asList, MetricsConfigProvider())
+          GaugeResetScheduler[IO, projects.Slug](eventStatusGauges.asList, MetricsConfigProvider[IO]().getInterval())
         creationSubscription            <- events.consumers.creation.SubscriptionFactory[IO]
         zombieEventsSubscription        <- events.consumers.zombieevents.SubscriptionFactory[IO]
         commitSyncRequestSubscription   <- events.consumers.commitsyncrequest.SubscriptionFactory[IO]

@@ -29,7 +29,7 @@ import io.renku.http.client.GitLabClient
 import io.renku.http.rest.Links.Href
 import io.renku.http.server.security.model.AuthUser
 import io.renku.jsonld.syntax._
-import io.renku.logging.ExecutionTimeRecorder
+import io.renku.logging.{ExecutionTimeRecorder, ExecutionTimeRecorderLoader}
 import io.renku.metrics.MetricsRegistry
 import io.renku.triplesgenerator
 import io.renku.triplesgenerator.api.events.ProjectViewedEvent
@@ -123,7 +123,7 @@ object Endpoint {
       projectFinder         <- ProjectFinder[F]
       jsonEncoder           <- ProjectJsonEncoder[F]
       tgClient              <- triplesgenerator.api.events.Client[F]
-      executionTimeRecorder <- ExecutionTimeRecorder[F]()
+      executionTimeRecorder <- ExecutionTimeRecorderLoader[F]()
       gitLabUrl             <- GitLabUrlLoader[F]()
     } yield new EndpointImpl[F](projectFinder,
                                 jsonEncoder,

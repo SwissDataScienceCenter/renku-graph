@@ -31,7 +31,7 @@ import io.renku.graph.model.GitLabUrl
 import io.renku.http.rest.Sorting
 import io.renku.http.rest.paging.PagingRequest
 import io.renku.http.server.security.model.AuthUser
-import io.renku.logging.ExecutionTimeRecorder
+import io.renku.logging.{ExecutionTimeRecorder, ExecutionTimeRecorderLoader}
 import io.renku.tinytypes.constraints.NonBlank
 import io.renku.tinytypes.{StringTinyType, TinyTypeFactory}
 import io.renku.triplesstore.{ProjectsConnectionConfig, SparqlQueryTimeRecorder}
@@ -109,7 +109,7 @@ object Endpoint {
     storeConfig           <- ProjectsConnectionConfig.fromConfig[F]()
     renkuResourceUrl      <- renku.ApiUrl[F]()
     gitLabUrl             <- GitLabUrlLoader[F]()
-    executionTimeRecorder <- ExecutionTimeRecorder[F]()
+    executionTimeRecorder <- ExecutionTimeRecorderLoader[F]()
     creatorsFinder        <- CreatorsFinder(storeConfig)
     datasetsFinder        <- DatasetsFinder(storeConfig, creatorsFinder)
   } yield new EndpointImpl[F](datasetsFinder, renkuResourceUrl, gitLabUrl, executionTimeRecorder)

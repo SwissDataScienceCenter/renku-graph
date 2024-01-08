@@ -15,8 +15,8 @@ object Dependencies {
     val circeOptics            = "0.15.0"
     val diffx                  = "0.9.0"
     val fs2                    = "3.9.3"
-    val http4s                 = "0.23.24"
-    val http4sEmber            = "0.23.24"
+    val http4s                 = "0.23.25"
+    val http4sEmber            = "0.23.25"
     val http4sPrometheus       = "0.24.6"
     val ip4s                   = "3.4.0"
     val jsonld4s               = "0.13.0"
@@ -24,7 +24,9 @@ object Dependencies {
     val log4jCore              = "2.22.1"
     val logback                = "1.4.14"
     val luceneQueryParser      = "9.9.1"
+    val monocle                = "3.2.0"
     val owlapi                 = "5.5.0"
+    val prometheus             = "0.16.0"
     val pureconfig             = "0.17.4"
     val rdf4jQueryParserSparql = "4.3.8"
     val refined                = "0.11.0"
@@ -40,6 +42,16 @@ object Dependencies {
     val widoco                 = "1.4.21"
     val wiremock               = "3.3.1"
   }
+
+  val monocle = Seq(
+    "dev.optics" %% "monocle-core" % "3.2.0"
+  )
+
+  val prometheus = Seq(
+    "io.prometheus" % "simpleclient"         % V.prometheus,
+    "io.prometheus" % "simpleclient_common"  % V.prometheus,
+    "io.prometheus" % "simpleclient_hotspot" % V.prometheus
+  )
 
   val ip4s = Seq(
     "com.comcast" %% "ip4s-core" % V.ip4s
@@ -137,7 +149,8 @@ object Dependencies {
   )
 
   val log4Cats = Seq(
-    "org.typelevel" %% "log4cats-core" % V.log4cats
+    "org.typelevel" %% "log4cats-core"  % V.log4cats,
+    "org.typelevel" %% "log4cats-slf4j" % V.log4cats
   )
 
   val testContainersScalaTest = Seq(

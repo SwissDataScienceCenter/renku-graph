@@ -32,6 +32,7 @@ import io.renku.triplesgenerator.events.consumers.tsmigrationrequest.Migration
 import io.renku.triplesstore._
 import io.renku.triplesstore.SparqlQuery.Prefixes
 import org.typelevel.log4cats.Logger
+import io.renku.util.jsonld.TinyTypeJsonLDCodec._
 
 private[tsmigrationrequest] trait MigrationExecutionRegister[F[_]] {
   def registerExecution(migrationName: Migration.Name): F[Unit]
