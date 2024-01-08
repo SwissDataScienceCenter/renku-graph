@@ -43,7 +43,9 @@ private object TestDatasetCreation {
       factory: (DatasetName, String) => C
   ): C = {
     val newBody =
-      (updateDSName(config.name, newName) >>> updateDSLocation(config.name, newName))(config.value)
+      (updateDSName(config.name, newName) >>>
+        updateDSLocation(config.name, newName) >>>
+        updateResourceIds(config.name, newName))(config.value)
     factory(DatasetName(newName), newBody)
   }
 
@@ -59,6 +61,9 @@ private object TestDatasetCreation {
       configBody.replace(oldLocation, newLocation)
     case configBody => configBody
   }
+
+  private def updateResourceIds(oldName: String, newName: String): String => String =
+    _.replaceAll(s"_$oldName", s"_$newName")
 
   def dsConnectionConfig[DCC <: DatasetConnectionConfig](config:        DatasetConfigFile,
                                                          serverCConfig: ConnectionConfig,
