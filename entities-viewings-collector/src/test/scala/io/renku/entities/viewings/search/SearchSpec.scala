@@ -44,7 +44,7 @@ import org.scalatest.matchers.should
 
 import java.time.Instant
 
-private abstract class SearchSpec
+abstract class SearchSpec
     extends AsyncFlatSpec
     with AsyncIOSpec
     with FinderSpec
