@@ -560,7 +560,8 @@ lazy val knowledgeGraph = project
   .settings(commonSettings)
   .settings(
     name := "knowledge-graph",
-    Test / fork := true,
+    Test / testOptions += Tests.Setup(JenaServer.knowledgeGraph("start")),
+    Test / testOptions += Tests.Cleanup(JenaServer.knowledgeGraph("forceStop")),
     libraryDependencies ++=
       Dependencies.logbackClassic ++
         Dependencies.widoco ++

@@ -20,15 +20,15 @@ package io.renku.triplesgenerator.events.consumers.tsmigrationrequest.migrations
 package projectslug
 
 import cats.effect.IO
+import cats.effect.testing.scalatest.AsyncIOSpec
 import eu.timepit.refined.auto._
-import io.renku.entities.searchgraphs.SearchInfoDatasets
+import io.renku.entities.searchgraphs.TestSearchInfoDatasets
 import io.renku.generators.Generators.Implicits._
 import io.renku.graph.model.testentities._
 import io.renku.graph.model.{GraphClass, entities, projects}
 import io.renku.interpreters.TestLogger
 import io.renku.jsonld.syntax._
-import io.renku.logging.TestSparqlQueryTimeRecorder
-import io.renku.testtools.CustomAsyncIOSpec
+import io.renku.triplesgenerator.TriplesGeneratorJenaSpec
 import io.renku.triplesgenerator.events.consumers.tsmigrationrequest.ConditionedMigration
 import io.renku.triplesstore.SparqlQuery.Prefixes
 import io.renku.triplesstore._
@@ -40,16 +40,14 @@ import org.typelevel.log4cats.Logger
 
 class SlugPersisterSpec
     extends AsyncFlatSpec
-    with CustomAsyncIOSpec
+    with AsyncIOSpec
+    with TriplesGeneratorJenaSpec
+    with TestSearchInfoDatasets
     with should.Matchers
     with OptionValues
-    with InMemoryJenaForSpec
-    with ProjectsDataset
-    with SearchInfoDatasets
     with TSTooling {
 
-  it should "persist the given slug" in {
-
+  it should "persist the given slug" in projectsDSConfig.use { implicit pcc =>
     val project = anyProjectEntities.generateOne.to[entities.Project]
 
     provisionProject(project).assertNoException >>
@@ -64,8 +62,7 @@ class SlugPersisterSpec
       migrationNeedChecker.checkMigrationNeeded.asserting(_ shouldBe a[ConditionedMigration.MigrationRequired.No])
   }
 
-  it should "leave the old dateModified if exists" in {
-
+  it should "leave the old dateModified if exists" in projectsDSConfig.use { implicit pcc =>
     val project = anyProjectEntities.generateOne.to[entities.Project]
 
     provisionProject(project).assertNoException >>
@@ -79,15 +76,14 @@ class SlugPersisterSpec
       migrationNeedChecker.checkMigrationNeeded.asserting(_ shouldBe a[ConditionedMigration.MigrationRequired.No])
   }
 
-  implicit override lazy val ioLogger: Logger[IO]                  = TestLogger[IO]()
-  private implicit val timeRecorder:   SparqlQueryTimeRecorder[IO] = TestSparqlQueryTimeRecorder[IO].unsafeRunSync()
-  private lazy val tsClient             = TSClient[IO](projectsDSConnectionInfo)
-  private lazy val persister            = new SlugPersisterImpl[IO](tsClient)
-  private lazy val migrationNeedChecker = new MigrationNeedCheckerImpl[IO](tsClient)
+  implicit override lazy val ioLogger: Logger[IO] = TestLogger[IO]()
+  private def persister(implicit pcc:            ProjectsConnectionConfig) = new SlugPersisterImpl[IO](tsClient)
+  private def migrationNeedChecker(implicit pcc: ProjectsConnectionConfig) = new MigrationNeedCheckerImpl[IO](tsClient)
 
-  private def findProjectSlug(id: projects.ResourceId): IO[Option[projects.Slug]] =
+  private def findProjectSlug(id: projects.ResourceId)(implicit
+      pcc: ProjectsConnectionConfig
+  ): IO[Option[projects.Slug]] =
     runSelect(
-      on = projectsDataset,
       SparqlQuery.ofUnsafe(
         "test find slug",
         Prefixes of renku -> "renku",
@@ -101,9 +97,10 @@ class SlugPersisterSpec
       )
     ).map(_.map(_.get("slug").map(projects.Slug(_))).headOption.flatten)
 
-  private def findProjectsSlug(id: projects.ResourceId): IO[Option[projects.Slug]] =
+  private def findProjectsSlug(id: projects.ResourceId)(implicit
+      pcc: ProjectsConnectionConfig
+  ): IO[Option[projects.Slug]] =
     runSelect(
-      on = projectsDataset,
       SparqlQuery.ofUnsafe(
         "test find slug",
         Prefixes of renku -> "renku",

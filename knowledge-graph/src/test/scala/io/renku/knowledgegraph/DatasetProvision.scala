@@ -19,27 +19,27 @@
 package io.renku.knowledgegraph
 
 import cats.effect.IO
-import io.renku.entities.searchgraphs.SearchInfoDatasets
+import io.renku.entities.searchgraphs.TestSearchInfoDatasets
 import io.renku.graph.model.entities.EntityFunctions
 import io.renku.graph.model.{RenkuUrl, entities}
 import io.renku.projectauth.{ProjectAuthData, ProjectAuthService, ProjectMember}
 import io.renku.triplesstore._
 
-trait DatasetProvision extends SearchInfoDatasets { self: ProjectsDataset with InMemoryJena =>
+trait DatasetProvision extends TestSearchInfoDatasets { self: GraphJenaSpec =>
 
-  def projectAuthServiceR(implicit renkuUrl: RenkuUrl) =
-    ProjectAuthService.resource[IO](projectsDSConnectionInfo.toCC())
+  def projectAuthServiceR(implicit renkuUrl: RenkuUrl, pcc: ProjectsConnectionConfig) =
+    ProjectAuthService.resource[IO](pcc.toCC())
 
   override def provisionProject(
       project: entities.Project
   )(implicit
       entityFunctions: EntityFunctions[entities.Project],
       graphsProducer:  GraphsProducer[entities.Project],
-      renkuUrl:        RenkuUrl
+      renkuUrl:        RenkuUrl,
+      pcc:             ProjectsConnectionConfig
   ): IO[Unit] = {
     val members  = project.members.flatMap(p => p.person.maybeGitLabId.map(gid => ProjectMember(gid, p.role)))
     val authData = ProjectAuthData(project.slug, members, project.visibility)
     super.provisionProject(project) *> projectAuthServiceR.use(_.update(authData))
   }
-
 }

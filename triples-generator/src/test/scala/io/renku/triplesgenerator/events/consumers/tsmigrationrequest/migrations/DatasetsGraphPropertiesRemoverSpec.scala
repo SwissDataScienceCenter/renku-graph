@@ -19,9 +19,10 @@
 package io.renku.triplesgenerator.events.consumers.tsmigrationrequest.migrations
 
 import cats.effect.IO
+import cats.effect.testing.scalatest.AsyncIOSpec
 import cats.syntax.all._
 import eu.timepit.refined.auto._
-import io.renku.entities.searchgraphs.SearchInfoDatasets
+import io.renku.entities.searchgraphs.TestSearchInfoDatasets
 import io.renku.generators.Generators.Implicits._
 import io.renku.graph.model._
 import io.renku.graph.model.testentities._
@@ -29,11 +30,10 @@ import io.renku.interpreters.TestLogger
 import io.renku.jsonld.syntax._
 import io.renku.logging.TestSparqlQueryTimeRecorder
 import io.renku.metrics.TestMetricsRegistry
-import io.renku.testtools.CustomAsyncIOSpec
+import io.renku.triplesgenerator.TriplesGeneratorJenaSpec
 import io.renku.triplesstore.SparqlQuery.Prefixes
 import io.renku.triplesstore._
 import io.renku.triplesstore.client.syntax._
-import org.scalamock.scalatest.AsyncMockFactory
 import org.scalatest.Succeeded
 import org.scalatest.flatspec.AsyncFlatSpec
 import org.scalatest.matchers.should
@@ -42,16 +42,14 @@ import tooling.RegisteredUpdateQueryMigration
 
 class DatasetsGraphPropertiesRemoverSpec
     extends AsyncFlatSpec
-    with CustomAsyncIOSpec
-    with should.Matchers
-    with InMemoryJenaForSpec
-    with ProjectsDataset
-    with SearchInfoDatasets
-    with AsyncMockFactory {
+    with AsyncIOSpec
+    with TriplesGeneratorJenaSpec
+    with TestSearchInfoDatasets
+    with should.Matchers {
 
   it should "be a RegisteredUpdateQueryMigration" in {
     implicit val metricsRegistry: TestMetricsRegistry[IO]     = TestMetricsRegistry[IO]
-    implicit val timeRecorder:    SparqlQueryTimeRecorder[IO] = TestSparqlQueryTimeRecorder[IO].unsafeRunSync()
+    implicit val timeRecorder:    SparqlQueryTimeRecorder[IO] = TestSparqlQueryTimeRecorder.createUnsafe
 
     DatasetsGraphKeywordsRemover[IO].asserting(
       _.getClass shouldBe classOf[RegisteredUpdateQueryMigration[IO]]
@@ -62,8 +60,7 @@ class DatasetsGraphPropertiesRemoverSpec
   }
 
   it should "remove old keywords and images properties " +
-    "from all datasets in the Datasets graph" in {
-
+    "from all datasets in the Datasets graph" in projectsDSConfig.use { implicit pcc =>
       val ds1 -> project1 = anyRenkuProjectEntities
         .addDataset {
           datasetEntities(provenanceInternal)
@@ -86,18 +83,18 @@ class DatasetsGraphPropertiesRemoverSpec
 
       for {
         _ <- provisionProjects(project1, project2).assertNoException
-        _ <- runUpdates(projectsDataset, insertSchemaKeywords(ds1TopSameAs, ds1)).assertNoException
-        _ <- runUpdates(projectsDataset, insertSchemaImages(ds1TopSameAs, ds1)).assertNoException
-        _ <- runUpdates(projectsDataset, insertSchemaKeywords(ds2TopSameAs, ds2)).assertNoException
-        _ <- runUpdates(projectsDataset, insertSchemaImages(ds2TopSameAs, ds2)).assertNoException
+        _ <- runUpdates(insertSchemaKeywords(ds1TopSameAs, ds1)).assertNoException
+        _ <- runUpdates(insertSchemaImages(ds1TopSameAs, ds1)).assertNoException
+        _ <- runUpdates(insertSchemaKeywords(ds2TopSameAs, ds2)).assertNoException
+        _ <- runUpdates(insertSchemaImages(ds2TopSameAs, ds2)).assertNoException
 
         _ <- fetchKeywords(ds1TopSameAs).asserting(_ shouldBe ds1.additionalInfo.keywords)
         _ <- fetchImages(ds1TopSameAs).asserting(_ shouldBe ds1.additionalInfo.images.map(_.uri))
         _ <- fetchKeywords(ds2TopSameAs).asserting(_ shouldBe ds2.additionalInfo.keywords)
         _ <- fetchImages(ds2TopSameAs).asserting(_ shouldBe ds2.additionalInfo.images.map(_.uri))
 
-        _ <- runUpdate(projectsDataset, DatasetsGraphKeywordsRemover.query).assertNoException
-        _ <- runUpdate(projectsDataset, DatasetsGraphImagesRemover.query).assertNoException
+        _ <- runUpdate(DatasetsGraphKeywordsRemover.query).assertNoException
+        _ <- runUpdate(DatasetsGraphImagesRemover.query).assertNoException
 
         _ <- fetchKeywords(ds1TopSameAs).asserting(_ shouldBe Nil)
         _ <- fetchImages(ds1TopSameAs).asserting(_ shouldBe Nil)
@@ -106,9 +103,10 @@ class DatasetsGraphPropertiesRemoverSpec
       } yield Succeeded
     }
 
-  private def fetchKeywords(topSameAs: datasets.TopmostSameAs): IO[List[datasets.Keyword]] =
+  private def fetchKeywords(topSameAs: datasets.TopmostSameAs)(implicit
+      pcc: ProjectsConnectionConfig
+  ): IO[List[datasets.Keyword]] =
     runSelect(
-      on = projectsDataset,
       SparqlQuery.ofUnsafe(
         "test ds keywords",
         Prefixes of (renku -> "renku", schema -> "schema"),
@@ -122,9 +120,10 @@ class DatasetsGraphPropertiesRemoverSpec
       )
     ).map(_.flatMap(_.get("keys").map(datasets.Keyword)))
 
-  private def fetchImages(topSameAs: datasets.TopmostSameAs): IO[List[images.ImageUri]] =
+  private def fetchImages(topSameAs: datasets.TopmostSameAs)(implicit
+      pcc: ProjectsConnectionConfig
+  ): IO[List[images.ImageUri]] =
     runSelect(
-      on = projectsDataset,
       SparqlQuery.ofUnsafe(
         "test ds images",
         Prefixes of (renku -> "renku", schema -> "schema"),

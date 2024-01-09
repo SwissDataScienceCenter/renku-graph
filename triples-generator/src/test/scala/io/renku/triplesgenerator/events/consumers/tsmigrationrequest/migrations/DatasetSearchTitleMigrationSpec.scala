@@ -19,61 +19,63 @@
 package io.renku.triplesgenerator.events.consumers.tsmigrationrequest.migrations
 
 import cats.effect.IO
+import cats.effect.testing.scalatest.AsyncIOSpec
 import eu.timepit.refined.auto._
-import io.renku.entities.searchgraphs.SearchInfoDatasets
+import io.renku.entities.searchgraphs.TestSearchInfoDatasets
 import io.renku.generators.Generators.Implicits._
 import io.renku.graph.model.datasets
 import io.renku.graph.model.testentities._
 import io.renku.interpreters.TestLogger
-import io.renku.testtools.IOSpec
+import io.renku.triplesgenerator.TriplesGeneratorJenaSpec
 import io.renku.triplesstore.SparqlQuery.Prefixes
 import io.renku.triplesstore._
+import org.scalatest.Succeeded
 import org.scalatest.matchers.should
-import org.scalatest.wordspec.AnyWordSpec
+import org.scalatest.wordspec.AsyncWordSpec
 import org.typelevel.log4cats.Logger
 
 class DatasetSearchTitleMigrationSpec
-    extends AnyWordSpec
-    with should.Matchers
-    with IOSpec
-    with InMemoryJenaForSpec
-    with SearchInfoDatasets
-    with ProjectsDataset {
+    extends AsyncWordSpec
+    with AsyncIOSpec
+    with TriplesGeneratorJenaSpec
+    with TestSearchInfoDatasets
+    with should.Matchers {
 
   private val prefixes = Prefixes of (schema -> "schema", renku -> "renku")
   implicit val ioLogger: Logger[IO] = TestLogger()
 
   "run" should {
 
-    "add datasets name into the search graph" in {
-
+    "add datasets name into the search graph" in projectsDSConfig.use { implicit pcc =>
       val data = anyRenkuProjectEntities
         .modify(replaceProjectCreator(personEntities.generateSome))
         .addDataset(datasetEntities(provenanceInternal))
         .generateList(min = 2, max = 2)
 
-      provisionTestProjects(data.map(_._2): _*).unsafeRunSync()
+      for {
+        _ <- provisionTestProjects(data.map(_._2): _*)
 
-      // initially, names are provisioned
-      val names = findDatasetNames.unsafeRunSync()
-      names should not be empty
+        // initially, names are provisioned
+        names <- findDatasetNames
+        _ = names should not be empty
 
-      // remove names
-      removeDatasetNames().unsafeRunSync()
-      findDatasetNames.unsafeRunSync() should be(empty)
+        // remove names
+        _ <- removeDatasetNames
+        _ <- findDatasetNames.asserting(_ should be(empty))
 
-      // run the migration
-      runUpdate(projectsDataset, DatasetSearchTitleMigration.query).unsafeRunSync()
+        // run the migration
+        _ <- runUpdate(DatasetSearchTitleMigration.query)
 
-      // names should be back
-      val nextNames = findDatasetNames.unsafeRunSync()
-      nextNames shouldBe names
+        // names should be back
+        _ <- findDatasetNames.asserting(_ shouldBe names)
+      } yield Succeeded
     }
   }
 
-  def findDatasetNames: IO[Map[datasets.TopmostSameAs, List[datasets.Name]]] =
+  private def findDatasetNames(implicit
+      pcc: ProjectsConnectionConfig
+  ): IO[Map[datasets.TopmostSameAs, List[datasets.Name]]] =
     runSelect(
-      on = projectsDataset,
       SparqlQuery.of(
         "find dates",
         prefixes,
@@ -92,9 +94,8 @@ class DatasetSearchTitleMigrationSpec
         .groupMap(_._1)(_._2)
     )
 
-  private def removeDatasetNames() =
+  private def removeDatasetNames(implicit pcc: ProjectsConnectionConfig) =
     runUpdate(
-      projectsDataset,
       SparqlQuery.of(
         "delete names",
         prefixes,

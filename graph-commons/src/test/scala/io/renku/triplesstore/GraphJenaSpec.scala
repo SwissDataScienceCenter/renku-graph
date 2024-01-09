@@ -19,7 +19,9 @@
 package io.renku.triplesstore
 
 import cats.effect.IO
+import cats.effect.kernel.Resource
 import cats.effect.unsafe.IORuntime
+import cats.syntax.all._
 import io.renku.generators.Generators.Implicits._
 import io.renku.graph.model.GraphModelGenerators.projectSlugs
 import io.renku.graph.model.RenkuUrl
@@ -42,4 +44,7 @@ trait GraphJenaSpec extends JenaSpec with TestProjectsDataset with TestMigration
     implicit val sqtr: SparqlQueryTimeRecorder[IO] = TestSparqlQueryTimeRecorder.createUnsafe
     TSClient[IO](cc)
   }
+
+  def allDSConfigs(implicit L: Logger[IO]): Resource[IO, (ProjectsConnectionConfig, MigrationsConnectionConfig)] =
+    projectsDSConfig.flatMap(migrationsDSConfig.tupleLeft(_))
 }

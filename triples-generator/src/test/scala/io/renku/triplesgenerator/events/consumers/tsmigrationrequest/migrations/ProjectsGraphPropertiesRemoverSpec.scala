@@ -19,9 +19,10 @@
 package io.renku.triplesgenerator.events.consumers.tsmigrationrequest.migrations
 
 import cats.effect.IO
+import cats.effect.testing.scalatest.AsyncIOSpec
 import cats.syntax.all._
 import eu.timepit.refined.auto._
-import io.renku.entities.searchgraphs.SearchInfoDatasets
+import io.renku.entities.searchgraphs.TestSearchInfoDatasets
 import io.renku.generators.Generators.Implicits._
 import io.renku.graph.model._
 import io.renku.graph.model.testentities._
@@ -29,7 +30,7 @@ import io.renku.interpreters.TestLogger
 import io.renku.jsonld.syntax._
 import io.renku.logging.TestSparqlQueryTimeRecorder
 import io.renku.metrics.TestMetricsRegistry
-import io.renku.testtools.CustomAsyncIOSpec
+import io.renku.triplesgenerator.TriplesGeneratorJenaSpec
 import io.renku.triplesstore.SparqlQuery.Prefixes
 import io.renku.triplesstore._
 import io.renku.triplesstore.client.syntax._
@@ -42,16 +43,15 @@ import tooling.RegisteredUpdateQueryMigration
 
 class ProjectsGraphPropertiesRemoverSpec
     extends AsyncFlatSpec
-    with CustomAsyncIOSpec
+    with AsyncIOSpec
+    with TriplesGeneratorJenaSpec
+    with TestSearchInfoDatasets
     with should.Matchers
-    with InMemoryJenaForSpec
-    with ProjectsDataset
-    with SearchInfoDatasets
     with AsyncMockFactory {
 
   it should "be a RegisteredUpdateQueryMigration" in {
     implicit val metricsRegistry: TestMetricsRegistry[IO]     = TestMetricsRegistry[IO]
-    implicit val timeRecorder:    SparqlQueryTimeRecorder[IO] = TestSparqlQueryTimeRecorder[IO].unsafeRunSync()
+    implicit val timeRecorder:    SparqlQueryTimeRecorder[IO] = TestSparqlQueryTimeRecorder.createUnsafe
 
     ProjectsGraphImagesRemover[IO].asserting(
       _.getClass shouldBe classOf[RegisteredUpdateQueryMigration[IO]]
@@ -62,8 +62,7 @@ class ProjectsGraphPropertiesRemoverSpec
   }
 
   it should "remove old keywords and images properties " +
-    "from all projects in the Projects graph" in {
-
+    "from all projects in the Projects graph" in projectsDSConfig.use { implicit pcc =>
       val project1 = anyRenkuProjectEntities
         .modify(replaceProjectKeywords(Set.empty))
         .modify(replaceImages(imageUris.generateList(min = 1)))
@@ -77,18 +76,18 @@ class ProjectsGraphPropertiesRemoverSpec
 
       for {
         _ <- provisionProjects(project1, project2).assertNoException
-        _ <- runUpdates(projectsDataset, insertSchemaKeywords(project1.resourceId, project1)).assertNoException
-        _ <- runUpdates(projectsDataset, insertSchemaImages(project1.resourceId, project1)).assertNoException
-        _ <- runUpdates(projectsDataset, insertSchemaKeywords(project2.resourceId, project2)).assertNoException
-        _ <- runUpdates(projectsDataset, insertSchemaImages(project2.resourceId, project2)).assertNoException
+        _ <- runUpdates(insertSchemaKeywords(project1.resourceId, project1)).assertNoException
+        _ <- runUpdates(insertSchemaImages(project1.resourceId, project1)).assertNoException
+        _ <- runUpdates(insertSchemaKeywords(project2.resourceId, project2)).assertNoException
+        _ <- runUpdates(insertSchemaImages(project2.resourceId, project2)).assertNoException
 
         _ <- fetchKeywords(project1.resourceId).asserting(_ shouldBe project1.keywords)
         _ <- fetchImages(project1.resourceId).asserting(_ shouldBe project1.images.map(_.uri))
         _ <- fetchKeywords(project2.resourceId).asserting(_ shouldBe project2.keywords)
         _ <- fetchImages(project2.resourceId).asserting(_ shouldBe project2.images.map(_.uri))
 
-        _ <- runUpdate(projectsDataset, ProjectsGraphKeywordsRemover.query).assertNoException
-        _ <- runUpdate(projectsDataset, ProjectsGraphImagesRemover.query).assertNoException
+        _ <- runUpdate(ProjectsGraphKeywordsRemover.query).assertNoException
+        _ <- runUpdate(ProjectsGraphImagesRemover.query).assertNoException
 
         _ <- fetchKeywords(project1.resourceId).asserting(_ shouldBe Set.empty)
         _ <- fetchImages(project1.resourceId).asserting(_ shouldBe Nil)
@@ -97,9 +96,10 @@ class ProjectsGraphPropertiesRemoverSpec
       } yield Succeeded
     }
 
-  private def fetchKeywords(projectId: projects.ResourceId): IO[Set[projects.Keyword]] =
+  private def fetchKeywords(projectId: projects.ResourceId)(implicit
+      pcc: ProjectsConnectionConfig
+  ): IO[Set[projects.Keyword]] =
     runSelect(
-      on = projectsDataset,
       SparqlQuery.ofUnsafe(
         "test project keywords",
         Prefixes of (renku -> "renku", schema -> "schema"),
@@ -113,9 +113,10 @@ class ProjectsGraphPropertiesRemoverSpec
       )
     ).map(_.flatMap(_.get("keys").map(projects.Keyword)).toSet)
 
-  private def fetchImages(projectId: projects.ResourceId): IO[List[images.ImageUri]] =
+  private def fetchImages(projectId: projects.ResourceId)(implicit
+      pcc: ProjectsConnectionConfig
+  ): IO[List[images.ImageUri]] =
     runSelect(
-      on = projectsDataset,
       SparqlQuery.ofUnsafe(
         "test project images",
         Prefixes of (renku -> "renku", schema -> "schema"),

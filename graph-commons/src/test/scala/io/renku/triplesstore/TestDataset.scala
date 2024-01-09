@@ -43,6 +43,9 @@ trait TestDataset {
       _.update(query)
     }
 
+  def runUpdates(queries: Seq[SparqlQuery])(implicit dcc: DatasetConnectionConfig, L: Logger[IO]): IO[Unit] =
+    queries.traverse_(runUpdate)
+
   def insert(quad: Quad)(implicit dcc: DatasetConnectionConfig, L: Logger[IO]): IO[Unit] =
     runUpdate {
       SparqlQuery.ofUnsafe("insert quad", sparql"INSERT DATA { $quad }")
