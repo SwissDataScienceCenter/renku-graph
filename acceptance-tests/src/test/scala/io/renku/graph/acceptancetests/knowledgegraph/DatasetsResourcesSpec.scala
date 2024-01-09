@@ -19,13 +19,9 @@
 package io.renku.graph.acceptancetests.knowledgegraph
 
 import cats.syntax.all._
-import eu.timepit.refined.auto._
 import io.circe.Json
-import io.circe.literal._
 import io.renku.generators.CommonGraphGenerators.authUsers
 import io.renku.generators.Generators.Implicits._
-import io.renku.generators.Generators._
-import io.renku.graph.acceptancetests.data
 import io.renku.graph.acceptancetests.data._
 import io.renku.graph.acceptancetests.flows.TSProvisioning
 import io.renku.graph.acceptancetests.tooling.TestReadabilityTools._
@@ -34,12 +30,9 @@ import io.renku.graph.model.EventsGenerators.commitIds
 import io.renku.graph.model._
 import io.renku.graph.model.projects.Role
 import io.renku.graph.model.testentities.generators.EntitiesGenerators._
-import io.renku.graph.model.testentities.{::~, creatorUsernameUpdaterInternal}
 import io.renku.http.client.UrlEncoder.urlEncode
 import io.renku.http.rest.Links.Rel
 import io.renku.http.server.EndpointTester._
-import io.renku.http.server.security.model.AuthUser
-import io.renku.tinytypes.json.TinyTypeDecoders._
 import org.http4s.Status._
 import org.scalatest.EitherValues
 
@@ -206,240 +199,6 @@ class DatasetsResourcesSpec
 
       Then("he should get NOT_FOUND response")
       response.status shouldBe NotFound
-    }
-  }
-
-  Feature("GET knowledge-graph/datasets?query=<text> to find datasets with a free-text search") {
-
-    Scenario("As a user I would like to be able to search for datasets by free-text search") {
-
-      gitLabStub.addAuthenticated(creator)
-
-      val text = nonBlankStrings(minLength = 10).generateOne
-
-      val (dataset1, testProject1) = renkuProjectEntities(visibilityPublic, creatorGen = cliShapedPersons)
-        .modify(removeMembers())
-        .addDataset(datasetEntities(provenanceInternal(cliShapedPersons)).modify(_.makeNameContaining(text)))
-        .generateOne
-      val project1 = dataProjects(testProject1).map(addMemberWithId(creator.id, Role.Owner)).generateOne
-
-      val (dataset2, testProject2) = renkuProjectEntities(visibilityPublic, creatorGen = cliShapedPersons)
-        .modify(removeMembers())
-        .addDataset(datasetEntities(provenanceInternal(cliShapedPersons)).modify(_.makeDescContaining(text)))
-        .generateOne
-      val project2 = dataProjects(testProject2).map(addMemberWithId(creator.id, Role.Owner)).generateOne
-      val (dataset3, testProject3) = renkuProjectEntities(visibilityPublic, creatorGen = cliShapedPersons)
-        .modify(removeMembers())
-        .addDataset(
-          datasetEntities(provenanceInternal(cliShapedPersons))
-            .modify(_.makeCreatorNameContaining(text)(creatorUsernameUpdaterInternal(cliShapedPersons)))
-        )
-        .generateOne
-      val project3 = dataProjects(testProject3).map(addMemberWithId(creator.id, Role.Owner)).generateOne
-      val (dataset4, testProject4 ::~ testProject4Fork) =
-        renkuProjectEntities(visibilityPublic, creatorGen = cliShapedPersons)
-          .addDataset(datasetEntities(provenanceInternal(cliShapedPersons)).modify(_.makeKeywordsContaining(text)))
-          .forkOnce(creatorGen = cliShapedPersons)
-          .generateOne
-          .bimap(identity, _.bimap(removeMembers(), removeMembers()))
-      val project4     = dataProjects(testProject4).map(addMemberWithId(creator.id, Role.Owner)).generateOne
-      val project4Fork = dataProjects(testProject4Fork).map(addMemberWithId(creator.id, Role.Owner)).generateOne
-      val (dataset5WithoutText, testProject5) = renkuProjectEntities(visibilityPublic, creatorGen = cliShapedPersons)
-        .modify(removeMembers())
-        .addDataset(datasetEntities(provenanceInternal(cliShapedPersons)))
-        .generateOne
-      val project5 = dataProjects(testProject5).map(addMemberWithId(creator.id, Role.Owner)).generateOne
-      val (_, testProject6Private) = renkuProjectEntities(visibilityPrivate, creatorGen = cliShapedPersons)
-        .modify(removeMembers())
-        .addDataset(datasetEntities(provenanceInternal(cliShapedPersons)).modify(_.makeNameContaining(text)))
-        .generateOne
-      val project6CreatorPerson = cliShapedPersons.generateOne
-      val project6Private = dataProjects(testProject6Private)
-        .map(replaceCreatorFrom(project6CreatorPerson, creator.id))
-        .map(addMemberFrom(project6CreatorPerson, creator.id, Role.Owner))
-        .generateOne
-
-      Given("some datasets with name, description, slug and author containing some arbitrary chosen text")
-
-      pushToStore(project1, creator)
-      pushToStore(project2, creator)
-      pushToStore(project3, creator)
-      pushToStore(project4, creator)
-      pushToStore(project4Fork, creator)
-      pushToStore(project5, creator)
-      pushToStore(project6Private, creator)
-
-      When("user calls the GET knowledge-graph/datasets?query=<text>")
-      val dsSearchResponse = knowledgeGraphClient GET s"knowledge-graph/datasets?query=${urlEncode(text.value)}"
-
-      Then("he should get OK response with some matching datasets")
-      dsSearchResponse.status shouldBe Ok
-
-      val foundDatasets = dsSearchResponse.jsonBody.as[List[Json]].value
-      foundDatasets should {
-        contain theSameElementsAs List(
-          searchResultJson(dataset1, 1, project1.slug, foundDatasets),
-          searchResultJson(dataset2, 1, project2.slug, foundDatasets),
-          searchResultJson(dataset3, 1, project3.slug, foundDatasets),
-          searchResultJson(dataset4, 2, project4.slug, foundDatasets)
-        ) or contain theSameElementsAs List(
-          searchResultJson(dataset1, 1, project1.slug, foundDatasets),
-          searchResultJson(dataset2, 1, project2.slug, foundDatasets),
-          searchResultJson(dataset3, 1, project3.slug, foundDatasets),
-          searchResultJson(dataset4, 2, project4Fork.slug, foundDatasets)
-        )
-      }
-
-      When("user calls the GET knowledge-graph/datasets?query=<text>&sort=name:asc")
-      val searchSortedByName =
-        knowledgeGraphClient GET s"knowledge-graph/datasets?query=${urlEncode(text.value)}&sort=name:asc"
-
-      Then("he should get OK response with some matching datasets sorted by name ASC")
-      searchSortedByName.status shouldBe Ok
-
-      val foundDatasetsSortedByName = searchSortedByName.jsonBody.as[List[Json]].value
-      val datasetsSortedByNameProj4Slug = List(
-        searchResultJson(dataset1, 1, project1.slug, foundDatasetsSortedByName),
-        searchResultJson(dataset2, 1, project2.slug, foundDatasetsSortedByName),
-        searchResultJson(dataset3, 1, project3.slug, foundDatasetsSortedByName),
-        searchResultJson(dataset4, 2, project4.slug, foundDatasetsSortedByName)
-      ).sortBy(_.hcursor.downField("name").as[String].getOrElse(fail("No 'name' property found")))
-      val datasetsSortedByNameProj4ForkSlug = List(
-        searchResultJson(dataset1, 1, project1.slug, foundDatasetsSortedByName),
-        searchResultJson(dataset2, 1, project2.slug, foundDatasetsSortedByName),
-        searchResultJson(dataset3, 1, project3.slug, foundDatasetsSortedByName),
-        searchResultJson(dataset4, 2, project4Fork.slug, foundDatasetsSortedByName)
-      ).sortBy(_.hcursor.downField("name").as[String].getOrElse(fail("No 'name' property found")))
-
-      foundDatasetsSortedByName should {
-        be(datasetsSortedByNameProj4Slug) or be(datasetsSortedByNameProj4ForkSlug)
-      }
-
-      When("user calls the GET knowledge-graph/datasets?query=<text>&sort=name:asc&page=2&per_page=1")
-      val searchForPage =
-        knowledgeGraphClient GET s"knowledge-graph/datasets?query=${urlEncode(text.value)}&sort=name:asc&page=2&per_page=1"
-
-      Then("he should get OK response with the dataset from the requested page")
-      val foundDatasetsPage = searchForPage.jsonBody.as[List[Json]].value
-      foundDatasetsPage should {
-        contain theSameElementsAs List(datasetsSortedByNameProj4Slug(1)) or
-          contain theSameElementsAs List(datasetsSortedByNameProj4ForkSlug(1))
-      }
-
-      When("user calls the GET knowledge-graph/datasets?sort=name:asc")
-      val searchWithoutPhrase = knowledgeGraphClient GET s"knowledge-graph/datasets?sort=name:asc"
-
-      Then("he should get OK response with all the datasets")
-      val foundDatasetsWithoutPhrase = searchWithoutPhrase.jsonBody.as[List[Json]].value
-      foundDatasetsWithoutPhrase should {
-        contain allElementsOf List(
-          searchResultJson(dataset1, 1, project1.slug, foundDatasetsWithoutPhrase),
-          searchResultJson(dataset2, 1, project2.slug, foundDatasetsWithoutPhrase),
-          searchResultJson(dataset3, 1, project3.slug, foundDatasetsWithoutPhrase),
-          searchResultJson(dataset4, 2, project4.slug, foundDatasetsWithoutPhrase),
-          searchResultJson(dataset5WithoutText, 1, project5.slug, foundDatasetsWithoutPhrase)
-        ).sortBy(_.hcursor.downField("name").as[String].getOrElse(fail("No 'name' property found"))) or
-          contain allElementsOf List(
-            searchResultJson(dataset1, 1, project1.slug, foundDatasetsWithoutPhrase),
-            searchResultJson(dataset2, 1, project2.slug, foundDatasetsWithoutPhrase),
-            searchResultJson(dataset3, 1, project3.slug, foundDatasetsWithoutPhrase),
-            searchResultJson(dataset4, 2, project4Fork.slug, foundDatasetsWithoutPhrase),
-            searchResultJson(dataset5WithoutText, 1, project5.slug, foundDatasetsWithoutPhrase)
-          ).sortBy(_.hcursor.downField("name").as[String].getOrElse(fail("No 'name' property found")))
-      }
-
-      When("user uses the response header link with the rel='first'")
-      val firstPageLink     = searchForPage.headerLink(rel = "first")
-      val firstPageResponse = restClient GET firstPageLink
-
-      Then("he should get OK response with the datasets from the first page")
-      val foundFirstPage = firstPageResponse.flatMap(_.as[List[Json]]).unsafeRunSync()
-      foundFirstPage should {
-        contain theSameElementsAs List(datasetsSortedByNameProj4Slug.head) or
-          contain theSameElementsAs List(datasetsSortedByNameProj4ForkSlug.head)
-      }
-
-      When("user uses 'details' link of one of the found datasets")
-      val someDatasetJson = Random.shuffle(foundDatasets).head
-
-      val detailsLinkResponse = (restClient GET someDatasetJson._links
-        .get(Rel("details"))
-        .getOrFail(message = "No link with rel 'details'")
-        .toString).flatMap(response => response.as[Json].map(json => response.status -> json)).unsafeRunSync()
-
-      detailsLinkResponse._1 shouldBe Ok
-
-      Then("he should get the same result as he'd call the knowledge-graph/datasets/:id endpoint directly")
-      val datasetDetailsResponse =
-        knowledgeGraphClient GET s"knowledge-graph/datasets/${urlEncode(findIdentifier(someDatasetJson).toString)}"
-      detailsLinkResponse._2 shouldBe datasetDetailsResponse.jsonBody
-    }
-
-    Scenario("As an authenticated user I would like to be able to search for datasets using free-text search") {
-
-      Given("I am authenticated")
-      gitLabStub.addAuthenticated(creator, user)
-
-      val text = nonBlankStrings(minLength = 10).generateOne
-
-      val (dataset1, testProject1) = renkuProjectEntities(visibilityPublic, creatorGen = cliShapedPersons)
-        .modify(removeMembers())
-        .addDataset(datasetEntities(provenanceInternal(cliShapedPersons)).modify(_.makeNameContaining(text)))
-        .generateOne
-      val project1CreatorPerson = cliShapedPersons.generateOne
-      val project1 = dataProjects(testProject1)
-        .map(replaceCreatorFrom(project1CreatorPerson, creator.id))
-        .map(addMemberWithId(user.id, Role.Maintainer) >>> addMemberFrom(project1CreatorPerson, creator.id, Role.Owner))
-        .generateOne
-
-      val (_, testProject2Private) = renkuProjectEntities(visibilityPrivate, creatorGen = cliShapedPersons)
-        .modify(removeMembers())
-        .addDataset(datasetEntities(provenanceInternal(cliShapedPersons)).modify(_.makeNameContaining(text)))
-        .generateOne
-      val project2CreatorPerson = cliShapedPersons.generateOne
-      val project2Private = dataProjects(testProject2Private)
-        .map(replaceCreatorFrom(project2CreatorPerson, creator.id))
-        .map(addMemberFrom(project2CreatorPerson, creator.id, Role.Owner))
-        .generateOne
-
-      val (dataset3PrivateWithAccess, testProject3PrivateWithAccess) =
-        renkuProjectEntities(visibilityPrivate, creatorGen = cliShapedPersons)
-          .modify(removeMembers())
-          .addDataset(datasetEntities(provenanceInternal(cliShapedPersons)).modify(_.makeNameContaining(text)))
-          .generateOne
-      val project3CreatorPerson = cliShapedPersons.generateOne
-      val project3PrivateWithAccess = dataProjects(testProject3PrivateWithAccess)
-        .map(replaceCreatorFrom(project3CreatorPerson, creator.id))
-        .map(addMemberWithId(user.id, Role.Maintainer) >>> addMemberFrom(project3CreatorPerson, creator.id, Role.Owner))
-        .generateOne
-
-      Given("some datasets with slug, description, name and author containing some arbitrary chosen text")
-      pushToStore(project1, creator)
-      pushToStore(project2Private, creator)
-      pushToStore(project3PrivateWithAccess, creator)
-
-      When("user calls the GET knowledge-graph/datasets?query=<text>")
-      val datasetsSearchResponse =
-        knowledgeGraphClient GET (s"knowledge-graph/datasets?query=${urlEncode(text.value)}&sort=name:asc", user.accessToken)
-
-      Then("he should get OK response with some matching datasets")
-      datasetsSearchResponse.status shouldBe Ok
-
-      val foundDatasets = datasetsSearchResponse.jsonBody.as[List[Json]].value
-      foundDatasets should contain theSameElementsAs List(
-        searchResultJson(dataset1, 1, project1.slug, foundDatasets),
-        searchResultJson(dataset3PrivateWithAccess, 1, project3PrivateWithAccess.slug, foundDatasets)
-      )
-    }
-
-    def pushToStore(project: data.Project, authUser: AuthUser) = {
-
-      val commitId = commitIds.generateOne
-      gitLabStub.setupProject(project, commitId)
-
-      mockCommitDataOnTripleGenerator(project, toPayloadJsonLD(project), commitId)
-
-      `data in the Triples Store`(project, commitId, authUser.accessToken)
     }
   }
 
