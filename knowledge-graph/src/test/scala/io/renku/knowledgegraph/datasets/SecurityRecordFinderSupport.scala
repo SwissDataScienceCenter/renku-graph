@@ -36,7 +36,6 @@ abstract class SecurityRecordFinderSupport
     with CustomAsyncIOSpec
     with should.Matchers
     with InMemoryJenaForSpec
-    // with ExternalJenaForSpec
     with ProjectsDataset
     with DatasetProvision {
 
