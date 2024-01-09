@@ -19,6 +19,7 @@
 package io.renku.graph.acceptancetests.knowledgegraph
 
 import cats.syntax.all._
+import eu.timepit.refined.auto._
 import io.circe.Json
 import io.renku.generators.CommonGraphGenerators.authUsers
 import io.renku.generators.Generators.Implicits._
@@ -35,7 +36,7 @@ import io.renku.http.rest.Links.Rel
 import io.renku.http.server.EndpointTester._
 import org.http4s.Status._
 import org.scalatest.EitherValues
-
+import io.renku.tinytypes.json.TinyTypeDecoders._
 import scala.util.Random
 
 class DatasetsResourcesSpec
