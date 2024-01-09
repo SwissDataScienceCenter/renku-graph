@@ -21,6 +21,13 @@ object JenaServer {
     method.invoke(instance)
   }
 
+  def entitiesSearch(methodName: String): ClassLoader => Unit = classLoader => {
+    val clazz    = classLoader.loadClass("io.renku.entities.EntitiesSearchJenaServer$")
+    val method   = clazz.getMethod(methodName)
+    val instance = clazz.getField("MODULE$").get(null)
+    method.invoke(instance)
+  }
+
   def viewingsCollector(methodName: String): ClassLoader => Unit = classLoader => {
     val clazz    = classLoader.loadClass("io.renku.entities.viewings.ViewingsCollectorJenaServer$")
     val method   = clazz.getMethod(methodName)

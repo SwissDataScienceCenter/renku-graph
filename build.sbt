@@ -442,7 +442,9 @@ lazy val entitiesSearch = project
   .withId("entities-search")
   .settings(commonSettings)
   .settings(
-    name := "entities-search"
+    name := "entities-search",
+    Test / testOptions += Tests.Setup(JenaServer.entitiesSearch("start")),
+    Test / testOptions += Tests.Cleanup(JenaServer.entitiesSearch("forceStop"))
   )
   .dependsOn(graphCommons % "compile->compile; test->test")
   .enablePlugins(AutomateHeaderPlugin)
@@ -672,6 +674,7 @@ lazy val commonSettings = Seq(
   )
 )
 
+import sbt.{Test, Tests}
 import sbtrelease.Vcs
 
 lazy val writeVersionToVersionConf = taskKey[Unit]("Write release version to version.conf files")

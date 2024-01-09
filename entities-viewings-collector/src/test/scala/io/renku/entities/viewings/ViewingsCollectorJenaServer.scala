@@ -20,4 +20,4 @@ package io.renku.entities.viewings
 
 import io.renku.triplesstore.client.util.JenaServer
 
-object ViewingsCollectorJenaServer extends JenaServer(module = "entities_viewings_collector", port = 3043)
+object ViewingsCollectorJenaServer extends JenaServer(module = "entities_viewings_collector", port = 3044)

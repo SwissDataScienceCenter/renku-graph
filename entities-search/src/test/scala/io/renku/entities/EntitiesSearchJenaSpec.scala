@@ -16,8 +16,13 @@
  * limitations under the License.
  */
 
-package io.renku.triplesgenerator
+package io.renku.entities
 
+import io.renku.triplesstore.GraphJenaSpec
 import io.renku.triplesstore.client.util.JenaServer
+import org.scalatest.Suite
 
-object TriplesGeneratorJenaServer extends JenaServer(module = "triples_generator", port = 3045)
+trait EntitiesSearchJenaSpec extends GraphJenaSpec {
+  self: Suite =>
+  lazy val server: JenaServer = EntitiesSearchJenaServer
+}

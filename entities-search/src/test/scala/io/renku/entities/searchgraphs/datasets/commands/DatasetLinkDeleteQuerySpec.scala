@@ -22,7 +22,8 @@ import Encoders._
 import cats.effect.IO
 import cats.effect.testing.scalatest.AsyncIOSpec
 import eu.timepit.refined.auto._
-import io.renku.entities.searchgraphs.SearchInfoDatasets
+import io.renku.entities.EntitiesSearchJenaSpec
+import io.renku.entities.searchgraphs.TestSearchInfoDatasets
 import io.renku.entities.searchgraphs.datasets.Generators._
 import io.renku.entities.searchgraphs.datasets.SearchInfoLens._
 import io.renku.entities.searchgraphs.datasets.links
@@ -34,20 +35,18 @@ import io.renku.interpreters.TestLogger
 import io.renku.jsonld.syntax._
 import io.renku.triplesstore.SparqlQuery.Prefixes
 import io.renku.triplesstore.client.syntax._
-import io.renku.triplesstore.{InMemoryJenaForSpec, ProjectsDataset, SparqlQuery}
+import io.renku.triplesstore.{ProjectsConnectionConfig, SparqlQuery}
 import org.scalatest.flatspec.AsyncFlatSpec
 import org.scalatest.matchers.should
 
 class DatasetLinkDeleteQuerySpec
     extends AsyncFlatSpec
     with AsyncIOSpec
-    with should.Matchers
-    with InMemoryJenaForSpec
-    with ProjectsDataset
-    with SearchInfoDatasets {
+    with EntitiesSearchJenaSpec
+    with TestSearchInfoDatasets
+    with should.Matchers {
 
-  it should "delete the link with the given id" in {
-
+  it should "delete the link with the given id" in projectsDSConfig.use { implicit pcc =>
     val project      = anyRenkuProjectEntities.generateOne.to[entities.RenkuProject]
     val otherProject = anyRenkuProjectEntities.generateOne.to[entities.RenkuProject]
     val info = datasetSearchInfoObjects(project).map { si =>
@@ -58,19 +57,19 @@ class DatasetLinkDeleteQuerySpec
 
     val link1 :: link2 :: Nil = info.links.toList
 
-    insertIO(projectsDataset, info.asQuads.toList) >>
+    insert(info.asQuads.toList) >>
       findLinks(info.topmostSameAs).asserting(_ shouldBe info.links.map(_.resourceId).toList.toSet) >>
-      runUpdate(projectsDataset, DatasetLinkDeleteQuery(info.topmostSameAs, link1.resourceId)).assertNoException >>
+      runUpdate(DatasetLinkDeleteQuery(info.topmostSameAs, link1.resourceId)).assertNoException >>
       findLinks(info.topmostSameAs).asserting(_ shouldBe Set(link2.resourceId)) >>
-      runUpdate(projectsDataset, DatasetLinkDeleteQuery(info.topmostSameAs, link2.resourceId)).assertNoException >>
+      runUpdate(DatasetLinkDeleteQuery(info.topmostSameAs, link2.resourceId)).assertNoException >>
       findLinks(info.topmostSameAs).asserting(_ shouldBe Set.empty) >>
       findCount(info.topmostSameAs).asserting(_ should be > 0)
   }
 
   implicit val ioLogger: TestLogger[IO] = TestLogger[IO]()
 
-  private def findLinks(topSameAs: datasets.TopmostSameAs) =
-    runSelect(projectsDataset, query(topSameAs))
+  private def findLinks(topSameAs: datasets.TopmostSameAs)(implicit pcc: ProjectsConnectionConfig) =
+    runSelect(query(topSameAs))
       .map(_.map(row => links.ResourceId(row("linkId"))).toSet)
 
   private def query(topSameAs: datasets.TopmostSameAs) =
@@ -86,8 +85,8 @@ class DatasetLinkDeleteQuerySpec
                |""".stripMargin
     )
 
-  private def findCount(topSameAs: datasets.TopmostSameAs) =
-    runSelect(projectsDataset, countQuery(topSameAs))
+  private def findCount(topSameAs: datasets.TopmostSameAs)(implicit pcc: ProjectsConnectionConfig) =
+    runSelect(countQuery(topSameAs))
       .map(_.headOption.flatMap(_.get("cnt").flatMap(_.toIntOption)).getOrElse(0))
 
   private def countQuery(topSameAs: datasets.TopmostSameAs) =

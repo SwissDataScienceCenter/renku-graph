@@ -16,8 +16,8 @@
  * limitations under the License.
  */
 
-package io.renku.triplesgenerator
+package io.renku.entities
 
 import io.renku.triplesstore.client.util.JenaServer
 
-object TriplesGeneratorJenaServer extends JenaServer(module = "triples_generator", port = 3045)
+object EntitiesSearchJenaServer extends JenaServer(module = "entities_search", port = 3043)
