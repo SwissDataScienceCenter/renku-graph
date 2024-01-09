@@ -35,7 +35,7 @@ import io.renku.webhookservice.crypto.HookTokenCrypto
 import io.renku.webhookservice.crypto.HookTokenCrypto.SerializedHookToken
 import io.renku.webhookservice.model.HookToken
 import org.http4s._
-import org.http4s.circe._
+import org.http4s.circe.CirceEntityCodec._
 import org.http4s.dsl.Http4sDsl
 import org.typelevel.ci._
 import org.typelevel.log4cats.Logger
@@ -66,9 +66,6 @@ class EndpointImpl[F[_]: Concurrent: Logger](
       response                           <- Accepted(Message.Info("Event accepted"))
     } yield response
   } recoverWith httpResponse
-
-  private implicit lazy val startCommitEntityDecoder: EntityDecoder[F, (CommitId, CommitSyncRequest)] =
-    jsonOf[F, (CommitId, CommitSyncRequest)]
 
   private lazy val badRequest: PartialFunction[Throwable, F[(CommitId, CommitSyncRequest)]] = {
     case NonFatal(exception) => BadRequestError(exception).raiseError[F, (CommitId, CommitSyncRequest)]

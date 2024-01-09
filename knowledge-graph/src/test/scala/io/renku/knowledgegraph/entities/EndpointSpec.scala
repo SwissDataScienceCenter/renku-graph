@@ -43,6 +43,7 @@ import org.http4s.Method.GET
 import org.http4s.Status._
 import org.http4s.headers.`Content-Type`
 import org.http4s.{Request, Uri}
+import org.http4s.circe.CirceEntityCodec._
 import org.scalacheck.Gen
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.matchers.should

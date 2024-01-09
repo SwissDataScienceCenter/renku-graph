@@ -37,7 +37,7 @@ import io.renku.testtools.{GitLabClientTools, IOSpec}
 import org.http4s.{Request, Response, Uri}
 import org.http4s.implicits._
 import org.http4s.Status._
-import org.http4s.circe._
+import org.http4s.circe.CirceEntityCodec._
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec

@@ -33,6 +33,7 @@ import io.renku.tokenrepository.repository.fetching.FetchTokenEndpoint
 import io.renku.tokenrepository.repository.metrics.QueriesExecutionTimes
 import org.http4s.dsl.Http4sDsl
 import org.http4s.{HttpRoutes, Request, Response}
+import org.http4s.circe.CirceEntityCodec._
 import org.typelevel.log4cats.Logger
 
 private trait MicroserviceRoutes[F[_]] {

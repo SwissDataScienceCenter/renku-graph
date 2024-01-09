@@ -34,6 +34,7 @@ import io.renku.http.rest.Sorting
 import io.renku.http.rest.paging.{PagingHeaders, PagingRequest, PagingResponse}
 import io.renku.logging.{ExecutionTimeRecorder, ExecutionTimeRecorderLoader}
 import io.renku.triplesstore.{ProjectsConnectionConfig, SparqlQueryTimeRecorder}
+import org.http4s.circe.CirceEntityCodec._
 import org.http4s.dsl.Http4sDsl
 import org.http4s.{Header, Request, Response}
 import org.typelevel.log4cats.Logger
@@ -52,7 +53,6 @@ class EndpointImpl[F[_]: MonadCancelThrow: Logger](
     with Endpoint[F] {
 
   import executionTimeRecorder._
-  import org.http4s.circe._
 
   def `GET /projects/:slug/datasets`(request: Request[F], criteria: Criteria): F[Response[F]] =
     measureAndLogTime(finishedSuccessfully(criteria.projectSlug)) {

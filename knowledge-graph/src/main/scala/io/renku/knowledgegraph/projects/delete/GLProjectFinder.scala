@@ -37,10 +37,11 @@ private class GLProjectFinderImpl[F[_]: Async: GitLabClient] extends GLProjectFi
   import eu.timepit.refined.auto._
   import io.circe.Decoder
   import io.renku.http.tinytypes.TinyTypeURIEncoder._
+  import io.renku.tinytypes.json.TinyTypeDecoders._
   import org.http4s._
   import org.http4s.Status._
-  import org.http4s.circe._
   import org.http4s.implicits._
+  import org.http4s.circe.CirceEntityCodec._
 
   override def findProject(slug: projects.Slug)(implicit at: AccessToken): F[Option[Project]] =
     GitLabClient[F].get(uri"projects" / slug, "single-project")(mapResponse)(at.some)
@@ -51,10 +52,8 @@ private class GLProjectFinderImpl[F[_]: Async: GitLabClient] extends GLProjectFi
   }
 
   private implicit lazy val decoder: Decoder[Project] = Decoder.instance { cursor =>
-    import io.renku.tinytypes.json.TinyTypeDecoders._
     (cursor.downField("id").as[projects.GitLabId], cursor.downField("path_with_namespace").as[projects.Slug])
       .mapN(Project(_, _))
   }
 
-  private implicit lazy val eDecoder: EntityDecoder[F, Project] = jsonOf
 }

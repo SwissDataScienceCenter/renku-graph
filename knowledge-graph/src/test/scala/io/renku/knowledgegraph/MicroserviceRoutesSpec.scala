@@ -52,6 +52,7 @@ import org.http4s.Status._
 import org.http4s._
 import org.http4s.headers.`Content-Type`
 import org.http4s.implicits._
+import org.http4s.circe.CirceEntityCodec._
 import org.http4s.server.AuthMiddleware
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.matchers.should

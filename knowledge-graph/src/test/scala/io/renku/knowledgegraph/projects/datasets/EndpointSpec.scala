@@ -40,6 +40,7 @@ import io.renku.testtools.CustomAsyncIOSpec
 import org.http4s.Status._
 import org.http4s._
 import org.http4s.headers.`Content-Type`
+import org.http4s.circe.CirceEntityCodec._
 import org.scalamock.scalatest.AsyncMockFactory
 import org.scalatest.BeforeAndAfterEach
 import org.scalatest.flatspec.AsyncFlatSpec

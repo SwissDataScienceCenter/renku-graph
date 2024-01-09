@@ -71,8 +71,8 @@ private class TriplesGeneratorClientImpl[F[_]: Async: Logger](tgUri: Uri)
     with Http4sClientDsl[F] {
 
   import io.circe.syntax._
+  import org.http4s.circe.CirceEntityCodec._
   import io.renku.http.tinytypes.TinyTypeURIEncoder._
-  import org.http4s.circe._
 
   override def createProject(newProject: NewProject): F[Result[Unit]] =
     send(POST(tgUri / "projects") withEntity newProject.asJson) {

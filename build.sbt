@@ -98,7 +98,8 @@ lazy val jsonldUtils = project
       Dependencies.jsonld4s
   )
   .dependsOn(
-    tinyTypes % "compile->compile;test->test"
+    tinyTypes % "compile->compile;test->test",
+    commonUtils % "compile->compile;test->test"
   )
 
 lazy val metricUtils = project

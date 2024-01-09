@@ -38,9 +38,9 @@ import io.renku.testtools.IOSpec
 import org.http4s.MediaType.application
 import org.http4s.Method.GET
 import org.http4s.Status.{InternalServerError, Ok}
-import org.http4s.circe._
+import org.http4s.circe.CirceEntityCodec._
 import org.http4s.headers.`Content-Type`
-import org.http4s.{EntityDecoder, Request, Uri}
+import org.http4s.{Request, Uri}
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
@@ -127,7 +127,4 @@ class EndpointSpec extends AnyWordSpec with should.Matchers with MockFactory wit
                .toRight(DecodingFailure(s"No tag for link $maybeDatasetLink", Nil))
     } yield model.Tag(name, startDate, maybeDesc, tag.datasetId)
   }
-
-  private implicit def httpEntityDecoder(implicit decoder: Decoder[model.Tag]): EntityDecoder[IO, List[model.Tag]] =
-    jsonOf[IO, List[model.Tag]]
 }

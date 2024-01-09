@@ -57,7 +57,7 @@ private[awaitinggeneration] class RemoteTriplesGenerator[F[_]: Async: Logger](
   import org.http4s._
   import org.http4s.Method.GET
   import org.http4s.Status.Unauthorized
-  import org.http4s.circe._
+  import org.http4s.circe.CirceEntityCodec._
   import org.http4s.dsl.io._
 
   override def generateTriples(

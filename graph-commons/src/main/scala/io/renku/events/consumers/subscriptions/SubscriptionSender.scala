@@ -26,6 +26,7 @@ import io.renku.control.Throttler
 import io.renku.graph.config.EventLogUrl
 import io.renku.http.client.RestClient
 import org.typelevel.log4cats.Logger
+import org.http4s.circe.CirceEntityCodec._
 
 private trait SubscriptionSender[F[_]] {
   def postToEventLog(subscriptionPayload: Json): F[Unit]
@@ -38,7 +39,6 @@ private class SubscriptionSenderImpl[F[_]: Async: Temporal: Logger](
 
   import org.http4s.Method.POST
   import org.http4s.Status.Accepted
-  import org.http4s.circe._
   import org.http4s.{Request, Response, Status}
 
   override def postToEventLog(subscriptionPayload: Json): F[Unit] = for {

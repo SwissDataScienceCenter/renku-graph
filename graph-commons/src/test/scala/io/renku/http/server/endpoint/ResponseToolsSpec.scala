@@ -29,6 +29,7 @@ import org.http4s.MediaRange.`*/*`
 import org.http4s.MediaType.application
 import org.http4s.headers.Accept
 import org.http4s.{Headers, Request, Response, Status}
+import org.http4s.circe.CirceEntityCodec._
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec

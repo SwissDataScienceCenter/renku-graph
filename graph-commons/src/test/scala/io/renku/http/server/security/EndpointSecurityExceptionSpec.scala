@@ -26,6 +26,7 @@ import io.renku.testtools.IOSpec
 import org.http4s.MediaType._
 import org.http4s.Status.{NotFound, Unauthorized}
 import org.http4s.headers.`Content-Type`
+import org.http4s.circe.CirceEntityCodec._
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
 

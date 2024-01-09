@@ -23,7 +23,6 @@ import cats.syntax.all._
 import com.typesafe.config.Config
 import io.renku.control.Throttler
 import io.renku.data.Message
-import io.renku.data.MessageCodecs._
 import io.renku.graph.model.projects
 import io.renku.http.client.{AccessToken, GitLabClient, RestClient}
 import io.renku.http.tinytypes.TinyTypeURIEncoder._

@@ -21,6 +21,7 @@ package io.renku.knowledgegraph
 import io.renku.core.client.Result.{Failure => CoreFailure}
 import io.renku.data.Message
 import org.http4s.{Response, Status}
+import org.http4s.circe.CirceEntityCodec._
 
 private sealed trait Failure extends Exception {
   val status:  Status

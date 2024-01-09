@@ -30,7 +30,7 @@ import io.renku.triplesstore.SparqlQueryTimeRecorder
 import model.Lineage
 import model.Node.Location
 import org.http4s.Response
-import org.http4s.circe.jsonEncoder
+import org.http4s.circe.CirceEntityCodec._
 import org.http4s.dsl.Http4sDsl
 import org.typelevel.log4cats.Logger
 

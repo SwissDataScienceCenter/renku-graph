@@ -35,6 +35,7 @@ import org.http4s.Status.{BadRequest, Conflict, Created, Forbidden, InternalServ
 import org.http4s.multipart.Multipart
 import org.http4s.{Request, Response}
 import org.typelevel.log4cats.Logger
+import org.http4s.circe.CirceEntityCodec._
 
 trait Endpoint[F[_]] {
   def `POST /projects`(request: Request[F], authUser: AuthUser): F[Response[F]]

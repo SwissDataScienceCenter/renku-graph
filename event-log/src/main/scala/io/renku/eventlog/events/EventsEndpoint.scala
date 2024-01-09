@@ -32,6 +32,7 @@ import io.renku.graph.model.events.{EventDate, EventInfo, EventStatus, StatusPro
 import io.renku.graph.model.projects
 import io.renku.http.rest.Sorting
 import io.renku.http.rest.paging.PagingRequest
+import org.http4s.circe.CirceEntityCodec._
 import org.http4s.dsl.Http4sDsl
 import org.http4s.{Request, Response}
 import org.typelevel.log4cats.Logger

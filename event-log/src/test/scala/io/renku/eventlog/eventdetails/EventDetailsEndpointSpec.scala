@@ -34,6 +34,7 @@ import io.renku.interpreters.TestLogger.Level.Error
 import io.renku.testtools.IOSpec
 import org.http4s.MediaType._
 import org.http4s.Status._
+import org.http4s.circe.CirceEntityCodec._
 import org.http4s.headers.`Content-Type`
 import org.scalacheck.Gen
 import org.scalamock.scalatest.MockFactory

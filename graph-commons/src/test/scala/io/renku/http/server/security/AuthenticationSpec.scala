@@ -30,6 +30,7 @@ import io.renku.http.server.security.model.{AuthUser, MaybeAuthUser}
 import io.renku.testtools.IOSpec
 import org.http4s.dsl.Http4sDsl
 import org.http4s.{AuthedRoutes, Request, Response}
+import org.http4s.circe.CirceEntityCodec._
 import org.scalacheck.Gen
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.matchers.should

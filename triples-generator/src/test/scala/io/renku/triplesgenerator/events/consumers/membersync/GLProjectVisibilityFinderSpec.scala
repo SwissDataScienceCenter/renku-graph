@@ -34,9 +34,9 @@ import io.renku.http.client.RestClient.ResponseMappingF
 import io.renku.http.client.{AccessToken, GitLabClient}
 import io.renku.http.tinytypes.TinyTypeURIEncoder._
 import io.renku.testtools.{CustomAsyncIOSpec, GitLabClientTools}
-import org.http4s.circe._
 import org.http4s.implicits._
 import org.http4s.{Request, Response, Status, Uri}
+import org.http4s.circe.CirceEntityCodec._
 import org.scalamock.scalatest.AsyncMockFactory
 import org.scalatest.flatspec.AsyncFlatSpec
 import org.scalatest.matchers.should

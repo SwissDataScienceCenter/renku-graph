@@ -25,6 +25,7 @@ import io.renku.generators.Generators._
 import io.renku.testtools.CustomAsyncIOSpec
 import org.http4s.ParseFailure
 import org.http4s.Status._
+import org.http4s.circe.CirceEntityCodec._
 import org.scalacheck.Gen
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AsyncWordSpec

@@ -42,6 +42,7 @@ import org.http4s.Status.{InternalServerError, Ok}
 import org.http4s.circe.jsonOf
 import org.http4s.headers.`Content-Type`
 import org.http4s.{EntityDecoder, Request, Uri}
+import org.http4s.circe.CirceEntityCodec._
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec

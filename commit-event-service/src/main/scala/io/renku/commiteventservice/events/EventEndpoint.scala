@@ -28,6 +28,7 @@ import io.circe.Json
 import io.renku.data.Message
 import io.renku.events.EventRequestContent
 import io.renku.events.consumers.{EventConsumersRegistry, EventSchedulingResult}
+import org.http4s.circe.CirceEntityCodec._
 import org.http4s.dsl.Http4sDsl
 import org.http4s.multipart.Multipart
 import org.http4s.{Request, Response}
@@ -41,8 +42,6 @@ trait EventEndpoint[F[_]] {
 class EventEndpointImpl[F[_]: Concurrent](eventConsumersRegistry: EventConsumersRegistry[F])
     extends Http4sDsl[F]
     with EventEndpoint[F] {
-
-  import org.http4s.circe._
 
   def processEvent(request: Request[F]): F[Response[F]] = {
     for {

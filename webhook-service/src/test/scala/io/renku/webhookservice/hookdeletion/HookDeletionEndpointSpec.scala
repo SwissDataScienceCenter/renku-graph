@@ -38,6 +38,7 @@ import io.renku.webhookservice.model.HookIdentifier
 import org.http4s.MediaType
 import org.http4s.Status.{InternalServerError, NotFound, Ok, Unauthorized}
 import org.http4s.headers.`Content-Type`
+import org.http4s.circe.CirceEntityCodec._
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec

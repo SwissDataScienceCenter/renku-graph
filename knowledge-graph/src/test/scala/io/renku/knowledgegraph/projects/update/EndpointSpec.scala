@@ -36,6 +36,7 @@ import io.renku.interpreters.TestLogger
 import io.renku.knowledgegraph
 import io.renku.testtools.CustomAsyncIOSpec
 import org.http4s.{Request, Status}
+import org.http4s.circe.CirceEntityCodec._
 import org.scalamock.scalatest.AsyncMockFactory
 import org.scalatest.flatspec.AsyncFlatSpec
 import org.scalatest.matchers.should

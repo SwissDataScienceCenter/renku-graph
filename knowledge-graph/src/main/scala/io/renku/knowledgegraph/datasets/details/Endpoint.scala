@@ -34,6 +34,7 @@ import io.renku.metrics.MetricsRegistry
 import io.renku.triplesgenerator
 import io.renku.triplesgenerator.api.events.DatasetViewedEvent
 import io.renku.triplesstore.SparqlQueryTimeRecorder
+import org.http4s.circe.CirceEntityCodec._
 import org.http4s.dsl.Http4sDsl
 import org.http4s.{Response, Uri}
 import org.typelevel.log4cats.Logger
@@ -55,7 +56,6 @@ class EndpointImpl[F[_]: MonadThrow: Logger](
     with Endpoint[F] {
 
   import executionTimeRecorder._
-  import org.http4s.circe._
 
   def `GET /datasets/:id`(identifier: RequestedDataset, authContext: AuthContext[RequestedDataset]): F[Response[F]] =
     measureAndLogTime(finishedSuccessfully(identifier)) {

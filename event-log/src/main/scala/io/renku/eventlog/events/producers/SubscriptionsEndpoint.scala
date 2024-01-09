@@ -27,6 +27,7 @@ import io.renku.data.Message
 import io.renku.events.Subscription
 import org.http4s.dsl.Http4sDsl
 import org.http4s.{Request, Response}
+import org.http4s.circe.CirceEntityCodec._
 import org.typelevel.log4cats.Logger
 
 import scala.util.control.NonFatal

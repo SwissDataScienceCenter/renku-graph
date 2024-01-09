@@ -33,6 +33,7 @@ import io.renku.webhookservice.hookcreation
 import io.renku.webhookservice.hookcreation.HookCreator.CreationResult
 import io.renku.webhookservice.hookcreation.HookCreator.CreationResult.{HookCreated, HookExisted}
 import io.renku.webhookservice.model.ProjectHookUrl
+import org.http4s.circe.CirceEntityCodec._
 import org.http4s.dsl.Http4sDsl
 import org.http4s.{Response, Status}
 import org.typelevel.log4cats.Logger

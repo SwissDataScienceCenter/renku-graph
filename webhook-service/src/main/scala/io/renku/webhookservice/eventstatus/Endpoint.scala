@@ -39,7 +39,7 @@ import io.renku.webhookservice.hookvalidation.HookValidator.HookValidationResult
 import io.renku.webhookservice.model.ProjectHookUrl
 import io.renku.{eventlog, triplesgenerator}
 import org.http4s.Response
-import org.http4s.circe._
+import org.http4s.circe.CirceEntityCodec._
 import org.http4s.dsl.Http4sDsl
 import org.typelevel.log4cats.Logger
 

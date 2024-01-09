@@ -34,9 +34,9 @@ import io.renku.http.client.{AccessToken, GitLabClient}
 import io.renku.http.tinytypes.TinyTypeURIEncoder._
 import io.renku.testtools.{GitLabClientTools, IOSpec}
 import org.http4s.Status.{BadRequest, Forbidden, NotFound, Ok, Unauthorized}
-import org.http4s.circe._
 import org.http4s.implicits._
 import org.http4s.{Request, Response, Uri}
+import org.http4s.circe.CirceEntityCodec._
 import org.scalacheck.Gen
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.matchers.should

@@ -29,6 +29,7 @@ import org.http4s._
 import org.http4s.client.Client
 import org.http4s.dsl.Http4sDsl
 import org.http4s.headers.`Content-Type`
+import org.http4s.circe.CirceEntityCodec._
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AsyncWordSpec
 

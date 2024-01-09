@@ -84,8 +84,8 @@ class TSClientImpl[F[_]: Async: Logger: SparqlQueryTimeRecorder](
   import org.http4s.MediaType.application._
   import org.http4s.Method.POST
   import org.http4s.Status._
-  import org.http4s.circe._
   import org.http4s.headers._
+  import org.http4s.circe._
   import triplesStoreConfig._
 
   override def updateWithNoResult(updateQuery: SparqlQuery): F[Unit] =

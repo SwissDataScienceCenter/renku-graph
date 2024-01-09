@@ -22,7 +22,6 @@ package projects.create
 import eu.timepit.refined.auto._
 import io.circe.literal._
 import io.renku.data.Message
-import io.renku.data.MessageCodecs._
 import io.renku.knowledgegraph.docs.model.Operation.POST
 import io.renku.knowledgegraph.docs.model._
 

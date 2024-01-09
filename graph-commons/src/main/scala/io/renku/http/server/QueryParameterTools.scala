@@ -23,6 +23,7 @@ import cats.data.NonEmptyList
 import eu.timepit.refined.auto._
 import io.renku.data.Message
 import org.http4s.{ParseFailure, Response, Status}
+import org.http4s.circe.CirceEntityCodec._
 
 object QueryParameterTools {
 

@@ -26,6 +26,7 @@ import io.renku.eventlog.metrics.QueriesExecutionTimes
 import io.renku.graph.model.events.EventId
 import io.renku.graph.model.projects.{Slug => ProjectSlug}
 import org.http4s._
+import org.http4s.circe.CirceEntityCodec._
 import org.http4s.dsl.Http4sDsl
 import org.http4s.headers.{`Content-Disposition`, `Content-Length`, `Content-Type`}
 import org.typelevel.ci._

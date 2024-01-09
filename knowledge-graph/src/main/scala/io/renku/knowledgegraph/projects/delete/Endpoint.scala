@@ -31,6 +31,7 @@ import io.renku.metrics.MetricsRegistry
 import io.renku.triplesgenerator.api.events.CleanUpEvent
 import io.renku.{eventlog, triplesgenerator}
 import org.http4s.Response
+import org.http4s.circe.CirceEntityCodec._
 import org.http4s.dsl.Http4sDsl
 import org.typelevel.log4cats.Logger
 

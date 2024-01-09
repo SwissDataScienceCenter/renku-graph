@@ -27,7 +27,7 @@ import io.renku.graph.model.projects
 import io.renku.triplesgenerator.TgDB.TsWriteLock
 import io.renku.triplesgenerator.api.ProjectUpdates
 import io.renku.triplesstore.SparqlQueryTimeRecorder
-import org.http4s.circe.CirceEntityDecoder._
+import org.http4s.circe.CirceEntityCodec._
 import org.http4s.dsl.Http4sDsl
 import org.http4s.{Request, Response}
 import org.typelevel.log4cats.Logger

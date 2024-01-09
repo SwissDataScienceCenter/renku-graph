@@ -31,7 +31,7 @@ import io.renku.graph.model.versions.SchemaVersion
 import io.renku.http.client.{AccessToken, GitLabClient, RestClient, UserAccessToken}
 import io.renku.http.tinytypes.TinyTypeURIEncoder._
 import org.http4s.Header
-import org.http4s.circe._
+import org.http4s.circe.CirceEntityCodec._
 import org.http4s.client.dsl.Http4sClientDsl
 import org.http4s.dsl.Http4sDsl
 import org.typelevel.ci._

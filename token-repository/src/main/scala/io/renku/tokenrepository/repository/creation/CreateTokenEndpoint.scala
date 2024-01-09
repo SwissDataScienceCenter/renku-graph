@@ -27,9 +27,9 @@ import io.renku.graph.model.projects.GitLabId
 import io.renku.http.client.{AccessToken, GitLabClient}
 import io.renku.tokenrepository.repository.ProjectsTokensDB.SessionResource
 import io.renku.tokenrepository.repository.metrics.QueriesExecutionTimes
-import org.http4s.circe._
+import org.http4s.circe.CirceEntityCodec._
 import org.http4s.dsl.Http4sDsl
-import org.http4s.{EntityDecoder, Request, Response}
+import org.http4s.{Request, Response}
 import org.typelevel.log4cats.Logger
 
 import scala.util.control.NonFatal
@@ -52,8 +52,6 @@ class CreateTokenEndpointImpl[F[_]: Concurrent: Logger](
       response    <- NoContent()
     } yield response
   } recoverWith httpResponse(projectId)
-
-  private implicit lazy val entityDecoder: EntityDecoder[F, AccessToken] = jsonOf[F, AccessToken]
 
   private case class BadRequestError(cause: Throwable) extends Exception(cause)
 

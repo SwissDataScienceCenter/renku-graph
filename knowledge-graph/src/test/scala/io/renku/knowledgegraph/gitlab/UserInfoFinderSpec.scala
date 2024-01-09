@@ -35,7 +35,7 @@ import io.renku.http.client.RestClient.ResponseMappingF
 import io.renku.http.client.{AccessToken, GitLabClient}
 import io.renku.testtools.GitLabClientTools
 import org.http4s.Status.{NotFound, Ok}
-import org.http4s.circe._
+import org.http4s.circe.CirceEntityCodec._
 import org.http4s.implicits._
 import org.http4s.{Request, Response, Uri}
 import org.scalamock.scalatest.AsyncMockFactory

@@ -33,7 +33,7 @@ import io.renku.triplesgenerator.api.NewProject
 import org.http4s.MediaType.application
 import org.http4s.Request
 import org.http4s.Status.{BadRequest, Created, InternalServerError}
-import org.http4s.circe._
+import org.http4s.circe.CirceEntityCodec._
 import org.http4s.headers.`Content-Type`
 import org.scalamock.scalatest.AsyncMockFactory
 import org.scalatest.flatspec.AsyncFlatSpec

@@ -30,6 +30,7 @@ import io.renku.http.server.security.model.AuthUser
 import io.renku.webhookservice.hookdeletion.HookRemover.DeletionResult
 import io.renku.webhookservice.hookdeletion.HookRemover.DeletionResult.HookDeleted
 import io.renku.webhookservice.model.{HookIdentifier, ProjectHookUrl}
+import org.http4s.circe.CirceEntityCodec._
 import org.http4s.dsl.Http4sDsl
 import org.http4s.{Response, Status}
 import org.typelevel.log4cats.Logger

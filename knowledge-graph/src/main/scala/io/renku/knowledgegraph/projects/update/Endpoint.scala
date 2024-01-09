@@ -30,7 +30,7 @@ import io.renku.http.server.security.model.AuthUser
 import io.renku.knowledgegraph.Failure
 import io.renku.metrics.MetricsRegistry
 import org.http4s.MediaType.{application, multipartType}
-import org.http4s.circe.CirceEntityDecoder._
+import org.http4s.circe.CirceEntityCodec._
 import org.http4s.dsl.Http4sDsl
 import org.http4s.headers.`Content-Type`
 import org.http4s.multipart.Multipart
