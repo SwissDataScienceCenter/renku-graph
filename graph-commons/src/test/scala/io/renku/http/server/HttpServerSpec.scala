@@ -29,7 +29,6 @@ import org.http4s._
 import org.http4s.client.Client
 import org.http4s.dsl.Http4sDsl
 import org.http4s.headers.`Content-Type`
-import org.http4s.circe.CirceEntityCodec._
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AsyncWordSpec
 
@@ -49,6 +48,8 @@ class HttpServerSpec extends AsyncWordSpec with CustomAsyncIOSpec with Http4sDsl
     }
 
     "create an http server which responds with NOT_FOUND and JSON body for non-existing resource" in {
+      import org.http4s.circe.CirceEntityCodec._
+
       client
         .run(Request[IO](Method.GET, baseUri / "non-existing"))
         .use { response =>

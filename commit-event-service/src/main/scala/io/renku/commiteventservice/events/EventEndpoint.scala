@@ -21,7 +21,7 @@ package io.renku.commiteventservice.events
 import cats.MonadThrow
 import cats.data.EitherT
 import cats.data.EitherT.right
-import cats.effect.kernel.Concurrent
+import cats.effect.Concurrent
 import cats.syntax.all._
 import eu.timepit.refined.auto._
 import io.circe.Json
@@ -42,6 +42,8 @@ trait EventEndpoint[F[_]] {
 class EventEndpointImpl[F[_]: Concurrent](eventConsumersRegistry: EventConsumersRegistry[F])
     extends Http4sDsl[F]
     with EventEndpoint[F] {
+
+  implicit val textDec: org.http4s.EntityDecoder[F, String] = org.http4s.EntityDecoder.text[F]
 
   def processEvent(request: Request[F]): F[Response[F]] = {
     for {

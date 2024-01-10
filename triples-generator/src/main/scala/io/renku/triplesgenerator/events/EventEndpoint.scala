@@ -50,6 +50,9 @@ class EventEndpointImpl[F[_]: Async: Logger](eventConsumersRegistry: EventConsum
   import io.renku.data.Message
   import org.http4s._
 
+  implicit val textDecoder: EntityDecoder[F, String]      = EntityDecoder.text[F]
+  implicit val baDecoder:   EntityDecoder[F, Array[Byte]] = EntityDecoder.byteArrayDecoder[F]
+
   override def processEvent(request: Request[F]): F[Response[F]] = {
     for {
       multipart      <- toMultipart(request)

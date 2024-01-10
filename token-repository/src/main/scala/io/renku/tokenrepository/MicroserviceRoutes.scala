@@ -32,7 +32,7 @@ import io.renku.tokenrepository.repository.deletion.DeleteTokenEndpoint
 import io.renku.tokenrepository.repository.fetching.FetchTokenEndpoint
 import io.renku.tokenrepository.repository.metrics.QueriesExecutionTimes
 import org.http4s.dsl.Http4sDsl
-import org.http4s.{HttpRoutes, Request, Response}
+import org.http4s.{EntityEncoder, HttpRoutes, Request, Response}
 import org.http4s.circe.CirceEntityCodec._
 import org.typelevel.log4cats.Logger
 
@@ -75,6 +75,8 @@ private class MicroserviceRoutesImpl[F[_]: MonadThrow](
     case true  => thunk
     case false => ServiceUnavailable(Message.Info("DB migration running"))
   }
+
+  private implicit val textEncoder: EntityEncoder[F, String] = EntityEncoder.stringEncoder[F]
 
   private def withAccessToken(request: Request[F])(f: Option[AccessToken] => F[Response[F]]): F[Response[F]] =
     f(getAccessToken(request))

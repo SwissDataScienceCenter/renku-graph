@@ -49,7 +49,7 @@ import io.renku.triplesstore.{ProjectSparqlClient, ProjectsConnectionConfig, Spa
 import org.http4s.circe.CirceEntityCodec._
 import org.http4s.dsl.Http4sDsl
 import org.http4s.server.AuthMiddleware
-import org.http4s.{AuthedRoutes, ParseFailure, Request, Response, Status, Uri}
+import org.http4s.{AuthedRoutes, EntityEncoder, ParseFailure, Request, Response, Status, Uri}
 import org.typelevel.log4cats.Logger
 
 private class MicroserviceRoutes[F[_]: Async](
@@ -322,6 +322,8 @@ private class MicroserviceRoutes[F[_]: Async](
       .semiflatMap { case (projectSlug, location) => `GET /lineage`(projectSlug, location, maybeAuthUser) }
       .merge
   }
+
+  private implicit val textEncoder: EntityEncoder[F, String] = EntityEncoder.stringEncoder[F]
 
   private implicit class PathPartsOps(parts: List[String]) {
     lazy val toProjectSlug: EitherT[F, Response[F], model.projects.Slug] = EitherT.fromEither[F] {

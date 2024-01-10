@@ -29,7 +29,6 @@ import org.http4s.MediaRange.`*/*`
 import org.http4s.MediaType.application
 import org.http4s.headers.Accept
 import org.http4s.{Headers, Request, Response, Status}
-import org.http4s.circe.CirceEntityCodec._
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
@@ -86,6 +85,7 @@ class ResponseToolsSpec extends AnyWordSpec with should.Matchers with IOSpec wit
       }(default = Response[IO](Status.Accepted).pure[IO])
 
       response.map(_.status).unsafeRunSync() shouldBe Status.BadRequest
+      import org.http4s.circe.CirceEntityCodec._
       response
         .flatMap(_.as[Message])
         .unsafeRunSync()
