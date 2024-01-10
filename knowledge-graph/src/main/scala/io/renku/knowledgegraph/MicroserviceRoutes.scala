@@ -52,7 +52,6 @@ import org.http4s.{AuthedRoutes, ParseFailure, Request, Response, Status, Uri}
 import org.typelevel.log4cats.Logger
 
 private class MicroserviceRoutes[F[_]: Async](
-    datasetsSearchEndpoint:     datasets.Endpoint[F],
     datasetDetailsEndpoint:     datasets.details.Endpoint[F],
     entitiesEndpoint:           entities.Endpoint[F],
     ontologyEndpoint:           ontology.Endpoint[F],
@@ -114,18 +113,10 @@ private class MicroserviceRoutes[F[_]: Async](
         }
     }
 
-  private lazy val `GET /datasets/*` : AuthedRoutes[MaybeAuthUser, F] = {
-    import datasets.Endpoint.Query.query
-    import datasets.Endpoint.Sort.sort
-
-    AuthedRoutes.of {
-      case GET -> Root / "knowledge-graph" / "datasets"
-          :? query(maybePhrase) +& sort(sortBy) +& page(page) +& perPage(perPage) as maybeUser =>
-        searchForDatasets(maybePhrase, sortBy, page, perPage, maybeUser.option)
-      case GET -> Root / "knowledge-graph" / "datasets" / RequestedDataset(dsId) as maybeUser =>
-        fetchDataset(dsId, maybeUser.option)
+  private lazy val `GET /datasets/*` : AuthedRoutes[MaybeAuthUser, F] =
+    AuthedRoutes.of { case GET -> Root / "knowledge-graph" / "datasets" / RequestedDataset(dsId) as maybeUser =>
+      fetchDataset(dsId, maybeUser.option)
     }
-  }
 
   // format: off
   private lazy val `GET /entities/*`: AuthedRoutes[MaybeAuthUser, F] = {
@@ -200,25 +191,6 @@ private class MicroserviceRoutes[F[_]: Async](
     case req @ GET -> "knowledge-graph" /: "ontology" /: path => `GET /ontology`(path)(req)
     case GET -> Root / "knowledge-graph" / "spec.json"        => docsEndpoint.`get /spec.json`
     case GET -> Root / "ping"                                 => Ok("pong")
-  }
-
-  private def searchForDatasets(
-      maybePhrase:   Option[ValidatedNel[ParseFailure, datasets.Endpoint.Query.Phrase]],
-      maybeSort:     ValidatedNel[ParseFailure, List[datasets.Endpoint.Sort.By]],
-      maybePage:     Option[ValidatedNel[ParseFailure, Page]],
-      maybePerPage:  Option[ValidatedNel[ParseFailure, PerPage]],
-      maybeAuthUser: Option[AuthUser]
-  ): F[Response[F]] = {
-    import datasets.Endpoint.Query._
-    import datasets.Endpoint.Sort
-
-    (maybePhrase.map(_.map(Option.apply)).getOrElse(Validated.validNel(Option.empty[Phrase])),
-     maybeSort,
-     PagingRequest(maybePage, maybePerPage)
-    ).mapN { case (maybePhrase, sort, paging) =>
-      val sortOrDefault = Sorting.fromList(sort).getOrElse(Sort.default)
-      datasetsSearchEndpoint.searchForDatasets(maybePhrase, sortOrDefault, paging, maybeAuthUser)
-    }.fold(toBadRequest, identity)
   }
 
   private def searchForEntities(
@@ -369,7 +341,6 @@ private object MicroserviceRoutes {
     implicit0(gv: GitLabClient[F]) <- GitLabClient[F]()
     implicit0(ru: RenkuUrl)        <- RenkuUrlLoader[F]()
 
-    datasetsSearchEndpoint     <- datasets.Endpoint[F]
     datasetDetailsEndpoint     <- datasets.details.Endpoint[F]
     entitiesEndpoint           <- entities.Endpoint[F]
     recentEntitiesEndpoint     <- entities.currentuser.recentlyviewed.Endpoint[F](projectConnConfig)
@@ -390,7 +361,6 @@ private object MicroserviceRoutes {
     datasetSameAsAuthorizer = DatasetSameAsRecordsFinder[F](projectSparqlClient).asAuthorizer
     versionRoutes <- version.Routes[F]
   } yield new MicroserviceRoutes(
-    datasetsSearchEndpoint,
     datasetDetailsEndpoint,
     entitiesEndpoint,
     ontologyEndpoint,

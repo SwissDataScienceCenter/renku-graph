@@ -16,7 +16,7 @@
  * limitations under the License.
  */
 
-package io.renku.knowledgegraph.datasets
+package io.renku.knowledgegraph.datasets.details
 
 import cats.MonadThrow
 import cats.data.NonEmptyList
@@ -27,6 +27,7 @@ import io.renku.graph.model.Schemas._
 import io.renku.graph.model.datasets._
 import io.renku.graph.model.persons.{Affiliation, Email, Name => UserName}
 import io.renku.graph.model.{GraphClass, projects}
+import io.renku.knowledgegraph.datasets.DatasetCreator
 import io.renku.triplesstore.SparqlQuery.Prefixes
 import io.renku.triplesstore._
 import org.typelevel.log4cats.Logger

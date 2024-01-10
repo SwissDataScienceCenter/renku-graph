@@ -37,7 +37,6 @@ object Endpoint {
   def apply[F[_]: Async]: F[Endpoint[F]] = for {
     serviceVersion <- ServiceVersion.readFromConfig[F]()
     endpointsDocs <- List(
-                       datasets.EndpointDocs[F],
                        datasets.details.EndpointDocs[F],
                        entities.EndpointDocs[F],
                        ontology.EndpointDocs[F],
