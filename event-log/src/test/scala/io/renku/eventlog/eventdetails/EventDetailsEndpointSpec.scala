@@ -28,20 +28,24 @@ import io.renku.generators.Generators.Implicits._
 import io.renku.generators.Generators._
 import io.renku.graph.model.EventsGenerators.{compoundEventIds, eventBodies}
 import io.renku.graph.model.events.EventDetails
-import io.renku.http.server.EndpointTester._
+import io.renku.http.RenkuEntityCodec
 import io.renku.interpreters.TestLogger
 import io.renku.interpreters.TestLogger.Level.Error
 import io.renku.testtools.IOSpec
 import org.http4s.MediaType._
 import org.http4s.Status._
-import org.http4s.circe.CirceEntityCodec._
 import org.http4s.headers.`Content-Type`
 import org.scalacheck.Gen
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
 
-class EventDetailsEndpointSpec extends AnyWordSpec with IOSpec with MockFactory with should.Matchers {
+class EventDetailsEndpointSpec
+    extends AnyWordSpec
+    with IOSpec
+    with MockFactory
+    with should.Matchers
+    with RenkuEntityCodec {
 
   "getDetails" should {
 

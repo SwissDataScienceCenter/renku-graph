@@ -28,7 +28,7 @@ import io.circe.Json
 import io.renku.data.Message
 import io.renku.events.EventRequestContent
 import io.renku.events.consumers.{EventConsumersRegistry, EventSchedulingResult}
-import org.http4s.circe.CirceEntityCodec._
+import io.renku.http.RenkuEntityCodec
 import org.http4s.dsl.Http4sDsl
 import org.http4s.multipart.Multipart
 import org.http4s.{Request, Response}
@@ -41,6 +41,7 @@ trait EventEndpoint[F[_]] {
 
 class EventEndpointImpl[F[_]: Concurrent](eventConsumersRegistry: EventConsumersRegistry[F])
     extends Http4sDsl[F]
+    with RenkuEntityCodec
     with EventEndpoint[F] {
 
   implicit val textDec: org.http4s.EntityDecoder[F, String] = org.http4s.EntityDecoder.text[F]

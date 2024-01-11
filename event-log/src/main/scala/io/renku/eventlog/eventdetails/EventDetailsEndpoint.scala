@@ -28,7 +28,7 @@ import io.renku.data.Message
 import io.renku.eventlog.EventLogDB.SessionResource
 import io.renku.eventlog.metrics.QueriesExecutionTimes
 import io.renku.graph.model.events.{CompoundEventId, EventDetails}
-import org.http4s.circe.CirceEntityCodec._
+import io.renku.http.RenkuEntityCodec
 import org.http4s.Response
 import org.http4s.dsl.Http4sDsl
 import org.typelevel.log4cats.Logger
@@ -41,6 +41,7 @@ trait EventDetailsEndpoint[F[_]] {
 
 class EventDetailsEndpointImpl[F[_]: Concurrent: Logger](eventDetailsFinder: EventDetailsFinder[F])
     extends Http4sDsl[F]
+    with RenkuEntityCodec
     with EventDetailsEndpoint[F] {
 
   override def getDetails(eventId: CompoundEventId): F[Response[F]] =

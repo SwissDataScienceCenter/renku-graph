@@ -31,6 +31,7 @@ import io.renku.graph.model.EventContentGenerators.eventDates
 import io.renku.graph.model.EventsGenerators.eventStatuses
 import io.renku.graph.model.GraphModelGenerators._
 import io.renku.graph.model.events._
+import io.renku.http.RenkuEntityCodec
 import io.renku.http.rest.paging.model.Total
 import io.renku.http.rest.paging.{PagingHeaders, PagingResponse}
 import io.renku.interpreters.TestLogger
@@ -42,7 +43,6 @@ import org.http4s.Status.{InternalServerError, Ok}
 import org.http4s.headers.`Content-Type`
 import org.http4s.implicits._
 import org.http4s.{EntityDecoder, Request}
-import org.http4s.circe.CirceEntityCodec._
 import org.scalacheck.Gen
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.matchers.should
@@ -50,7 +50,7 @@ import org.scalatest.wordspec.AnyWordSpec
 
 import scala.util.{Random, Try}
 
-class EventsEndpointSpec extends AnyWordSpec with IOSpec with MockFactory with should.Matchers {
+class EventsEndpointSpec extends AnyWordSpec with IOSpec with MockFactory with should.Matchers with RenkuEntityCodec {
 
   "findEvents" should {
 

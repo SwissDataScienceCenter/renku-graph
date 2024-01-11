@@ -21,13 +21,14 @@ package io.renku.eventlog.events.producers
 import EventProducersRegistry.{SubscriptionResult, UnsupportedPayload}
 import cats.MonadThrow
 import cats.effect.kernel.Concurrent
+import cats.syntax.all._
 import eu.timepit.refined.auto._
 import io.circe.Json
 import io.renku.data.Message
 import io.renku.events.Subscription
+import io.renku.http.RenkuEntityCodec
 import org.http4s.dsl.Http4sDsl
 import org.http4s.{Request, Response}
-import org.http4s.circe.CirceEntityCodec._
 import org.typelevel.log4cats.Logger
 
 import scala.util.control.NonFatal
@@ -39,16 +40,14 @@ trait SubscriptionsEndpoint[F[_]] {
 class SubscriptionsEndpointImpl[F[_]: Concurrent: Logger](
     subscriptionCategoryRegistry: EventProducersRegistry[F]
 ) extends Http4sDsl[F]
+    with RenkuEntityCodec
     with SubscriptionsEndpoint[F] {
 
   import SubscriptionsEndpointImpl._
-  import cats.syntax.all._
-  import org.http4s.circe._
-  import org.http4s.{Request, Response}
 
   override def addSubscription(request: Request[F]): F[Response[F]] = {
     for {
-      json         <- request.asJson recoverWith badRequest
+      json         <- request.as[Json] recoverWith badRequest
       eitherResult <- subscriptionCategoryRegistry register json
       _            <- badRequestIfError(eitherResult)
       response     <- Accepted(Message.Info("Subscription added"))

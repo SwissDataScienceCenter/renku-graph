@@ -24,9 +24,9 @@ import cats.syntax.all._
 import io.circe.Json
 import io.renku.control.Throttler
 import io.renku.graph.config.EventLogUrl
+import io.renku.http.RenkuEntityCodec
 import io.renku.http.client.RestClient
 import org.typelevel.log4cats.Logger
-import org.http4s.circe.CirceEntityCodec._
 
 private trait SubscriptionSender[F[_]] {
   def postToEventLog(subscriptionPayload: Json): F[Unit]
@@ -35,7 +35,8 @@ private trait SubscriptionSender[F[_]] {
 private class SubscriptionSenderImpl[F[_]: Async: Temporal: Logger](
     eventLogUrl: EventLogUrl
 ) extends RestClient[F, SubscriptionSender[F]](Throttler.noThrottling)
-    with SubscriptionSender[F] {
+    with SubscriptionSender[F]
+    with RenkuEntityCodec {
 
   import org.http4s.Method.POST
   import org.http4s.Status.Accepted

@@ -30,9 +30,9 @@ import io.renku.eventlog.metrics.QueriesExecutionTimes
 import io.renku.graph.config.EventLogUrl
 import io.renku.graph.model.events.{EventDate, EventInfo, EventStatus, StatusProcessingTime}
 import io.renku.graph.model.projects
+import io.renku.http.RenkuEntityCodec
 import io.renku.http.rest.Sorting
 import io.renku.http.rest.paging.PagingRequest
-import org.http4s.circe.CirceEntityCodec._
 import org.http4s.dsl.Http4sDsl
 import org.http4s.{Request, Response}
 import org.typelevel.log4cats.Logger
@@ -45,6 +45,7 @@ trait EventsEndpoint[F[_]] {
 
 class EventsEndpointImpl[F[_]: MonadThrow: Logger](eventsFinder: EventsFinder[F], eventLogUrl: EventLogUrl)
     extends Http4sDsl[F]
+    with RenkuEntityCodec
     with EventsEndpoint[F] {
 
   override def findEvents(criteria: EventsEndpoint.Criteria, request: Request[F]): F[Response[F]] =
