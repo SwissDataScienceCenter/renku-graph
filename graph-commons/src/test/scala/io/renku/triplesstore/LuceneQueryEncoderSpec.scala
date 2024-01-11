@@ -18,26 +18,25 @@
 
 package io.renku.triplesstore
 
+import cats.effect.IO
+import cats.effect.testing.scalatest.AsyncIOSpec
 import eu.timepit.refined.auto._
 import io.renku.generators.Generators.Implicits._
 import io.renku.generators.Generators.{NonBlank, nonEmptyStrings}
 import io.renku.generators.jsonld.JsonLDGenerators.entityIds
 import io.renku.graph.model.testentities.{schema, _}
-import io.renku.testtools.IOSpec
+import io.renku.interpreters.TestLogger
 import io.renku.triplesstore.SparqlQuery.Prefixes
 import io.renku.triplesstore.client.model.Quad
 import io.renku.triplesstore.client.sparql.LuceneQuery
 import io.renku.triplesstore.client.syntax._
 import org.scalacheck.Gen
+import org.scalatest.Succeeded
 import org.scalatest.matchers.should
-import org.scalatest.wordspec.AnyWordSpec
+import org.scalatest.wordspec.AsyncWordSpec
+import org.typelevel.log4cats.Logger
 
-class LuceneQueryEncoderSpec
-    extends AnyWordSpec
-    with IOSpec
-    with InMemoryJenaForSpec
-    with ProjectsDataset
-    with should.Matchers {
+class LuceneQueryEncoderSpec extends AsyncWordSpec with AsyncIOSpec with CommonsJenaSpec with should.Matchers {
 
   private val specialChars =
     List[NonBlank]("\\", "+", "-", "&", "|", "!", "(", ")", "{", "}", "[", "]", "^", "\"", "~", "*", "?", ":", "/")
@@ -45,56 +44,58 @@ class LuceneQueryEncoderSpec
   "queryAsString" should {
 
     specialChars foreach { specialChar =>
-      s"escape '$specialChar' so it can be used as a string in the Lucene search" in {
+      s"escape '$specialChar' so it can be used as a string in the Lucene search" in projectsDSConfig.use {
+        implicit pcc =>
+          val name = s"$specialChar${nonEmptyStrings(minLength = 3).generateOne}"
+          val quad = Quad(entityIds.generateOne, entityIds.generateOne, schema / "name", name.asTripleObject)
 
-        val name = s"$specialChar${nonEmptyStrings(minLength = 3).generateOne}"
-        val quad = Quad(entityIds.generateOne, entityIds.generateOne, schema / "name", name.asTripleObject)
+          for {
+            _ <- insert(quad)
 
-        insert(to = projectsDataset, quad)
-
-        runSelect(
-          on = projectsDataset,
-          SparqlQuery.of(
-            "lucene test query",
-            Prefixes of (schema -> "schema", text -> "text"),
-            sparql"""|SELECT ?name
-                     |WHERE {
-                     |  GRAPH ?g {
-                     |    ?id text:query (schema:name ${LuceneQuery.escape(name).asTripleObject});
-                     |    schema:name ?name
-                     |  }
-                     |}""".stripMargin
-          )
-        ).unsafeRunSync() shouldBe List(Map("name" -> name.value))
+            _ <- runSelect(
+                   SparqlQuery.of(
+                     "lucene test query",
+                     Prefixes of (schema -> "schema", text -> "text"),
+                     sparql"""|SELECT ?name
+                              |WHERE {
+                              |  GRAPH ?g {
+                              |    ?id text:query (schema:name ${LuceneQuery.escape(name).asTripleObject});
+                              |    schema:name ?name
+                              |  }
+                              |}""".stripMargin
+                   )
+                 ).asserting(_ shouldBe List(Map("name" -> name.value)))
+          } yield Succeeded
       }
     }
   }
 
   "tripleObjectEncoder" should {
 
-    "encode the query as triple object" in {
-
+    "encode the query as triple object" in projectsDSConfig.use { implicit pcc =>
       val name = s"${specialCharsGen.generateOne}${nonEmptyStrings(minLength = 3).generateOne}"
       val quad = Quad(entityIds.generateOne, entityIds.generateOne, schema / "name", name.asTripleObject)
 
-      insert(to = projectsDataset, quad)
+      for {
+        _ <- insert(quad)
 
-      runSelect(
-        on = projectsDataset,
-        SparqlQuery.of(
-          "lucene test query",
-          Prefixes of (schema -> "schema", text -> "text"),
-          sparql"""|SELECT ?name
-                   |WHERE {
-                   |  GRAPH ?g {
-                   |    ?id text:query (schema:name ${LuceneQuery.fuzzy(name).asTripleObject});
-                   |    schema:name ?name
-                   |  }
-                   |}""".stripMargin
-        )
-      ).unsafeRunSync() shouldBe List(Map("name" -> name.value))
+        _ <- runSelect(
+               SparqlQuery.of(
+                 "lucene test query",
+                 Prefixes of (schema -> "schema", text -> "text"),
+                 sparql"""|SELECT ?name
+                          |WHERE {
+                          |  GRAPH ?g {
+                          |    ?id text:query (schema:name ${LuceneQuery.fuzzy(name).asTripleObject});
+                          |    schema:name ?name
+                          |  }
+                          |}""".stripMargin
+               )
+             ).asserting(_ shouldBe List(Map("name" -> name.value)))
+      } yield Succeeded
     }
   }
 
   private lazy val specialCharsGen: Gen[NonBlank] = Gen.oneOf(specialChars)
+  private implicit lazy val logger: Logger[IO]    = TestLogger()
 }

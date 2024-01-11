@@ -18,7 +18,7 @@
 
 package io.renku.triplesstore
 
-import cats.effect.IO
+import cats.effect.{Clock, IO}
 import cats.effect.std.Random
 import cats.syntax.all._
 import io.renku.http.client.BasicAuthCredentials
@@ -32,10 +32,8 @@ private object TestDatasetCreation {
     IO.fromEither(configFactory.fromTtlFile())
 
   def generateName(ttl: DatasetConfigFile, testClass: Class[_]) =
-    Random
-      .scalaUtilRandom[IO]
-      .flatMap(_.nextIntBounded(1000))
-      .map(v => s"${ttl.datasetName}_${testClass.getSimpleName.toLowerCase}_$v")
+    (Random.scalaUtilRandom[IO].flatMap(_.nextIntBounded(1000)) -> Clock[IO].realTime.map(_.toMillis))
+      .mapN((l, t) => s"${ttl.datasetName}_${testClass.getSimpleName.toLowerCase}_${l}_$t")
 
   def updateDSConfig[C <: DatasetConfigFile](
       config:  C,

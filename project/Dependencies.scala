@@ -38,7 +38,6 @@ object Dependencies {
     val sentryLogback          = "7.1.0"
     val skunk                  = "0.6.2"
     val swaggerParser          = "2.1.19"
-    val testContainersScala    = "0.41.0"
     val widoco                 = "1.4.21"
     val wiremock               = "3.3.1"
   }
@@ -152,15 +151,6 @@ object Dependencies {
     "org.typelevel" %% "log4cats-core"  % V.log4cats,
     "org.typelevel" %% "log4cats-slf4j" % V.log4cats
   )
-
-  val testContainersScalaTest = Seq(
-    "com.dimafeng" %% "testcontainers-scala-scalatest" % V.testContainersScala
-  )
-  val testContainersPostgres =
-    testContainersScalaTest ++
-      Seq(
-        "com.dimafeng" %% "testcontainers-scala-postgresql" % V.testContainersScala
-      )
 
   val wiremock = Seq(
     "org.wiremock" % "wiremock" % V.wiremock

@@ -19,37 +19,37 @@
 package io.renku.triplesgenerator.events.consumers.minprojectinfo
 
 import cats.effect.IO
+import cats.effect.testing.scalatest.AsyncIOSpec
 import io.renku.generators.Generators.Implicits._
 import io.renku.graph.model.testentities._
 import io.renku.interpreters.TestLogger
-import io.renku.logging.TestSparqlQueryTimeRecorder
-import io.renku.testtools.IOSpec
+import io.renku.triplesgenerator.TriplesGeneratorJenaSpec
 import io.renku.triplesstore._
+import org.scalatest.Succeeded
 import org.scalatest.matchers.should
-import org.scalatest.wordspec.AnyWordSpec
+import org.scalatest.wordspec.AsyncWordSpec
 
 class ProjectExistenceCheckerSpec
-    extends AnyWordSpec
-    with should.Matchers
-    with IOSpec
-    with InMemoryJenaForSpec
-    with ProjectsDataset {
+    extends AsyncWordSpec
+    with AsyncIOSpec
+    with TriplesGeneratorJenaSpec
+    with should.Matchers {
 
   "checkProjectExists" should {
 
-    "return false if project does not exist in the TS; true otherwise" in {
-
+    "return false if project does not exist in the TS; true otherwise" in projectsDSConfig.use { implicit pcc =>
       val project = anyProjectEntities.generateOne
 
-      checker.checkProjectExists(project.resourceId).unsafeRunSync() shouldBe false
+      for {
+        _ <- checker.checkProjectExists(project.resourceId).asserting(_ shouldBe false)
 
-      upload(to = projectsDataset, project)
+        _ <- uploadToProjects(project)
 
-      checker.checkProjectExists(project.resourceId).unsafeRunSync() shouldBe true
+        _ <- checker.checkProjectExists(project.resourceId).asserting(_ shouldBe true)
+      } yield Succeeded
     }
   }
 
-  private implicit val logger:       TestLogger[IO]              = TestLogger[IO]()
-  private implicit val timeRecorder: SparqlQueryTimeRecorder[IO] = TestSparqlQueryTimeRecorder[IO].unsafeRunSync()
-  private lazy val checker = new ProjectExistenceCheckerImpl[IO](TSClient[IO](projectsDSConnectionInfo))
+  private implicit val logger: TestLogger[IO] = TestLogger[IO]()
+  private def checker(implicit pcc: ProjectsConnectionConfig) = new ProjectExistenceCheckerImpl[IO](tsClient)
 }

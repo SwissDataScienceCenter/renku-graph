@@ -225,8 +225,6 @@ lazy val triplesStoreClient = project
         Dependencies.rdf4jQueryParserSparql ++
         Dependencies.http4sClient ++
         Dependencies.http4sCirce,
-    libraryDependencies ++=
-      Dependencies.testContainersScalaTest.map(_ % Test)
   )
   .dependsOn(
     generators % "test->test",
@@ -324,8 +322,7 @@ lazy val graphCommons = project
         Dependencies.log4Cats,
     // Test dependencies
     libraryDependencies ++=
-      (Dependencies.testContainersPostgres ++
-        Dependencies.wiremock ++
+      (Dependencies.wiremock ++
         Dependencies.scalamock).map(_ % Test)
   )
   .dependsOn(

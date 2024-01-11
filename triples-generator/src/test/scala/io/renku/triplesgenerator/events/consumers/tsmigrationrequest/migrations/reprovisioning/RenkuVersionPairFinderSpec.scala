@@ -19,6 +19,7 @@
 package io.renku.triplesgenerator.events.consumers.tsmigrationrequest.migrations.reprovisioning
 
 import cats.effect.IO
+import cats.effect.testing.scalatest.AsyncIOSpec
 import cats.syntax.all._
 import io.renku.generators.Generators.Implicits._
 import io.renku.graph.model.GraphModelGenerators._
@@ -26,57 +27,60 @@ import io.renku.graph.model.RenkuUrl
 import io.renku.interpreters.TestLogger
 import io.renku.interpreters.TestLogger.Level.Warn
 import io.renku.logging.TestExecutionTimeRecorder
-import io.renku.testtools.IOSpec
+import io.renku.triplesgenerator.TriplesGeneratorJenaSpec
 import io.renku.triplesgenerator.generators.VersionGenerators.renkuVersionPairs
-import io.renku.triplesstore.{InMemoryJenaForSpec, MigrationsDataset, SparqlQueryTimeRecorder}
+import io.renku.triplesstore.{MigrationsConnectionConfig, SparqlQueryTimeRecorder}
 import org.scalatest._
 import matchers._
-import org.scalatest.wordspec.AnyWordSpec
+import org.scalatest.wordspec.AsyncWordSpec
 
 class RenkuVersionPairFinderSpec
-    extends AnyWordSpec
-    with IOSpec
+    extends AsyncWordSpec
+    with AsyncIOSpec
+    with TriplesGeneratorJenaSpec
     with should.Matchers
-    with InMemoryJenaForSpec
-    with MigrationsDataset {
+    with BeforeAndAfterEach {
 
   private implicit lazy val renkuUrl: RenkuUrl = renkuUrls.generateOne
 
   "find" should {
 
-    "return the Version pair in the triples store" in new TestCase {
+    "return the Version pair in the triples store" in migrationsDSConfig.use { implicit mcc =>
+      for {
+        _ <- uploadToMigrations(currentVersionPair)
 
-      upload(to = migrationsDataset, currentVersionPair)
+        _ <- versionPairFinder.find().asserting(_ shouldBe currentVersionPair.some)
 
-      versionPairFinder.find().unsafeRunSync() shouldBe currentVersionPair.some
-
-      logger.loggedOnly(Warn(s"re-provisioning - version pair find finished${executionTimeRecorder.executionTimeInfo}"))
+        _ <- logger.loggedOnlyF(
+               Warn(s"re-provisioning - version pair find finished${executionTimeRecorder.executionTimeInfo}")
+             )
+      } yield Succeeded
     }
 
-    "return None if there are no Version pair in the triple store" in new TestCase {
-
-      versionPairFinder.find().unsafeRunSync() shouldBe None
-
-      logger.loggedOnly(Warn(s"re-provisioning - version pair find finished${executionTimeRecorder.executionTimeInfo}"))
+    "return None if there are no Version pair in the triple store" in migrationsDSConfig.use { implicit mcc =>
+      versionPairFinder.find().asserting(_ shouldBe None) >>
+        logger.loggedOnlyF(
+          Warn(s"re-provisioning - version pair find finished${executionTimeRecorder.executionTimeInfo}")
+        )
     }
 
-    "return an IllegalStateException if there are multiple Version Pairs" in new TestCase {
-
-      upload(to = migrationsDataset, currentVersionPair, renkuVersionPairs.generateOne)
-
-      intercept[IllegalStateException] {
-        versionPairFinder.find().unsafeRunSync()
-      }.getMessage should startWith("Too many Version pairs found:")
+    "return an IllegalStateException if there are multiple Version Pairs" in migrationsDSConfig.use { implicit mcc =>
+      uploadToMigrations(currentVersionPair, renkuVersionPairs.generateOne) >>
+        versionPairFinder
+          .find()
+          .assertThrowsError[IllegalStateException](_.getMessage should startWith("Too many Version pairs found:"))
     }
   }
 
-  private trait TestCase {
-    val currentVersionPair = renkuVersionPairs.generateOne
+  private lazy val currentVersionPair = renkuVersionPairs.generateOne
 
-    implicit val logger: TestLogger[IO] = TestLogger[IO]()
-    val executionTimeRecorder = TestExecutionTimeRecorder[IO]()
-    private implicit val timeRecorder: SparqlQueryTimeRecorder[IO] =
-      new SparqlQueryTimeRecorder[IO](executionTimeRecorder)
-    val versionPairFinder = new RenkuVersionPairFinderImpl[IO](migrationsDSConnectionInfo)
+  private implicit lazy val logger: TestLogger[IO] = TestLogger[IO]()
+  private lazy val executionTimeRecorder = TestExecutionTimeRecorder[IO]()
+  private implicit val tr: SparqlQueryTimeRecorder[IO] = new SparqlQueryTimeRecorder[IO](executionTimeRecorder)
+  private def versionPairFinder(implicit mcc: MigrationsConnectionConfig) = new RenkuVersionPairFinderImpl[IO](mcc)
+
+  protected override def beforeEach(): Unit = {
+    super.beforeEach()
+    logger.reset()
   }
 }

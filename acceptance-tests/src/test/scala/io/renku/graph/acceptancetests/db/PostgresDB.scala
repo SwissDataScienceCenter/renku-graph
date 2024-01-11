@@ -19,82 +19,27 @@
 package io.renku.graph.acceptancetests.db
 
 import cats.effect._
-import com.dimafeng.testcontainers.FixedHostPortGenericContainer
 import eu.timepit.refined.auto._
 import io.renku.db.DBConfigProvider.DBConfig
-import io.renku.db.{PostgresContainer, SessionResource}
-import skunk.codec.all._
-import skunk.implicits._
-import skunk._
+import io.renku.db.{PostgresServer, SessionResource}
 import natchez.Trace.Implicits.noop
 import org.typelevel.log4cats.Logger
-import scala.concurrent.duration._
+import skunk._
+import skunk.implicits._
 
 object PostgresDB {
-  private[this] val starting: Ref[IO, Boolean] = Ref.unsafe[IO, Boolean](false)
 
-  private val dbConfig = DBConfig[Any](
-    host = "localhost",
-    port = 5432,
-    name = "postgres",
-    user = "at",
-    pass = "at",
-    connectionPool = 8
-  )
+  lazy val server: PostgresServer = new PostgresServer("acceptance_tests", port = 5432)
 
-  private val postgresContainer = {
-    val cfg = dbConfig
-    FixedHostPortGenericContainer(
-      imageName = PostgresContainer.image,
-      env = Map(
-        "POSTGRES_USER"     -> cfg.user.value,
-        "POSTGRES_PASSWORD" -> cfg.pass.value
-      ),
-      exposedPorts = Seq(cfg.port.value),
-      exposedHostPort = cfg.port.value,
-      exposedContainerPort = cfg.port.value,
-      command = Seq(s"-p ${cfg.port.value}")
-    )
-  }
+  private lazy val dbConfig = server.dbConfig
 
-  def startPostgres(implicit L: Logger[IO]) =
-    starting.getAndUpdate(_ => true).flatMap {
-      case false =>
-        IO.unlessA(postgresContainer.container.isRunning)(
-          IO(postgresContainer.start()) *> waitForPostgres *> L.info(
-            "PostgreSQL database started"
-          )
-        )
-
-      case true =>
-        waitForPostgres
-    }
-
-  private def waitForPostgres =
-    fs2.Stream
-      .awakeDelay[IO](0.5.seconds)
-      .evalMap { _ =>
-        Session
-          .single[IO](
-            host = dbConfig.host,
-            port = dbConfig.port,
-            user = dbConfig.user.value,
-            password = Some(dbConfig.pass.value),
-            database = dbConfig.name.value
-          )
-          .use(_.unique(sql"SELECT 1".query(int4)))
-          .attempt
-      }
-      .map(_.fold(_ => 1, _ => 0))
-      .take(100)
-      .find(_ == 0)
-      .compile
-      .drain
+  def start(implicit logger: Logger[IO]): IO[Unit] =
+    IO(server.start()) >> logger.info("triples_generator DB started")
 
   def sessionPool(dbCfg: DBConfig[_]): Resource[IO, Resource[IO, Session[IO]]] =
     Session
       .pooled[IO](
-        host = postgresContainer.host,
+        host = dbCfg.host.value,
         port = dbConfig.port.value,
         database = dbCfg.name.value,
         user = dbCfg.user.value,

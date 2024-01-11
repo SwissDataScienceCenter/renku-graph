@@ -19,6 +19,7 @@
 package io.renku.triplesgenerator.tsprovisioning.transformation.namedgraphs.persons
 
 import cats.effect.IO
+import cats.effect.testing.scalatest.AsyncIOSpec
 import cats.syntax.all._
 import eu.timepit.refined.auto._
 import io.renku.generators.Generators.Implicits._
@@ -29,68 +30,67 @@ import io.renku.graph.model.{GraphClass, entities, persons}
 import io.renku.interpreters.TestLogger
 import io.renku.jsonld.syntax._
 import io.renku.logging.TestSparqlQueryTimeRecorder
-import io.renku.testtools.IOSpec
+import io.renku.triplesgenerator.TriplesGeneratorJenaSpec
 import io.renku.triplesstore.SparqlQuery._
 import io.renku.triplesstore._
 import io.renku.triplesstore.client.model.Quad
 import io.renku.triplesstore.client.syntax._
+import org.scalatest.{OptionValues, Succeeded}
 import org.scalatest.matchers.should
-import org.scalatest.wordspec.AnyWordSpec
+import org.scalatest.wordspec.AsyncWordSpec
 
 class KGPersonFinderSpec
-    extends AnyWordSpec
-    with IOSpec
+    extends AsyncWordSpec
+    with AsyncIOSpec
+    with TriplesGeneratorJenaSpec
     with should.Matchers
-    with InMemoryJenaForSpec
-    with ProjectsDataset {
+    with OptionValues {
 
   "find" should {
 
-    "find a Person by its resourceId" in new TestCase {
+    "find a Person by its resourceId" in projectsDSConfig.use { implicit pcc =>
       val person = personEntities().generateOne.to[entities.Person]
 
-      upload(to = projectsDataset, person)
-
-      (finder find person).unsafeRunSync() shouldBe Some(person)
+      uploadToProjects(person) >>
+        (finder find person).asserting(_ shouldBe Some(person))
     }
 
-    "pick-up one of the Person names if there multiple" in new TestCase {
+    "pick-up one of the Person names if there multiple" in projectsDSConfig.use { implicit pcc =>
       val person = personEntities().generateOne.to[entities.Person]
 
-      upload(to = projectsDataset, person)
+      for {
+        _ <- uploadToProjects(person)
 
-      val duplicateNames = personNames.generateNonEmptyList().toList.toSet
-      duplicateNames foreach { name =>
-        insert(to = projectsDataset,
-               Quad(GraphClass.Persons.id, person.resourceId.asEntityId, schema / "name", name.asObject)
-        )
-      }
-      findNames(person) shouldBe duplicateNames + person.name
+        duplicateNames = personNames.generateNonEmptyList().toList
+        _ <- duplicateNames.traverse_ { name =>
+               insert(Quad(GraphClass.Persons.id, person.resourceId.asEntityId, schema / "name", name.asObject))
+             }
+        _ <- findNames(person).asserting(_ shouldBe duplicateNames.toSet + person.name)
 
-      val Some(found) = (finder find person).unsafeRunSync()
+        found <- finder.find(person).map(_.value)
 
-      found.resourceId       shouldBe person.resourceId
-      Set(found.name)          should contain oneElementOf (duplicateNames + person.name)
-      found.maybeEmail       shouldBe person.maybeEmail
-      found.maybeAffiliation shouldBe person.maybeAffiliation
+        _ = found.resourceId       shouldBe person.resourceId
+        _ = Set(found.name)          should contain oneElementOf (duplicateNames.toSet + person.name)
+        _ = found.maybeEmail       shouldBe person.maybeEmail
+        _ = found.maybeAffiliation shouldBe person.maybeAffiliation
+      } yield Succeeded
     }
 
-    "return no Person if it doesn't exist" in new TestCase {
+    "return no Person if it doesn't exist" in projectsDSConfig.use { implicit pcc =>
       finder
         .find(personEntities().generateOne.to[entities.Person])
-        .unsafeRunSync() shouldBe None
+        .asserting(_ shouldBe None)
     }
   }
 
-  private trait TestCase {
-    private implicit val logger:       TestLogger[IO]              = TestLogger[IO]()
-    private implicit val timeRecorder: SparqlQueryTimeRecorder[IO] = TestSparqlQueryTimeRecorder[IO].unsafeRunSync()
-    val finder = new KGPersonFinderImpl[IO](projectsDSConnectionInfo)
+  private implicit lazy val logger: TestLogger[IO] = TestLogger[IO]()
+  private def finder(implicit pcc: ProjectsConnectionConfig) = {
+    implicit val tr: SparqlQueryTimeRecorder[IO] = TestSparqlQueryTimeRecorder.createUnsafe
+    new KGPersonFinderImpl[IO](pcc)
   }
 
-  private def findNames(id: entities.Person): Set[persons.Name] =
+  private def findNames(id: entities.Person)(implicit pcc: ProjectsConnectionConfig): IO[Set[persons.Name]] =
     runSelect(
-      on = projectsDataset,
       SparqlQuery.of(
         "fetch person name",
         Prefixes of schema -> "schema",
@@ -101,7 +101,5 @@ class KGPersonFinderSpec
             |  }
             |}""".stripMargin
       )
-    ).unsafeRunSync()
-      .map(row => persons.Name(row("name")))
-      .toSet
+    ).map(_.map(row => persons.Name(row("name"))).toSet)
 }

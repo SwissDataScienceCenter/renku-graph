@@ -23,49 +23,49 @@ import io.renku.generators.Generators.Implicits._
 import io.renku.graph.model.GraphModelGenerators._
 import io.renku.graph.model._
 import Schemas.renku
+import cats.effect.testing.scalatest.AsyncIOSpec
 import eu.timepit.refined.auto._
 import io.renku.graph.model.versions.{CliVersion, RenkuVersionPair, SchemaVersion}
 import io.renku.interpreters.TestLogger
 import io.renku.logging.TestSparqlQueryTimeRecorder
-import io.renku.testtools.IOSpec
+import io.renku.triplesgenerator.TriplesGeneratorJenaSpec
 import io.renku.triplesgenerator.generators.VersionGenerators._
 import io.renku.triplesstore.SparqlQuery.Prefixes
 import io.renku.triplesstore._
+import org.scalatest.Succeeded
 import org.scalatest.matchers.should.Matchers
-import org.scalatest.wordspec.AnyWordSpec
+import org.scalatest.wordspec.AsyncWordSpec
 
-class RenkuVersionPairUpdaterSpec
-    extends AnyWordSpec
-    with IOSpec
-    with Matchers
-    with InMemoryJenaForSpec
-    with MigrationsDataset {
+class RenkuVersionPairUpdaterSpec extends AsyncWordSpec with AsyncIOSpec with TriplesGeneratorJenaSpec with Matchers {
 
   "update" should {
-    "create a renku:VersionPair with the given version pair" in new TestCase {
-      findPairInDb shouldBe Set.empty
+    "create a renku:VersionPair with the given version pair" in migrationsDSConfig.use { implicit mcc =>
+      for {
+        _ <- findPairInDb.asserting(_ shouldBe Set.empty)
 
-      renkuVersionPairUpdater.update(currentRenkuVersionPair).unsafeRunSync()
+        _ <- renkuVersionPairUpdater.update(currentRenkuVersionPair)
 
-      findPairInDb shouldBe Set(currentRenkuVersionPair)
+        _ <- findPairInDb.asserting(_ shouldBe Set(currentRenkuVersionPair))
 
-      renkuVersionPairUpdater.update(newVersionCompatibilityPairs).unsafeRunSync()
+        _ <- renkuVersionPairUpdater.update(newVersionCompatibilityPairs)
 
-      findPairInDb shouldBe Set(newVersionCompatibilityPairs)
+        _ <- findPairInDb.asserting(_ shouldBe Set(newVersionCompatibilityPairs))
+      } yield Succeeded
     }
   }
 
-  private trait TestCase {
-    val currentRenkuVersionPair      = renkuVersionPairs.generateOne
-    val newVersionCompatibilityPairs = renkuVersionPairs.generateOne
+  val currentRenkuVersionPair      = renkuVersionPairs.generateOne
+  val newVersionCompatibilityPairs = renkuVersionPairs.generateOne
 
-    private implicit val renkuUrl:     RenkuUrl                    = renkuUrls.generateOne
-    private implicit val logger:       TestLogger[IO]              = TestLogger[IO]()
-    private implicit val timeRecorder: SparqlQueryTimeRecorder[IO] = TestSparqlQueryTimeRecorder[IO].unsafeRunSync()
-    val renkuVersionPairUpdater = new RenkuVersionPairUpdaterImpl[IO](migrationsDSConnectionInfo)
+  private implicit val renkuUrl:    RenkuUrl       = renkuUrls.generateOne
+  private implicit lazy val logger: TestLogger[IO] = TestLogger[IO]()
+  private def renkuVersionPairUpdater(implicit mcc: MigrationsConnectionConfig) = {
+    implicit val tr: SparqlQueryTimeRecorder[IO] = TestSparqlQueryTimeRecorder.createUnsafe
+    new RenkuVersionPairUpdaterImpl[IO](mcc)
+  }
 
-    def findPairInDb: Set[RenkuVersionPair] = runSelect(
-      on = migrationsDataset,
+  private def findPairInDb(implicit mcc: MigrationsConnectionConfig): IO[Set[RenkuVersionPair]] =
+    runSelect(
       SparqlQuery.of(
         "fetch version pair info",
         Prefixes of renku -> "renku",
@@ -77,8 +77,5 @@ class RenkuVersionPairUpdaterSpec
             |}
             |""".stripMargin
       )
-    ).unsafeRunSync()
-      .map(row => RenkuVersionPair(CliVersion(row("cliVersion")), SchemaVersion(row("schemaVersion"))))
-      .toSet
-  }
+    ).map(_.map(row => RenkuVersionPair(CliVersion(row("cliVersion")), SchemaVersion(row("schemaVersion")))).toSet)
 }

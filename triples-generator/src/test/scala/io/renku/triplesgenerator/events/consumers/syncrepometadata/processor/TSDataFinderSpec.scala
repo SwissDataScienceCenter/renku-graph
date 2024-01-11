@@ -19,14 +19,14 @@
 package io.renku.triplesgenerator.events.consumers.syncrepometadata.processor
 
 import cats.effect.IO
+import cats.effect.testing.scalatest.AsyncIOSpec
 import cats.syntax.all._
 import io.renku.generators.Generators.Implicits._
 import io.renku.graph.model.entities
 import io.renku.graph.model.testentities._
 import io.renku.interpreters.TestLogger
-import io.renku.logging.TestSparqlQueryTimeRecorder
-import io.renku.testtools.CustomAsyncIOSpec
-import io.renku.triplesstore.{InMemoryJenaForSpec, ProjectsDataset, SparqlQueryTimeRecorder, TSClient}
+import io.renku.triplesgenerator.TriplesGeneratorJenaSpec
+import io.renku.triplesstore.ProjectsConnectionConfig
 import org.scalatest.OptionValues
 import org.scalatest.flatspec.AsyncFlatSpec
 import org.scalatest.matchers.should
@@ -34,43 +34,39 @@ import org.scalatestplus.scalacheck.ScalaCheckPropertyChecks
 
 class TSDataFinderSpec
     extends AsyncFlatSpec
-    with CustomAsyncIOSpec
+    with AsyncIOSpec
+    with TriplesGeneratorJenaSpec
     with should.Matchers
-    with InMemoryJenaForSpec
-    with ProjectsDataset
     with OptionValues
     with ScalaCheckPropertyChecks {
 
   forAll(anyProjectEntities.map(_.to[entities.Project])) { project =>
-    it should s"fetch relevant data from the TS - project ${project.name}" in {
-
-      upload(to = projectsDataset, project)
-
-      finder
-        .fetchTSData(project.slug)
-        .asserting(
-          _.value shouldBe DataExtract
-            .TS(
-              project.resourceId,
-              project.slug,
-              project.name,
-              project.visibility,
-              project.dateModified.some,
-              project.maybeDescription,
-              project.keywords,
-              project.images.sortBy(_.position).map(_.uri)
-            )
-        )
+    it should s"fetch relevant data from the TS - project ${project.name}" in projectsDSConfig.use { implicit pcc =>
+      uploadToProjects(project) >>
+        finder
+          .fetchTSData(project.slug)
+          .asserting(
+            _.value shouldBe DataExtract
+              .TS(
+                project.resourceId,
+                project.slug,
+                project.name,
+                project.visibility,
+                project.dateModified.some,
+                project.maybeDescription,
+                project.keywords,
+                project.images.sortBy(_.position).map(_.uri)
+              )
+          )
     }
   }
 
-  it should "return None if there's no project with the given slug" in {
+  it should "return None if there's no project with the given slug" in projectsDSConfig.use { implicit pcc =>
     finder
       .fetchTSData(projectSlugs.generateOne)
       .asserting(_ shouldBe None)
   }
 
-  private implicit val logger:       TestLogger[IO]              = TestLogger[IO]()
-  private implicit val timeRecorder: SparqlQueryTimeRecorder[IO] = TestSparqlQueryTimeRecorder[IO].unsafeRunSync()
-  private lazy val finder = new TSDataFinderImpl[IO](TSClient[IO](projectsDSConnectionInfo))
+  private implicit val logger: TestLogger[IO] = TestLogger[IO]()
+  private def finder(implicit pcc: ProjectsConnectionConfig) = new TSDataFinderImpl[IO](tsClient)
 }

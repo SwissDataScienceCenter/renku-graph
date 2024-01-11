@@ -54,6 +54,11 @@ trait TestDataset {
   def insert(quads: Seq[Quad])(implicit dcc: DatasetConnectionConfig, L: Logger[IO]): IO[Unit] =
     quads.toList.traverse_(insert)
 
+  def delete(quad: Quad)(implicit dcc: DatasetConnectionConfig, L: Logger[IO]): IO[Unit] =
+    runUpdate {
+      SparqlQuery.ofUnsafe("delete quad", sparql"DELETE DATA { $quad }")
+    }
+
   def triplesCount(implicit dcc: DatasetConnectionConfig, L: Logger[IO]): IO[Long] =
     runSelect(
       SparqlQuery.ofUnsafe("triples count", "SELECT (COUNT(?s) AS ?count) WHERE { GRAPH ?g { ?s ?p ?o } }")
