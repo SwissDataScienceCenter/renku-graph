@@ -69,6 +69,7 @@ class PostgresServer(module: String, port: Int) {
       while (rc != 0) {
         Thread.sleep(500)
         rc = isReadyCmd.!
+        if (rc == 0) println(s"PostgreSQL container for module '$module' started on port $port")
       }
     }
 
