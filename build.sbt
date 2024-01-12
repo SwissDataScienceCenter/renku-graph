@@ -215,7 +215,7 @@ lazy val triplesStoreClient = project
   .settings(commonSettings)
   .settings(
     name := "triples-store-client",
-    Test / testOptions += Tests.Setup(JenaServer.triplesStoreClient("start")),
+    Test / testOptions += Tests.Setup(JenaServer.triplesStoreClient("sbtStart")),
     Test / testOptions += Tests.Cleanup(JenaServer.triplesStoreClient("forceStop")),
     libraryDependencies ++=
       Dependencies.jsonld4s ++
@@ -300,8 +300,8 @@ lazy val graphCommons = project
   .settings(
     name := "graph-commons",
     Test / testOptions += Tests.Setup { cl =>
-      PostgresServer.commons("start")
-      JenaServer.commons("start")
+      PostgresServer.commons("sbtStart")
+      JenaServer.commons("sbtStart")
     },
     Test / testOptions += Tests.Cleanup { cl =>
       PostgresServer.commons("forceStop")
@@ -347,7 +347,7 @@ lazy val eventsQueue = project
   .settings(commonSettings)
   .settings(
     name := "events-queue",
-    Test / testOptions += Tests.Setup(PostgresServer.eventsQueue("start")),
+    Test / testOptions += Tests.Setup(PostgresServer.eventsQueue("sbtStart")),
     Test / testOptions += Tests.Cleanup(PostgresServer.eventsQueue("forceStop"))
   )
   .dependsOn(
@@ -374,7 +374,7 @@ lazy val eventLog = project
   .settings(commonSettings)
   .settings(
     name := "event-log",
-    Test / testOptions += Tests.Setup(PostgresServer.eventLog("start")),
+    Test / testOptions += Tests.Setup(PostgresServer.eventLog("sbtStart")),
     Test / testOptions += Tests.Cleanup(PostgresServer.eventLog("forceStop")),
     libraryDependencies ++= Dependencies.logbackClassic ++ Dependencies.circeGenericExtras
   )
@@ -440,7 +440,7 @@ lazy val entitiesSearch = project
   .settings(commonSettings)
   .settings(
     name := "entities-search",
-    Test / testOptions += Tests.Setup(JenaServer.entitiesSearch("start")),
+    Test / testOptions += Tests.Setup(JenaServer.entitiesSearch("sbtStart")),
     Test / testOptions += Tests.Cleanup(JenaServer.entitiesSearch("forceStop"))
   )
   .dependsOn(graphCommons % "compile->compile; test->test")
@@ -452,7 +452,7 @@ lazy val projectAuth = project
   .settings(commonSettings)
   .settings(
     name := "project-auth",
-    Test / testOptions += Tests.Setup(JenaServer.projectAuth("start")),
+    Test / testOptions += Tests.Setup(JenaServer.projectAuth("sbtStart")),
     Test / testOptions += Tests.Cleanup(JenaServer.projectAuth("forceStop")),
     libraryDependencies ++= Dependencies.http4sClient
   )
@@ -478,7 +478,7 @@ lazy val entitiesViewingsCollector = project
   .settings(commonSettings)
   .settings(
     name := "entities-viewings-collector",
-    Test / testOptions += Tests.Setup(JenaServer.viewingsCollector("start")),
+    Test / testOptions += Tests.Setup(JenaServer.viewingsCollector("sbtStart")),
     Test / testOptions += Tests.Cleanup(JenaServer.viewingsCollector("forceStop"))
   )
   .dependsOn(
@@ -494,7 +494,7 @@ lazy val triplesGenerator = project
   .settings(commonSettings)
   .settings(
     name := "triples-generator",
-    Test / testOptions += Tests.Setup(JenaServer.triplesGenerator("start")),
+    Test / testOptions += Tests.Setup(JenaServer.triplesGenerator("sbtStart")),
     Test / testOptions += Tests.Cleanup(JenaServer.triplesGenerator("forceStop")),
     libraryDependencies ++=
       Dependencies.logbackClassic ++
@@ -531,7 +531,7 @@ lazy val tokenRepository = project
   .settings(commonSettings)
   .settings(
     name := "token-repository",
-    Test / testOptions += Tests.Setup(PostgresServer.tokenRepository("start")),
+    Test / testOptions += Tests.Setup(PostgresServer.tokenRepository("sbtStart")),
     Test / testOptions += Tests.Cleanup(PostgresServer.tokenRepository("forceStop")),
     libraryDependencies ++= Dependencies.logbackClassic
   )
@@ -557,7 +557,7 @@ lazy val knowledgeGraph = project
   .settings(commonSettings)
   .settings(
     name := "knowledge-graph",
-    Test / testOptions += Tests.Setup(JenaServer.knowledgeGraph("start")),
+    Test / testOptions += Tests.Setup(JenaServer.knowledgeGraph("sbtStart")),
     Test / testOptions += Tests.Cleanup(JenaServer.knowledgeGraph("forceStop")),
     libraryDependencies ++=
       Dependencies.logbackClassic ++
@@ -680,7 +680,6 @@ lazy val commonSettings = Seq(
   )
 )
 
-import sbt.{Test, Tests}
 import sbtrelease.Vcs
 
 lazy val writeVersionToVersionConf = taskKey[Unit]("Write release version to version.conf files")

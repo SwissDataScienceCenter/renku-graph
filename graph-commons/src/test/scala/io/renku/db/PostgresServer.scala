@@ -52,6 +52,12 @@ class PostgresServer(module: String, port: Int) {
   private val stopCmd      = s"docker stop -t5 $containerName"
   private val isReadyCmd   = s"docker exec $containerName pg_isready"
   private var wasRunning: Boolean = false
+  private var sbtStarted: Boolean = false
+
+  def sbtStart(): Unit = {
+    start()
+    sbtStarted = true
+  }
 
   def start(): Unit =
     if (skipServer) println("Not starting postgres via docker")
@@ -73,7 +79,7 @@ class PostgresServer(module: String, port: Int) {
   }
 
   def stop(): Unit =
-    if (!skipServer && !wasRunning) {
+    if (!skipServer && !wasRunning && !sbtStarted) {
       println(s"Stopping PostgreSQL container for module '$module'")
       stopCmd.!!
       ()
