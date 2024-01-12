@@ -48,16 +48,10 @@ class JenaServer(module: String, port: Int) {
   private val readyCmd     = "curl http://localhost:3030/$/ping --no-progress-meter --fail 1> /dev/null"
   private val isReadyCmd   = s"docker exec $containerName sh -c '$readyCmd'"
   private var wasRunning: Boolean = false
-  private var sbtStarted: Boolean = false
-
-  def sbtStart(): Unit = {
-    start()
-    sbtStarted = true
-  }
 
   def start(): Unit =
     if (skipServer) println("Not starting Jena via docker")
-    else if (checkRunning || sbtStarted) ()
+    else if (checkRunning) ()
     else {
       println(s"Starting Jena container for module '$module' from '$image' image")
       startCmd.!!
@@ -76,7 +70,7 @@ class JenaServer(module: String, port: Int) {
   }
 
   def stop(): Unit =
-    if (!skipServer && !wasRunning && !sbtStarted) {
+    if (!skipServer && !wasRunning) {
       println(s"Stopping Jena container for module '$module'")
       stopCmd.!!
       ()
