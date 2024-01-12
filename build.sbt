@@ -215,7 +215,7 @@ lazy val triplesStoreClient = project
   .settings(commonSettings)
   .settings(
     name := "triples-store-client",
-    Test / testOptions += Tests.Setup(JenaServer.triplesStoreClient("sbtStart")),
+    Test / testOptions += Tests.Setup(JenaServer.triplesStoreClient("start")),
     Test / testOptions += Tests.Cleanup(JenaServer.triplesStoreClient("forceStop")),
     libraryDependencies ++=
       Dependencies.jsonld4s ++
