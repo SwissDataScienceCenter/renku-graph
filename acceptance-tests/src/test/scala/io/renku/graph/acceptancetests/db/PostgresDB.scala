@@ -33,8 +33,11 @@ object PostgresDB {
 
   private lazy val dbConfig = server.dbConfig
 
+  def startUnsafe(): Unit = server.start()
+  def forceStop():   Unit = server.forceStop()
+
   def start(implicit logger: Logger[IO]): IO[Unit] =
-    IO(server.start()) >> logger.info("triples_generator DB started")
+    IO(startUnsafe()) >> logger.info("triples_generator DB started")
 
   def sessionPool(dbCfg: DBConfig[_]): Resource[IO, Resource[IO, Session[IO]]] =
     Session

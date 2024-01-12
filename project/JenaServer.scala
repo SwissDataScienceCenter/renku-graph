@@ -48,4 +48,11 @@ object JenaServer {
     val instance = clazz.getField("MODULE$").get(null)
     method.invoke(instance)
   }
+
+  def acceptanceTests(methodName: String): ClassLoader => Unit = classLoader => {
+    val clazz    = classLoader.loadClass("io.renku.graph.acceptancetests.db.TriplesStore$")
+    val method   = clazz.getMethod(methodName)
+    val instance = clazz.getField("MODULE$").get(null)
+    method.invoke(instance)
+  }
 }

@@ -224,7 +224,7 @@ lazy val triplesStoreClient = project
         Dependencies.fs2Core ++
         Dependencies.rdf4jQueryParserSparql ++
         Dependencies.http4sClient ++
-        Dependencies.http4sCirce,
+        Dependencies.http4sCirce
   )
   .dependsOn(
     generators % "test->test",
@@ -591,7 +591,15 @@ lazy val acceptanceTests = project
   .settings(commonSettings)
   .settings(
     name := "acceptance-tests",
-    Test / parallelExecution := false
+    Test / parallelExecution := false,
+    Test / testOptions += Tests.Setup { cl =>
+      PostgresServer.acceptanceTests("startUnsafe")
+      JenaServer.acceptanceTests("startUnsafe")
+    },
+    Test / testOptions += Tests.Cleanup { cl =>
+      PostgresServer.acceptanceTests("forceStop")
+      JenaServer.acceptanceTests("forceStop")
+    }
   )
   .dependsOn(
     webhookService,
