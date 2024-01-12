@@ -44,11 +44,12 @@ class ProjectDonePersisterSpec
     implicit mcc =>
       val slugs       = projectSlugs.generateList(min = 2)
       val insertQuery = BacklogCreator.asToBeMigratedInserts.apply(slugs).value
+      val finder      = progressFinder
 
       runUpdate(insertQuery).assertNoException >>
-        progressFinder.findProgressInfo.asserting(_ shouldBe s"${slugs.size} left from ${slugs.size}") >>
+        finder.findProgressInfo.asserting(_ shouldBe s"${slugs.size} left from ${slugs.size}") >>
         donePersister.noteDone(Random.shuffle(slugs).head).assertNoException >>
-        progressFinder.findProgressInfo.asserting(_ shouldBe s"${slugs.size - 1} left from ${slugs.size}")
+        finder.findProgressInfo.asserting(_ shouldBe s"${slugs.size - 1} left from ${slugs.size}")
   }
 
   private implicit lazy val renkuUrl: RenkuUrl       = renkuUrls.generateOne

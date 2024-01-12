@@ -43,16 +43,16 @@ class ProjectDonePersisterSpec
   "noteDone" should {
 
     "persist the (MigrationToV10, renku:migrated, slug) triple" in migrationsDSConfig.use { implicit mcc =>
-      val slugs       = projectSlugs.generateList(min = 2)
-      val insertQuery = BacklogCreator.asToBeMigratedInserts.apply(slugs).value
+      val slugs  = projectSlugs.generateList(min = 2)
+      val finder = progressFinder
       for {
-        _ <- runUpdate(insertQuery)
+        _ <- runUpdate(BacklogCreator.asToBeMigratedInserts.apply(slugs).value)
 
-        _ <- progressFinder.findProgressInfo.asserting(_ shouldBe s"${slugs.size} left from ${slugs.size}")
+        _ <- finder.findProgressInfo.asserting(_ shouldBe s"${slugs.size} left from ${slugs.size}")
 
         _ <- donePersister.noteDone(Random.shuffle(slugs).head)
 
-        _ <- progressFinder.findProgressInfo.asserting(_ shouldBe s"${slugs.size - 1} left from ${slugs.size}")
+        _ <- finder.findProgressInfo.asserting(_ shouldBe s"${slugs.size - 1} left from ${slugs.size}")
       } yield Succeeded
     }
   }
