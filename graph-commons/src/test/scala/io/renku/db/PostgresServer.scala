@@ -61,7 +61,7 @@ class PostgresServer(module: String, port: Int) {
 
   def start(): Unit =
     if (skipServer) println("Not starting postgres via docker")
-    else if (checkRunning) ()
+    else if (checkRunning || sbtStarted) ()
     else {
       println(s"Starting PostgreSQL container for module '$module' from '$image' image")
       startCmd.!!

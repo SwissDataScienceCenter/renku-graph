@@ -57,7 +57,7 @@ class JenaServer(module: String, port: Int) {
 
   def start(): Unit =
     if (skipServer) println("Not starting Jena via docker")
-    else if (checkRunning) ()
+    else if (checkRunning || sbtStarted) ()
     else {
       println(s"Starting Jena container for module '$module' from '$image' image")
       startCmd.!!
