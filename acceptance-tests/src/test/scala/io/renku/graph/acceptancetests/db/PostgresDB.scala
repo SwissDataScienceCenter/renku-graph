@@ -19,12 +19,13 @@
 package io.renku.graph.acceptancetests.db
 
 import cats.effect._
+import cats.syntax.all._
 import eu.timepit.refined.auto._
 import io.renku.db.DBConfigProvider.DBConfig
 import io.renku.db.{PostgresServer, SessionResource}
 import natchez.Trace.Implicits.noop
-import org.typelevel.log4cats.Logger
 import skunk._
+import skunk.codec.all.bool
 import skunk.implicits._
 
 object PostgresDB {
@@ -36,8 +37,8 @@ object PostgresDB {
   def startUnsafe(): Unit = server.start()
   def forceStop():   Unit = server.forceStop()
 
-  def start(implicit logger: Logger[IO]): IO[Unit] =
-    IO(startUnsafe()) >> logger.info("triples_generator DB started")
+  def start(): IO[Unit] =
+    IO(startUnsafe())
 
   def sessionPool(dbCfg: DBConfig[_]): Resource[IO, Resource[IO, Session[IO]]] =
     Session
@@ -65,15 +66,21 @@ object PostgresDB {
     // note: it would be simpler to use the default user that is created with the container, but that requires
     // to first refactor how the configuration is loaded. Currently services load it from the file every time and so
     // this creates the users as expected from the given config
+    val roleExists: Query[Void, Boolean] =
+      sql"SELECT EXISTS (SELECT 1 FROM pg_catalog.pg_roles WHERE rolname = '#${cfg.user.value}')".query(bool)
     val createRole: Command[Void] =
       sql"create role #${cfg.user.value} with password '#${cfg.pass.value}' superuser login".command
     val createDatabase: Command[Void] = sql"create database  #${cfg.name.value}".command
     val grants:         Command[Void] = sql"grant all on database #${cfg.name.value} to #${cfg.user.value}".command
 
     session.use { s =>
-      s.execute(createRole) *>
-        s.execute(createDatabase) *>
-        s.execute(grants)
+      s.unique(roleExists) >>= {
+        case true => ().pure[IO]
+        case false =>
+          s.execute(createRole) *>
+            s.execute(createDatabase) *>
+            s.execute(grants)
+      }
     }.void
   }
 }

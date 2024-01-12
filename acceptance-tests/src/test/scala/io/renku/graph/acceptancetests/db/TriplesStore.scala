@@ -36,8 +36,8 @@ object TriplesStore extends JenaServerSupport {
   def startUnsafe(): Unit = server.start()
   def forceStop():   Unit = server.forceStop()
 
-  def start(implicit logger: Logger[IO]): IO[Unit] =
-    IO(startUnsafe()) >> logger.info("jena started")
+  def start(): IO[Unit] =
+    IO(startUnsafe())
 
   def findProjectAuth(
       slug: projects.Slug

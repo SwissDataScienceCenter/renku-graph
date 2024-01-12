@@ -55,7 +55,7 @@ trait ApplicationServices extends GitLabStubSupport with RemoteTriplesGenerator 
   override def beforeAll(): Unit = {
     super.beforeAll()
 
-    ((PostgresDB.start -> TriplesStore.start).parTupled.void >>
+    ((PostgresDB.start() -> TriplesStore.start()).parTupled.void >>
       servicesRunner
         .run(
           tokenRepository,
