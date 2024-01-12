@@ -32,8 +32,8 @@ import io.renku.generators.Generators._
 import io.renku.graph.model.EventsGenerators.commitIds
 import io.renku.graph.model.GraphModelGenerators.projectIds
 import io.renku.graph.model.events.CommitId
+import io.renku.http.RenkuEntityCodec
 import io.renku.http.client.RestClientError.UnauthorizedException
-import io.renku.http.server.EndpointTester._
 import io.renku.interpreters.TestLogger
 import io.renku.interpreters.TestLogger.Level.Info
 import io.renku.testtools.IOSpec
@@ -44,12 +44,11 @@ import org.http4s.Status._
 import org.http4s._
 import org.http4s.headers.`Content-Type`
 import org.http4s.implicits._
-import org.http4s.circe.CirceEntityCodec._
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
 
-class EndpointSpec extends AnyWordSpec with MockFactory with should.Matchers with IOSpec {
+class EndpointSpec extends AnyWordSpec with MockFactory with should.Matchers with IOSpec with RenkuEntityCodec {
 
   "processPushEvent" should {
 
@@ -57,7 +56,7 @@ class EndpointSpec extends AnyWordSpec with MockFactory with should.Matchers wit
 
       expectDecryptionOf(serializedHookToken, returning = HookToken(syncRequest.project.id))
 
-      val request = Request(Method.POST, uri"/webhooks" / "events")
+      val request = Request[IO](Method.POST, uri"/webhooks" / "events")
         .withHeaders(Headers("X-Gitlab-Token" -> serializedHookToken.toString))
         .withEntity(pushEventPayloadFrom(commitId, syncRequest))
 
@@ -78,7 +77,7 @@ class EndpointSpec extends AnyWordSpec with MockFactory with should.Matchers wit
 
     "return BAD_REQUEST for invalid push event payload" in new TestCase {
 
-      val request = Request(Method.POST, uri"/webhooks" / "events")
+      val request = Request[IO](Method.POST, uri"/webhooks" / "events")
         .withHeaders(Headers("X-Gitlab-Token" -> serializedHookToken.toString))
         .withEntity(Json.obj())
 
@@ -93,7 +92,7 @@ class EndpointSpec extends AnyWordSpec with MockFactory with should.Matchers wit
 
     "return UNAUTHORIZED if X-Gitlab-Token token is not present in the header" in new TestCase {
 
-      val request = Request(Method.POST, uri"/webhooks" / "events")
+      val request = Request[IO](Method.POST, uri"/webhooks" / "events")
         .withEntity(pushEventPayloadFrom(commitId, syncRequest))
 
       val response = endpoint.processPushEvent(request).unsafeRunSync()
@@ -110,7 +109,7 @@ class EndpointSpec extends AnyWordSpec with MockFactory with should.Matchers wit
         .expects(serializedHookToken)
         .returning(HookToken(projectIds.generateOne).pure[IO])
 
-      val request = Request(Method.POST, uri"/webhooks" / "events")
+      val request = Request[IO](Method.POST, uri"/webhooks" / "events")
         .withHeaders(Headers("X-Gitlab-Token" -> serializedHookToken.toString))
         .withEntity(pushEventPayloadFrom(commitId, syncRequest))
 
@@ -129,7 +128,7 @@ class EndpointSpec extends AnyWordSpec with MockFactory with should.Matchers wit
         .expects(serializedHookToken)
         .returning(exception.raiseError[IO, HookToken])
 
-      val request = Request(Method.POST, uri"/webhooks" / "events")
+      val request = Request[IO](Method.POST, uri"/webhooks" / "events")
         .withHeaders(Headers(("X-Gitlab-Token", serializedHookToken.toString)))
         .withEntity(pushEventPayloadFrom(commitId, syncRequest))
 

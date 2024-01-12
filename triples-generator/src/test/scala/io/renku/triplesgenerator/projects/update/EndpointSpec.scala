@@ -28,6 +28,7 @@ import io.renku.generators.Generators.Implicits._
 import io.renku.generators.Generators.exceptions
 import io.renku.graph.model.RenkuTinyTypeGenerators.projectSlugs
 import io.renku.graph.model.projects
+import io.renku.http.RenkuEntityCodec
 import io.renku.interpreters.TestLogger
 import io.renku.testtools.CustomAsyncIOSpec
 import io.renku.triplesgenerator.api.Generators.projectUpdatesGen
@@ -35,13 +36,17 @@ import io.renku.triplesgenerator.api.ProjectUpdates
 import org.http4s.MediaType.application
 import org.http4s.Request
 import org.http4s.Status.{BadRequest, InternalServerError, NotFound, Ok}
-import org.http4s.circe.CirceEntityCodec._
 import org.http4s.headers.`Content-Type`
 import org.scalamock.scalatest.AsyncMockFactory
 import org.scalatest.flatspec.AsyncFlatSpec
 import org.scalatest.matchers.should
 
-class EndpointSpec extends AsyncFlatSpec with CustomAsyncIOSpec with should.Matchers with AsyncMockFactory {
+class EndpointSpec
+    extends AsyncFlatSpec
+    with CustomAsyncIOSpec
+    with should.Matchers
+    with AsyncMockFactory
+    with RenkuEntityCodec {
 
   it should "decode the payload, pass it to the project updater and return Ok for Result.Updated" in {
 

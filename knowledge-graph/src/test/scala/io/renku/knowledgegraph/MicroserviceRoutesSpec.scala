@@ -33,6 +33,7 @@ import io.renku.graph.http.server.security.Authorizer.AuthContext
 import io.renku.graph.model
 import io.renku.graph.model.GraphModelGenerators._
 import io.renku.graph.model.RenkuUrl
+import io.renku.http.RenkuEntityCodec
 import io.renku.http.client.UrlEncoder.urlEncode
 import io.renku.http.rest.Sorting
 import io.renku.http.rest.paging.PagingRequest
@@ -52,7 +53,6 @@ import org.http4s.Status._
 import org.http4s._
 import org.http4s.headers.`Content-Type`
 import org.http4s.implicits._
-import org.http4s.circe.CirceEntityCodec._
 import org.http4s.server.AuthMiddleware
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.matchers.should
@@ -68,6 +68,7 @@ class MicroserviceRoutesSpec
     with MockFactory
     with ScalaCheckPropertyChecks
     with should.Matchers
+    with RenkuEntityCodec
     with IOSpec {
 
   "GET /knowledge-graph/datasets/:id" should {

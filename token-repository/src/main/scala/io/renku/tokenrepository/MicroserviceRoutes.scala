@@ -22,6 +22,7 @@ import cats.MonadThrow
 import cats.effect._
 import cats.syntax.all._
 import io.renku.graph.http.server.binders.{ProjectId, ProjectSlug}
+import io.renku.http.RenkuEntityCodec
 import io.renku.http.client.{AccessToken, GitLabClient}
 import io.renku.http.server.security.RequestTokenFinder.getAccessToken
 import io.renku.http.server.version
@@ -33,7 +34,6 @@ import io.renku.tokenrepository.repository.fetching.FetchTokenEndpoint
 import io.renku.tokenrepository.repository.metrics.QueriesExecutionTimes
 import org.http4s.dsl.Http4sDsl
 import org.http4s.{EntityEncoder, HttpRoutes, Request, Response}
-import org.http4s.circe.CirceEntityCodec._
 import org.typelevel.log4cats.Logger
 
 private trait MicroserviceRoutes[F[_]] {
@@ -49,7 +49,8 @@ private class MicroserviceRoutesImpl[F[_]: MonadThrow](
     versionRoutes:          version.Routes[F],
     dbReady:                Ref[F, Boolean]
 ) extends Http4sDsl[F]
-    with MicroserviceRoutes[F] {
+    with MicroserviceRoutes[F]
+    with RenkuEntityCodec {
 
   import associateTokenEndpoint._
   import deleteTokenEndpoint._

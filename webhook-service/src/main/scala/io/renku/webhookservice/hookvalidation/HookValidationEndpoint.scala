@@ -24,6 +24,7 @@ import cats.syntax.all._
 import eu.timepit.refined.auto._
 import io.renku.data.Message
 import io.renku.graph.model.projects.GitLabId
+import io.renku.http.RenkuEntityCodec
 import io.renku.http.client.GitLabClient
 import io.renku.http.server.security.model.AuthUser
 import io.renku.metrics.MetricsRegistry
@@ -32,7 +33,6 @@ import io.renku.webhookservice.hookvalidation.HookValidator.HookValidationResult
 import io.renku.webhookservice.hookvalidation.HookValidator.HookValidationResult.{HookExists, HookMissing}
 import io.renku.webhookservice.model.ProjectHookUrl
 import org.http4s.Response
-import org.http4s.circe.CirceEntityCodec._
 import org.http4s.dsl.Http4sDsl
 import org.typelevel.log4cats.Logger
 
@@ -42,7 +42,8 @@ trait HookValidationEndpoint[F[_]] {
 
 class HookValidationEndpointImpl[F[_]: MonadThrow: Logger](hookValidator: HookValidator[F])
     extends Http4sDsl[F]
-    with HookValidationEndpoint[F] {
+    with HookValidationEndpoint[F]
+    with RenkuEntityCodec {
 
   def validateHook(projectId: GitLabId, authUser: AuthUser): F[Response[F]] = {
     hookValidator.validateHook(projectId, Some(authUser.accessToken)).flatMap(toHttpResponse(_))

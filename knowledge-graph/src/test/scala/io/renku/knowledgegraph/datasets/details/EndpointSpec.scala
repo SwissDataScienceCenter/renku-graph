@@ -38,6 +38,7 @@ import io.renku.graph.model.images.ImageUri
 import io.renku.graph.model.persons.{Affiliation, Email, Name => UserName}
 import io.renku.graph.model.projects.Slug
 import io.renku.graph.model.testentities.generators.EntitiesGenerators
+import io.renku.http.RenkuEntityCodec
 import io.renku.http.rest.Links
 import io.renku.http.rest.Links.Rel.Self
 import io.renku.http.rest.Links.{Href, Rel}
@@ -53,7 +54,6 @@ import org.http4s.Status._
 import org.http4s._
 import org.http4s.circe.jsonOf
 import org.http4s.headers.`Content-Type`
-import org.http4s.circe.CirceEntityCodec._
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.EitherValues
 import org.scalatest.matchers.should
@@ -69,6 +69,7 @@ class EndpointSpec
     with MockFactory
     with ScalaCheckPropertyChecks
     with EntitiesGenerators
+    with RenkuEntityCodec
     with IOSpec {
 
   "GET /datasets/:id" should {

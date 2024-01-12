@@ -33,8 +33,8 @@ import io.renku.generators.Generators.Implicits._
 import io.renku.generators.Generators._
 import io.renku.graph.model.GraphModelGenerators.{gitLabUrls, renkuUrls}
 import io.renku.graph.model._
+import io.renku.http.RenkuEntityCodec
 import io.renku.http.rest.paging.{PagingHeaders, PagingResponse}
-import io.renku.http.server.EndpointTester._
 import io.renku.interpreters.TestLogger
 import io.renku.interpreters.TestLogger.Level.Error
 import io.renku.testtools.IOSpec
@@ -43,7 +43,6 @@ import org.http4s.Method.GET
 import org.http4s.Status._
 import org.http4s.headers.`Content-Type`
 import org.http4s.{Request, Uri}
-import org.http4s.circe.CirceEntityCodec._
 import org.scalacheck.Gen
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.matchers.should
@@ -56,6 +55,7 @@ class EndpointSpec
     with ScalaCheckPropertyChecks
     with should.Matchers
     with IOSpec
+    with RenkuEntityCodec
     with ModelEncoders {
   private implicit val renkuUrl: RenkuUrl = renkuUrls.generateOne
   private implicit val renkuApiUrl: renku.ApiUrl =

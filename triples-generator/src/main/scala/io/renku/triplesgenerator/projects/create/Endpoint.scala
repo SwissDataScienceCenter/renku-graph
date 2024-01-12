@@ -24,11 +24,11 @@ import cats.syntax.all._
 import eu.timepit.refined.auto._
 import io.renku.data.Message
 import io.renku.graph.model.{RenkuUrl, datasets}
+import io.renku.http.RenkuEntityCodec
 import io.renku.lock.Lock
 import io.renku.triplesgenerator.TgDB.TsWriteLock
 import io.renku.triplesgenerator.api.NewProject
 import io.renku.triplesstore.{ProjectSparqlClient, SparqlQueryTimeRecorder}
-import org.http4s.circe.CirceEntityCodec._
 import org.http4s.dsl.Http4sDsl
 import org.http4s.{Request, Response}
 import org.typelevel.log4cats.Logger
@@ -48,7 +48,8 @@ object Endpoint {
 
 private class EndpointImpl[F[_]: Async: Logger](projectCreator: ProjectCreator[F])
     extends Http4sDsl[F]
-    with Endpoint[F] {
+    with Endpoint[F]
+    with RenkuEntityCodec {
 
   override def `POST /projects`(request: Request[F]): F[Response[F]] =
     EitherT(decodePayload(request))
@@ -59,7 +60,7 @@ private class EndpointImpl[F[_]: Async: Logger](projectCreator: ProjectCreator[F
       .handleErrorWith(errorHttpResult)
 
   private def decodePayload: Request[F] => F[Either[Response[F], NewProject]] =
-    _.as[NewProject].map(_.asRight[Response[F]]).handleError(badRequest)
+    _.asJson(NewProject.decoder).map(_.asRight[Response[F]]).handleError(badRequest)
 
   private lazy val badRequest: Throwable => Either[Response[F], NewProject] = { _ =>
     Response[F](BadRequest).withEntity(Message.Error("Invalid payload")).asLeft[NewProject]

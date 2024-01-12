@@ -26,7 +26,7 @@ import io.renku.graph.model.persons
 import io.renku.http.client.UserAccessToken
 import io.renku.http.server.security.EndpointSecurityException.AuthenticationFailure
 import org.http4s.{Response, Status}
-import org.http4s.circe.CirceEntityCodec._
+import io.renku.http.RenkuEntityCodec._
 
 import java.util.Objects
 

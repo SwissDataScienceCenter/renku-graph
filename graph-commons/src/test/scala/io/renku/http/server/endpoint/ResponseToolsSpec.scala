@@ -76,7 +76,6 @@ class ResponseToolsSpec extends AnyWordSpec with should.Matchers with IOSpec wit
     }
 
     "return BadRequest with an error message result when no matching MediaType defined" in new TestCase {
-
       val otherAccept = Accept(application.`ld+json`)
       implicit val request: Request[IO] = Request(headers = Headers(otherAccept))
 
@@ -85,7 +84,8 @@ class ResponseToolsSpec extends AnyWordSpec with should.Matchers with IOSpec wit
       }(default = Response[IO](Status.Accepted).pure[IO])
 
       response.map(_.status).unsafeRunSync() shouldBe Status.BadRequest
-      import org.http4s.circe.CirceEntityCodec._
+
+      import io.renku.http.RenkuEntityCodec._
       response
         .flatMap(_.as[Message])
         .unsafeRunSync()

@@ -21,14 +21,15 @@ package io.renku.tokenrepository.api
 import cats.effect.Async
 import cats.syntax.all._
 import com.typesafe.config.{Config, ConfigFactory}
+import io.circe.Decoder
 import io.circe.syntax._
 import io.renku.control.Throttler
 import io.renku.graph.model.projects
 import io.renku.graph.model.projects.GitLabId
+import io.renku.http.RenkuEntityCodec
 import io.renku.http.client.{AccessToken, GitLabClient, RestClient}
 import io.renku.http.tinytypes.TinyTypeURIEncoder._
 import org.http4s.Uri
-import org.http4s.circe.CirceEntityCodec._
 import org.http4s.client.dsl.Http4sClientDsl
 import org.http4s.dsl.Http4sDsl
 import org.typelevel.log4cats.Logger
@@ -53,7 +54,8 @@ private class TokenRepositoryClientImpl[F[_]: Async: Logger](trUri: Uri)
     extends RestClient[F, Nothing](Throttler.noThrottling)
     with TokenRepositoryClient[F]
     with Http4sDsl[F]
-    with Http4sClientDsl[F] {
+    with Http4sClientDsl[F]
+    with RenkuEntityCodec {
 
   override def findAccessToken(projectId: projects.GitLabId): F[Option[AccessToken]] =
     findAccessToken(trUri / "projects" / projectId / "tokens")
@@ -63,7 +65,7 @@ private class TokenRepositoryClientImpl[F[_]: Async: Logger](trUri: Uri)
 
   private def findAccessToken(uri: Uri): F[Option[AccessToken]] =
     send(GET(uri)) {
-      case (Ok, _, response) => response.as[Option[AccessToken]]
+      case (Ok, _, response) => response.asJson(Decoder.decodeOption[AccessToken])
       case (NotFound, _, _)  => Option.empty[AccessToken].pure[F]
     }
 

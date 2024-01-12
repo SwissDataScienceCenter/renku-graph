@@ -22,15 +22,16 @@ import cats.NonEmptyParallel
 import cats.effect.kernel.Async
 import cats.syntax.all._
 import eu.timepit.refined.auto._
+import io.circe.syntax._
 import io.renku.config.renku
 import io.renku.data.Message
 import io.renku.entities.viewings.search.RecentEntitiesFinder
 import io.renku.graph.config.GitLabUrlLoader
 import io.renku.graph.model.GitLabUrl
+import io.renku.http.RenkuEntityCodec
 import io.renku.knowledgegraph.entities.ModelEncoders._
 import io.renku.triplesstore.{ProjectsConnectionConfig, SparqlQueryTimeRecorder}
 import org.http4s.Response
-import org.http4s.circe.CirceEntityCodec._
 import org.http4s.dsl.Http4sDsl
 import org.typelevel.log4cats.Logger
 
@@ -62,12 +63,13 @@ object Endpoint {
       renkuApiUrl:  renku.ApiUrl,
       gitLabApiUrl: GitLabUrl
   ) extends Endpoint[F]
-      with Http4sDsl[F] {
+      with Http4sDsl[F]
+      with RenkuEntityCodec {
 
     override def getRecentlyViewedEntities(criteria: RecentEntitiesFinder.Criteria): F[Response[F]] =
       finder
         .findRecentlyViewedEntities(criteria)
-        .flatMap(r => Ok(r.results))
+        .flatMap(r => Ok(r.results.asJson))
         .recoverWith(ex =>
           Logger[F].error(ex)("Recent entity search failed!") *>
             InternalServerError(Message.Error("Recent entity search failed!"))

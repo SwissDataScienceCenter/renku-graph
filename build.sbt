@@ -231,7 +231,8 @@ lazy val triplesStoreClient = project
   )
   .dependsOn(
     generators % "test->test",
-    tinyTypes  % "compile->compile; test->test"
+    tinyTypes  % "compile->compile; test->test",
+    http4sClientUtils % "compile->compile;test->test"
   )
   .enablePlugins(AutomateHeaderPlugin)
 

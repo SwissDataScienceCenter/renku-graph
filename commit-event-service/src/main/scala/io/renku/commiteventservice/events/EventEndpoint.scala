@@ -44,8 +44,6 @@ class EventEndpointImpl[F[_]: Concurrent](eventConsumersRegistry: EventConsumers
     with RenkuEntityCodec
     with EventEndpoint[F] {
 
-  implicit val textDec: org.http4s.EntityDecoder[F, String] = org.http4s.EntityDecoder.text[F]
-
   def processEvent(request: Request[F]): F[Response[F]] = {
     for {
       multipart    <- toMultipart(request)

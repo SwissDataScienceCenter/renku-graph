@@ -24,6 +24,7 @@ import cats.syntax.all._
 import io.renku.config.renku
 import io.renku.graph.config.RenkuUrlLoader
 import io.renku.graph.model.{RenkuUrl, persons}
+import io.renku.http.RenkuEntityCodec
 import io.renku.http.client.GitLabClient
 import io.renku.http.rest.paging.{PagingHeaders, PagingRequest, PagingResponse}
 import io.renku.http.server.security.model.AuthUser
@@ -103,12 +104,12 @@ private class EndpointImpl[F[_]: Async: Logger](projectsFinder: ProjectsFinder[F
                                                 renkuUrl:    RenkuUrl,
                                                 renkuApiUrl: renku.ApiUrl
 ) extends Http4sDsl[F]
+    with RenkuEntityCodec
     with Endpoint[F] {
 
   import eu.timepit.refined.auto._
   import io.circe.syntax._
   import io.renku.data.Message
-  import org.http4s.circe.CirceEntityCodec._
   import org.http4s.{Header, Request, Response, Status}
 
   private implicit val rnkUrl:    RenkuUrl     = renkuUrl

@@ -31,6 +31,7 @@ import io.renku.generators.CommonGraphGenerators.accessTokens
 import io.renku.generators.Generators.Implicits._
 import io.renku.graph.model.GraphModelGenerators.projectSlugs
 import io.renku.graph.model.projects
+import io.renku.http.RenkuEntityCodec
 import io.renku.http.client.RestClient.ResponseMappingF
 import io.renku.http.client.{AccessToken, GitLabClient}
 import io.renku.http.server.EndpointTester._
@@ -53,6 +54,7 @@ class GitLabProjectFinderSpec
     with should.Matchers
     with IOSpec
     with MockFactory
+    with RenkuEntityCodec
     with GitLabClientTools[IO] {
 
   "findProject" should {

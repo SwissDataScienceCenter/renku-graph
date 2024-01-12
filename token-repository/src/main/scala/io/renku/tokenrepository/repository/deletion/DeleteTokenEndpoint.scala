@@ -22,11 +22,11 @@ import cats.effect.Async
 import cats.syntax.all._
 import io.renku.data.Message
 import io.renku.graph.model.projects.GitLabId
+import io.renku.http.RenkuEntityCodec
 import io.renku.http.client.{AccessToken, GitLabClient}
 import io.renku.tokenrepository.repository.ProjectsTokensDB.SessionResource
 import io.renku.tokenrepository.repository.metrics.QueriesExecutionTimes
 import org.http4s.Response
-import org.http4s.circe.CirceEntityCodec._
 import org.http4s.dsl.Http4sDsl
 import org.typelevel.log4cats.Logger
 
@@ -38,7 +38,8 @@ trait DeleteTokenEndpoint[F[_]] {
 
 class DeleteTokenEndpointImpl[F[_]: Async: Logger](tokenRemover: TokenRemover[F])
     extends Http4sDsl[F]
-    with DeleteTokenEndpoint[F] {
+    with DeleteTokenEndpoint[F]
+    with RenkuEntityCodec {
 
   override def deleteToken(projectId: GitLabId, maybeAccessToken: Option[AccessToken]): F[Response[F]] =
     (tokenRemover.delete(projectId, maybeAccessToken).flatMap(logSuccess(projectId)) >> NoContent())

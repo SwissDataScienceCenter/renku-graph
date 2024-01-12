@@ -25,11 +25,11 @@ import cats.syntax.all._
 import io.circe.syntax._
 import io.renku.data.Message
 import io.renku.graph.model.projects
+import io.renku.http.RenkuEntityCodec
 import io.renku.http.client.AccessToken
 import io.renku.tokenrepository.repository.ProjectsTokensDB.SessionResource
 import io.renku.tokenrepository.repository.metrics.QueriesExecutionTimes
 import org.http4s.Response
-import org.http4s.circe.CirceEntityCodec._
 import org.http4s.dsl.Http4sDsl
 import org.typelevel.log4cats.Logger
 
@@ -46,7 +46,8 @@ trait FetchTokenEndpoint[F[_]] {
 
 class FetchTokenEndpointImpl[F[_]: MonadThrow: Logger](tokenFinder: TokenFinder[F])
     extends Http4sDsl[F]
-    with FetchTokenEndpoint[F] {
+    with FetchTokenEndpoint[F]
+    with RenkuEntityCodec {
 
   override def fetchToken[ID](
       projectIdentifier: ID

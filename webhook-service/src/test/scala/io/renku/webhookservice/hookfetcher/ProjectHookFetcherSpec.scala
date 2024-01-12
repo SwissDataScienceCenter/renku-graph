@@ -29,10 +29,10 @@ import io.renku.generators.CommonGraphGenerators._
 import io.renku.generators.Generators.Implicits._
 import io.renku.generators.Generators._
 import io.renku.graph.model.GraphModelGenerators.projectIds
+import io.renku.http.RenkuEntityCodec
 import io.renku.http.client.RestClient.ResponseMappingF
 import io.renku.http.client.{AccessToken, GitLabClient}
 import io.renku.http.rest.paging.model.Page
-import io.renku.http.server.EndpointTester.jsonEntityEncoder
 import io.renku.http.tinytypes.TinyTypeURIEncoder._
 import io.renku.interpreters.TestLogger
 import io.renku.testtools.GitLabClientTools
@@ -52,6 +52,7 @@ class ProjectHookFetcherSpec
     with AsyncMockFactory
     with GitLabClientTools[IO]
     with should.Matchers
+    with RenkuEntityCodec
     with OptionValues {
 
   it should "return list of project hooks from all pages" in {

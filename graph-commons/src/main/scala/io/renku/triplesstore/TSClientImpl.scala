@@ -18,14 +18,16 @@
 
 package io.renku.triplesstore
 
-import cats.{Applicative, MonadThrow}
+import cats.Applicative
 import cats.effect._
 import cats.syntax.all._
+import eu.timepit.refined.auto._
 import eu.timepit.refined.api.Refined
 import eu.timepit.refined.numeric.NonNegative
 import io.circe.Decoder
 import io.circe.Decoder.decodeList
 import io.renku.control.Throttler
+import io.renku.http.RenkuEntityCodec
 import io.renku.http.client.{HttpRequest, RestClient}
 import io.renku.http.client.RestClient.{MaxRetriesAfterConnectionTimeout, SleepAfterConnectionIssue}
 import io.renku.http.rest.paging.Paging.PagedResultsFinder
@@ -33,6 +35,12 @@ import io.renku.http.rest.paging.PagingRequest
 import io.renku.jsonld.JsonLD
 import org.http4s.{MediaType, Uri}
 import org.http4s.MediaRange._
+import io.renku.http.client.UrlEncoder
+import org.http4s.{Request, Response, Status}
+import org.http4s.MediaType.application
+import org.http4s.Method.POST
+import org.http4s.Status._
+import org.http4s.headers._
 import org.typelevel.log4cats.Logger
 
 import scala.concurrent.duration._
@@ -73,19 +81,12 @@ class TSClientImpl[F[_]: Async: Logger: SparqlQueryTimeRecorder](
       requestTimeoutOverride = timeout.some
     )
     with TSClient[F]
+    with RenkuEntityCodec
     with RdfMediaTypes {
 
   private val applicative: Applicative[F] = Applicative[F]
   import TSClientImpl._
   import applicative.whenA
-  import eu.timepit.refined.auto._
-  import io.renku.http.client.UrlEncoder.urlEncode
-  import org.http4s.{Request, Response, Status}
-  import org.http4s.MediaType.application._
-  import org.http4s.Method.POST
-  import org.http4s.Status._
-  import org.http4s.headers._
-  import org.http4s.circe._
   import triplesStoreConfig._
 
   override def updateWithNoResult(updateQuery: SparqlQuery): F[Unit] =
@@ -116,7 +117,7 @@ class TSClientImpl[F[_]: Async: Logger: SparqlQueryTimeRecorder](
   private def uploadRequest(uploadUri: Uri, jsonLD: JsonLD) = HttpRequest(
     request(POST, uploadUri, triplesStoreConfig.authCredentials)
       .withEntity(jsonLD.toJson)
-      .putHeaders(`Content-Type`(`ld+json`)),
+      .putHeaders(`Content-Type`(application.`ld+json`)),
     name = "json-ld upload"
   )
 
@@ -139,7 +140,7 @@ class TSClientImpl[F[_]: Async: Logger: SparqlQueryTimeRecorder](
   private def sparqlQueryRequest(uri: Uri, queryType: SparqlQueryType, query: SparqlQuery) = HttpRequest(
     request(POST, uri, triplesStoreConfig.authCredentials)
       .withEntity(toEntity(queryType, query))
-      .putHeaders(`Content-Type`(`x-www-form-urlencoded`),
+      .putHeaders(`Content-Type`(application.`x-www-form-urlencoded`),
                   Accept(new MediaType(`application/*`.mainType, "sparql-results+json"))
       ),
     name = query.name
@@ -153,12 +154,12 @@ class TSClientImpl[F[_]: Async: Logger: SparqlQueryTimeRecorder](
 
   private def responseMapperFor[ResultType](implicit
       decoder: Decoder[ResultType]
-  ): Response[F] => F[ResultType] = _.as[ResultType](MonadThrow[F], jsonOf[F, ResultType])
+  ): Response[F] => F[ResultType] = _.asJson(decoder)
 
   private def toEntity(queryType: SparqlQueryType, query: SparqlQuery): String =
     queryType match {
-      case _: SparqlSelect => s"query=${urlEncode(query.toString)}"
-      case _ => s"update=${urlEncode(query.toString)}"
+      case _: SparqlSelect => s"query=${UrlEncoder.urlEncode(query.toString)}"
+      case _ => s"update=${UrlEncoder.urlEncode(query.toString)}"
     }
 
   private def path(queryType: SparqlQueryType): String = queryType match {

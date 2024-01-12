@@ -28,8 +28,8 @@ import io.renku.generators.CommonGraphGenerators.authUsers
 import io.renku.generators.Generators.Implicits._
 import io.renku.graph.model.GraphModelGenerators.projectIds
 import io.renku.graph.model.projects
+import io.renku.http.RenkuEntityCodec
 import io.renku.http.client.AccessToken
-import io.renku.http.server.EndpointTester._
 import io.renku.interpreters.TestLogger
 import io.renku.interpreters.TestLogger.Level.Error
 import io.renku.testtools.IOSpec
@@ -37,12 +37,16 @@ import io.renku.webhookservice.hookvalidation.HookValidator.HookValidationResult
 import org.http4s.Status._
 import org.http4s._
 import org.http4s.headers.`Content-Type`
-import org.http4s.circe.CirceEntityCodec._
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
 
-class HookValidationEndpointSpec extends AnyWordSpec with MockFactory with should.Matchers with IOSpec {
+class HookValidationEndpointSpec
+    extends AnyWordSpec
+    with MockFactory
+    with should.Matchers
+    with IOSpec
+    with RenkuEntityCodec {
 
   "validateHook" should {
 

@@ -24,7 +24,7 @@ import io.circe.Json
 import io.renku.generators.Generators.Implicits._
 import io.renku.generators.Generators.relativePaths
 import io.renku.generators.jsonld.JsonLDGenerators.jsonLDEntities
-import io.renku.http.server.EndpointTester._
+import io.renku.http.RenkuEntityCodec
 import io.renku.interpreters.TestLogger
 import io.renku.testtools.IOSpec
 import org.http4s.MediaType.{application, text}
@@ -45,7 +45,8 @@ class EndpointSpec
     with should.Matchers
     with MockFactory
     with IOSpec
-    with TableDrivenPropertyChecks {
+    with TableDrivenPropertyChecks
+    with RenkuEntityCodec {
 
   "GET /ontology" should {
 

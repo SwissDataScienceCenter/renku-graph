@@ -31,12 +31,14 @@ import io.renku.graph.model.EventsGenerators.commitIds
 import io.renku.graph.model._
 import io.renku.graph.model.projects.Role
 import io.renku.graph.model.testentities.generators.EntitiesGenerators._
+import io.renku.http.RenkuEntityCodec
 import io.renku.http.client.UrlEncoder.urlEncode
 import io.renku.http.rest.Links.Rel
 import io.renku.http.server.EndpointTester._
 import org.http4s.Status._
 import org.scalatest.EitherValues
 import io.renku.tinytypes.json.TinyTypeDecoders._
+
 import scala.util.Random
 
 class DatasetsResourcesSpec
@@ -45,6 +47,7 @@ class DatasetsResourcesSpec
     with TSProvisioning
     with TSData
     with DatasetsApiEncoders
+    with RenkuEntityCodec
     with EitherValues {
 
   private val creator = authUsers.generateOne
@@ -152,7 +155,7 @@ class DatasetsResourcesSpec
 
       val (getTagsResponseStatus, getTagsJsons) = restClient
         .GET(dsTagsLink.toString, user.accessToken)
-        .flatMap(response => response.as[List[Json]].map(json => response.status -> json))
+        .flatMap(response => response.asJson[List[Json]].map(json => response.status -> json))
         .unsafeRunSync()
 
       Then("he should get OK response with the dataset's tags")

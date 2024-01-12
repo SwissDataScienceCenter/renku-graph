@@ -27,6 +27,7 @@ import io.renku.generators.CommonGraphGenerators.httpStatuses
 import io.renku.generators.Generators.Implicits._
 import io.renku.graph.model
 import io.renku.graph.model.RenkuTinyTypeGenerators.projectSlugs
+import io.renku.http.RenkuEntityCodec
 import io.renku.http.server.EndpointTester._
 import io.renku.http.server.version
 import io.renku.http.tinytypes.TinyTypeURIEncoder._
@@ -39,14 +40,18 @@ import org.http4s.Status._
 import org.http4s._
 import org.http4s.headers.`Content-Type`
 import org.http4s.implicits._
-import org.http4s.circe.CirceEntityCodec._
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
 
 import scala.language.reflectiveCalls
 
-class MicroserviceRoutesSpec extends AnyWordSpec with IOSpec with MockFactory with should.Matchers {
+class MicroserviceRoutesSpec
+    extends AnyWordSpec
+    with IOSpec
+    with MockFactory
+    with should.Matchers
+    with RenkuEntityCodec {
 
   "POST /events" should {
 

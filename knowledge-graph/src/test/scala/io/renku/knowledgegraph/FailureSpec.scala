@@ -25,11 +25,11 @@ import io.renku.data.Message
 import io.renku.generators.CommonGraphGenerators.serverErrorHttpStatuses
 import io.renku.generators.Generators.Implicits._
 import io.renku.generators.Generators.exceptions
+import io.renku.http.RenkuEntityCodec
 import munit.{CatsEffectSuite, ScalaCheckEffectSuite}
 import org.scalacheck.effect.PropF.forAllF
-import org.http4s.circe.CirceEntityCodec._
 
-class FailureSpec extends CatsEffectSuite with ScalaCheckEffectSuite {
+class FailureSpec extends CatsEffectSuite with ScalaCheckEffectSuite with RenkuEntityCodec {
 
   test("toResponse should turn the failure into a Response with failure's status and message in the body") {
     forAllF(Generators.failures) { failure =>

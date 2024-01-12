@@ -22,6 +22,7 @@ import cats.effect.Async
 import cats.syntax.all._
 import io.renku.events.consumers.Project
 import io.renku.graph.model.projects
+import io.renku.http.RenkuEntityCodec
 import io.renku.http.client.{AccessToken, GitLabClient}
 
 private trait GLProjectFinder[F[_]] {
@@ -32,7 +33,7 @@ private object GLProjectFinder {
   def apply[F[_]: Async: GitLabClient]: GLProjectFinder[F] = new GLProjectFinderImpl[F]
 }
 
-private class GLProjectFinderImpl[F[_]: Async: GitLabClient] extends GLProjectFinder[F] {
+private class GLProjectFinderImpl[F[_]: Async: GitLabClient] extends GLProjectFinder[F] with RenkuEntityCodec {
 
   import eu.timepit.refined.auto._
   import io.circe.Decoder
@@ -41,13 +42,12 @@ private class GLProjectFinderImpl[F[_]: Async: GitLabClient] extends GLProjectFi
   import org.http4s._
   import org.http4s.Status._
   import org.http4s.implicits._
-  import org.http4s.circe.CirceEntityCodec._
 
   override def findProject(slug: projects.Slug)(implicit at: AccessToken): F[Option[Project]] =
     GitLabClient[F].get(uri"projects" / slug, "single-project")(mapResponse)(at.some)
 
   private lazy val mapResponse: PartialFunction[(Status, Request[F], Response[F]), F[Option[Project]]] = {
-    case (Ok, _, response) => response.as[Project].map(Option.apply)
+    case (Ok, _, response) => response.asJson(decoder).map(Option.apply)
     case (NotFound, _, _)  => Option.empty[Project].pure[F]
   }
 

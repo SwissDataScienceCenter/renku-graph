@@ -29,6 +29,7 @@ import io.renku.generators.CommonGraphGenerators.authUsers
 import io.renku.generators.Generators.Implicits._
 import io.renku.generators.Generators.exceptions
 import io.renku.graph.model.projects
+import io.renku.http.RenkuEntityCodec
 import io.renku.http.client.AccessToken
 import io.renku.interpreters.TestLogger
 import io.renku.interpreters.TestLogger.Level.Error
@@ -38,12 +39,11 @@ import io.renku.{eventlog, triplesgenerator}
 import org.http4s.MediaType.application
 import org.http4s.Status.{Accepted, InternalServerError, NotFound}
 import org.http4s.headers.`Content-Type`
-import org.http4s.circe.CirceEntityCodec._
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
 
-class EndpointSpec extends AnyWordSpec with should.Matchers with IOSpec with MockFactory {
+class EndpointSpec extends AnyWordSpec with should.Matchers with IOSpec with MockFactory with RenkuEntityCodec {
 
   "DELETE /projects/:slug" should {
 

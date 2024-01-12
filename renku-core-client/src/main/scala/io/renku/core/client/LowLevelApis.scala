@@ -28,10 +28,10 @@ import io.circe.{Decoder, DecodingFailure}
 import io.renku.control.Throttler
 import io.renku.graph.model.projects
 import io.renku.graph.model.versions.SchemaVersion
+import io.renku.http.RenkuEntityCodec
 import io.renku.http.client.{AccessToken, GitLabClient, RestClient, UserAccessToken}
 import io.renku.http.tinytypes.TinyTypeURIEncoder._
 import org.http4s.Header
-import org.http4s.circe.CirceEntityCodec._
 import org.http4s.client.dsl.Http4sClientDsl
 import org.http4s.dsl.Http4sDsl
 import org.typelevel.ci._
@@ -62,7 +62,8 @@ private class LowLevelApisImpl[F[_]: Async: Logger](coreLatestUri: RenkuCoreUri.
     extends RestClient[F, Nothing](Throttler.noThrottling)
     with LowLevelApis[F]
     with Http4sDsl[F]
-    with Http4sClientDsl[F] {
+    with Http4sClientDsl[F]
+    with RenkuEntityCodec {
 
   import clientTools._
 

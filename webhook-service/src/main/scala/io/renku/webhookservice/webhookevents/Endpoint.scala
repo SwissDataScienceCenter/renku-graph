@@ -29,13 +29,13 @@ import io.renku.eventlog.api.events.CommitSyncRequest
 import io.renku.events.consumers.Project
 import io.renku.graph.model.events.CommitId
 import io.renku.graph.model.projects.{GitLabId, Slug}
+import io.renku.http.RenkuEntityCodec
 import io.renku.http.client.RestClientError.UnauthorizedException
 import io.renku.metrics.MetricsRegistry
 import io.renku.webhookservice.crypto.HookTokenCrypto
 import io.renku.webhookservice.crypto.HookTokenCrypto.SerializedHookToken
 import io.renku.webhookservice.model.HookToken
 import org.http4s._
-import org.http4s.circe.CirceEntityCodec._
 import org.http4s.dsl.Http4sDsl
 import org.typelevel.ci._
 import org.typelevel.log4cats.Logger
@@ -50,14 +50,14 @@ class EndpointImpl[F[_]: Concurrent: Logger](
     hookTokenCrypto: HookTokenCrypto[F],
     elClient:        eventlog.api.events.Client[F]
 ) extends Http4sDsl[F]
-    with Endpoint[F] {
+    with Endpoint[F]
+    with RenkuEntityCodec {
 
-  import Endpoint._
   import hookTokenCrypto._
 
   def processPushEvent(request: Request[F]): F[Response[F]] = {
     for {
-      pushEvent @ (_, commitSyncRequest) <- request.as[(CommitId, CommitSyncRequest)] recoverWith badRequest
+      pushEvent @ (_, commitSyncRequest) <- request.asJson(Endpoint.pushEventDecoder) recoverWith badRequest
       authToken                          <- findHookToken(request)
       hookToken                          <- decrypt(authToken) recoverWith unauthorizedException
       _                                  <- validate(hookToken, commitSyncRequest)

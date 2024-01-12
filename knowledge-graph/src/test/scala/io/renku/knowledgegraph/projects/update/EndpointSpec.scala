@@ -30,18 +30,22 @@ import io.renku.generators.Generators.Implicits._
 import io.renku.generators.Generators.exceptions
 import io.renku.graph.model.RenkuTinyTypeGenerators.projectSlugs
 import io.renku.graph.model.projects
-import io.renku.http.server.EndpointTester._
+import io.renku.http.RenkuEntityCodec
 import io.renku.http.server.security.model.AuthUser
 import io.renku.interpreters.TestLogger
 import io.renku.knowledgegraph
 import io.renku.testtools.CustomAsyncIOSpec
 import org.http4s.{Request, Status}
-import org.http4s.circe.CirceEntityCodec._
 import org.scalamock.scalatest.AsyncMockFactory
 import org.scalatest.flatspec.AsyncFlatSpec
 import org.scalatest.matchers.should
 
-class EndpointSpec extends AsyncFlatSpec with CustomAsyncIOSpec with should.Matchers with AsyncMockFactory {
+class EndpointSpec
+    extends AsyncFlatSpec
+    with CustomAsyncIOSpec
+    with should.Matchers
+    with AsyncMockFactory
+    with RenkuEntityCodec {
 
   it should "decode the JSON payload, update the project and return Accepted on success" in {
 

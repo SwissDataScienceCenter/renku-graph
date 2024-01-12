@@ -34,8 +34,8 @@ import io.renku.generators.Generators.exceptions
 import io.renku.graph.model.GraphModelGenerators.projectIds
 import io.renku.graph.model.projects
 import io.renku.graph.model.projects.GitLabId
+import io.renku.http.RenkuEntityCodec
 import io.renku.http.client.AccessToken
-import io.renku.http.server.EndpointTester._
 import io.renku.http.server.security.model.AuthUser
 import io.renku.interpreters.TestLogger
 import io.renku.interpreters.TestLogger.Level.{Error, Warn}
@@ -49,7 +49,6 @@ import io.renku.{eventlog, triplesgenerator}
 import org.http4s.MediaType.application
 import org.http4s.Status._
 import org.http4s.headers.`Content-Type`
-import org.http4s.circe.CirceEntityCodec._
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.concurrent.{Eventually, IntegrationPatience}
 import org.scalatest.matchers.should
@@ -61,6 +60,7 @@ class EndpointSpec
     with should.Matchers
     with IOSpec
     with Eventually
+    with RenkuEntityCodec
     with IntegrationPatience {
 
   "fetchProcessingStatus" should {

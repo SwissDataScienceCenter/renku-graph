@@ -25,7 +25,6 @@ import io.renku.jsonld.JsonLD
 import org.http4s.MediaType
 import org.http4s.MediaType.application.`ld+json`
 import org.http4s.Method.POST
-import org.http4s.circe.CirceEntityCodec._
 import org.http4s.client.Client
 import org.http4s.client.dsl.Http4sClientDsl
 import org.http4s.headers.{Accept, `Content-Type`}

@@ -23,8 +23,7 @@ import cats.effect._
 import cats.syntax.all._
 import com.comcast.ip4s.{Host, Port}
 import fs2.io.net.Network
-import io.circe.Json
-import io.circe.literal._
+import io.circe.{Encoder, Json}
 import io.circe.syntax._
 import io.renku.generators.Generators.Implicits._
 import io.renku.graph.acceptancetests.data.Project
@@ -39,10 +38,10 @@ import io.renku.graph.model
 import io.renku.graph.model.events.CommitId
 import io.renku.graph.model.testentities.Person
 import io.renku.graph.model.{persons, projects}
+import io.renku.http.RenkuEntityCodec
 import io.renku.http.client.AccessToken.ProjectAccessToken
 import io.renku.http.client.UserAccessToken
 import org.http4s._
-import org.http4s.circe.CirceEntityCodec._
 import org.http4s.client.Client
 import org.http4s.dsl.Http4sDsl
 import org.http4s.ember.server.EmberServerBuilder
@@ -56,9 +55,13 @@ import java.time.{Instant, LocalDate}
  */
 final class GitLabApiStub[F[_]: Async: Logger](private val stateRef: Ref[F, State])
     extends Http4sDsl[F]
-    with Http4sDslUtils {
+    with Http4sDslUtils
+    with RenkuEntityCodec {
   private[this] val apiPrefix = "api/v4"
   private[this] val logger    = Logger[F]
+
+  private implicit def entityEncoder[A: Encoder]: EntityEncoder[F, A] =
+    jsonEntityEncoderFor[F, A]
 
   def update(f: State => State): F[Unit] =
     stateRef.update(f)

@@ -24,10 +24,10 @@ import cats.effect.kernel.Concurrent
 import cats.syntax.all._
 import io.renku.data.Message
 import io.renku.graph.model.projects.GitLabId
+import io.renku.http.RenkuEntityCodec
 import io.renku.http.client.{AccessToken, GitLabClient}
 import io.renku.tokenrepository.repository.ProjectsTokensDB.SessionResource
 import io.renku.tokenrepository.repository.metrics.QueriesExecutionTimes
-import org.http4s.circe.CirceEntityCodec._
 import org.http4s.dsl.Http4sDsl
 import org.http4s.{Request, Response}
 import org.typelevel.log4cats.Logger
@@ -41,13 +41,14 @@ trait CreateTokenEndpoint[F[_]] {
 class CreateTokenEndpointImpl[F[_]: Concurrent: Logger](
     tokensCreator: TokensCreator[F]
 ) extends Http4sDsl[F]
-    with CreateTokenEndpoint[F] {
+    with CreateTokenEndpoint[F]
+    with RenkuEntityCodec {
 
   import tokensCreator._
 
   override def createToken(projectId: GitLabId, request: Request[F]): F[Response[F]] = {
     for {
-      accessToken <- request.as[AccessToken] recoverWith badRequest
+      accessToken <- request.asJson[AccessToken] recoverWith badRequest
       _           <- create(projectId, accessToken)
       response    <- NoContent()
     } yield response

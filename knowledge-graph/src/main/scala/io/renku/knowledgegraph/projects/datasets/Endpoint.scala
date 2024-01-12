@@ -28,13 +28,13 @@ import io.renku.config.renku
 import io.renku.data.Message
 import io.renku.graph.config.{GitLabUrlLoader, RenkuUrlLoader}
 import io.renku.graph.model.{GitLabUrl, RenkuUrl, projects}
+import io.renku.http.RenkuEntityCodec
 import io.renku.http.rest.Links._
 import io.renku.http.rest.SortBy.Direction
 import io.renku.http.rest.Sorting
 import io.renku.http.rest.paging.{PagingHeaders, PagingRequest, PagingResponse}
 import io.renku.logging.{ExecutionTimeRecorder, ExecutionTimeRecorderLoader}
 import io.renku.triplesstore.{ProjectsConnectionConfig, SparqlQueryTimeRecorder}
-import org.http4s.circe.CirceEntityCodec._
 import org.http4s.dsl.Http4sDsl
 import org.http4s.{Header, Request, Response}
 import org.typelevel.log4cats.Logger
@@ -50,6 +50,7 @@ class EndpointImpl[F[_]: MonadCancelThrow: Logger](
     executionTimeRecorder: ExecutionTimeRecorder[F]
 )(implicit renkuUrl: RenkuUrl, renkuApiUrl: renku.ApiUrl, gitLabUrl: GitLabUrl)
     extends Http4sDsl[F]
+    with RenkuEntityCodec
     with Endpoint[F] {
 
   import executionTimeRecorder._

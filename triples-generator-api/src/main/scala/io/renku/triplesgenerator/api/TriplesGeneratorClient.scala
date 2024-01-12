@@ -25,6 +25,7 @@ import com.typesafe.config.{Config, ConfigFactory}
 import io.renku.control.Throttler
 import io.renku.graph.config.TriplesGeneratorUrl
 import io.renku.graph.model.projects
+import io.renku.http.RenkuEntityCodec
 import io.renku.http.client.RestClient
 import io.renku.metrics.MetricsRegistry
 import org.http4s.Uri
@@ -68,10 +69,11 @@ private class TriplesGeneratorClientImpl[F[_]: Async: Logger](tgUri: Uri)
     extends RestClient[F, Nothing](Throttler.noThrottling)
     with TriplesGeneratorClient[F]
     with Http4sDsl[F]
-    with Http4sClientDsl[F] {
+    with Http4sClientDsl[F]
+    with RenkuEntityCodec {
 
   import io.circe.syntax._
-  import org.http4s.circe.CirceEntityCodec._
+
   import io.renku.http.tinytypes.TinyTypeURIEncoder._
 
   override def createProject(newProject: NewProject): F[Result[Unit]] =
