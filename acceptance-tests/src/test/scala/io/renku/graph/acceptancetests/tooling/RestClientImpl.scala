@@ -19,7 +19,6 @@
 package io.renku.graph.acceptancetests.tooling
 
 import cats.effect.IO
-import cats.effect.unsafe.IORuntime
 import eu.timepit.refined.auto._
 import io.renku.control.Throttler
 import io.renku.http.client.{AccessToken, GitLabClient, RestClient}
@@ -31,12 +30,12 @@ import scala.concurrent.duration._
 class RestClientImpl(implicit logger: Logger[IO])
     extends RestClient[IO, RestClientImpl](Throttler.noThrottling, retryInterval = 500 millis, maxRetries = 1) {
 
-  def GET(url: String)(implicit ioRuntime: IORuntime): IO[Response[IO]] = for {
+  def GET(url: String): IO[Response[IO]] = for {
     uri      <- validateUri(url)
     response <- send(request(Method.GET, uri))(mapResponse)
   } yield response
 
-  def GET(url: String, accessToken: AccessToken)(implicit ioRuntime: IORuntime): IO[Response[IO]] = for {
+  def GET(url: String, accessToken: AccessToken): IO[Response[IO]] = for {
     uri      <- validateUri(url)
     response <- send(GitLabClient.request[IO](Method.GET, uri, Some(accessToken)))(mapResponse)
   } yield response

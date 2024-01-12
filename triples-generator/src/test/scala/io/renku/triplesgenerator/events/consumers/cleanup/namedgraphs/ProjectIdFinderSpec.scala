@@ -19,48 +19,40 @@
 package io.renku.triplesgenerator.events.consumers.cleanup.namedgraphs
 
 import cats.effect.IO
+import cats.effect.testing.scalatest.AsyncIOSpec
 import io.renku.generators.Generators.Implicits._
 import io.renku.graph.model.GraphModelGenerators.projectSlugs
 import io.renku.graph.model.entities
 import io.renku.graph.model.testentities._
 import io.renku.interpreters.TestLogger
 import io.renku.logging.TestSparqlQueryTimeRecorder
-import io.renku.testtools.IOSpec
-import io.renku.triplesstore.{InMemoryJenaForSpec, ProjectsDataset, SparqlQueryTimeRecorder}
+import io.renku.triplesgenerator.TriplesGeneratorJenaSpec
+import io.renku.triplesstore.{ProjectsConnectionConfig, SparqlQueryTimeRecorder}
 import org.scalatest.matchers.should
-import org.scalatest.wordspec.AnyWordSpec
+import org.scalatest.wordspec.AsyncWordSpec
 
-class ProjectIdFinderSpec
-    extends AnyWordSpec
-    with should.Matchers
-    with InMemoryJenaForSpec
-    with ProjectsDataset
-    with IOSpec {
+class ProjectIdFinderSpec extends AsyncWordSpec with AsyncIOSpec with TriplesGeneratorJenaSpec with should.Matchers {
 
   "findProjectId" should {
 
-    "return ProjectIdentification object found for the given Project Slug" in new TestCase {
-
+    "return ProjectIdentification object found for the given Project Slug" in projectsDSConfig.use { implicit pcc =>
       val project = anyProjectEntities.generateOne.to[entities.Project]
 
-      upload(to = projectsDataset, project)
-
-      finder.findProjectId(project.slug).unsafeRunSync() shouldBe Some(project.identification)
+      uploadToProjects(project) >>
+        finder.findProjectId(project.slug).asserting(_ shouldBe Some(project.identification))
     }
 
-    "return None when there's no Project with the given Slug" in new TestCase {
-
+    "return None when there's no Project with the given Slug" in projectsDSConfig.use { implicit pcc =>
       val project = anyProjectEntities.generateOne.to[entities.Project]
 
-      upload(to = projectsDataset, project)
-
-      finder.findProjectId(projectSlugs.generateOne).unsafeRunSync() shouldBe None
+      uploadToProjects(project) >>
+        finder.findProjectId(projectSlugs.generateOne).asserting(_ shouldBe None)
     }
   }
 
-  private trait TestCase {
-    private implicit val logger:       TestLogger[IO]              = TestLogger[IO]()
-    private implicit val timeRecorder: SparqlQueryTimeRecorder[IO] = TestSparqlQueryTimeRecorder[IO].unsafeRunSync()
-    val finder = new ProjectIdFinderImpl[IO](projectsDSConnectionInfo)
+  private implicit lazy val logger: TestLogger[IO] = TestLogger[IO]()
+  private def finder(implicit pcc: ProjectsConnectionConfig) = {
+    implicit val tr: SparqlQueryTimeRecorder[IO] = TestSparqlQueryTimeRecorder.createUnsafe
+    new ProjectIdFinderImpl[IO](pcc)
   }
 }

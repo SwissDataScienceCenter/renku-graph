@@ -22,7 +22,8 @@ import Encoders._
 import cats.effect.IO
 import cats.effect.testing.scalatest.AsyncIOSpec
 import eu.timepit.refined.auto._
-import io.renku.entities.searchgraphs.SearchInfoDatasets
+import io.renku.entities.EntitiesSearchJenaSpec
+import io.renku.entities.searchgraphs.TestSearchInfoDatasets
 import io.renku.entities.searchgraphs.datasets.Generators._
 import io.renku.generators.Generators.Implicits._
 import io.renku.graph.model.Schemas.schema
@@ -32,33 +33,32 @@ import io.renku.interpreters.TestLogger
 import io.renku.jsonld.syntax._
 import io.renku.triplesstore.SparqlQuery.Prefixes
 import io.renku.triplesstore.client.syntax._
-import io.renku.triplesstore.{InMemoryJenaForSpec, ProjectsDataset, SparqlQuery}
+import io.renku.triplesstore.{ProjectsConnectionConfig, SparqlQuery}
 import org.scalatest.flatspec.AsyncFlatSpec
 import org.scalatest.matchers.should
 
 class SlugVisibilitiesConcatDeleteQuerySpec
     extends AsyncFlatSpec
     with AsyncIOSpec
-    with should.Matchers
-    with InMemoryJenaForSpec
-    with ProjectsDataset
-    with SearchInfoDatasets {
+    with EntitiesSearchJenaSpec
+    with TestSearchInfoDatasets
+    with should.Matchers {
 
-  it should "delete the renku:projectsVisibilitiesConcat triple of the given DS" in {
+  it should "delete the renku:projectsVisibilitiesConcat triple of the given DS" in projectsDSConfig.use {
+    implicit pcc =>
+      val project = anyRenkuProjectEntities.generateOne.to[entities.RenkuProject]
+      val info    = datasetSearchInfoObjects(project).generateOne
 
-    val project = anyRenkuProjectEntities.generateOne.to[entities.RenkuProject]
-    val info    = datasetSearchInfoObjects(project).generateOne
-
-    insertIO(projectsDataset, info.asQuads.toList) >>
-      findSlugVisibilities(info.topmostSameAs).asserting(_.isDefined shouldBe true) >>
-      runUpdate(projectsDataset, SlugVisibilitiesConcatDeleteQuery(info.topmostSameAs)).assertNoException >>
-      findSlugVisibilities(info.topmostSameAs).asserting(_.isDefined shouldBe false)
+      insert(info.asQuads.toList) >>
+        findSlugVisibilities(info.topmostSameAs).asserting(_.isDefined shouldBe true) >>
+        runUpdate(SlugVisibilitiesConcatDeleteQuery(info.topmostSameAs)).assertNoException >>
+        findSlugVisibilities(info.topmostSameAs).asserting(_.isDefined shouldBe false)
   }
 
   implicit val ioLogger: TestLogger[IO] = TestLogger[IO]()
 
-  private def findSlugVisibilities(topSameAs: datasets.TopmostSameAs) =
-    runSelect(projectsDataset, query(topSameAs))
+  private def findSlugVisibilities(topSameAs: datasets.TopmostSameAs)(implicit pcc: ProjectsConnectionConfig) =
+    runSelect(query(topSameAs))
       .map(_.headOption.flatMap(_.get("vis")))
 
   private def query(topSameAs: datasets.TopmostSameAs) =

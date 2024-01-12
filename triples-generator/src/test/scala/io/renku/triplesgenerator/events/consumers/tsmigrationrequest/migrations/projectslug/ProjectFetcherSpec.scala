@@ -20,14 +20,14 @@ package io.renku.triplesgenerator.events.consumers.tsmigrationrequest.migrations
 package projectslug
 
 import cats.effect.IO
-import io.renku.entities.searchgraphs.SearchInfoDatasets
+import cats.effect.testing.scalatest.AsyncIOSpec
+import io.renku.entities.searchgraphs.TestSearchInfoDatasets
 import io.renku.generators.Generators.Implicits._
 import io.renku.graph.model._
 import io.renku.graph.model.testentities._
 import io.renku.interpreters.TestLogger
-import io.renku.logging.TestSparqlQueryTimeRecorder
-import io.renku.testtools.CustomAsyncIOSpec
-import io.renku.triplesstore.{InMemoryJenaForSpec, ProjectsDataset, SparqlQueryTimeRecorder, TSClient}
+import io.renku.triplesgenerator.TriplesGeneratorJenaSpec
+import io.renku.triplesstore.ProjectsConnectionConfig
 import org.scalatest.OptionValues
 import org.scalatest.flatspec.AsyncFlatSpec
 import org.scalatest.matchers.should
@@ -35,16 +35,14 @@ import org.typelevel.log4cats.Logger
 
 class ProjectFetcherSpec
     extends AsyncFlatSpec
-    with CustomAsyncIOSpec
+    with AsyncIOSpec
+    with TriplesGeneratorJenaSpec
+    with TestSearchInfoDatasets
     with should.Matchers
-    with InMemoryJenaForSpec
-    with ProjectsDataset
-    with SearchInfoDatasets
     with OptionValues
     with TSTooling {
 
-  it should "fetch info about the project" in {
-
+  it should "fetch info about the project" in projectsDSConfig.use { implicit pcc =>
     val project = anyProjectEntities.generateOne.to[entities.Project]
 
     provisionProject(project).assertNoException >>
@@ -54,11 +52,10 @@ class ProjectFetcherSpec
         .asserting(_.value shouldBe ProjectInfo(project.resourceId, project.slug))
   }
 
-  it should "return no project if one does not exists" in {
+  it should "return no project if one does not exists" in projectsDSConfig.use { implicit pcc =>
     fetcher.fetchProject(projectSlugs.generateOne).asserting(_ shouldBe None)
   }
 
-  implicit override lazy val ioLogger: Logger[IO]                  = TestLogger[IO]()
-  private implicit val timeRecorder:   SparqlQueryTimeRecorder[IO] = TestSparqlQueryTimeRecorder[IO].unsafeRunSync()
-  private lazy val fetcher = new ProjectFetcherImpl[IO](TSClient[IO](projectsDSConnectionInfo))
+  implicit override lazy val ioLogger: Logger[IO] = TestLogger[IO]()
+  private def fetcher(implicit pcc: ProjectsConnectionConfig) = new ProjectFetcherImpl[IO](tsClient)
 }

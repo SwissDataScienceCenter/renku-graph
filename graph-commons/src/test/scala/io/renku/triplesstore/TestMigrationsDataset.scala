@@ -22,6 +22,7 @@ import TestDatasetCreation._
 import cats.effect.{IO, Resource}
 import cats.syntax.all._
 import io.renku.graph.triplesstore.DatasetTTLs.MigrationsTTL
+import io.renku.jsonld.{Graph, JsonLDEncoder}
 import io.renku.triplesstore.client.http.SparqlClient
 import org.typelevel.log4cats.Logger
 
@@ -43,4 +44,24 @@ trait TestMigrationsDataset extends TestDataset {
       .flatMap(ttl => generateName(ttl, getClass).tupleLeft(ttl))
       .map { case (origTtl, newName) => updateDSConfig(origTtl, newName, new MigrationsTTL(_, _)) }
       .toResource
+
+  def uploadToMigrations(graphs: Graph*)(implicit mcc: MigrationsConnectionConfig, L: Logger[IO]): IO[Unit] =
+    SparqlClient[IO](mcc.toCC()).use { client =>
+      graphs.toList
+        .traverse_(g => IO.fromEither(g.flatten) >>= client.upload)
+    }
+
+  def uploadToMigrations[T](objects: T*)(implicit
+      entityEncoder: JsonLDEncoder[T],
+      mcc:           MigrationsConnectionConfig,
+      L:             Logger[IO]
+  ): IO[Unit] =
+    uploadToMigrations(objects.flatMap(graphsProducer(_)(entityEncoder)).toList: _*)
+
+  private def graphsProducer[A](entity: A)(implicit entityEncoder: JsonLDEncoder[A]): List[Graph] = {
+    import io.renku.jsonld.DefaultGraph
+    import io.renku.jsonld.syntax._
+
+    List(DefaultGraph.fromJsonLDsUnsafe(entity.asJsonLD))
+  }
 }

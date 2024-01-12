@@ -61,15 +61,16 @@ private class ReProvisioningStatusImpl[F[_]: Async: Parallel: Logger: SparqlQuer
   override def underReProvisioning(): F[Boolean] = isCacheExpired >>= {
     case true =>
       fetchStatus >>= {
-        case Some(ReProvisioningInfo.Status.Running) => triggerPeriodicStatusCheck() map (_ => true)
-        case _                                       => updateCacheCheckTime() map (_ => false)
+        case Some(ReProvisioningInfo.Status.Running) => triggerPeriodicStatusCheck().as(true)
+        case _                                       => updateCacheCheckTime().as(false)
       }
     case false => false.pure[F]
   }
 
-  override def setRunning(on: MicroserviceBaseUrl): F[Unit] = upload(
-    ReProvisioningInfo(ReProvisioningInfo.Status.Running, on).asJsonLD
-  )
+  override def setRunning(on: MicroserviceBaseUrl): F[Unit] =
+    upload(
+      ReProvisioningInfo(ReProvisioningInfo.Status.Running, on).asJsonLD
+    )
 
   override def clear(): F[Unit] = deleteFromDb() >> renewSubscriptions()
 

@@ -20,11 +20,12 @@ package io.renku.db
 
 import cats.data.Kleisli
 import cats.effect.IO
+import cats.effect.testing.scalatest.AsyncIOSpec
 import cats.syntax.all._
 import eu.timepit.refined.auto._
+import io.renku.db.DBConfigProvider.DBConfig
 import io.renku.db.syntax.QueryDef
 import io.renku.metrics.LabeledHistogram
-import io.renku.testtools.CustomAsyncIOSpec
 import org.scalamock.scalatest.AsyncMockFactory
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AsyncWordSpec
@@ -37,21 +38,20 @@ import scala.concurrent.duration.FiniteDuration
 class DbClientSpec
     extends AsyncWordSpec
     with CommonsPostgresSpec
-    with CustomAsyncIOSpec
+    with AsyncIOSpec
     with should.Matchers
     with AsyncMockFactory {
 
   "measureExecutionTime(SqlStatement)" should {
 
-    "execute the query and do nothing if no histogram given" in {
+    "execute the query and do nothing if no histogram given" in testDBResource.use { implicit cfg =>
       val result = 1
       new TestDbClient(maybeHistogram = None)
         .executeQuery(query(queryName, returning = result))
         .asserting(_ shouldBe result)
     }
 
-    "execute the query and measure execution time with the given histogram" in {
-
+    "execute the query and measure execution time with the given histogram" in testDBResource.use { implicit cfg =>
       val histogram = mock[LabeledHistogram[IO]]
       val dbClient  = new TestDbClient(histogram.some)
 
@@ -68,15 +68,14 @@ class DbClientSpec
 
   "measureExecutionTime(Kleisli)" should {
 
-    "execute the query and do nothing if no histogram given" in {
+    "execute the query and do nothing if no histogram given" in testDBResource.use { implicit cfg =>
       val result = 1
       new TestDbClient(maybeHistogram = None)
         .executeQuery(queryName.value, QueryDef[IO, Int](query(queryName, returning = result).queryExecution.run))
         .asserting(_ shouldBe result)
     }
 
-    "execute the query and measure execution time with the given histogram" in {
-
+    "execute the query and measure execution time with the given histogram" in testDBResource.use { implicit cfg =>
       val histogram = mock[LabeledHistogram[IO]]
       val dbClient  = new TestDbClient(maybeHistogram = Some(histogram))
       (histogram
@@ -102,15 +101,16 @@ class DbClientSpec
     name
   )
 
-  private class TestDbClient(maybeHistogram: Option[LabeledHistogram[IO]]) extends DbClient(maybeHistogram) {
+  private class TestDbClient(maybeHistogram: Option[LabeledHistogram[IO]])(implicit cfg: DBConfig[TestDB])
+      extends DbClient(maybeHistogram) {
 
     def executeQuery(query: SqlStatement[IO, Int]): IO[Int] =
-      (testDBResource >>= sessionResource).use {
+      sessionResource(cfg).use {
         measureExecutionTime[Int](query)(_)
       }
 
     def executeQuery(name: String, query: Kleisli[IO, Session[IO], Int]): IO[Int] =
-      (testDBResource >>= sessionResource).use {
+      sessionResource(cfg).use {
         measureExecutionTime[Int](name, query)(_)
       }
   }

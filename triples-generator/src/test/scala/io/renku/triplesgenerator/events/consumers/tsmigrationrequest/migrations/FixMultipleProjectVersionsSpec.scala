@@ -19,15 +19,16 @@
 package io.renku.triplesgenerator.events.consumers.tsmigrationrequest.migrations
 
 import cats.effect.IO
+import cats.effect.testing.scalatest.AsyncIOSpec
 import eu.timepit.refined.auto._
-import io.renku.entities.searchgraphs.SearchInfoDatasets
+import io.renku.entities.searchgraphs.TestSearchInfoDatasets
 import io.renku.generators.Generators.Implicits._
 import io.renku.graph.model.testentities._
 import io.renku.graph.model.versions.SchemaVersion
 import io.renku.graph.model.{GraphClass, entities, projects}
 import io.renku.interpreters.TestLogger
 import io.renku.jsonld.syntax._
-import io.renku.testtools.CustomAsyncIOSpec
+import io.renku.triplesgenerator.TriplesGeneratorJenaSpec
 import io.renku.triplesstore.SparqlQuery.Prefixes
 import io.renku.triplesstore._
 import io.renku.triplesstore.client.model.Quad
@@ -38,16 +39,14 @@ import org.typelevel.log4cats.Logger
 
 class FixMultipleProjectVersionsSpec
     extends AsyncFlatSpec
-    with CustomAsyncIOSpec
-    with should.Matchers
-    with InMemoryJenaForSpec
-    with SearchInfoDatasets
-    with ProjectsDataset {
+    with AsyncIOSpec
+    with TriplesGeneratorJenaSpec
+    with TestSearchInfoDatasets
+    with should.Matchers {
 
   implicit val ioLogger: Logger[IO] = TestLogger()
 
-  it should "remove obsolete project version values when multiple exist" in {
-
+  it should "remove obsolete project version values when multiple exist" in projectsDSConfig.use { implicit pcc =>
     val currentVersion = SchemaVersion("10")
     val olderVersion   = SchemaVersion("9")
     val project1 =
@@ -76,7 +75,7 @@ class FixMultipleProjectVersionsSpec
              )
            )
 
-      _ <- runUpdate(projectsDataset, FixMultipleProjectVersions.query(currentVersion)).assertNoException
+      _ <- runUpdate(FixMultipleProjectVersions.query(currentVersion)).assertNoException
 
       _ <- findProjectVersions.asserting(
              _ shouldBe Map(project1.resourceId -> Set(currentVersion),
@@ -87,9 +86,8 @@ class FixMultipleProjectVersionsSpec
     } yield ()
   }
 
-  private def add(to: projects.ResourceId, version: SchemaVersion) =
-    insertIO(
-      to = projectsDataset,
+  private def add(to: projects.ResourceId, version: SchemaVersion)(implicit pcc: ProjectsConnectionConfig) =
+    insert(
       Quad(
         GraphClass.Project.id(to),
         to.asEntityId,
@@ -98,9 +96,10 @@ class FixMultipleProjectVersionsSpec
       )
     )
 
-  private def findProjectVersions: IO[Map[projects.ResourceId, Set[SchemaVersion]]] =
+  private def findProjectVersions(implicit
+      pcc: ProjectsConnectionConfig
+  ): IO[Map[projects.ResourceId, Set[SchemaVersion]]] =
     runSelect(
-      on = projectsDataset,
       SparqlQuery.of(
         "find versions",
         Prefixes of schema -> "schema",

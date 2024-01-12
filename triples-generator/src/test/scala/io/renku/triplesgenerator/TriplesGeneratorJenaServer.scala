@@ -20,4 +20,4 @@ package io.renku.triplesgenerator
 
 import io.renku.triplesstore.client.util.JenaServer
 
-object TriplesGeneratorJenaServer extends JenaServer(module = "triples_generator", port = 3044)
+object TriplesGeneratorJenaServer extends JenaServer(module = "triples_generator", port = 3045)

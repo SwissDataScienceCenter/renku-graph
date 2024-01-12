@@ -30,9 +30,8 @@ object TokenRepository {
   private lazy val dbConfig: DBConfigProvider.DBConfig[ProjectsTokensDB] =
     new ProjectsTokensDbConfigProvider[Try].get().fold(throw _, identity)
 
-  def startDB()(implicit logger: Logger[IO]): IO[Unit] = for {
-    _ <- PostgresDB.startPostgres
+  def initDB()(implicit logger: Logger[IO]): IO[Unit] = for {
     _ <- PostgresDB.initializeDatabase(dbConfig)
-    _ <- logger.info("projects_tokens DB started")
+    _ <- logger.info("projects_tokens DB initialised")
   } yield ()
 }

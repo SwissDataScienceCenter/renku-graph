@@ -21,6 +21,7 @@ package io.renku.triplesstore
 import cats.effect.IO
 import cats.syntax.all._
 import io.circe.DecodingFailure
+import io.renku.jsonld.EntityId
 import io.renku.triplesstore.client.http.{RowDecoder, SparqlClient}
 import io.renku.triplesstore.client.model.Quad
 import io.renku.triplesstore.client.syntax._
@@ -42,10 +43,33 @@ trait TestDataset {
       _.update(query)
     }
 
+  def runUpdates(queries: Seq[SparqlQuery])(implicit dcc: DatasetConnectionConfig, L: Logger[IO]): IO[Unit] =
+    queries.traverse_(runUpdate)
+
   def insert(quad: Quad)(implicit dcc: DatasetConnectionConfig, L: Logger[IO]): IO[Unit] =
     runUpdate {
       SparqlQuery.ofUnsafe("insert quad", sparql"INSERT DATA { $quad }")
     }
+
+  def insert(quads: Seq[Quad])(implicit dcc: DatasetConnectionConfig, L: Logger[IO]): IO[Unit] =
+    quads.toList.traverse_(insert)
+
+  def delete(quad: Quad)(implicit dcc: DatasetConnectionConfig, L: Logger[IO]): IO[Unit] =
+    runUpdate {
+      SparqlQuery.ofUnsafe("delete quad", sparql"DELETE DATA { $quad }")
+    }
+
+  def triplesCount(implicit dcc: DatasetConnectionConfig, L: Logger[IO]): IO[Long] =
+    runSelect(
+      SparqlQuery.ofUnsafe("triples count", "SELECT (COUNT(?s) AS ?count) WHERE { GRAPH ?g { ?s ?p ?o } }")
+    ).map(_.headOption.map(_.apply("count")).flatMap(_.toLongOption).getOrElse(0L))
+
+  def triplesCount(graphId: EntityId)(implicit dcc: DatasetConnectionConfig, L: Logger[IO]): IO[Long] =
+    runSelect(
+      SparqlQuery.ofUnsafe("triples count on graph",
+                           s"SELECT (COUNT(?s) AS ?count) WHERE { GRAPH ${graphId.sparql} { ?s ?p ?o } }"
+      )
+    ).map(_.headOption.map(_.apply("count")).flatMap(_.toLongOption).getOrElse(0L))
 
   private implicit lazy val defaultDecoder: RowDecoder[Map[String, String]] =
     RowDecoder.fromDecoder { cur =>

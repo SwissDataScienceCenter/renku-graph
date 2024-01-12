@@ -21,12 +21,12 @@ package migrations
 package projectslug
 
 import cats.effect.IO
-import io.renku.entities.searchgraphs.SearchInfoDatasets
+import cats.effect.testing.scalatest.AsyncIOSpec
+import io.renku.entities.searchgraphs.TestSearchInfoDatasets
 import io.renku.generators.Generators.Implicits._
 import io.renku.graph.model.testentities._
 import io.renku.interpreters.TestLogger
-import io.renku.logging.TestSparqlQueryTimeRecorder
-import io.renku.testtools.CustomAsyncIOSpec
+import io.renku.triplesgenerator.TriplesGeneratorJenaSpec
 import io.renku.triplesstore._
 import org.scalamock.scalatest.AsyncMockFactory
 import org.scalatest.flatspec.AsyncFlatSpec
@@ -35,50 +35,47 @@ import org.typelevel.log4cats.Logger
 
 class MigrationNeedCheckerSpec
     extends AsyncFlatSpec
-    with CustomAsyncIOSpec
-    with should.Matchers
-    with InMemoryJenaForSpec
-    with ProjectsDataset
-    with SearchInfoDatasets
+    with AsyncIOSpec
+    with TriplesGeneratorJenaSpec
+    with TestSearchInfoDatasets
     with AsyncMockFactory
+    with should.Matchers
     with TSTooling {
 
-  it should "return Yes if there are projects without renku:slug in the Projects or Project graph" in {
+  it should "return Yes if there are projects without renku:slug in the Projects or Project graph" in projectsDSConfig
+    .use { implicit pcc =>
+      val project = anyProjectEntities.generateOne
 
-    val project = anyProjectEntities.generateOne
+      provisionTestProject(project).assertNoException >>
+        deleteRenkuSlugProp(project.resourceId).assertNoException >>
+        checker.checkMigrationNeeded.asserting(_ shouldBe a[ConditionedMigration.MigrationRequired.Yes])
+    }
 
-    provisionTestProject(project).assertNoException >>
-      deleteRenkuSlugProp(project.resourceId).assertNoException >>
-      checker.checkMigrationNeeded.asserting(_ shouldBe a[ConditionedMigration.MigrationRequired.Yes])
+  it should "return Yes if there are projects without renku:slug in the Project graph" in projectsDSConfig.use {
+    implicit pcc =>
+      val project = anyProjectEntities.generateOne
+
+      provisionTestProject(project).assertNoException >>
+        deleteProjectRenkuSlug(project.resourceId).assertNoException >>
+        checker.checkMigrationNeeded.asserting(_ shouldBe a[ConditionedMigration.MigrationRequired.Yes])
   }
 
-  it should "return Yes if there are projects without renku:slug in the Project graph" in {
+  it should "return Yes if there are projects without renku:slug in the Projects graph" in projectsDSConfig.use {
+    implicit pcc =>
+      val project = anyProjectEntities.generateOne
 
-    val project = anyProjectEntities.generateOne
-
-    provisionTestProject(project).assertNoException >>
-      deleteProjectRenkuSlug(project.resourceId).assertNoException >>
-      checker.checkMigrationNeeded.asserting(_ shouldBe a[ConditionedMigration.MigrationRequired.Yes])
+      provisionTestProject(project).assertNoException >>
+        deleteProjectsRenkuSlug(project.resourceId).assertNoException >>
+        checker.checkMigrationNeeded.asserting(_ shouldBe a[ConditionedMigration.MigrationRequired.Yes])
   }
 
-  it should "return Yes if there are projects without renku:slug in the Projects graph" in {
-
-    val project = anyProjectEntities.generateOne
-
-    provisionTestProject(project).assertNoException >>
-      deleteProjectsRenkuSlug(project.resourceId).assertNoException >>
-      checker.checkMigrationNeeded.asserting(_ shouldBe a[ConditionedMigration.MigrationRequired.Yes])
-  }
-
-  it should "return No if there are no projects without renku:slug" in {
-
+  it should "return No if there are no projects without renku:slug" in projectsDSConfig.use { implicit pcc =>
     val project = anyProjectEntities.generateOne
 
     provisionTestProject(project).assertNoException >>
       checker.checkMigrationNeeded.asserting(_ shouldBe a[ConditionedMigration.MigrationRequired.No])
   }
 
-  implicit override lazy val ioLogger: Logger[IO]                  = TestLogger[IO]()
-  private implicit val timeRecorder:   SparqlQueryTimeRecorder[IO] = TestSparqlQueryTimeRecorder[IO].unsafeRunSync()
-  private lazy val checker = new MigrationNeedCheckerImpl[IO](TSClient[IO](projectsDSConnectionInfo))
+  implicit override lazy val ioLogger: Logger[IO] = TestLogger[IO]()
+  private def checker(implicit pcc: ProjectsConnectionConfig) = new MigrationNeedCheckerImpl[IO](tsClient)
 }

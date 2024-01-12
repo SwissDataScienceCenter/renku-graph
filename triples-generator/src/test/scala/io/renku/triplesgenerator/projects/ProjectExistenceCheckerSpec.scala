@@ -19,14 +19,14 @@
 package io.renku.triplesgenerator.projects
 
 import cats.effect.IO
-import io.renku.entities.searchgraphs.SearchInfoDatasets
+import cats.effect.testing.scalatest.AsyncIOSpec
+import io.renku.entities.searchgraphs.TestSearchInfoDatasets
 import io.renku.generators.Generators.Implicits._
 import io.renku.graph.model.entities
 import io.renku.graph.model.testentities._
 import io.renku.interpreters.TestLogger
-import io.renku.logging.TestSparqlQueryTimeRecorder
-import io.renku.testtools.CustomAsyncIOSpec
-import io.renku.triplesstore.{InMemoryJenaForSpec, ProjectsDataset, SparqlQueryTimeRecorder, TSClient}
+import io.renku.triplesgenerator.TriplesGeneratorJenaSpec
+import io.renku.triplesstore.ProjectsConnectionConfig
 import org.scalatest.OptionValues
 import org.scalatest.flatspec.AsyncFlatSpec
 import org.scalatest.matchers.should
@@ -34,27 +34,23 @@ import org.typelevel.log4cats.Logger
 
 class ProjectExistenceCheckerSpec
     extends AsyncFlatSpec
-    with CustomAsyncIOSpec
+    with AsyncIOSpec
+    with TriplesGeneratorJenaSpec
+    with TestSearchInfoDatasets
     with should.Matchers
-    with OptionValues
-    with InMemoryJenaForSpec
-    with ProjectsDataset
-    with SearchInfoDatasets {
+    with OptionValues {
 
-  it should "return true if project exists in the TS" in {
-
+  it should "return true if project exists in the TS" in projectsDSConfig.use { implicit pcc =>
     val project = anyProjectEntities.generateOne.to[entities.Project]
 
     provisionProject(project).assertNoException >>
       checker.checkExists(project.slug).asserting(_ shouldBe true)
   }
 
-  it should "return false if project does not exist in the TS" in {
+  it should "return false if project does not exist in the TS" in projectsDSConfig.use { implicit pcc =>
     checker.checkExists(projectSlugs.generateOne).asserting(_ shouldBe false)
   }
 
-  private implicit val logger:       TestLogger[IO]              = TestLogger[IO]()
-  private implicit val timeRecorder: SparqlQueryTimeRecorder[IO] = TestSparqlQueryTimeRecorder[IO].unsafeRunSync()
-  private lazy val checker = new ProjectExistenceCheckerImpl[IO](TSClient[IO](projectsDSConnectionInfo))
   implicit override val ioLogger: Logger[IO] = TestLogger[IO]()
+  private def checker(implicit pcc: ProjectsConnectionConfig) = new ProjectExistenceCheckerImpl[IO](tsClient)
 }

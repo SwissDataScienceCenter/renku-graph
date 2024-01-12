@@ -33,8 +33,11 @@ object TriplesStore extends JenaServerSupport {
 
   lazy val fusekiUrl: FusekiUrl = FusekiUrl(server.conConfig.baseUrl.renderString)
 
+  def startUnsafe(): Unit = server.start()
+  def forceStop():   Unit = server.forceStop()
+
   def start(): IO[Unit] =
-    IO(server.start())
+    IO(startUnsafe())
 
   def findProjectAuth(
       slug: projects.Slug

@@ -45,9 +45,7 @@ private object MigrationStartTimeFinder {
   } yield new MigrationStartTimeFinderImpl[F](tsClient)
 }
 
-private class MigrationStartTimeFinderImpl[F[_]: Async: Logger: SparqlQueryTimeRecorder](
-    tsClient: TSClient[F]
-)(implicit ru: RenkuUrl)
+private class MigrationStartTimeFinderImpl[F[_]: Async: Logger](tsClient: TSClient[F])(implicit ru: RenkuUrl)
     extends MigrationStartTimeFinder[F] {
 
   import ResultsDecoder._

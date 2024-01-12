@@ -49,13 +49,13 @@ class ProjectStatusResourceSpec
 
   Feature("Project Status API for a given project") {
 
-    val memberUser = authUsers.generateOne
-    val project =
-      dataProjects(renkuProjectEntities(visibilityPublic, creatorGen = cliShapedPersons).modify(removeMembers()),
-                   CommitsCount(numberOfEvents.value)
-      ).map(addMemberWithId(memberUser.id, Role.Owner)).generateOne
-
     Scenario("Call by a user who is not a member of the project") {
+
+      val memberUser = authUsers.generateOne
+      val project =
+        dataProjects(renkuProjectEntities(visibilityPublic, creatorGen = cliShapedPersons).modify(removeMembers()),
+                     CommitsCount(numberOfEvents.value)
+        ).map(addMemberWithId(memberUser.id, Role.Owner)).generateOne
 
       Given("there's no webhook for a given project in GitLab")
       gitLabStub.addProject(project)
@@ -89,6 +89,12 @@ class ProjectStatusResourceSpec
     }
 
     Scenario("Call by a user who is a member of the project") {
+
+      val memberUser = authUsers.generateOne
+      val project =
+        dataProjects(renkuProjectEntities(visibilityPublic, creatorGen = cliShapedPersons).modify(removeMembers()),
+                     CommitsCount(numberOfEvents.value)
+        ).map(addMemberWithId(memberUser.id, Role.Owner)).generateOne
 
       When("there's no webhook for a given project in GitLab")
       gitLabStub.addProject(project)

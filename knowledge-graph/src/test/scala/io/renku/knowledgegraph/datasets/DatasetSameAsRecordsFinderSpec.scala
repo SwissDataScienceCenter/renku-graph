@@ -22,13 +22,14 @@ import cats.effect.IO
 import io.renku.generators.Generators.Implicits._
 import io.renku.graph.model.datasets.SameAs
 import io.renku.graph.model.testentities.generators.EntitiesGenerators
-import io.renku.triplesstore.ProjectSparqlClient
+import io.renku.triplesstore.{ProjectSparqlClient, ProjectsConnectionConfig}
 
 class DatasetSameAsRecordsFinderSpec extends SecurityRecordFinderSupport {
 
-  lazy val finder = ProjectSparqlClient[IO](projectsDSConnectionInfo).map(DatasetSameAsRecordsFinder.apply[IO])
+  private def finder(implicit pcc: ProjectsConnectionConfig) =
+    ProjectSparqlClient[IO](pcc).map(DatasetSameAsRecordsFinder.apply[IO])
 
-  it should "find security records for a simple project with one dataset" in {
+  it should "find security records for a simple project with one dataset" in projectsDSConfig.use { implicit pcc =>
     val project = projectWithDatasetAndMembers.generateOne
 
     val dsSameAs = SameAs(project.datasets.head.provenance.topmostSameAs.value)
@@ -40,7 +41,7 @@ class DatasetSameAsRecordsFinderSpec extends SecurityRecordFinderSupport {
     } yield ()
   }
 
-  it should "find security records without members if there are none" in {
+  it should "find security records without members if there are none" in projectsDSConfig.use { implicit pcc =>
     val project  = projectWithDatasetAndNoMembers.generateOne
     val dsSameAs = SameAs(project.datasets.head.provenance.topmostSameAs.value)
     for {
@@ -50,7 +51,7 @@ class DatasetSameAsRecordsFinderSpec extends SecurityRecordFinderSupport {
     } yield ()
   }
 
-  it should "find security records for a forked project" in {
+  it should "find security records for a forked project" in projectsDSConfig.use { implicit pcc =>
     val (dataset, (parentProject, project)) = projectAndFork.generateOne
 
     val dsSameAs = SameAs(dataset.provenance.topmostSameAs.value)
@@ -62,7 +63,7 @@ class DatasetSameAsRecordsFinderSpec extends SecurityRecordFinderSupport {
     } yield ()
   }
 
-  it should "find security records for the project that has the dataset" in {
+  it should "find security records for the project that has the dataset" in projectsDSConfig.use { implicit pcc =>
     val createProjects = projectWithDatasetAndMembers.asStream.toIO
       .evalTap(provisionTestProject(_))
       .take(3)
@@ -77,7 +78,7 @@ class DatasetSameAsRecordsFinderSpec extends SecurityRecordFinderSupport {
     } yield ()
   }
 
-  it should "find nothing if there is no project using the dataset" in {
+  it should "find nothing if there is no project using the dataset" in projectsDSConfig.use { implicit pcc =>
     val project = projectWithDatasetAndMembers.generateOne
     val dsSameAs = EntitiesGenerators.datasetSameAs
       .suchThat(_.value != project.datasets.head.provenance.topmostSameAs.value)

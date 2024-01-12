@@ -20,63 +20,62 @@ package io.renku.knowledgegraph.users.projects
 package finder
 
 import cats.effect.IO
+import cats.effect.testing.scalatest.AsyncIOSpec
 import cats.syntax.all._
-import io.renku.entities.searchgraphs.SearchInfoDatasets
+import io.renku.entities.searchgraphs.TestSearchInfoDatasets
 import io.renku.generators.CommonGraphGenerators.{authUsers, userAccessTokens}
 import io.renku.generators.Generators.Implicits._
 import io.renku.graph.model.projects
 import io.renku.graph.model.testentities._
 import io.renku.http.server.security.model.AuthUser
 import io.renku.interpreters.TestLogger
+import io.renku.knowledgegraph.KnowledgeGraphJenaSpec
 import io.renku.logging.TestSparqlQueryTimeRecorder
-import io.renku.testtools.IOSpec
-import io.renku.triplesstore.{InMemoryJenaForSpec, ProjectsDataset, SparqlQueryTimeRecorder}
+import io.renku.triplesstore.{ProjectsConnectionConfig, SparqlQueryTimeRecorder}
 import org.scalacheck.Gen
 import org.scalatest.matchers.should
-import org.scalatest.wordspec.AnyWordSpec
+import org.scalatest.wordspec.AsyncWordSpec
 import org.typelevel.log4cats.Logger
 
 class TSProjectFinderSpec
-    extends AnyWordSpec
-    with should.Matchers
-    with InMemoryJenaForSpec
-    with ProjectsDataset
-    with SearchInfoDatasets
-    with IOSpec {
+    extends AsyncWordSpec
+    with AsyncIOSpec
+    with KnowledgeGraphJenaSpec
+    with TestSearchInfoDatasets
+    with should.Matchers {
 
   implicit override val ioLogger: Logger[IO] = TestLogger[IO]()
 
   "findProjectsInTS" should {
 
-    "return info about all projects where the user from criteria is either a member or a user of" in new TestCase {
+    "return info about all projects where the user from criteria is either a member or a user of" in projectsDSConfig
+      .use { implicit pcc =>
+        val criteria = {
+          val c = criterias.generateOne
+          c.copy(maybeUser = authUsers.generateOne.copy(id = c.userId).some)
+        }
 
-      val criteria = {
-        val c = criterias.generateOne
-        c.copy(maybeUser = authUsers.generateOne.copy(id = c.userId).some)
+        val matchingMember =
+          memberPersonGitLabIdLens.replace(criteria.userId.some)(
+            projectMemberEntities(withGitLabId).generateOne
+          )
+        val project1WithMatchingMember = anyProjectEntities
+          .map(replaceMembers(Set(projectMemberEntities(withGitLabId).generateOne, matchingMember)))
+          .generateOne
+        val project2WithMatchingMember = anyProjectEntities
+          .map(replaceMembers(projectMemberEntities(withGitLabId).generateSet() + matchingMember))
+          .generateOne
+
+        val projectWithoutMatchingMember = projectEntities(visibilityPublic).generateOne
+
+        provisionTestProjects(project1WithMatchingMember, project2WithMatchingMember, projectWithoutMatchingMember) >>
+          finder.findProjectsInTS(criteria).asserting {
+            _ should contain theSameElementsAs
+              List(project1WithMatchingMember, project2WithMatchingMember).map(_.to[model.Project.Activated])
+          }
       }
 
-      val matchingMember =
-        memberPersonGitLabIdLens.replace(criteria.userId.some)(
-          projectMemberEntities(withGitLabId).generateOne
-        )
-      val project1WithMatchingMember = anyProjectEntities
-        .map(replaceMembers(Set(projectMemberEntities(withGitLabId).generateOne, matchingMember)))
-        .generateOne
-      val project2WithMatchingMember = anyProjectEntities
-        .map(replaceMembers(projectMemberEntities(withGitLabId).generateSet() + matchingMember))
-        .generateOne
-
-      val projectWithoutMatchingMember = projectEntities(visibilityPublic).generateOne
-
-      provisionTestProjects(project1WithMatchingMember, project2WithMatchingMember, projectWithoutMatchingMember)
-        .unsafeRunSync()
-
-      finder.findProjectsInTS(criteria).unsafeRunSync() should contain theSameElementsAs
-        List(project1WithMatchingMember, project2WithMatchingMember).map(_.to[model.Project.Activated])
-    }
-
-    "not see projects the authUser has no access to" in new TestCase {
-
+    "not see projects the authUser has no access to" in projectsDSConfig.use { implicit pcc =>
       val authUserMember = projectMemberEntities(withGitLabId).generateOne
       val authUser       = authUserMember.person
       val criteria = criterias.generateOne.copy(maybeUser =
@@ -106,29 +105,28 @@ class TSProjectFinderSpec
         privateProjectWithMatchingMemberOnly,
         nonPrivateProjectWithMatchingMemberOnly,
         projectWithMatchingAuthUserOnly
-      ).unsafeRunSync()
-
-      finder.findProjectsInTS(criteria).unsafeRunSync() should contain theSameElementsAs
-        List(privateProjectWithMatchingMemberAndAuthUser, nonPrivateProjectWithMatchingMemberOnly)
-          .map(_.to[model.Project.Activated])
+      ) >>
+        finder.findProjectsInTS(criteria).asserting {
+          _ should contain theSameElementsAs
+            List(privateProjectWithMatchingMemberAndAuthUser, nonPrivateProjectWithMatchingMemberOnly)
+              .map(_.to[model.Project.Activated])
+        }
     }
 
-    "return no projects if there are no projects where the criteria user is a member of" in new TestCase {
+    "return no projects if there are no projects where the criteria user is a member of" in projectsDSConfig.use {
+      implicit pcc =>
+        val criteria = {
+          val c = criterias.generateOne
+          c.copy(maybeUser = authUsers.generateOne.copy(id = c.userId).some)
+        }
 
-      val criteria = {
-        val c = criterias.generateOne
-        c.copy(maybeUser = authUsers.generateOne.copy(id = c.userId).some)
-      }
-
-      provisionTestProjects(projectEntities(visibilityPublic).generateOne).unsafeRunSync()
-
-      finder.findProjectsInTS(criteria).unsafeRunSync() shouldBe Nil
+        provisionTestProjects(projectEntities(visibilityPublic).generateOne) >>
+          finder.findProjectsInTS(criteria).asserting(_ shouldBe Nil)
     }
   }
 
-  private trait TestCase {
-    private implicit val logger:       TestLogger[IO]              = TestLogger[IO]()
-    private implicit val timeRecorder: SparqlQueryTimeRecorder[IO] = TestSparqlQueryTimeRecorder[IO].unsafeRunSync()
-    val finder = new TSProjectFinderImpl[IO](projectsDSConnectionInfo)
+  private def finder(implicit pcc: ProjectsConnectionConfig) = {
+    implicit val tr: SparqlQueryTimeRecorder[IO] = TestSparqlQueryTimeRecorder.createUnsafe
+    new TSProjectFinderImpl[IO](pcc)
   }
 }

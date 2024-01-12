@@ -20,13 +20,13 @@ package io.renku.triplesgenerator.events.consumers.tsmigrationrequest.migrations
 package projectslug
 
 import cats.effect.IO
+import cats.effect.testing.scalatest.AsyncIOSpec
 import io.renku.generators.Generators.Implicits._
 import io.renku.graph.model.GraphModelGenerators.renkuUrls
 import io.renku.graph.model.RenkuTinyTypeGenerators.projectSlugs
 import io.renku.graph.model.RenkuUrl
 import io.renku.interpreters.TestLogger
-import io.renku.logging.TestSparqlQueryTimeRecorder
-import io.renku.testtools.CustomAsyncIOSpec
+import io.renku.triplesgenerator.TriplesGeneratorJenaSpec
 import io.renku.triplesstore._
 import org.scalatest.OptionValues
 import org.scalatest.flatspec.AsyncFlatSpec
@@ -36,27 +36,24 @@ import scala.util.Random
 
 class ProjectDonePersisterSpec
     extends AsyncFlatSpec
-    with CustomAsyncIOSpec
+    with AsyncIOSpec
+    with TriplesGeneratorJenaSpec
     with should.Matchers
-    with InMemoryJenaForSpec
-    with MigrationsDataset
     with OptionValues {
 
-  it should "remove the (AddProjectSlug, renku:toBeMigrated, slug) triple" in {
-
+  it should "remove the (AddProjectSlug, renku:toBeMigrated, slug) triple" in migrationsDSConfig.use { implicit mcc =>
     val slugs       = projectSlugs.generateList(min = 2)
     val insertQuery = BacklogCreator.asToBeMigratedInserts.apply(slugs).value
+    val finder      = progressFinder
 
-    runUpdate(on = migrationsDataset, insertQuery).assertNoException >>
-      progressFinder.findProgressInfo.asserting(_ shouldBe s"${slugs.size} left from ${slugs.size}") >>
+    runUpdate(insertQuery).assertNoException >>
+      finder.findProgressInfo.asserting(_ shouldBe s"${slugs.size} left from ${slugs.size}") >>
       donePersister.noteDone(Random.shuffle(slugs).head).assertNoException >>
-      progressFinder.findProgressInfo.asserting(_ shouldBe s"${slugs.size - 1} left from ${slugs.size}")
+      finder.findProgressInfo.asserting(_ shouldBe s"${slugs.size - 1} left from ${slugs.size}")
   }
 
-  private implicit lazy val renkuUrl: RenkuUrl                    = renkuUrls.generateOne
-  private implicit val logger:        TestLogger[IO]              = TestLogger[IO]()
-  private implicit lazy val tr:       SparqlQueryTimeRecorder[IO] = TestSparqlQueryTimeRecorder[IO].unsafeRunSync()
-  private lazy val tsClient       = TSClient[IO](migrationsDSConnectionInfo)
-  private lazy val progressFinder = new ProgressFinderImpl[IO](tsClient)
-  private lazy val donePersister  = new ProjectDonePersisterImpl[IO](tsClient)
+  private implicit lazy val renkuUrl: RenkuUrl       = renkuUrls.generateOne
+  private implicit val logger:        TestLogger[IO] = TestLogger[IO]()
+  private def progressFinder(implicit mcc: MigrationsConnectionConfig) = new ProgressFinderImpl[IO](tsClient)
+  private def donePersister(implicit mcc:  MigrationsConnectionConfig) = new ProjectDonePersisterImpl[IO](tsClient)
 }

@@ -224,9 +224,7 @@ lazy val triplesStoreClient = project
         Dependencies.fs2Core ++
         Dependencies.rdf4jQueryParserSparql ++
         Dependencies.http4sClient ++
-        Dependencies.http4sCirce,
-    libraryDependencies ++=
-      Dependencies.testContainersScalaTest.map(_ % Test)
+        Dependencies.http4sCirce
   )
   .dependsOn(
     generators % "test->test",
@@ -302,12 +300,12 @@ lazy val graphCommons = project
   .settings(
     name := "graph-commons",
     Test / testOptions += Tests.Setup { cl =>
-      PostgresServer.commons("start")
-      JenaServer.commons("start")
+      PostgresServer.commons("start")(cl)
+      JenaServer.commons("start")(cl)
     },
     Test / testOptions += Tests.Cleanup { cl =>
-      PostgresServer.commons("forceStop")
-      JenaServer.commons("forceStop")
+      PostgresServer.commons("forceStop")(cl)
+      JenaServer.commons("forceStop")(cl)
     },
     libraryDependencies ++=
       Dependencies.pureconfig ++
@@ -324,8 +322,7 @@ lazy val graphCommons = project
         Dependencies.log4Cats,
     // Test dependencies
     libraryDependencies ++=
-      (Dependencies.testContainersPostgres ++
-        Dependencies.wiremock ++
+      (Dependencies.wiremock ++
         Dependencies.scalamock).map(_ % Test)
   )
   .dependsOn(
@@ -442,7 +439,9 @@ lazy val entitiesSearch = project
   .withId("entities-search")
   .settings(commonSettings)
   .settings(
-    name := "entities-search"
+    name := "entities-search",
+    Test / testOptions += Tests.Setup(JenaServer.entitiesSearch("start")),
+    Test / testOptions += Tests.Cleanup(JenaServer.entitiesSearch("forceStop"))
   )
   .dependsOn(graphCommons % "compile->compile; test->test")
   .enablePlugins(AutomateHeaderPlugin)
@@ -558,7 +557,8 @@ lazy val knowledgeGraph = project
   .settings(commonSettings)
   .settings(
     name := "knowledge-graph",
-    Test / fork := true,
+    Test / testOptions += Tests.Setup(JenaServer.knowledgeGraph("start")),
+    Test / testOptions += Tests.Cleanup(JenaServer.knowledgeGraph("forceStop")),
     libraryDependencies ++=
       Dependencies.logbackClassic ++
         Dependencies.widoco ++
@@ -591,7 +591,15 @@ lazy val acceptanceTests = project
   .settings(commonSettings)
   .settings(
     name := "acceptance-tests",
-    Test / parallelExecution := false
+    Test / parallelExecution := false,
+    Test / testOptions += Tests.Setup { cl =>
+      PostgresServer.acceptanceTests("startUnsafe")(cl)
+      JenaServer.acceptanceTests("startUnsafe")(cl)
+    },
+    Test / testOptions += Tests.Cleanup { cl =>
+      PostgresServer.acceptanceTests("forceStop")(cl)
+      JenaServer.acceptanceTests("forceStop")(cl)
+    }
   )
   .dependsOn(
     webhookService,

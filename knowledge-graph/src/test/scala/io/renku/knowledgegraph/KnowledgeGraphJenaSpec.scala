@@ -16,25 +16,13 @@
  * limitations under the License.
  */
 
-package io.renku.triplesstore
+package io.renku.knowledgegraph
 
-import cats.effect.unsafe.IORuntime
-import com.dimafeng.testcontainers.ForAllTestContainer
-import org.scalatest.{BeforeAndAfter, Suite}
+import io.renku.triplesstore.GraphJenaSpec
+import io.renku.triplesstore.client.util.JenaServer
+import org.scalatest.Suite
 
-trait InMemoryJenaForSpec extends ForAllTestContainer with InMemoryJena with BeforeAndAfter with ResultsDecoder {
+trait KnowledgeGraphJenaSpec extends GraphJenaSpec {
   self: Suite =>
-
-  implicit val ioRuntime: IORuntime
-
-  override def afterStart(): Unit = {
-    super.afterStart()
-    createDatasets().unsafeRunSync()
-  }
-
-  def clearDatasetsBefore: Boolean = true
-
-  before {
-    if (clearDatasetsBefore) clearAllDatasets()
-  }
+  lazy val server: JenaServer = KnowledgeGraphJenaServer
 }

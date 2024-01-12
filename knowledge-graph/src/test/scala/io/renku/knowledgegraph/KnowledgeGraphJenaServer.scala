@@ -16,22 +16,8 @@
  * limitations under the License.
  */
 
-package io.renku.db
+package io.renku.knowledgegraph
 
-import com.dimafeng.testcontainers.PostgreSQLContainer
-import org.testcontainers.utility.DockerImageName
+import io.renku.triplesstore.client.util.JenaServer
 
-object PostgresContainer {
-  val version = "16.0-alpine"
-
-  val image = s"postgres:$version"
-
-  val imageName: DockerImageName = DockerImageName.parse(image)
-
-  def container(dbConfig: DBConfigProvider.DBConfig[_]): PostgreSQLContainer = PostgreSQLContainer(
-    dockerImageNameOverride = imageName,
-    databaseName = dbConfig.name.value,
-    username = dbConfig.user.value,
-    password = dbConfig.pass.value
-  )
-}
+object KnowledgeGraphJenaServer extends JenaServer(module = "knowledge_graph", port = 3046)

@@ -62,6 +62,10 @@ trait TestProjectsDataset extends TestDataset {
       .map { case (origTtl, newName) => updateDSConfig(origTtl, newName, new ProjectsTTL(_, _)) }
       .toResource
 
+  trait GraphsProducer[T] {
+    def apply(obj: T)(implicit entityFunctions: EntityFunctions[T]): List[Graph]
+  }
+
   protected implicit def projectsDSGraphsProducer[A](implicit
       renkuUrl: RenkuUrl,
       glApiUrl: GitLabApiUrl

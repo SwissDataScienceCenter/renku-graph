@@ -19,9 +19,10 @@
 package io.renku.triplesgenerator.events.consumers.tsmigrationrequest.migrations
 
 import cats.effect.IO
+import cats.effect.testing.scalatest.AsyncIOSpec
 import cats.syntax.all._
 import eu.timepit.refined.auto._
-import io.renku.entities.searchgraphs.{SearchInfoDatasets, concatSeparator}
+import io.renku.entities.searchgraphs.{TestSearchInfoDatasets, concatSeparator}
 import io.renku.generators.Generators.Implicits._
 import io.renku.graph.model._
 import io.renku.graph.model.testentities._
@@ -29,7 +30,7 @@ import io.renku.interpreters.TestLogger
 import io.renku.jsonld.syntax._
 import io.renku.logging.TestSparqlQueryTimeRecorder
 import io.renku.metrics.TestMetricsRegistry
-import io.renku.testtools.CustomAsyncIOSpec
+import io.renku.triplesgenerator.TriplesGeneratorJenaSpec
 import io.renku.triplesstore.SparqlQuery.Prefixes
 import io.renku.triplesstore._
 import io.renku.triplesstore.client.syntax._
@@ -42,11 +43,10 @@ import tooling.RegisteredUpdateQueryMigration
 
 class DatasetsGraphFlattenersSpec
     extends AsyncFlatSpec
-    with CustomAsyncIOSpec
+    with AsyncIOSpec
+    with TriplesGeneratorJenaSpec
+    with TestSearchInfoDatasets
     with should.Matchers
-    with InMemoryJenaForSpec
-    with ProjectsDataset
-    with SearchInfoDatasets
     with AsyncMockFactory {
 
   it should "be a RegisteredUpdateQueryMigration" in {
@@ -65,8 +65,7 @@ class DatasetsGraphFlattenersSpec
   }
 
   it should "add new keywordsConcat, imagesConcat, creatorsNamesConcat and projectsVisibilitiesConcat properties " +
-    "to all datasets in the Datasets graph" in {
-
+    "to all datasets in the Datasets graph" in projectsDSConfig.use { implicit pcc =>
       val ds1 -> project1 = anyRenkuProjectEntities
         .addDataset {
           datasetEntities(provenanceInternal)
@@ -89,10 +88,10 @@ class DatasetsGraphFlattenersSpec
 
       for {
         _ <- provisionProjects(project1, project2).assertNoException
-        _ <- runUpdates(projectsDataset, insertSchemaKeywords(ds1TopSameAs, ds1)).assertNoException
-        _ <- runUpdates(projectsDataset, insertSchemaImages(ds1TopSameAs, ds1)).assertNoException
-        _ <- runUpdates(projectsDataset, insertSchemaKeywords(ds2TopSameAs, ds2)).assertNoException
-        _ <- runUpdates(projectsDataset, insertSchemaImages(ds2TopSameAs, ds2)).assertNoException
+        _ <- runUpdates(insertSchemaKeywords(ds1TopSameAs, ds1)).assertNoException
+        _ <- runUpdates(insertSchemaImages(ds1TopSameAs, ds1)).assertNoException
+        _ <- runUpdates(insertSchemaKeywords(ds2TopSameAs, ds2)).assertNoException
+        _ <- runUpdates(insertSchemaImages(ds2TopSameAs, ds2)).assertNoException
 
         _ <- fetchKeywords(ds1TopSameAs).asserting(_ shouldBe ds1.additionalInfo.keywords)
         _ <- fetchImages(ds1TopSameAs).asserting(_ shouldBe ds1.additionalInfo.images.map(_.uri))
@@ -103,14 +102,14 @@ class DatasetsGraphFlattenersSpec
         _ <- fetchCreatorsNames(ds2TopSameAs).asserting(_ shouldBe ds2.provenance.creators.map(_.name).toList)
         _ <- fetchSlugsVisibs(ds2TopSameAs).asserting(_ shouldBe List(project2.slug -> project2.visibility))
 
-        _ <- runUpdate(projectsDataset, deleteKeywords(ds1TopSameAs)).assertNoException
-        _ <- runUpdate(projectsDataset, deleteImages(ds1TopSameAs)).assertNoException
-        _ <- runUpdate(projectsDataset, deleteCreatorsNames(ds1TopSameAs)).assertNoException
-        _ <- runUpdate(projectsDataset, deleteSlugsVisibs(ds1TopSameAs)).assertNoException
-        _ <- runUpdate(projectsDataset, deleteKeywords(ds2TopSameAs)).assertNoException
-        _ <- runUpdate(projectsDataset, deleteImages(ds2TopSameAs)).assertNoException
-        _ <- runUpdate(projectsDataset, deleteCreatorsNames(ds2TopSameAs)).assertNoException
-        _ <- runUpdate(projectsDataset, deleteSlugsVisibs(ds2TopSameAs)).assertNoException
+        _ <- runUpdate(deleteKeywords(ds1TopSameAs)).assertNoException
+        _ <- runUpdate(deleteImages(ds1TopSameAs)).assertNoException
+        _ <- runUpdate(deleteCreatorsNames(ds1TopSameAs)).assertNoException
+        _ <- runUpdate(deleteSlugsVisibs(ds1TopSameAs)).assertNoException
+        _ <- runUpdate(deleteKeywords(ds2TopSameAs)).assertNoException
+        _ <- runUpdate(deleteImages(ds2TopSameAs)).assertNoException
+        _ <- runUpdate(deleteCreatorsNames(ds2TopSameAs)).assertNoException
+        _ <- runUpdate(deleteSlugsVisibs(ds2TopSameAs)).assertNoException
 
         _ <- fetchKeywords(ds1TopSameAs).asserting(_ shouldBe Nil)
         _ <- fetchImages(ds1TopSameAs).asserting(_ shouldBe Nil)
@@ -121,10 +120,10 @@ class DatasetsGraphFlattenersSpec
         _ <- fetchCreatorsNames(ds2TopSameAs).asserting(_ shouldBe Nil)
         _ <- fetchSlugsVisibs(ds2TopSameAs).asserting(_ shouldBe Nil)
 
-        _ <- runUpdate(projectsDataset, DatasetsGraphKeywordsFlattener.query).assertNoException
-        _ <- runUpdate(projectsDataset, DatasetsGraphImagesFlattener.query).assertNoException
-        _ <- runUpdate(projectsDataset, DatasetsGraphCreatorsFlattener.query).assertNoException
-        _ <- runUpdate(projectsDataset, DatasetsGraphSlugsVisibilitiesFlattener.query).assertNoException
+        _ <- runUpdate(DatasetsGraphKeywordsFlattener.query).assertNoException
+        _ <- runUpdate(DatasetsGraphImagesFlattener.query).assertNoException
+        _ <- runUpdate(DatasetsGraphCreatorsFlattener.query).assertNoException
+        _ <- runUpdate(DatasetsGraphSlugsVisibilitiesFlattener.query).assertNoException
 
         _ <- fetchKeywords(ds1TopSameAs).asserting(_ shouldBe ds1.additionalInfo.keywords)
         _ <- fetchImages(ds1TopSameAs).asserting(_ shouldBe ds1.additionalInfo.images.map(_.uri))
@@ -137,9 +136,10 @@ class DatasetsGraphFlattenersSpec
       } yield Succeeded
     }
 
-  private def fetchKeywords(topSameAs: datasets.TopmostSameAs): IO[List[datasets.Keyword]] =
+  private def fetchKeywords(topSameAs: datasets.TopmostSameAs)(implicit
+      pcc: ProjectsConnectionConfig
+  ): IO[List[datasets.Keyword]] =
     runSelect(
-      on = projectsDataset,
       SparqlQuery.ofUnsafe(
         "test ds keywords",
         Prefixes of (renku -> "renku", schema -> "schema"),
@@ -157,9 +157,10 @@ class DatasetsGraphFlattenersSpec
         .getOrElse(List.empty[datasets.Keyword])
     )
 
-  private def fetchImages(topSameAs: datasets.TopmostSameAs): IO[List[images.ImageUri]] =
+  private def fetchImages(topSameAs: datasets.TopmostSameAs)(implicit
+      pcc: ProjectsConnectionConfig
+  ): IO[List[images.ImageUri]] =
     runSelect(
-      on = projectsDataset,
       SparqlQuery.ofUnsafe(
         "test ds images",
         Prefixes of (renku -> "renku", schema -> "schema"),
@@ -186,9 +187,10 @@ class DatasetsGraphFlattenersSpec
         .getOrElse(List.empty[images.ImageUri])
     )
 
-  private def fetchCreatorsNames(topSameAs: datasets.TopmostSameAs): IO[List[persons.Name]] =
+  private def fetchCreatorsNames(topSameAs: datasets.TopmostSameAs)(implicit
+      pcc: ProjectsConnectionConfig
+  ): IO[List[persons.Name]] =
     runSelect(
-      on = projectsDataset,
       SparqlQuery.ofUnsafe(
         "test ds creators names",
         Prefixes of (renku -> "renku", schema -> "schema"),
@@ -206,9 +208,10 @@ class DatasetsGraphFlattenersSpec
         .getOrElse(List.empty[persons.Name])
     )
 
-  private def fetchSlugsVisibs(topSameAs: datasets.TopmostSameAs): IO[List[(projects.Slug, projects.Visibility)]] =
+  private def fetchSlugsVisibs(topSameAs: datasets.TopmostSameAs)(implicit
+      pcc: ProjectsConnectionConfig
+  ): IO[List[(projects.Slug, projects.Visibility)]] =
     runSelect(
-      on = projectsDataset,
       SparqlQuery.ofUnsafe(
         "test ds slugs visibilities",
         Prefixes of (renku -> "renku", schema -> "schema"),

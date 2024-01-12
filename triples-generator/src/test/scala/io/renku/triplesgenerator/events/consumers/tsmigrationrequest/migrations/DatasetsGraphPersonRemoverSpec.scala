@@ -20,8 +20,9 @@ package io.renku.triplesgenerator.events.consumers.tsmigrationrequest.migrations
 
 import cats.data.NonEmptyList
 import cats.effect.IO
+import cats.effect.testing.scalatest.AsyncIOSpec
 import eu.timepit.refined.auto._
-import io.renku.entities.searchgraphs.SearchInfoDatasets
+import io.renku.entities.searchgraphs.TestSearchInfoDatasets
 import io.renku.generators.Generators.Implicits._
 import io.renku.graph.model._
 import io.renku.graph.model.testentities._
@@ -29,12 +30,11 @@ import io.renku.interpreters.TestLogger
 import io.renku.jsonld.syntax._
 import io.renku.logging.TestSparqlQueryTimeRecorder
 import io.renku.metrics.TestMetricsRegistry
-import io.renku.testtools.CustomAsyncIOSpec
+import io.renku.triplesgenerator.TriplesGeneratorJenaSpec
 import io.renku.triplesstore.SparqlQuery.Prefixes
 import io.renku.triplesstore._
 import io.renku.triplesstore.client.model.Quad
 import io.renku.triplesstore.client.syntax._
-import org.scalamock.scalatest.AsyncMockFactory
 import org.scalatest.flatspec.AsyncFlatSpec
 import org.scalatest.matchers.should
 import org.typelevel.log4cats.Logger
@@ -42,34 +42,31 @@ import tooling.RegisteredUpdateQueryMigration
 
 class DatasetsGraphPersonRemoverSpec
     extends AsyncFlatSpec
-    with CustomAsyncIOSpec
-    with should.Matchers
-    with InMemoryJenaForSpec
-    with ProjectsDataset
-    with SearchInfoDatasets
-    with AsyncMockFactory {
+    with AsyncIOSpec
+    with TriplesGeneratorJenaSpec
+    with TestSearchInfoDatasets
+    with should.Matchers {
 
   it should "be a RegisteredUpdateQueryMigration" in {
     implicit val metricsRegistry: TestMetricsRegistry[IO]     = TestMetricsRegistry[IO]
-    implicit val timeRecorder:    SparqlQueryTimeRecorder[IO] = TestSparqlQueryTimeRecorder[IO].unsafeRunSync()
+    implicit val timeRecorder:    SparqlQueryTimeRecorder[IO] = TestSparqlQueryTimeRecorder.createUnsafe
 
     DatasetsGraphPersonRemover[IO].asserting(
       _.getClass shouldBe classOf[RegisteredUpdateQueryMigration[IO]]
     )
   }
 
-  it should "remove Person entities from the Datasets graph" in {
-
+  it should "remove Person entities from the Datasets graph" in projectsDSConfig.use { implicit pcc =>
     val ds1 -> project1 = anyRenkuProjectEntities.addDataset(datasetEntities(provenanceInternal)).generateOne
     val ds2 -> project2 = anyRenkuProjectEntities.addDataset(datasetEntities(provenanceInternal)).generateOne
 
     val allNames = (ds1.provenance.creators.toList ::: ds2.provenance.creators.toList).map(_.name).toSet
 
     provisionTestProjects(project1, project2).assertNoException >>
-      insertIO(projectsDataset, toQuads(ds1.provenance.creators)).assertNoException >>
-      insertIO(projectsDataset, toQuads(ds2.provenance.creators)).assertNoException >>
+      insert(toQuads(ds1.provenance.creators)).assertNoException >>
+      insert(toQuads(ds2.provenance.creators)).assertNoException >>
       fetchCreatorsNames.asserting(_.toSet shouldBe allNames) >>
-      runUpdate(projectsDataset, DatasetsGraphPersonRemover.query).assertNoException >>
+      runUpdate(DatasetsGraphPersonRemover.query).assertNoException >>
       fetchCreatorsNames.asserting(_ shouldBe List.empty)
   }
 
@@ -85,9 +82,8 @@ class DatasetsGraphPersonRemoverSpec
     )
   )
 
-  private def fetchCreatorsNames: IO[List[persons.Name]] =
+  private def fetchCreatorsNames(implicit pcc: ProjectsConnectionConfig): IO[List[persons.Name]] =
     runSelect(
-      on = projectsDataset,
       SparqlQuery.ofUnsafe(
         "test creator name",
         Prefixes of schema -> "schema",

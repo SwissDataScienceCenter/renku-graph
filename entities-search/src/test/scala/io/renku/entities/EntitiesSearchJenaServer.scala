@@ -16,6 +16,8 @@
  * limitations under the License.
  */
 
-package io.renku.db
+package io.renku.entities
 
-object CommonsPostgresServer extends PostgresServer(module = "graph_commons", port = 5400)
+import io.renku.triplesstore.client.util.JenaServer
+
+object EntitiesSearchJenaServer extends JenaServer(module = "entities_search", port = 3043)
