@@ -20,59 +20,62 @@ package io.renku.triplesgenerator.events.consumers.tsmigrationrequest.migrations
 package projectsgraph
 
 import cats.effect.IO
+import cats.effect.testing.scalatest.AsyncIOSpec
+import cats.syntax.all._
 import io.renku.generators.Generators.Implicits._
 import io.renku.graph.model.GraphModelGenerators.renkuUrls
 import io.renku.graph.model.RenkuTinyTypeGenerators.projectSlugs
 import io.renku.graph.model._
 import io.renku.interpreters.TestLogger
 import io.renku.logging.TestSparqlQueryTimeRecorder
-import io.renku.testtools.IOSpec
+import io.renku.triplesgenerator.TriplesGeneratorJenaSpec
 import io.renku.triplesstore._
 import org.scalacheck.Gen
-import org.scalamock.scalatest.MockFactory
-import org.scalatest.OptionValues
+import org.scalamock.scalatest.AsyncMockFactory
 import org.scalatest.matchers.should
-import org.scalatest.wordspec.AnyWordSpec
+import org.scalatest.wordspec.AsyncWordSpec
+import org.scalatest.{OptionValues, Succeeded}
 import tooling._
 
 class ProjectsPageFinderSpec
-    extends AnyWordSpec
+    extends AsyncWordSpec
+    with AsyncIOSpec
+    with TriplesGeneratorJenaSpec
     with should.Matchers
-    with IOSpec
-    with InMemoryJenaForSpec
-    with MigrationsDataset
-    with MockFactory
+    with AsyncMockFactory
     with OptionValues {
 
   private val pageSize = 50
 
   "nextProjectsPage" should {
 
-    "return next page of projects for migration each time the method is called" in new TestCase {
+    "return next page of projects for migration each time the method is called" in migrationsDSConfig.use {
+      implicit mcc =>
+        val slugs = projectSlugs
+          .generateList(min = pageSize + 1, max = Gen.choose(pageSize + 1, (2 * pageSize) - 1).generateOne)
+          .sorted
 
-      val slugs = projectSlugs
-        .generateList(min = pageSize + 1, max = Gen.choose(pageSize + 1, (2 * pageSize) - 1).generateOne)
-        .sorted
+        for {
+          _ <- runUpdate(BacklogCreator.asToBeMigratedInserts.apply(slugs).value)
 
-      runUpdate(on = migrationsDataset, BacklogCreator.asToBeMigratedInserts.apply(slugs).value).unsafeRunSync()
+          (page1, page2) = slugs splitAt pageSize
 
-      val (page1, page2) = slugs splitAt pageSize
+          _ <- finder.nextProjectsPage().asserting(_ shouldBe page1)
 
-      finder.nextProjectsPage().unsafeRunSync() shouldBe page1
+          _ <- page1.traverse_(donePersister.noteDone)
+          _ <- finder.nextProjectsPage().asserting(_ shouldBe page2)
 
-      page1.foreach(donePersister.noteDone(_).unsafeRunSync())
-      finder.nextProjectsPage().unsafeRunSync() shouldBe page2
-
-      page2.foreach(donePersister.noteDone(_).unsafeRunSync())
-      finder.nextProjectsPage().unsafeRunSync() shouldBe Nil
+          _ <- page2.traverse_(donePersister.noteDone)
+          _ <- finder.nextProjectsPage().asserting(_ shouldBe Nil)
+        } yield Succeeded
     }
   }
 
-  private trait TestCase {
-    implicit val renkuUrl:             RenkuUrl                    = renkuUrls.generateOne
-    private implicit val logger:       TestLogger[IO]              = TestLogger[IO]()
-    private implicit val timeRecorder: SparqlQueryTimeRecorder[IO] = TestSparqlQueryTimeRecorder[IO].unsafeRunSync()
-    val finder        = new ProjectsPageFinderImpl[IO](RecordsFinder[IO](migrationsDSConnectionInfo))
-    val donePersister = new ProjectDonePersisterImpl[IO](TSClient[IO](migrationsDSConnectionInfo))
+  private implicit lazy val renkuUrl: RenkuUrl       = renkuUrls.generateOne
+  private implicit lazy val logger:   TestLogger[IO] = TestLogger[IO]()
+  private def donePersister(implicit mcc: MigrationsConnectionConfig) = new ProjectDonePersisterImpl[IO](tsClient)
+  private def finder(implicit mcc: MigrationsConnectionConfig) = {
+    implicit val tr: SparqlQueryTimeRecorder[IO] = TestSparqlQueryTimeRecorder.createUnsafe
+    new ProjectsPageFinderImpl[IO](RecordsFinder[IO](mcc))
   }
 }

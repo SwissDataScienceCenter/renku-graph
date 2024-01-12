@@ -19,22 +19,22 @@
 package io.renku.triplesgenerator.projects.update
 
 import cats.effect.IO
+import cats.effect.testing.scalatest.AsyncIOSpec
 import cats.syntax.all._
 import eu.timepit.refined.auto._
-import io.renku.entities.searchgraphs.{SearchInfoDatasets, concatSeparator}
+import io.renku.entities.searchgraphs.{TestSearchInfoDatasets, concatSeparator}
 import io.renku.generators.Generators.Implicits._
 import io.renku.graph.model.images.ImageUri
 import io.renku.graph.model.testentities._
 import io.renku.graph.model.{GraphClass, entities, projects}
 import io.renku.interpreters.TestLogger
 import io.renku.jsonld.syntax._
-import io.renku.testtools.CustomAsyncIOSpec
+import io.renku.triplesgenerator.TriplesGeneratorJenaSpec
 import io.renku.triplesgenerator.api.ProjectUpdates
 import io.renku.triplesstore.SparqlQuery.Prefixes
 import io.renku.triplesstore.client.syntax._
-import io.renku.triplesstore.{InMemoryJenaForSpec, ProjectsDataset, SparqlQuery}
+import io.renku.triplesstore.{ProjectsConnectionConfig, SparqlQuery}
 import org.scalacheck.Gen
-import org.scalamock.scalatest.AsyncMockFactory
 import org.scalatest.flatspec.AsyncFlatSpec
 import org.scalatest.matchers.should
 import org.scalatest.{OptionValues, Succeeded}
@@ -42,16 +42,13 @@ import org.typelevel.log4cats.Logger
 
 class UpdateQueriesCalculatorSpec
     extends AsyncFlatSpec
-    with CustomAsyncIOSpec
-    with should.Matchers
+    with AsyncIOSpec
+    with TriplesGeneratorJenaSpec
+    with TestSearchInfoDatasets
     with OptionValues
-    with InMemoryJenaForSpec
-    with ProjectsDataset
-    with SearchInfoDatasets
-    with AsyncMockFactory {
+    with should.Matchers {
 
-  it should "create upsert queries when there's a new description" in {
-
+  it should "create upsert queries when there's a new description" in projectsDSConfig.use { implicit pcc =>
     val project = anyProjectEntities.generateOne.to[entities.Project]
 
     val newValue = projectDescriptions.generateSome
@@ -72,8 +69,7 @@ class UpdateQueriesCalculatorSpec
     } yield Succeeded
   }
 
-  it should "create delete queries when description is removed" in {
-
+  it should "create delete queries when description is removed" in projectsDSConfig.use { implicit pcc =>
     val project = anyProjectEntities
       .map(replaceProjectDesc(projectDescriptions.generateSome))
       .generateOne
@@ -97,8 +93,7 @@ class UpdateQueriesCalculatorSpec
     } yield Succeeded
   }
 
-  it should "create upsert queries when there are new keywords" in {
-
+  it should "create upsert queries when there are new keywords" in projectsDSConfig.use { implicit pcc =>
     val project = anyProjectEntities
       .map(replaceProjectKeywords(projectKeywords.generateSet(min = 1)))
       .generateOne
@@ -122,8 +117,7 @@ class UpdateQueriesCalculatorSpec
     } yield Succeeded
   }
 
-  it should "create queries that deletes keywords on removal" in {
-
+  it should "create queries that deletes keywords on removal" in projectsDSConfig.use { implicit pcc =>
     val project = anyProjectEntities
       .map(replaceProjectKeywords(projectKeywords.generateSet(min = 1)))
       .generateOne
@@ -147,8 +141,7 @@ class UpdateQueriesCalculatorSpec
     } yield Succeeded
   }
 
-  it should "create upsert queries when there are new images" in {
-
+  it should "create upsert queries when there are new images" in projectsDSConfig.use { implicit pcc =>
     val project = anyProjectEntities.generateOne.to[entities.Project]
 
     val newValue = imageUris.generateList(min = 1)
@@ -169,8 +162,7 @@ class UpdateQueriesCalculatorSpec
     } yield Succeeded
   }
 
-  it should "create queries that deletes images on removal" in {
-
+  it should "create queries that deletes images on removal" in projectsDSConfig.use { implicit pcc =>
     val project = anyProjectEntities
       .map(replaceImages(imageUris.generateList(min = 1)))
       .generateOne
@@ -194,8 +186,7 @@ class UpdateQueriesCalculatorSpec
     } yield Succeeded
   }
 
-  it should "create queries that inserts keywords when there were none" in {
-
+  it should "create queries that inserts keywords when there were none" in projectsDSConfig.use { implicit pcc =>
     val project = anyProjectEntities.map(replaceProjectKeywords(Set.empty)).generateOne.to[entities.Project]
 
     val newValue = projectKeywords.generateSet(min = 1)
@@ -216,8 +207,7 @@ class UpdateQueriesCalculatorSpec
     } yield Succeeded
   }
 
-  it should "create upsert queries when there's a visibility update" in {
-
+  it should "create upsert queries when there's a visibility update" in projectsDSConfig.use { implicit pcc =>
     val project = anyProjectEntities.generateOne.to[entities.Project]
 
     val newValue = Gen.oneOf(projects.Visibility.all - project.visibility).generateOne
@@ -238,8 +228,7 @@ class UpdateQueriesCalculatorSpec
     } yield Succeeded
   }
 
-  it should "create no upsert queries if there are no new values" in {
-
+  it should "create no upsert queries if there are no new values" in projectsDSConfig.use { implicit pcc =>
     val project      = anyProjectEntities.generateOne.to[entities.Project]
     val beforeUpdate = TSData(project)
 
@@ -253,11 +242,11 @@ class UpdateQueriesCalculatorSpec
     } yield Succeeded
   }
 
-  private implicit val logger: TestLogger[IO] = TestLogger[IO]()
+  implicit override val ioLogger: Logger[IO] = TestLogger[IO]()
   private lazy val updatesCalculator = new UpdateQueriesCalculatorImpl[IO]
 
-  private def execute(queries: List[SparqlQuery]) =
-    queries.traverse_(runUpdate(on = projectsDataset, _))
+  private def execute(queries: List[SparqlQuery])(implicit pcc: ProjectsConnectionConfig) =
+    queries.traverse_(runUpdate)
 
   private case class TSData(maybeDescription: Option[projects.Description],
                             visibility:       projects.Visibility,
@@ -270,9 +259,10 @@ class UpdateQueriesCalculatorSpec
       TSData(project.maybeDescription, project.visibility, project.images.map(_.uri), project.keywords)
   }
 
-  private def dataInProjectGraph(project: entities.Project): IO[Option[TSData]] =
+  private def dataInProjectGraph(project: entities.Project)(implicit
+      pcc: ProjectsConnectionConfig
+  ): IO[Option[TSData]] =
     runSelect(
-      on = projectsDataset,
       SparqlQuery.ofUnsafe(
         "UpdateQueriesCalculator Project fetch",
         Prefixes of (renku -> "renku", schema -> "schema"),
@@ -299,9 +289,10 @@ class UpdateQueriesCalculatorSpec
       )
     ).map(toDataExtract).flatMap(toOptionOrFail)
 
-  private def dataInProjectsGraph(project: entities.Project): IO[Option[TSData]] =
+  private def dataInProjectsGraph(project: entities.Project)(implicit
+      pcc: ProjectsConnectionConfig
+  ): IO[Option[TSData]] =
     runSelect(
-      on = projectsDataset,
       SparqlQuery.ofUnsafe(
         "UpdateQueriesCalculator Projects fetch",
         Prefixes of (renku -> "renku", schema -> "schema"),
@@ -340,6 +331,4 @@ class UpdateQueriesCalculatorSpec
     case h :: Nil => h.some.pure[IO]
     case l        => new Exception(s"Found ${l.size} rows but expected not more than one").raiseError[IO, Nothing]
   }
-
-  implicit override val ioLogger: Logger[IO] = TestLogger[IO]()
 }

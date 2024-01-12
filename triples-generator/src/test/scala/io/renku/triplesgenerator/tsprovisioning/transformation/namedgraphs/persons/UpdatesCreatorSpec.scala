@@ -18,6 +18,8 @@
 
 package io.renku.triplesgenerator.tsprovisioning.transformation.namedgraphs.persons
 
+import cats.effect.IO
+import cats.effect.testing.scalatest.AsyncIOSpec
 import cats.syntax.all._
 import eu.timepit.refined.auto._
 import io.renku.generators.Generators.Implicits._
@@ -26,28 +28,28 @@ import io.renku.graph.model.entities.Person
 import io.renku.graph.model.testentities.generators.EntitiesGenerators
 import io.renku.graph.model.{GraphClass, entities}
 import io.renku.http.client.UrlEncoder
-import io.renku.testtools.IOSpec
+import io.renku.interpreters.TestLogger
+import io.renku.triplesgenerator.TriplesGeneratorJenaSpec
 import io.renku.triplesgenerator.tsprovisioning.transformation.namedgraphs.persons.UpdatesCreatorSpec.PersonData
 import io.renku.triplesstore.SparqlQuery.Prefixes
-import io.renku.triplesstore.{InMemoryJenaForSpec, ProjectsDataset, SparqlQuery}
+import io.renku.triplesstore.{ProjectsConnectionConfig, SparqlQuery}
+import org.scalatest.Succeeded
 import org.scalatest.matchers.should
-import org.scalatest.wordspec.AnyWordSpec
+import org.scalatest.wordspec.AsyncWordSpec
 
 class UpdatesCreatorSpec
-    extends AnyWordSpec
-    with IOSpec
+    extends AsyncWordSpec
+    with AsyncIOSpec
+    with TriplesGeneratorJenaSpec
     with EntitiesGenerators
-    with should.Matchers
-    with InMemoryJenaForSpec
-    with ProjectsDataset {
+    with should.Matchers {
 
   import UpdatesCreator._
 
   "preparePreDataUpdates" should {
 
     "generate queries which delete person's name, email and affiliation " +
-      "in case all of them were changed" in {
-
+      "in case all of them were changed" in projectsDSConfig.use { implicit pcc =>
         val Some(kgPerson) = personEntities(withGitLabId, withEmail)
           .map(_.copy(maybeAffiliation = personAffiliations.generateSome))
           .generateOne
@@ -57,53 +59,65 @@ class UpdatesCreatorSpec
                                          maybeAffiliation = personAffiliations.generateSome
         )
 
-        upload(to = projectsDataset, kgPerson)
+        for {
+          _ <- uploadToProjects(kgPerson)
 
-        findPersons shouldBe Set(
-          PersonData(
-            kgPerson.resourceId.value,
-            kgPerson.name.value.some,
-            kgPerson.maybeEmail.map(_.value),
-            kgPerson.maybeAffiliation.map(_.value),
-            kgPerson.gitLabId.value.some
-          )
-        )
+          _ <- findPersons.asserting(
+                 _ shouldBe Set(
+                   PersonData(
+                     kgPerson.resourceId.value,
+                     kgPerson.name.value.some,
+                     kgPerson.maybeEmail.map(_.value),
+                     kgPerson.maybeAffiliation.map(_.value),
+                     kgPerson.gitLabId.value.some
+                   )
+                 )
+               )
 
-        val queries = preparePreDataUpdates(kgPerson, mergedPerson)
+          _ <- runUpdates(preparePreDataUpdates(kgPerson, mergedPerson))
 
-        queries.runAll(on = projectsDataset).unsafeRunSync()
-
-        findPersons shouldBe Set(PersonData(kgPerson.resourceId.value, None, None, None, kgPerson.gitLabId.value.some))
+          _ <- findPersons.asserting(
+                 _ shouldBe Set(PersonData(kgPerson.resourceId.value, None, None, None, kgPerson.gitLabId.value.some))
+               )
+        } yield Succeeded
       }
 
     "generate queries which delete person's name, email and affiliation " +
-      "in case they are removed" in {
-
+      "in case they are removed" in projectsDSConfig.use { implicit pcc =>
         val Some(kgPerson) = personEntities(withGitLabId, withEmail)
           .map(_.copy(maybeAffiliation = personAffiliations.generateSome))
           .generateOne
           .toMaybe[entities.Person.WithGitLabId]
         val mergedPerson = kgPerson.copy(maybeEmail = None, maybeAffiliation = None)
 
-        upload(to = projectsDataset, kgPerson)
+        for {
+          _ <- uploadToProjects(kgPerson)
 
-        findPersons shouldBe Set(
-          PersonData(
-            kgPerson.resourceId.value,
-            kgPerson.name.value.some,
-            kgPerson.maybeEmail.map(_.value),
-            kgPerson.maybeAffiliation.map(_.value),
-            kgPerson.gitLabId.value.some
-          )
-        )
+          _ <- findPersons.asserting(
+                 _ shouldBe Set(
+                   PersonData(
+                     kgPerson.resourceId.value,
+                     kgPerson.name.value.some,
+                     kgPerson.maybeEmail.map(_.value),
+                     kgPerson.maybeAffiliation.map(_.value),
+                     kgPerson.gitLabId.value.some
+                   )
+                 )
+               )
 
-        val queries = preparePreDataUpdates(kgPerson, mergedPerson)
+          _ <- runUpdates(preparePreDataUpdates(kgPerson, mergedPerson))
 
-        queries.runAll(on = projectsDataset).unsafeRunSync()
-
-        findPersons shouldBe Set(
-          PersonData(kgPerson.resourceId.value, Some(kgPerson.name.value), None, None, kgPerson.gitLabId.value.some)
-        )
+          _ <- findPersons.asserting(
+                 _ shouldBe Set(
+                   PersonData(kgPerson.resourceId.value,
+                              Some(kgPerson.name.value),
+                              None,
+                              None,
+                              kgPerson.gitLabId.value.some
+                   )
+                 )
+               )
+        } yield Succeeded
       }
 
     "generate no queries when person's name, email and affiliation are the same" in {
@@ -119,81 +133,86 @@ class UpdatesCreatorSpec
 
   "preparePostDataUpdates" should {
 
-    "generate queries which delete person's duplicate name, email and/or affiliation" in {
+    "generate queries which delete person's duplicate name, email and/or affiliation" in projectsDSConfig.use {
+      implicit pcc =>
+        val Some(person) = personEntities(withGitLabId, withEmail)
+          .map(_.copy(maybeAffiliation = personAffiliations.generateSome))
+          .generateOne
+          .toMaybe[entities.Person.WithGitLabId]
+        val duplicatePerson = person.copy(name = personNames.generateOne,
+                                          maybeEmail = personEmails.generateSome,
+                                          maybeAffiliation = personAffiliations.generateSome
+        )
 
-      val Some(person) = personEntities(withGitLabId, withEmail)
-        .map(_.copy(maybeAffiliation = personAffiliations.generateSome))
-        .generateOne
-        .toMaybe[entities.Person.WithGitLabId]
-      val duplicatePerson = person.copy(name = personNames.generateOne,
-                                        maybeEmail = personEmails.generateSome,
-                                        maybeAffiliation = personAffiliations.generateSome
-      )
+        for {
+          _ <- uploadToProjects(person, duplicatePerson)
 
-      upload(to = projectsDataset, person, duplicatePerson)
+          _ <- findPersons.asserting(
+                 _.toIdAndPropertyPairs shouldBe Set(
+                   (person.resourceId.value -> person.name.value).some,
+                   person.maybeEmail.map(person.resourceId.value -> _.value),
+                   person.maybeAffiliation.map(person.resourceId.value -> _.value),
+                   (person.resourceId.value          -> person.gitLabId.value.toString).some,
+                   (duplicatePerson.resourceId.value -> duplicatePerson.name.value).some,
+                   duplicatePerson.maybeEmail.map(duplicatePerson.resourceId.value -> _.value),
+                   duplicatePerson.maybeAffiliation.map(duplicatePerson.resourceId.value -> _.value),
+                   (duplicatePerson.resourceId.value -> duplicatePerson.gitLabId.value.toString).some
+                 ).flatten
+               )
 
-      findPersons.toIdAndPropertyPairs shouldBe Set(
-        (person.resourceId.value -> person.name.value).some,
-        person.maybeEmail.map(person.resourceId.value -> _.value),
-        person.maybeAffiliation.map(person.resourceId.value -> _.value),
-        (person.resourceId.value          -> person.gitLabId.value.toString).some,
-        (duplicatePerson.resourceId.value -> duplicatePerson.name.value).some,
-        duplicatePerson.maybeEmail.map(duplicatePerson.resourceId.value -> _.value),
-        duplicatePerson.maybeAffiliation.map(duplicatePerson.resourceId.value -> _.value),
-        (duplicatePerson.resourceId.value -> duplicatePerson.gitLabId.value.toString).some
-      ).flatten
+          _ <- runUpdates(preparePostDataUpdates(person))
 
-      val queries = preparePostDataUpdates(person)
+          givenPersons = List(person, duplicatePerson)
+          persons <- findPersons
+          _ = persons.size shouldBe 1
 
-      queries.runAll(on = projectsDataset).unsafeRunSync()
+          // TODO the givenPersons.name is url-encoded whereas persons.head.name is not (?)
+          _ = persons.head.name
+                .map(UrlEncoder.urlEncode) should contain oneElementOf givenPersons.flatMap(_.name).map(_.value)
 
-      val givenPersons = List(person, duplicatePerson)
-      val persons      = findPersons
-      persons.size shouldBe 1
-
-      // TODO the givenPersons.name is url-encoded whereas persons.head.name is not (?)
-      persons.head.name.map(UrlEncoder.urlEncode) should contain oneElementOf givenPersons.flatMap(_.name).map(_.value)
-
-      persons.head.email       should contain oneElementOf givenPersons.flatMap(_.maybeEmail).map(_.value)
-      persons.head.affiliation should contain oneElementOf givenPersons.flatMap(_.maybeAffiliation).map(_.value)
+          _ = persons.head.email       should contain oneElementOf givenPersons.flatMap(_.maybeEmail).map(_.value)
+          _ = persons.head.affiliation should contain oneElementOf givenPersons.flatMap(_.maybeAffiliation).map(_.value)
+        } yield Succeeded
     }
 
-    "generate queries which do nothing if there are no duplicates" in {
-
+    "generate queries which do nothing if there are no duplicates" in projectsDSConfig.use { implicit pcc =>
       val Some(person) = personEntities(withGitLabId, withEmail)
         .map(_.copy(maybeAffiliation = personAffiliations.generateSome))
         .generateOne
         .toMaybe[entities.Person.WithGitLabId]
 
-      upload(to = projectsDataset, person)
+      for {
+        _ <- uploadToProjects(person)
 
-      findPersons shouldBe Set(
-        PersonData(person.resourceId.value,
-                   person.name.value.some,
-                   person.maybeEmail.map(_.value),
-                   person.maybeAffiliation.map(_.value),
-                   person.gitLabId.value.some
-        )
-      )
+        _ <- findPersons.asserting(
+               _ shouldBe Set(
+                 PersonData(person.resourceId.value,
+                            person.name.value.some,
+                            person.maybeEmail.map(_.value),
+                            person.maybeAffiliation.map(_.value),
+                            person.gitLabId.value.some
+                 )
+               )
+             )
 
-      val queries = preparePostDataUpdates(person)
+        _ <- runUpdates(preparePostDataUpdates(person))
 
-      queries.runAll(on = projectsDataset).unsafeRunSync()
-
-      findPersons shouldBe Set(
-        PersonData(person.resourceId.value,
-                   person.name.value.some,
-                   person.maybeEmail.map(_.value),
-                   person.maybeAffiliation.map(_.value),
-                   person.gitLabId.value.some
-        )
-      )
+        _ <- findPersons.asserting(
+               _ shouldBe Set(
+                 PersonData(person.resourceId.value,
+                            person.name.value.some,
+                            person.maybeEmail.map(_.value),
+                            person.maybeAffiliation.map(_.value),
+                            person.gitLabId.value.some
+                 )
+               )
+             )
+      } yield Succeeded
     }
   }
 
-  private def findPersons: Set[PersonData] =
+  private def findPersons(implicit pcc: ProjectsConnectionConfig): IO[Set[PersonData]] =
     runSelect(
-      on = projectsDataset,
       SparqlQuery.of(
         "fetch person data",
         Prefixes of schema -> "schema",
@@ -213,16 +232,16 @@ class UpdatesCreatorSpec
             |}
             |""".stripMargin
       )
-    ).unsafeRunSync()
-      .map(row =>
+    ).map(
+      _.map(row =>
         PersonData(row("id"),
                    row.get("name"),
                    row.get("email"),
                    row.get("affiliation"),
                    row.get("gitlabId").map(_.toInt)
         )
-      )
-      .toSet
+      ).toSet
+    )
 
   private implicit class QueryResultsOps(
       records: Set[PersonData]
@@ -233,6 +252,8 @@ class UpdatesCreatorSpec
           pairs ++ Set(maybeName, maybeEmail, maybeAffiliation, maybeGitLabId.map(_.toString)).flatten.map(id -> _)
       }
   }
+
+  private implicit lazy val ioLogger: TestLogger[IO] = TestLogger()
 }
 
 object UpdatesCreatorSpec {

@@ -19,14 +19,14 @@
 package io.renku.triplesgenerator.events.consumers.tsmigrationrequest.migrations.lucenereindex
 
 import cats.effect.IO
+import cats.effect.testing.scalatest.AsyncIOSpec
 import cats.syntax.all._
 import io.renku.generators.Generators.Implicits._
 import io.renku.graph.model.GraphModelGenerators.renkuUrls
 import io.renku.graph.model.RenkuTinyTypeGenerators.projectSlugs
 import io.renku.graph.model.RenkuUrl
 import io.renku.interpreters.TestLogger
-import io.renku.logging.TestSparqlQueryTimeRecorder
-import io.renku.testtools.CustomAsyncIOSpec
+import io.renku.triplesgenerator.TriplesGeneratorJenaSpec
 import io.renku.triplesstore._
 import org.scalatest.flatspec.AsyncFlatSpec
 import org.scalatest.matchers.should
@@ -36,34 +36,29 @@ import scala.util.Random
 
 class ProjectDonePersisterSpec
     extends AsyncFlatSpec
+    with AsyncIOSpec
+    with TriplesGeneratorJenaSpec
     with should.Matchers
-    with CustomAsyncIOSpec
-    with InMemoryJenaForSpec
-    with MigrationsDataset
     with OptionValues {
 
-  it should "persist the (MigrationToV10, renku:migrated, slug) triple" in {
-
-    val slugs = projectSlugs.generateList(min = 2)
-
+  it should "persist the (MigrationToV10, renku:migrated, slug) triple" in migrationsDSConfig.use { implicit mcc =>
+    val slugs  = projectSlugs.generateList(min = 2)
+    val finder = progressFinder
     for {
-      _ <- slugs.map { slug =>
-             val insertQuery = BacklogCreator.asToBeMigratedInserts(migrationName, slug)
-             runUpdate(on = migrationsDataset, insertQuery)
-           }.sequence
+      _ <- slugs.map(BacklogCreator.asToBeMigratedInserts(migrationName, _)).traverse_(runUpdate)
 
-      _ <- progressFinder.findProgressInfo.asserting(_ shouldBe s"${slugs.size} left from ${slugs.size}")
+      _ <- finder.findProgressInfo.asserting(_ shouldBe s"${slugs.size} left from ${slugs.size}")
 
       _ <- donePersister.noteDone(Random.shuffle(slugs).head).assertNoException
 
-      _ <- progressFinder.findProgressInfo.asserting(_ shouldBe s"${slugs.size - 1} left from ${slugs.size}")
+      _ <- finder.findProgressInfo.asserting(_ shouldBe s"${slugs.size - 1} left from ${slugs.size}")
     } yield Succeeded
   }
 
-  private implicit lazy val renkuUrl: RenkuUrl                    = renkuUrls.generateOne
-  private implicit val logger:        TestLogger[IO]              = TestLogger[IO]()
-  private implicit val tr:            SparqlQueryTimeRecorder[IO] = TestSparqlQueryTimeRecorder[IO].unsafeRunSync()
-  private lazy val tsClient       = TSClient[IO](migrationsDSConnectionInfo)
-  private lazy val progressFinder = new ProgressFinderImpl[IO](migrationName, tsClient)
-  private lazy val donePersister  = new ProjectDonePersisterImpl[IO](migrationName, tsClient)
+  private implicit lazy val renkuUrl: RenkuUrl       = renkuUrls.generateOne
+  private implicit lazy val logger:   TestLogger[IO] = TestLogger[IO]()
+  private def progressFinder(implicit mcc: MigrationsConnectionConfig) =
+    new ProgressFinderImpl[IO](migrationName, tsClient)
+  private def donePersister(implicit mcc: MigrationsConnectionConfig) =
+    new ProjectDonePersisterImpl[IO](migrationName, tsClient)
 }

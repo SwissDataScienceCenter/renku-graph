@@ -19,81 +19,80 @@
 package io.renku.triplesgenerator.events.consumers.tsmigrationrequest.migrations.reprovisioning
 
 import cats.effect.IO
-import io.renku.generators.Generators.nonEmptyStrings
+import cats.effect.testing.scalatest.AsyncIOSpec
 import io.renku.generators.Generators.Implicits.GenOps
-import io.renku.graph.model.{entities, persons, GraphClass}
+import io.renku.generators.Generators.nonEmptyStrings
 import io.renku.graph.model.testentities._
+import io.renku.graph.model.{GraphClass, entities, persons}
 import io.renku.interpreters.TestLogger
 import io.renku.jsonld.syntax._
-import io.renku.logging.TestExecutionTimeRecorder
-import io.renku.testtools.IOSpec
+import io.renku.logging.TestSparqlQueryTimeRecorder
+import io.renku.triplesgenerator.TriplesGeneratorJenaSpec
 import io.renku.triplesstore._
 import io.renku.triplesstore.client.model.Quad
 import io.renku.triplesstore.client.syntax._
 import org.scalatest.matchers.should
-import org.scalatest.wordspec.AnyWordSpec
-import org.scalatest.OptionValues
+import org.scalatest.wordspec.AsyncWordSpec
+import org.scalatest.{OptionValues, Succeeded}
 
 class TriplesRemoverSpec
-    extends AnyWordSpec
+    extends AsyncWordSpec
+    with AsyncIOSpec
+    with TriplesGeneratorJenaSpec
     with should.Matchers
-    with OptionValues
-    with IOSpec
-    with InMemoryJenaForSpec
-    with ProjectsDataset {
+    with OptionValues {
 
   "removeAllTriples" should {
 
-    "remove all graphs from the projects DS except from the renku:ProjectViewedTime and renku:PersonViewing" in new TestCase {
+    "remove all graphs from the projects DS except from the renku:ProjectViewedTime and renku:PersonViewing" in projectsDSConfig
+      .use { implicit pcc =>
+        val someProject = anyRenkuProjectEntities
+          .map(replaceProjectCreator(personEntities(personGitLabIds.generateSome).generateSome))
+          .generateOne
+          .to[entities.RenkuProject]
 
-      val someProject = anyRenkuProjectEntities
-        .map(replaceProjectCreator(personEntities(personGitLabIds.generateSome).generateSome))
-        .generateOne
-        .to[entities.RenkuProject]
-      upload(to = projectsDataset, someProject, anyRenkuProjectEntities.generateOne.to[entities.RenkuProject])
-      insertViewTime(someProject, someProject.maybeCreator.value.resourceId)
+        for {
+          _ <- uploadToProjects(someProject, anyRenkuProjectEntities.generateOne.to[entities.RenkuProject])
+          _ <- insertViewTime(someProject, someProject.maybeCreator.value.resourceId)
 
-      triplesCount(on = projectsDataset).unsafeRunSync() should be > 0L
+          _ <- triplesCount.asserting(_ should be > 0L)
 
-      val projectViewedGraphTriples = triplesCount(projectsDataset, GraphClass.ProjectViewedTimes.id).unsafeRunSync()
-      projectViewedGraphTriples should be > 0L
-      val personViewingsGraphTriples = triplesCount(projectsDataset, GraphClass.PersonViewings.id).unsafeRunSync()
-      personViewingsGraphTriples should be > 0L
+          projectViewedGraphTriples <- triplesCount(GraphClass.ProjectViewedTimes.id)
+          _ = projectViewedGraphTriples should be > 0L
+          personViewingsGraphTriples <- triplesCount(GraphClass.PersonViewings.id)
+          _ = personViewingsGraphTriples should be > 0L
 
-      triplesRemover.removeAllTriples().unsafeRunSync() shouldBe ()
+          _ <- triplesRemover.removeAllTriples().assertNoException
 
-      triplesCount(on = projectsDataset).unsafeRunSync() shouldBe projectViewedGraphTriples + personViewingsGraphTriples
+          _ <- triplesCount.asserting(_ shouldBe projectViewedGraphTriples + personViewingsGraphTriples)
 
-      triplesCount(projectsDataset, GraphClass.ProjectViewedTimes.id).unsafeRunSync() shouldBe projectViewedGraphTriples
-      triplesCount(projectsDataset, GraphClass.PersonViewings.id).unsafeRunSync() shouldBe personViewingsGraphTriples
-    }
+          _ <- triplesCount(GraphClass.ProjectViewedTimes.id).asserting(_ shouldBe projectViewedGraphTriples)
+          _ <- triplesCount(GraphClass.PersonViewings.id).asserting(_ shouldBe personViewingsGraphTriples)
+        } yield Succeeded
+      }
   }
 
-  private trait TestCase {
-    private implicit val logger: TestLogger[IO] = TestLogger[IO]()
-    private implicit val tr: SparqlQueryTimeRecorder[IO] =
-      new SparqlQueryTimeRecorder[IO](TestExecutionTimeRecorder[IO]())
-    val triplesRemover = new TriplesRemoverImpl[IO](projectsDSConnectionInfo)
+  private implicit lazy val logger: TestLogger[IO] = TestLogger[IO]()
+  private def triplesRemover(implicit pcc: ProjectsConnectionConfig) = {
+    implicit val tr: SparqlQueryTimeRecorder[IO] = TestSparqlQueryTimeRecorder.createUnsafe
+    new TriplesRemoverImpl[IO](pcc)
   }
 
-  private def insertViewTime(project: entities.Project, viewerId: persons.ResourceId): Unit = {
-
+  private def insertViewTime(project: entities.Project, viewerId: persons.ResourceId)(implicit
+      pcc: ProjectsConnectionConfig
+  ): IO[Unit] =
     insert(
-      to = projectsDataset,
       Quad(GraphClass.ProjectViewedTimes.id,
            project.resourceId.asEntityId,
            renku / "prop",
            nonEmptyStrings().generateOne.asTripleObject
       )
-    )
-
-    insert(
-      to = projectsDataset,
-      Quad(GraphClass.PersonViewings.id,
-           viewerId.asEntityId,
-           renku / "prop",
-           nonEmptyStrings().generateOne.asTripleObject
+    ) >>
+      insert(
+        Quad(GraphClass.PersonViewings.id,
+             viewerId.asEntityId,
+             renku / "prop",
+             nonEmptyStrings().generateOne.asTripleObject
+        )
       )
-    )
-  }
 }

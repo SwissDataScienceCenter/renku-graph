@@ -19,6 +19,7 @@
 package io.renku.triplesgenerator.events.consumers.tsmigrationrequest.migrations
 
 import cats.effect.IO
+import cats.effect.testing.scalatest.AsyncIOSpec
 import eu.timepit.refined.auto._
 import io.renku.generators.Generators.Implicits._
 import io.renku.graph.model._
@@ -26,69 +27,71 @@ import io.renku.graph.model.testentities._
 import io.renku.interpreters.TestLogger
 import io.renku.logging.TestSparqlQueryTimeRecorder
 import io.renku.metrics.MetricsRegistry
-import io.renku.testtools.IOSpec
+import io.renku.triplesgenerator.TriplesGeneratorJenaSpec
 import io.renku.triplesstore.SparqlQuery.Prefixes
 import io.renku.triplesstore._
-import org.scalamock.scalatest.MockFactory
+import org.scalamock.scalatest.AsyncMockFactory
+import org.scalatest.Succeeded
 import org.scalatest.matchers.should
-import org.scalatest.wordspec.AnyWordSpec
+import org.scalatest.wordspec.AsyncWordSpec
 import tooling._
 
 class RemoveNotLinkedPersonsSpec
-    extends AnyWordSpec
+    extends AsyncWordSpec
+    with AsyncIOSpec
+    with TriplesGeneratorJenaSpec
     with should.Matchers
-    with IOSpec
-    with InMemoryJenaForSpec
-    with ProjectsDataset
-    with MockFactory {
+    with AsyncMockFactory {
 
   "run" should {
 
-    "find all Person objects that are not linked to any entity and remove them" in {
-      val project = anyRenkuProjectEntities
-        .modify(replaceProjectCreator(personEntities.generateSome))
-        .modify(replaceMembers(Set.empty))
-        .map(_.to[entities.Project])
-        .generateOne
+    "find all Person objects that are not linked to any entity and remove them" in projectsDSConfig.use {
+      implicit pcc =>
+        val project = anyRenkuProjectEntities
+          .modify(replaceProjectCreator(personEntities.generateSome))
+          .modify(replaceMembers(Set.empty))
+          .map(_.to[entities.Project])
+          .generateOne
 
-      assume(project.maybeCreator.isDefined)
+        assume(project.maybeCreator.isDefined)
 
-      upload(to = projectsDataset, project)
+        for {
+          _ <- uploadToProjects(project)
 
-      val person = personEntities.generateOne.to[entities.Person]
-      upload(to = projectsDataset, person)
+          person = personEntities.generateOne.to[entities.Person]
+          _ <- uploadToProjects(person)
 
-      assume((project.maybeCreator.map(_.resourceId).toSet + person.resourceId).size > 1)
+          _ = assume((project.maybeCreator.map(_.resourceId).toSet + person.resourceId).size > 1)
 
-      findAllPersons shouldBe project.maybeCreator.map(_.resourceId).toSet + person.resourceId
+          _ <- findAllPersons.asserting(_ shouldBe project.maybeCreator.map(_.resourceId).toSet + person.resourceId)
 
-      runUpdate(on = projectsDataset, RemoveNotLinkedPersons.query).unsafeRunSync() shouldBe ()
+          _ <- runUpdate(RemoveNotLinkedPersons.query)
 
-      findAllPersons shouldBe project.maybeCreator.map(_.resourceId).toSet
+          _ <- findAllPersons.asserting(_ shouldBe project.maybeCreator.map(_.resourceId).toSet)
+        } yield Succeeded
     }
   }
 
   "apply" should {
     "return an QueryBasedMigration" in {
-      implicit val logger:          TestLogger[IO]              = TestLogger[IO]()
       implicit val timeRecorder:    SparqlQueryTimeRecorder[IO] = TestSparqlQueryTimeRecorder[IO].unsafeRunSync()
       implicit val metricsRegistry: MetricsRegistry[IO]         = new MetricsRegistry.DisabledMetricsRegistry[IO]()
       RemoveNotLinkedPersons[IO].unsafeRunSync().getClass shouldBe classOf[UpdateQueryMigration[IO]]
     }
   }
 
-  private def findAllPersons: Set[persons.ResourceId] = runSelect(
-    on = projectsDataset,
-    SparqlQuery.of(
-      "fetch personId",
-      Prefixes of schema -> "schema",
-      s"""|SELECT ?personId
-          |FROM <${GraphClass.Persons.id}> { 
-          |  ?personId a schema:Person 
-          |}
-          |""".stripMargin
-    )
-  ).unsafeRunSync()
-    .map(row => persons.ResourceId(row("personId")))
-    .toSet
+  private def findAllPersons(implicit pcc: ProjectsConnectionConfig): IO[Set[persons.ResourceId]] =
+    runSelect(
+      SparqlQuery.of(
+        "fetch personId",
+        Prefixes of schema -> "schema",
+        s"""|SELECT ?personId
+            |FROM <${GraphClass.Persons.id}> { 
+            |  ?personId a schema:Person 
+            |}
+            |""".stripMargin
+      )
+    ).map(_.map(row => persons.ResourceId(row("personId"))).toSet)
+
+  private implicit lazy val logger: TestLogger[IO] = TestLogger()
 }

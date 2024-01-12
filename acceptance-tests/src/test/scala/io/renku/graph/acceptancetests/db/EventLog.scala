@@ -118,10 +118,9 @@ object EventLog extends TypeSerializers {
     session.prepare(command).flatMap(_.execute(projectId)).void
   }
 
-  def startDB()(implicit logger: Logger[IO]): IO[Unit] = for {
-    _ <- PostgresDB.startPostgres
+  def initDB()(implicit logger: Logger[IO]): IO[Unit] = for {
     _ <- PostgresDB.initializeDatabase(dbConfig)
-    _ <- logger.info("event_log DB started")
+    _ <- logger.info("event_log DB initialised")
   } yield ()
 
   private lazy val sessionResource: Resource[IO, SessionResource[IO, EventLogDB]] =

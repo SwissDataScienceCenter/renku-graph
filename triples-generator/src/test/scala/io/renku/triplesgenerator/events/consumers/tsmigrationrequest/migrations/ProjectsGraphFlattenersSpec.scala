@@ -19,8 +19,9 @@
 package io.renku.triplesgenerator.events.consumers.tsmigrationrequest.migrations
 
 import cats.effect.IO
+import cats.effect.testing.scalatest.AsyncIOSpec
 import eu.timepit.refined.auto._
-import io.renku.entities.searchgraphs.{SearchInfoDatasets, concatSeparator}
+import io.renku.entities.searchgraphs.{TestSearchInfoDatasets, concatSeparator}
 import io.renku.generators.Generators.Implicits._
 import io.renku.graph.model._
 import io.renku.graph.model.testentities._
@@ -28,11 +29,10 @@ import io.renku.interpreters.TestLogger
 import io.renku.jsonld.syntax._
 import io.renku.logging.TestSparqlQueryTimeRecorder
 import io.renku.metrics.TestMetricsRegistry
-import io.renku.testtools.CustomAsyncIOSpec
+import io.renku.triplesgenerator.TriplesGeneratorJenaSpec
 import io.renku.triplesstore.SparqlQuery.Prefixes
 import io.renku.triplesstore._
 import io.renku.triplesstore.client.syntax._
-import org.scalamock.scalatest.AsyncMockFactory
 import org.scalatest.Succeeded
 import org.scalatest.flatspec.AsyncFlatSpec
 import org.scalatest.matchers.should
@@ -41,16 +41,14 @@ import tooling.RegisteredUpdateQueryMigration
 
 class ProjectsGraphFlattenersSpec
     extends AsyncFlatSpec
-    with CustomAsyncIOSpec
-    with should.Matchers
-    with InMemoryJenaForSpec
-    with ProjectsDataset
-    with SearchInfoDatasets
-    with AsyncMockFactory {
+    with AsyncIOSpec
+    with TriplesGeneratorJenaSpec
+    with TestSearchInfoDatasets
+    with should.Matchers {
 
   it should "be a RegisteredUpdateQueryMigration" in {
     implicit val metricsRegistry: TestMetricsRegistry[IO]     = TestMetricsRegistry[IO]
-    implicit val timeRecorder:    SparqlQueryTimeRecorder[IO] = TestSparqlQueryTimeRecorder[IO].unsafeRunSync()
+    implicit val timeRecorder:    SparqlQueryTimeRecorder[IO] = TestSparqlQueryTimeRecorder.createUnsafe
 
     ProjectsGraphKeywordsFlattener[IO].asserting(
       _.getClass shouldBe classOf[RegisteredUpdateQueryMigration[IO]]
@@ -60,54 +58,55 @@ class ProjectsGraphFlattenersSpec
     )
   }
 
-  it should "add new keywordsConcat and imagesConcat properties to all projects in the Project graph" in {
+  it should "add new keywordsConcat and imagesConcat properties to all projects in the Project graph" in projectsDSConfig
+    .use { implicit pcc =>
+      val project1 = anyRenkuProjectEntities
+        .modify(replaceProjectKeywords(Set.empty))
+        .modify(replaceImages(imageUris.generateList(min = 1)))
+        .generateOne
+        .to[entities.Project]
+      val project2 = anyRenkuProjectEntities
+        .modify(replaceProjectKeywords(projectKeywords.generateSet(min = 1)))
+        .modify(replaceImages(Nil))
+        .generateOne
+        .to[entities.Project]
 
-    val project1 = anyRenkuProjectEntities
-      .modify(replaceProjectKeywords(Set.empty))
-      .modify(replaceImages(imageUris.generateList(min = 1)))
-      .generateOne
-      .to[entities.Project]
-    val project2 = anyRenkuProjectEntities
-      .modify(replaceProjectKeywords(projectKeywords.generateSet(min = 1)))
-      .modify(replaceImages(Nil))
-      .generateOne
-      .to[entities.Project]
+      for {
+        _ <- provisionProjects(project1, project2).assertNoException
+        _ <- runUpdates(insertSchemaKeywords(project1.resourceId, project1)).assertNoException
+        _ <- runUpdates(insertSchemaImages(project1.resourceId, project1)).assertNoException
+        _ <- runUpdates(insertSchemaKeywords(project2.resourceId, project2)).assertNoException
+        _ <- runUpdates(insertSchemaImages(project2.resourceId, project2)).assertNoException
 
-    for {
-      _ <- provisionProjects(project1, project2).assertNoException
-      _ <- runUpdates(projectsDataset, insertSchemaKeywords(project1.resourceId, project1)).assertNoException
-      _ <- runUpdates(projectsDataset, insertSchemaImages(project1.resourceId, project1)).assertNoException
-      _ <- runUpdates(projectsDataset, insertSchemaKeywords(project2.resourceId, project2)).assertNoException
-      _ <- runUpdates(projectsDataset, insertSchemaImages(project2.resourceId, project2)).assertNoException
+        _ <- fetchKeywords(project1.resourceId).asserting(_ shouldBe project1.keywords)
+        _ <- fetchImages(project1.resourceId).asserting(_ shouldBe project1.images.map(_.uri))
+        _ <- fetchKeywords(project2.resourceId).asserting(_ shouldBe project2.keywords)
+        _ <- fetchImages(project2.resourceId).asserting(_ shouldBe project2.images.map(_.uri))
 
-      _ <- fetchKeywords(project1.resourceId).asserting(_ shouldBe project1.keywords)
-      _ <- fetchImages(project1.resourceId).asserting(_ shouldBe project1.images.map(_.uri))
-      _ <- fetchKeywords(project2.resourceId).asserting(_ shouldBe project2.keywords)
-      _ <- fetchImages(project2.resourceId).asserting(_ shouldBe project2.images.map(_.uri))
+        _ <- runUpdate(deleteKeywords(project1.resourceId)).assertNoException
+        _ <- runUpdate(deleteImages(project1.resourceId)).assertNoException
+        _ <- runUpdate(deleteKeywords(project2.resourceId)).assertNoException
+        _ <- runUpdate(deleteImages(project2.resourceId)).assertNoException
 
-      _ <- runUpdate(projectsDataset, deleteKeywords(project1.resourceId)).assertNoException
-      _ <- runUpdate(projectsDataset, deleteImages(project1.resourceId)).assertNoException
-      _ <- runUpdate(projectsDataset, deleteKeywords(project2.resourceId)).assertNoException
-      _ <- runUpdate(projectsDataset, deleteImages(project2.resourceId)).assertNoException
+        _ <- fetchKeywords(project1.resourceId).asserting(_ shouldBe Set.empty)
+        _ <- fetchImages(project1.resourceId).asserting(_ shouldBe Nil)
+        _ <- fetchKeywords(project2.resourceId).asserting(_ shouldBe Set.empty)
+        _ <- fetchImages(project2.resourceId).asserting(_ shouldBe Nil)
 
-      _ <- fetchKeywords(project1.resourceId).asserting(_ shouldBe Set.empty)
-      _ <- fetchImages(project1.resourceId).asserting(_ shouldBe Nil)
-      _ <- fetchKeywords(project2.resourceId).asserting(_ shouldBe Set.empty)
-      _ <- fetchImages(project2.resourceId).asserting(_ shouldBe Nil)
+        _ <- runUpdate(ProjectsGraphKeywordsFlattener.query).assertNoException
+        _ <- runUpdate(ProjectsGraphImagesFlattener.query).assertNoException
 
-      _ <- runUpdate(projectsDataset, ProjectsGraphKeywordsFlattener.query).assertNoException
-      _ <- runUpdate(projectsDataset, ProjectsGraphImagesFlattener.query).assertNoException
+        _ <- fetchKeywords(project1.resourceId).asserting(_ shouldBe project1.keywords)
+        _ <- fetchImages(project1.resourceId).asserting(_ shouldBe project1.images.map(_.uri))
+        _ <- fetchKeywords(project2.resourceId).asserting(_ shouldBe project2.keywords)
+        _ <- fetchImages(project2.resourceId).asserting(_ shouldBe project2.images.map(_.uri))
+      } yield Succeeded
+    }
 
-      _ <- fetchKeywords(project1.resourceId).asserting(_ shouldBe project1.keywords)
-      _ <- fetchImages(project1.resourceId).asserting(_ shouldBe project1.images.map(_.uri))
-      _ <- fetchKeywords(project2.resourceId).asserting(_ shouldBe project2.keywords)
-      _ <- fetchImages(project2.resourceId).asserting(_ shouldBe project2.images.map(_.uri))
-    } yield Succeeded
-  }
-
-  private def fetchKeywords(projectId: projects.ResourceId): IO[Set[projects.Keyword]] =
+  private def fetchKeywords(projectId: projects.ResourceId)(implicit
+      pcc: ProjectsConnectionConfig
+  ): IO[Set[projects.Keyword]] =
     runSelect(
-      on = projectsDataset,
       SparqlQuery.ofUnsafe(
         "test project keywords",
         Prefixes of (renku -> "renku", schema -> "schema"),
@@ -125,9 +124,10 @@ class ProjectsGraphFlattenersSpec
         .getOrElse(Set.empty[projects.Keyword])
     )
 
-  private def fetchImages(projectId: projects.ResourceId): IO[List[images.ImageUri]] =
+  private def fetchImages(projectId: projects.ResourceId)(implicit
+      pcc: ProjectsConnectionConfig
+  ): IO[List[images.ImageUri]] =
     runSelect(
-      on = projectsDataset,
       SparqlQuery.ofUnsafe(
         "test project images",
         Prefixes of (renku -> "renku", schema -> "schema"),

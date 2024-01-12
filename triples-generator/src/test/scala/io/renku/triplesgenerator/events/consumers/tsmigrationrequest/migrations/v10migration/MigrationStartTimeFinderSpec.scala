@@ -18,7 +18,8 @@
 
 package io.renku.triplesgenerator.events.consumers.tsmigrationrequest.migrations.v10migration
 
-import cats.effect.IO
+import cats.effect.testing.scalatest.AsyncIOSpec
+import cats.effect.{IO, Temporal}
 import eu.timepit.refined.auto._
 import io.renku.generators.Generators.Implicits._
 import io.renku.graph.model.GraphModelGenerators.renkuUrls
@@ -26,62 +27,60 @@ import io.renku.graph.model.RenkuUrl
 import io.renku.graph.model.Schemas.renku
 import io.renku.interpreters.TestLogger
 import io.renku.jsonld.syntax._
-import io.renku.logging.TestSparqlQueryTimeRecorder
-import io.renku.testtools.IOSpec
+import io.renku.triplesgenerator.TriplesGeneratorJenaSpec
 import io.renku.triplesstore.SparqlQuery.Prefixes
 import io.renku.triplesstore._
 import io.renku.triplesstore.client.syntax._
+import org.scalatest.Succeeded
 import org.scalatest.matchers.should
-import org.scalatest.wordspec.AnyWordSpec
+import org.scalatest.wordspec.AsyncWordSpec
+import org.typelevel.log4cats.Logger
 
 import java.time.Instant
+import scala.concurrent.duration._
 
 class MigrationStartTimeFinderSpec
-    extends AnyWordSpec
-    with should.Matchers
-    with IOSpec
-    with InMemoryJenaForSpec
-    with MigrationsDataset {
+    extends AsyncWordSpec
+    with AsyncIOSpec
+    with TriplesGeneratorJenaSpec
+    with should.Matchers {
 
   "findMigrationStartDate" should {
 
     "create a new migration start date if there's no one in the TS " +
-      "and keep returning the same date each time called" in new TestCase {
+      "and keep returning the same date each time called" in migrationsDSConfig.use { implicit mcc =>
+        for {
+          _ <- findStartTime.asserting(_ shouldBe None)
 
-        findStartTime shouldBe None
+          startTime <- finder.findMigrationStartDate
 
-        val startTime = finder.findMigrationStartDate.unsafeRunSync()
+          _ <- findStartTime.asserting(_ shouldBe Some(startTime))
 
-        findStartTime shouldBe Some(startTime)
+          _ = startTime compareTo Instant.now() should be <= 0
 
-        startTime compareTo Instant.now() should be <= 0
+          _ <- Temporal[IO].sleep(1000 millis)
 
-        Thread.sleep(1000)
+          _ <- finder.findMigrationStartDate.asserting(_ shouldBe startTime)
 
-        finder.findMigrationStartDate.unsafeRunSync() shouldBe startTime
-
-        findStartTime shouldBe Some(startTime)
+          _ <- findStartTime.asserting(_ shouldBe Some(startTime))
+        } yield Succeeded
       }
   }
 
-  private trait TestCase {
-    private implicit val renkuUrl:     RenkuUrl                    = renkuUrls.generateOne
-    private implicit val logger:       TestLogger[IO]              = TestLogger[IO]()
-    private implicit val timeRecorder: SparqlQueryTimeRecorder[IO] = TestSparqlQueryTimeRecorder[IO].unsafeRunSync()
-    val finder = new MigrationStartTimeFinderImpl[IO](TSClient(migrationsDSConnectionInfo))
+  private implicit val renkuUrl:    RenkuUrl   = renkuUrls.generateOne
+  private implicit lazy val logger: Logger[IO] = TestLogger[IO]()
+  private def finder(implicit mcc: MigrationsConnectionConfig) = new MigrationStartTimeFinderImpl[IO](tsClient)
 
-    def findStartTime =
-      runSelect(
-        on = migrationsDataset,
-        SparqlQuery.of(
-          "test V10 start time",
-          Prefixes.of(renku -> "renku"),
-          s"""|SELECT ?time
-              |WHERE {
-              |  ${MigrationToV10.name.asEntityId.asSparql.sparql} renku:startTime ?time
-              |}
-              |""".stripMargin
-        )
-      ).unsafeRunSync().headOption.flatMap(_.get("time").map(Instant.parse))
-  }
+  private def findStartTime(implicit mcc: MigrationsConnectionConfig) =
+    runSelect(
+      SparqlQuery.of(
+        "test V10 start time",
+        Prefixes.of(renku -> "renku"),
+        s"""|SELECT ?time
+            |WHERE {
+            |  ${MigrationToV10.name.asEntityId.asSparql.sparql} renku:startTime ?time
+            |}
+            |""".stripMargin
+      )
+    ).map(_.headOption.flatMap(_.get("time").map(Instant.parse)))
 }

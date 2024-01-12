@@ -19,10 +19,12 @@
 package io.renku.triplesgenerator.events.consumers.cleanup.namedgraphs
 
 import cats.effect.IO
+import cats.effect.testing.scalatest.AsyncIOSpec
 import cats.syntax.all._
 import eu.timepit.refined.auto._
 import io.renku.entities.searchgraphs.SearchGraphsCleaner
 import io.renku.generators.Generators.Implicits._
+import io.renku.generators.Generators.countingGen
 import io.renku.graph.model._
 import io.renku.graph.model.datasets.TopmostSameAs
 import io.renku.graph.model.testentities._
@@ -31,89 +33,96 @@ import io.renku.graph.model.views.RdfResource
 import io.renku.interpreters.TestLogger
 import io.renku.jsonld.EntityId
 import io.renku.logging.TestSparqlQueryTimeRecorder
-import io.renku.testtools.IOSpec
+import io.renku.triplesgenerator.TriplesGeneratorJenaSpec
 import io.renku.triplesgenerator.events.consumers.membersync.ProjectAuthSync
 import io.renku.triplesstore.SparqlQuery.Prefixes
 import io.renku.triplesstore._
-import org.scalamock.scalatest.MockFactory
+import org.scalamock.scalatest.AsyncMockFactory
 import org.scalatest.matchers.should
-import org.scalatest.wordspec.AnyWordSpec
+import org.scalatest.wordspec.AsyncWordSpec
+import org.scalatest.{OptionValues, Succeeded}
 import org.scalatestplus.scalacheck.ScalaCheckPropertyChecks
 
 class TSCleanerSpec
-    extends AnyWordSpec
-    with IOSpec
-    with should.Matchers
-    with InMemoryJenaForSpec
-    with ProjectsDataset
+    extends AsyncWordSpec
+    with AsyncIOSpec
+    with TriplesGeneratorJenaSpec
     with ScalaCheckPropertyChecks
     with EntitiesGenerators
-    with MockFactory {
+    with should.Matchers
+    with OptionValues
+    with AsyncMockFactory {
 
   "removeTriples" should {
 
-    "remove all activities, datasets and their dependant entities of the project" in new TestCase {
-      forAll(renkuProjectEntitiesWithDatasetsAndActivities) { project =>
-        upload(to = projectsDataset, project)
+    forAll(renkuProjectEntitiesWithDatasetsAndActivities, countingGen) { (project, attempt) =>
+      s"remove all activities, datasets and their dependant entities of the project #$attempt" in projectsDSConfig.use {
+        implicit pcc =>
+          for {
+            _ <- uploadToProjects(project)
 
-        givenProjectIdFindingSucceeds(project)
-        givenSearchGraphsCleaningSucceeds(project)
-        givenProjectAuthSync(project)
+            _ = givenProjectIdFindingSucceeds(project)
+            _ = givenSearchGraphsCleaningSucceeds(project)
+            _ = givenProjectAuthSync(project)
 
-        (cleaner removeTriples project.slug).unsafeRunSync()
+            _ <- cleaner.removeTriples(project.slug)
 
-        findAllData(project.resourceId).unsafeRunSync() shouldBe List.empty
+            _ <- findAllData(project.resourceId).asserting(_ shouldBe List.empty)
+          } yield Succeeded
       }
     }
 
     "remove project with all the entities " +
-      "and remove the parent relationship on the child" in new TestCase {
+      "and remove the parent relationship on the child" in projectsDSConfig.use { implicit pcc =>
         val (parent, child) = renkuProjectEntitiesWithDatasetsAndActivities.generateOne
           .forkOnce()
 
-        upload(to = projectsDataset, parent, child)
+        for {
+          _ <- uploadToProjects(parent, child)
 
-        findProjectParent(child.resourceId).unsafeRunSync() shouldBe parent.resourceId.some
+          _ <- findProjectParent(child.resourceId).asserting(_ shouldBe parent.resourceId.some)
 
-        givenProjectIdFindingSucceeds(parent)
-        givenSearchGraphsCleaningSucceeds(parent)
-        givenProjectAuthSync(parent)
+          _ = givenProjectIdFindingSucceeds(parent)
+          _ = givenSearchGraphsCleaningSucceeds(parent)
+          _ = givenProjectAuthSync(parent)
 
-        (cleaner removeTriples parent.slug).unsafeRunSync()
+          _ <- cleaner.removeTriples(parent.slug)
 
-        findProject(parent.resourceId).unsafeRunSync()        shouldBe Nil
-        findProject(child.resourceId).unsafeRunSync().isEmpty shouldBe false
-        findProjectParent(child.resourceId).unsafeRunSync()   shouldBe None
+          _ <- findProject(parent.resourceId).asserting(_ shouldBe Nil)
+          _ <- findProject(child.resourceId).asserting(_.isEmpty shouldBe false)
+          _ <- findProjectParent(child.resourceId).asserting(_ shouldBe None)
+        } yield Succeeded
       }
 
     "remove project with all the entities " +
-      "and relink the parent relationship between children and grandparent" in new TestCase {
+      "and relink the parent relationship between children and grandparent" in projectsDSConfig.use { implicit pcc =>
         val grandparent ::~ (parent ::~ child) =
           renkuProjectEntitiesWithDatasetsAndActivities.generateOne
             .forkOnce()
             .map(_.forkOnce())
 
-        upload(to = projectsDataset, grandparent, parent, child)
+        for {
+          _ <- uploadToProjects(grandparent, parent, child)
 
-        findProjectParent(parent.resourceId).unsafeRunSync() shouldBe grandparent.resourceId.some
-        findProjectParent(child.resourceId).unsafeRunSync()  shouldBe parent.resourceId.some
+          _ <- findProjectParent(parent.resourceId).asserting(_ shouldBe grandparent.resourceId.some)
+          _ <- findProjectParent(child.resourceId).asserting(_ shouldBe parent.resourceId.some)
 
-        givenProjectIdFindingSucceeds(parent)
-        givenSearchGraphsCleaningSucceeds(parent)
-        givenProjectAuthSync(parent)
+          _ = givenProjectIdFindingSucceeds(parent)
+          _ = givenSearchGraphsCleaningSucceeds(parent)
+          _ = givenProjectAuthSync(parent)
 
-        (cleaner removeTriples parent.slug).unsafeRunSync()
+          _ <- cleaner.removeTriples(parent.slug)
 
-        findProject(parent.resourceId).unsafeRunSync()        shouldBe Nil
-        findProject(child.resourceId).unsafeRunSync().isEmpty shouldBe false
-        findProjectParent(child.resourceId).unsafeRunSync()   shouldBe grandparent.resourceId.some
+          _ <- findProject(parent.resourceId).asserting(_ shouldBe Nil)
+          _ <- findProject(child.resourceId).asserting(_.isEmpty shouldBe false)
+          _ <- findProjectParent(child.resourceId).asserting(_ shouldBe grandparent.resourceId.some)
+        } yield Succeeded
       }
 
     "remove project with all the entities " +
       "and update the sameAs hierarchy " +
       "when project containing a DS which is the first in the sameAs hierarchy is removed " +
-      "- external DS" in new TestCase {
-
+      "- external DS" in projectsDSConfig.use { implicit pcc =>
         val (topProjectDS, topProject) =
           renkuProjectEntities(anyVisibility).addDataset(datasetEntities(provenanceImportedExternal)).generateOne
 
@@ -123,31 +132,34 @@ class TSCleanerSpec
         val (bottomProjectDS, bottomProject) =
           renkuProjectEntities(anyVisibility).importDataset(middleProjectDS).generateOne
 
-        upload(to = projectsDataset, topProject, middleProject, bottomProject)
+        for {
+          _ <- uploadToProjects(topProject, middleProject, bottomProject)
 
-        givenProjectIdFindingSucceeds(topProject)
-        givenSearchGraphsCleaningSucceeds(topProject)
-        givenProjectAuthSync(topProject)
+          _ = givenProjectIdFindingSucceeds(topProject)
+          _ = givenSearchGraphsCleaningSucceeds(topProject)
+          _ = givenProjectAuthSync(topProject)
 
-        (cleaner removeTriples topProject.slug).unsafeRunSync()
+          _ <- cleaner.removeTriples(topProject.slug)
 
-        findProject(topProject.resourceId).unsafeRunSync() shouldBe List.empty
-        findDataset(topProjectDS.entityId).unsafeRunSync() shouldBe Nil
+          _ <- findProject(topProject.resourceId).asserting(_ shouldBe List.empty)
+          _ <- findDataset(topProjectDS.entityId).asserting(_ shouldBe Nil)
 
-        val Some((middleSameAs, middleTopmostSameAs)) = findSameAs(middleProjectDS.entityId).unsafeRunSync()
-        middleSameAs              shouldBe topProjectDS.provenance.sameAs.some
-        middleTopmostSameAs.value shouldBe topProjectDS.provenance.sameAs.value
+          _ <- findSameAs(middleProjectDS.entityId).map(_.value).asserting { case (middleSameAs, middleTopmostSameAs) =>
+                 middleSameAs              shouldBe topProjectDS.provenance.sameAs.some
+                 middleTopmostSameAs.value shouldBe topProjectDS.provenance.sameAs.value
+               }
 
-        val Some((bottomSameAs, bottomTopmostSameAs)) = findSameAs(bottomProjectDS.entityId).unsafeRunSync()
-        bottomSameAs.map(_.value) shouldBe middleProjectDS.entityId.value.some
-        bottomTopmostSameAs.value shouldBe topProjectDS.provenance.sameAs.value
+          _ <- findSameAs(bottomProjectDS.entityId).map(_.value).asserting { case (bottomSameAs, bottomTopmostSameAs) =>
+                 bottomSameAs.map(_.value) shouldBe middleProjectDS.entityId.value.some
+                 bottomTopmostSameAs.value shouldBe topProjectDS.provenance.sameAs.value
+               }
+        } yield Succeeded
       }
 
     "remove project with all the entities " +
       "and update the sameAs hierarchy " +
       "when project containing a DS which is the first in the sameAs hierarchy is removed " +
-      "- internal DS" in new TestCase {
-
+      "- internal DS" in projectsDSConfig.use { implicit pcc =>
         val (topProjectDS, topProject) =
           renkuProjectEntities(anyVisibility).addDataset(datasetEntities(provenanceInternal)).generateOne
 
@@ -157,157 +169,187 @@ class TSCleanerSpec
         val (bottomProjectDS, bottomProject) =
           renkuProjectEntities(anyVisibility).importDataset(middleProjectDS).generateOne
 
-        upload(to = projectsDataset, middleProject, bottomProject, topProject)
+        for {
+          _ <- uploadToProjects(middleProject, bottomProject, topProject)
 
-        givenProjectIdFindingSucceeds(topProject)
-        givenSearchGraphsCleaningSucceeds(topProject)
-        givenProjectAuthSync(topProject)
+          _ = givenProjectIdFindingSucceeds(topProject)
+          _ = givenSearchGraphsCleaningSucceeds(topProject)
+          _ = givenProjectAuthSync(topProject)
 
-        (cleaner removeTriples topProject.slug).unsafeRunSync()
+          _ <- cleaner.removeTriples(topProject.slug)
 
-        findProject(topProject.resourceId).unsafeRunSync() shouldBe List.empty
-        findDataset(topProjectDS.entityId).unsafeRunSync() shouldBe Nil
+          _ <- findProject(topProject.resourceId).asserting(_ shouldBe List.empty)
+          _ <- findDataset(topProjectDS.entityId).asserting(_ shouldBe Nil)
 
-        val Some((middleSameAs, middleTopmostSameAs)) = findSameAs(middleProjectDS.entityId).unsafeRunSync()
-        middleSameAs              shouldBe None
-        middleTopmostSameAs.value shouldBe middleProjectDS.entityId.value
+          _ <- findSameAs(middleProjectDS.entityId).map(_.value).asserting { case (middleSameAs, middleTopmostSameAs) =>
+                 middleSameAs              shouldBe None
+                 middleTopmostSameAs.value shouldBe middleProjectDS.entityId.value
+               }
 
-        val Some((bottomSameAs, bottomTopmostSameAs)) = findSameAs(bottomProjectDS.entityId).unsafeRunSync()
-        bottomSameAs.map(_.value) shouldBe middleProjectDS.entityId.value.some
-        bottomTopmostSameAs.value shouldBe middleProjectDS.entityId.value
+          _ <- findSameAs(bottomProjectDS.entityId).map(_.value).asserting { case (bottomSameAs, bottomTopmostSameAs) =>
+                 bottomSameAs.map(_.value) shouldBe middleProjectDS.entityId.value.some
+                 bottomTopmostSameAs.value shouldBe middleProjectDS.entityId.value
+               }
+        } yield Succeeded
       }
 
     "remove project with all the entities " +
       "and update the sameAs hierarchy " +
-      "when project containing a DS which is in the middle of the sameAs hierarchy is removed" in new TestCase {
+      "when project containing a DS which is in the middle of the sameAs hierarchy is removed" in projectsDSConfig.use {
+        implicit pcc =>
+          val (topProjectDS, topProject) =
+            renkuProjectEntities(anyVisibility).addDataset(datasetEntities(provenanceInternal)).generateOne
 
-        val (topProjectDS, topProject) =
-          renkuProjectEntities(anyVisibility).addDataset(datasetEntities(provenanceInternal)).generateOne
+          val (middleProjectDS, middleProject) =
+            renkuProjectEntities(anyVisibility).importDataset(topProjectDS).generateOne
 
-        val (middleProjectDS, middleProject) =
-          renkuProjectEntities(anyVisibility).importDataset(topProjectDS).generateOne
+          val (bottomProjectDS, bottomProject) =
+            renkuProjectEntities(anyVisibility).importDataset(middleProjectDS).generateOne
 
-        val (bottomProjectDS, bottomProject) =
-          renkuProjectEntities(anyVisibility).importDataset(middleProjectDS).generateOne
+          for {
+            _ <- uploadToProjects(middleProject, bottomProject, topProject)
 
-        upload(to = projectsDataset, middleProject, bottomProject, topProject)
+            _ = givenProjectIdFindingSucceeds(middleProject)
+            _ = givenSearchGraphsCleaningSucceeds(middleProject)
+            _ = givenProjectAuthSync(middleProject)
 
-        givenProjectIdFindingSucceeds(middleProject)
-        givenSearchGraphsCleaningSucceeds(middleProject)
-        givenProjectAuthSync(middleProject)
+            _ <- cleaner.removeTriples(middleProject.slug)
 
-        (cleaner removeTriples middleProject.slug).unsafeRunSync()
+            _ <- findProject(middleProject.resourceId).asserting(_ shouldBe List.empty)
 
-        findProject(middleProject.resourceId).unsafeRunSync() shouldBe List.empty
+            _ <- findSameAs(topProjectDS.entityId).map(_.value).asserting { case (topSameAs, topTopmostSameAs) =>
+                   topSameAs              shouldBe None
+                   topTopmostSameAs.value shouldBe topProjectDS.entityId.value
+                 }
 
-        val Some((topSameAs, topTopmostSameAs)) = findSameAs(topProjectDS.entityId).unsafeRunSync()
-        topSameAs              shouldBe None
-        topTopmostSameAs.value shouldBe topProjectDS.entityId.value
+            _ <- findDataset(middleProjectDS.entityId).asserting(_ shouldBe Nil)
 
-        findDataset(middleProjectDS.entityId).unsafeRunSync() shouldBe Nil
-
-        val Some((bottomSameAs, bottomTopmostSameAs)) = findSameAs(bottomProjectDS.entityId).unsafeRunSync()
-        bottomSameAs.map(_.value) shouldBe topProjectDS.entityId.value.some
-        bottomTopmostSameAs.value shouldBe topProjectDS.entityId.value
+            _ <- findSameAs(bottomProjectDS.entityId)
+                   .map(_.value)
+                   .asserting { case (bottomSameAs, bottomTopmostSameAs) =>
+                     bottomSameAs.map(_.value) shouldBe topProjectDS.entityId.value.some
+                     bottomTopmostSameAs.value shouldBe topProjectDS.entityId.value
+                   }
+          } yield Succeeded
       }
 
     "remove project with all the entities " +
       "and update the sameAs hierarchy " +
-      "when project containing a DS which is the last in the sameAs hierarchy is removed" in new TestCase {
+      "when project containing a DS which is the last in the sameAs hierarchy is removed" in projectsDSConfig.use {
+        implicit pcc =>
+          val (topProjectDS, topProject) =
+            renkuProjectEntities(anyVisibility).addDataset(datasetEntities(provenanceInternal)).generateOne
 
-        val (topProjectDS, topProject) =
-          renkuProjectEntities(anyVisibility).addDataset(datasetEntities(provenanceInternal)).generateOne
+          val (middleProjectDS, middleProject) =
+            renkuProjectEntities(anyVisibility).importDataset(topProjectDS).generateOne
 
-        val (middleProjectDS, middleProject) =
-          renkuProjectEntities(anyVisibility).importDataset(topProjectDS).generateOne
+          val (bottomProjectDS, bottomProject) =
+            renkuProjectEntities(anyVisibility).importDataset(middleProjectDS).generateOne
 
-        val (bottomProjectDS, bottomProject) =
-          renkuProjectEntities(anyVisibility).importDataset(middleProjectDS).generateOne
+          for {
+            _ <- uploadToProjects(middleProject, bottomProject, topProject)
 
-        upload(to = projectsDataset, middleProject, bottomProject, topProject)
+            _ = givenProjectIdFindingSucceeds(bottomProject)
+            _ = givenSearchGraphsCleaningSucceeds(bottomProject)
+            _ = givenProjectAuthSync(bottomProject)
 
-        givenProjectIdFindingSucceeds(bottomProject)
-        givenSearchGraphsCleaningSucceeds(bottomProject)
-        givenProjectAuthSync(bottomProject)
+            _ <- cleaner.removeTriples(bottomProject.slug)
 
-        (cleaner removeTriples bottomProject.slug).unsafeRunSync()
+            _ <- findProject(bottomProject.resourceId).asserting(_ shouldBe List.empty)
 
-        findProject(bottomProject.resourceId).unsafeRunSync() shouldBe List.empty
+            _ <- findSameAs(topProjectDS.entityId).map(_.value).asserting { case (topSameAs, topTopmostSameAs) =>
+                   topSameAs              shouldBe None
+                   topTopmostSameAs.value shouldBe topProjectDS.entityId.value
+                 }
 
-        val Some((topSameAs, topTopmostSameAs)) = findSameAs(topProjectDS.entityId).unsafeRunSync()
-        topSameAs              shouldBe None
-        topTopmostSameAs.value shouldBe topProjectDS.entityId.value
+            _ <-
+              findSameAs(middleProjectDS.entityId).map(_.value).asserting { case (middleSameAs, middleTopmostSameAs) =>
+                middleSameAs.map(_.value) shouldBe topProjectDS.entityId.value.some
+                middleTopmostSameAs.value shouldBe topProjectDS.entityId.value
+              }
 
-        val Some((middleSameAs, middleTopmostSameAs)) = findSameAs(middleProjectDS.entityId).unsafeRunSync()
-        middleSameAs.map(_.value) shouldBe topProjectDS.entityId.value.some
-        middleTopmostSameAs.value shouldBe topProjectDS.entityId.value
-
-        findDataset(bottomProjectDS.entityId).unsafeRunSync() shouldBe Nil
+            _ <- findDataset(bottomProjectDS.entityId).asserting(_ shouldBe Nil)
+          } yield Succeeded
       }
 
     "remove project with all the entities " +
       "and update the sameAs hierarchy " +
-      "when there are multiple direct descendants of the DS on project to be removed" in new TestCase {
+      "when there are multiple direct descendants of the DS on project to be removed" in projectsDSConfig.use {
+        implicit pcc =>
+          val (topProjectDS, topProject) =
+            renkuProjectEntities(anyVisibility).addDataset(datasetEntities(provenanceInternal)).generateOne
 
-        val (topProjectDS, topProject) =
-          renkuProjectEntities(anyVisibility).addDataset(datasetEntities(provenanceInternal)).generateOne
+          val (middleProject1DS, middleProject1) =
+            renkuProjectEntities(anyVisibility).importDataset(topProjectDS).generateOne
 
-        val (middleProject1DS, middleProject1) =
-          renkuProjectEntities(anyVisibility).importDataset(topProjectDS).generateOne
+          val (middleProject2DS, middleProject2) =
+            renkuProjectEntities(anyVisibility).importDataset(topProjectDS).generateOne
 
-        val (middleProject2DS, middleProject2) =
-          renkuProjectEntities(anyVisibility).importDataset(topProjectDS).generateOne
+          val (bottomProjectDS, bottomProject) =
+            renkuProjectEntities(anyVisibility).importDataset(middleProject1DS).generateOne
 
-        val (bottomProjectDS, bottomProject) =
-          renkuProjectEntities(anyVisibility).importDataset(middleProject1DS).generateOne
+          for {
+            _ <- uploadToProjects(middleProject1, middleProject2, bottomProject, topProject)
 
-        upload(to = projectsDataset, middleProject1, middleProject2, bottomProject, topProject)
+            _ = givenProjectIdFindingSucceeds(topProject)
+            _ = givenSearchGraphsCleaningSucceeds(topProject)
+            _ = givenProjectAuthSync(topProject)
 
-        givenProjectIdFindingSucceeds(topProject)
-        givenSearchGraphsCleaningSucceeds(topProject)
-        givenProjectAuthSync(topProject)
+            _ <- cleaner.removeTriples(topProject.slug)
 
-        (cleaner removeTriples topProject.slug).unsafeRunSync()
+            _ <- findProject(topProject.resourceId).asserting(_ shouldBe List.empty)
+            _ <- findDataset(topProjectDS.entityId).asserting(_ shouldBe Nil)
 
-        findProject(topProject.resourceId).unsafeRunSync() shouldBe List.empty
-        findDataset(topProjectDS.entityId).unsafeRunSync() shouldBe Nil
+            _ <- findOutNewlyNominatedTopDS(middleProject1DS, middleProject2DS) >>= { newTopDS =>
+                   if (newTopDS == middleProject1DS.entityId) {
+                     for {
+                       _ <- findSameAs(middleProject1DS.entityId).map(_.value).asserting {
+                              case (newTopSameAs, newTopTopmostSameAs) =>
+                                newTopSameAs              shouldBe None
+                                newTopTopmostSameAs.value shouldBe middleProject1DS.entityId.value
+                            }
 
-        val newTopDS = findOutNewlyNominatedTopDS(middleProject1DS, middleProject2DS)
+                       _ <- findSameAs(middleProject2DS.entityId).map(_.value).asserting {
+                              case (otherMiddleSameAs, otherMiddleTopmostSameAs) =>
+                                otherMiddleSameAs.map(_.value) shouldBe middleProject1DS.entityId.value.some
+                                otherMiddleTopmostSameAs.value shouldBe middleProject1DS.entityId.value
+                            }
 
-        if (newTopDS == middleProject1DS.entityId) {
-          val Some((newTopSameAs, newTopTopmostSameAs)) = findSameAs(middleProject1DS.entityId).unsafeRunSync()
-          newTopSameAs              shouldBe None
-          newTopTopmostSameAs.value shouldBe middleProject1DS.entityId.value
+                       _ <- findSameAs(bottomProjectDS.entityId).map(_.value).asserting {
+                              case (bottomSameAs, bottomTopmostSameAs) =>
+                                bottomSameAs.map(_.value) shouldBe middleProject1DS.entityId.value.some
+                                bottomTopmostSameAs.value shouldBe middleProject1DS.entityId.value
+                            }
+                     } yield ()
+                   } else if (newTopDS == middleProject2DS.entityId) {
+                     for {
+                       _ <- findSameAs(middleProject2DS.entityId).map(_.value).asserting {
+                              case (newTopSameAs, newTopTopmostSameAs) =>
+                                newTopSameAs              shouldBe None
+                                newTopTopmostSameAs.value shouldBe middleProject2DS.entityId.value
+                            }
 
-          val Some((otherMiddleSameAs, otherMiddleTopmostSameAs)) =
-            findSameAs(middleProject2DS.entityId).unsafeRunSync()
-          otherMiddleSameAs.map(_.value) shouldBe middleProject1DS.entityId.value.some
-          otherMiddleTopmostSameAs.value shouldBe middleProject1DS.entityId.value
+                       _ <- findSameAs(middleProject1DS.entityId).map(_.value).asserting {
+                              case (otherMiddleSameAs, otherMiddleTopmostSameAs) =>
+                                otherMiddleSameAs.map(_.value) shouldBe middleProject2DS.entityId.value.some
+                                otherMiddleTopmostSameAs.value shouldBe middleProject2DS.entityId.value
+                            }
 
-          val Some((bottomSameAs, bottomTopmostSameAs)) = findSameAs(bottomProjectDS.entityId).unsafeRunSync()
-          bottomSameAs.map(_.value) shouldBe middleProject1DS.entityId.value.some
-          bottomTopmostSameAs.value shouldBe middleProject1DS.entityId.value
-        } else if (newTopDS == middleProject2DS.entityId) {
-          val Some((newTopSameAs, newTopTopmostSameAs)) = findSameAs(middleProject2DS.entityId).unsafeRunSync()
-          newTopSameAs              shouldBe None
-          newTopTopmostSameAs.value shouldBe middleProject2DS.entityId.value
-
-          val Some((otherMiddleSameAs, otherMiddleTopmostSameAs)) =
-            findSameAs(middleProject1DS.entityId).unsafeRunSync()
-          otherMiddleSameAs.map(_.value) shouldBe middleProject2DS.entityId.value.some
-          otherMiddleTopmostSameAs.value shouldBe middleProject2DS.entityId.value
-
-          val Some((bottomSameAs, bottomTopmostSameAs)) = findSameAs(bottomProjectDS.entityId).unsafeRunSync()
-          bottomSameAs.map(_.value) shouldBe middleProject1DS.entityId.value.some
-          bottomTopmostSameAs.value shouldBe middleProject2DS.entityId.value
-        } else fail("No descendant DS has been nominated as the new top DS")
+                       _ <- findSameAs(bottomProjectDS.entityId).map(_.value).asserting {
+                              case (bottomSameAs, bottomTopmostSameAs) =>
+                                bottomSameAs.map(_.value) shouldBe middleProject1DS.entityId.value.some
+                                bottomTopmostSameAs.value shouldBe middleProject2DS.entityId.value
+                            }
+                     } yield ()
+                   } else fail("No descendant DS has been nominated as the new top DS")
+                 }
+          } yield Succeeded
       }
 
     "remove project with all the entities " +
       "and update the sameAs hierarchy " +
       "when there are multiple direct descendants of the DS on project to be removed " +
-      "and some of the descendants have been modified" in new TestCase {
-
+      "and some of the descendants have been modified" in projectsDSConfig.use { implicit pcc =>
         val (topProjectDS, topProject) =
           renkuProjectEntities(anyVisibility).addDataset(datasetEntities(provenanceInternal)).generateOne
 
@@ -322,74 +364,131 @@ class TSCleanerSpec
         val (bottomProjectDS, bottomProject) =
           renkuProjectEntities(anyVisibility).importDataset(middleProject1DS).generateOne
 
-        upload(to = projectsDataset, topProject, middleProject1, middleProject2, bottomProject)
+        for {
+          _ <- uploadToProjects(topProject, middleProject1, middleProject2, bottomProject)
 
-        givenProjectIdFindingSucceeds(topProject)
-        givenSearchGraphsCleaningSucceeds(topProject)
-        givenProjectAuthSync(topProject)
+          _ = givenProjectIdFindingSucceeds(topProject)
+          _ = givenSearchGraphsCleaningSucceeds(topProject)
+          _ = givenProjectAuthSync(topProject)
 
-        (cleaner removeTriples topProject.slug).unsafeRunSync()
+          _ <- cleaner.removeTriples(topProject.slug)
 
-        findProject(topProject.resourceId).unsafeRunSync() shouldBe List.empty
-        findDataset(topProjectDS.entityId).unsafeRunSync() shouldBe Nil
+          _ <- findProject(topProject.resourceId).asserting(_ shouldBe List.empty)
+          _ <- findDataset(topProjectDS.entityId).asserting(_ shouldBe Nil)
 
-        val Some((middleProject1DSSameAs, middleProject1DSTopmostSameAs)) =
-          findSameAs(middleProject1DS.entityId).unsafeRunSync()
-        middleProject1DSSameAs.map(_.value) shouldBe middleProject2DS.entityId.value.some
-        middleProject1DSTopmostSameAs.value shouldBe middleProject2DS.entityId.value
+          _ <- findSameAs(middleProject1DS.entityId).map(_.value).asserting {
+                 case (middleProject1DSSameAs, middleProject1DSTopmostSameAs) =>
+                   middleProject1DSSameAs.map(_.value) shouldBe middleProject2DS.entityId.value.some
+                   middleProject1DSTopmostSameAs.value shouldBe middleProject2DS.entityId.value
+               }
 
-        val Some((middleProject1ModifDSSameAs, middleProject1ModifDSTopmostSameAs)) =
-          findSameAs(middleProject1ModifDS.entityId).unsafeRunSync()
-        middleProject1ModifDSSameAs              shouldBe None
-        middleProject1ModifDSTopmostSameAs.value shouldBe middleProject1ModifDS.entityId.value
+          _ <- findSameAs(middleProject1ModifDS.entityId).map(_.value).asserting {
+                 case (middleProject1ModifDSSameAs, middleProject1ModifDSTopmostSameAs) =>
+                   middleProject1ModifDSSameAs              shouldBe None
+                   middleProject1ModifDSTopmostSameAs.value shouldBe middleProject1ModifDS.entityId.value
+               }
 
-        val Some((newTopSameAs, newTopTopmostSameAs)) = findSameAs(middleProject2DS.entityId).unsafeRunSync()
-        newTopSameAs              shouldBe None
-        newTopTopmostSameAs.value shouldBe middleProject2DS.entityId.value
+          _ <-
+            findSameAs(middleProject2DS.entityId).map(_.value).asserting { case (newTopSameAs, newTopTopmostSameAs) =>
+              newTopSameAs              shouldBe None
+              newTopTopmostSameAs.value shouldBe middleProject2DS.entityId.value
+            }
 
-        val Some((bottomSameAs, bottomTopmostSameAs)) = findSameAs(bottomProjectDS.entityId).unsafeRunSync()
-        // It's a question if this SameAs should be middleProject2DS too.
-        // However, leaving things this way preserves the 'real' import hierarchy and middleProject1DS points to the new top DS anyway.
-        bottomSameAs.map(_.value) shouldBe middleProject1DS.entityId.value.some
-        bottomTopmostSameAs.value shouldBe middleProject2DS.entityId.value
+          _ <- findSameAs(bottomProjectDS.entityId).map(_.value).asserting { case (bottomSameAs, bottomTopmostSameAs) =>
+                 // It's a question if this SameAs should be middleProject2DS too.
+                 // However, leaving things this way preserves the 'real' import hierarchy and middleProject1DS points to the new top DS anyway.
+                 bottomSameAs.map(_.value) shouldBe middleProject1DS.entityId.value.some
+                 bottomTopmostSameAs.value shouldBe middleProject2DS.entityId.value
+               }
+        } yield Succeeded
       }
 
     "remove project with all the entities " +
       "and update the sameAs hierarchy " +
-      "when project containing a fork and containing a DS which is the top in the sameAs hierarchy is removed" in new TestCase {
+      "when project containing a fork and containing a DS which is the top in the sameAs hierarchy is removed" in projectsDSConfig
+        .use { implicit pcc =>
+          val (topProjectDS, topProjectBeforeForking) =
+            renkuProjectEntities(anyVisibility).addDataset(datasetEntities(provenanceInternal)).generateOne
 
-        val (topProjectDS, topProjectBeforeForking) =
-          renkuProjectEntities(anyVisibility).addDataset(datasetEntities(provenanceInternal)).generateOne
+          val (topProject, topProjectFork) = topProjectBeforeForking.forkOnce()
 
-        val (topProject, topProjectFork) = topProjectBeforeForking.forkOnce()
+          val (bottomProjectDS, bottomProject) =
+            renkuProjectEntities(anyVisibility).importDataset(topProjectDS).generateOne
 
-        val (bottomProjectDS, bottomProject) =
-          renkuProjectEntities(anyVisibility).importDataset(topProjectDS).generateOne
+          for {
+            _ <- uploadToProjects(bottomProject, topProject, topProjectFork)
 
-        upload(to = projectsDataset, bottomProject, topProject, topProjectFork)
+            _ = givenProjectIdFindingSucceeds(topProject)
+            _ = givenSearchGraphsCleaningSucceeds(topProject)
+            _ = givenProjectAuthSync(topProject)
 
-        givenProjectIdFindingSucceeds(topProject)
-        givenSearchGraphsCleaningSucceeds(topProject)
-        givenProjectAuthSync(topProject)
+            _ <- cleaner.removeTriples(topProject.slug)
 
-        (cleaner removeTriples topProject.slug).unsafeRunSync()
+            _ <- findProject(topProject.resourceId).asserting(_ shouldBe List.empty)
+            _ <- findProject(topProjectFork.resourceId).asserting(_.size should be > 0)
 
-        findProject(topProject.resourceId).unsafeRunSync()        shouldBe List.empty
-        findProject(topProjectFork.resourceId).unsafeRunSync().size should be > 0
+            _ <- findSameAs(topProjectDS.entityId).map(_.value).asserting { case (topSameAs, topTopmostSameAs) =>
+                   topSameAs              shouldBe None
+                   topTopmostSameAs.value shouldBe topProjectDS.entityId.value
+                 }
 
-        val Some((topSameAs, topTopmostSameAs)) = findSameAs(topProjectDS.entityId).unsafeRunSync()
-        topSameAs              shouldBe None
-        topTopmostSameAs.value shouldBe topProjectDS.entityId.value
-
-        val Some((bottomSameAs, bottomTopmostSameAs)) = findSameAs(bottomProjectDS.entityId).unsafeRunSync()
-        bottomSameAs.map(_.value) shouldBe topProjectDS.entityId.value.some
-        bottomTopmostSameAs.value shouldBe topProjectDS.entityId.value
-      }
+            _ <-
+              findSameAs(bottomProjectDS.entityId).map(_.value).asserting { case (bottomSameAs, bottomTopmostSameAs) =>
+                bottomSameAs.map(_.value) shouldBe topProjectDS.entityId.value.some
+                bottomTopmostSameAs.value shouldBe topProjectDS.entityId.value
+              }
+          } yield Succeeded
+        }
 
     "remove project with all the entities " +
       "and update the sameAs hierarchy " +
-      "when project containing a fork and containing a DS which is the middle in the sameAs hierarchy is removed" in new TestCase {
+      "when project containing a fork and containing a DS which is the middle in the sameAs hierarchy is removed" in projectsDSConfig
+        .use { implicit pcc =>
+          val (topProjectDS, topProject) =
+            renkuProjectEntities(anyVisibility).addDataset(datasetEntities(provenanceInternal)).generateOne
 
+          val (middleProjectDS, middleProjectBeforeForking) =
+            renkuProjectEntities(anyVisibility).importDataset(topProjectDS).generateOne
+
+          val (middleProject, middleProjectFork) = middleProjectBeforeForking.forkOnce()
+
+          val (bottomProjectDS, bottomProject) =
+            renkuProjectEntities(anyVisibility).importDataset(middleProjectDS).generateOne
+
+          for {
+            _ <- uploadToProjects(topProject, middleProject, middleProjectFork, bottomProject)
+
+            _ = givenProjectIdFindingSucceeds(middleProject)
+            _ = givenSearchGraphsCleaningSucceeds(middleProject)
+            _ = givenProjectAuthSync(middleProject)
+
+            _ <- cleaner.removeTriples(middleProject.slug)
+
+            _ <- findSameAs(topProjectDS.entityId).map(_.value).asserting { case (topSameAs, topTopmostSameAs) =>
+                   topSameAs              shouldBe None
+                   topTopmostSameAs.value shouldBe topProjectDS.entityId.value
+                 }
+
+            _ <- findProject(middleProject.resourceId).asserting(_ shouldBe List.empty)
+            _ <- findProject(middleProjectFork.resourceId).asserting(_.size should be > 0)
+
+            _ <-
+              findSameAs(middleProjectDS.entityId).map(_.value).asserting { case (middleSameAs, middleTopmostSameAs) =>
+                middleSameAs.map(_.value) shouldBe topProjectDS.entityId.value.some
+                middleTopmostSameAs.value shouldBe topProjectDS.entityId.value
+              }
+
+            _ <-
+              findSameAs(bottomProjectDS.entityId).map(_.value).asserting { case (bottomSameAs, bottomTopmostSameAs) =>
+                bottomSameAs.map(_.value) shouldBe middleProjectDS.entityId.value.some
+                bottomTopmostSameAs.value shouldBe topProjectDS.entityId.value
+              }
+          } yield Succeeded
+        }
+
+    "remove project with all the entities " +
+      "and update the sameAs hierarchy " +
+      "when both the project and its fork get deleted" in projectsDSConfig.use { implicit pcc =>
         val (topProjectDS, topProject) =
           renkuProjectEntities(anyVisibility).addDataset(datasetEntities(provenanceInternal)).generateOne
 
@@ -401,216 +500,194 @@ class TSCleanerSpec
         val (bottomProjectDS, bottomProject) =
           renkuProjectEntities(anyVisibility).importDataset(middleProjectDS).generateOne
 
-        upload(to = projectsDataset, topProject, middleProject, middleProjectFork, bottomProject)
+        for {
+          _ <- uploadToProjects(topProject, middleProject, middleProjectFork, bottomProject)
 
-        givenProjectIdFindingSucceeds(middleProject)
-        givenSearchGraphsCleaningSucceeds(middleProject)
-        givenProjectAuthSync(middleProject)
+          _ = givenProjectIdFindingSucceeds(middleProject)
+          _ = givenProjectIdFindingSucceeds(middleProjectFork)
+          _ = givenProjectAuthSync(middleProject)
+          _ = givenSearchGraphsCleaningSucceeds(middleProject)
+          _ = givenSearchGraphsCleaningSucceeds(middleProjectFork)
+          _ = givenProjectAuthSync(middleProjectFork)
 
-        cleaner.removeTriples(middleProject.slug).unsafeRunSync()
+          _ <- cleaner.removeTriples(middleProject.slug)
+          _ <- cleaner.removeTriples(middleProjectFork.slug)
 
-        val Some((topSameAs, topTopmostSameAs)) = findSameAs(topProjectDS.entityId).unsafeRunSync()
-        topSameAs              shouldBe None
-        topTopmostSameAs.value shouldBe topProjectDS.entityId.value
+          _ <- findSameAs(topProjectDS.entityId).map(_.value).asserting { case (topSameAs, topTopmostSameAs) =>
+                 topSameAs              shouldBe None
+                 topTopmostSameAs.value shouldBe topProjectDS.entityId.value
+               }
 
-        findProject(middleProject.resourceId).unsafeRunSync()        shouldBe List.empty
-        findProject(middleProjectFork.resourceId).unsafeRunSync().size should be > 0
+          _ <- findProject(middleProject.resourceId).asserting(_ shouldBe List.empty)
+          _ <- findProject(middleProjectFork.resourceId).asserting(_ shouldBe List.empty)
+          _ <- findSameAs(middleProjectDS.entityId).asserting(_ shouldBe None)
 
-        val Some((middleSameAs, middleTopmostSameAs)) = findSameAs(middleProjectDS.entityId).unsafeRunSync()
-        middleSameAs.map(_.value) shouldBe topProjectDS.entityId.value.some
-        middleTopmostSameAs.value shouldBe topProjectDS.entityId.value
-
-        val Some((bottomSameAs, bottomTopmostSameAs)) = findSameAs(bottomProjectDS.entityId).unsafeRunSync()
-        bottomSameAs.map(_.value) shouldBe middleProjectDS.entityId.value.some
-        bottomTopmostSameAs.value shouldBe topProjectDS.entityId.value
+          _ <- findSameAs(bottomProjectDS.entityId).map(_.value).asserting { case (bottomSameAs, bottomTopmostSameAs) =>
+                 bottomSameAs.map(_.value) shouldBe topProjectDS.entityId.value.some
+                 bottomTopmostSameAs.value shouldBe topProjectDS.entityId.value
+               }
+        } yield Succeeded
       }
 
     "remove project with all the entities " +
       "and update the sameAs hierarchy " +
-      "when both the project and its fork get deleted" in new TestCase {
+      "when project containing a fork and a DS with multiple direct descendants is removed" in projectsDSConfig.use {
+        implicit pcc =>
+          val (topProjectDS, topProject) =
+            renkuProjectEntities(anyVisibility).addDataset(datasetEntities(provenanceInternal)).generateOne
 
-        val (topProjectDS, topProject) =
-          renkuProjectEntities(anyVisibility).addDataset(datasetEntities(provenanceInternal)).generateOne
+          val (middleProjectDS, middleProjectBeforeForking) =
+            renkuProjectEntities(anyVisibility).importDataset(topProjectDS).generateOne
 
-        val (middleProjectDS, middleProjectBeforeForking) =
-          renkuProjectEntities(anyVisibility).importDataset(topProjectDS).generateOne
+          val (middleProject, middleProjectFork) = middleProjectBeforeForking.forkOnce()
 
-        val (middleProject, middleProjectFork) = middleProjectBeforeForking.forkOnce()
+          val (bottomProject1DS, bottomProject1) =
+            renkuProjectEntities(anyVisibility).importDataset(middleProjectDS).generateOne
 
-        val (bottomProjectDS, bottomProject) =
-          renkuProjectEntities(anyVisibility).importDataset(middleProjectDS).generateOne
+          val (bottomProject2DS, bottomProject2) =
+            renkuProjectEntities(anyVisibility).importDataset(middleProjectDS).generateOne
 
-        upload(to = projectsDataset, topProject, middleProject, middleProjectFork, bottomProject)
+          for {
+            _ <- uploadToProjects(topProject, middleProject, middleProjectFork, bottomProject1, bottomProject2)
 
-        givenProjectIdFindingSucceeds(middleProject)
-        givenProjectIdFindingSucceeds(middleProjectFork)
-        givenProjectAuthSync(middleProject)
-        givenSearchGraphsCleaningSucceeds(middleProject)
-        givenSearchGraphsCleaningSucceeds(middleProjectFork)
-        givenProjectAuthSync(middleProjectFork)
+            _ = givenProjectIdFindingSucceeds(middleProject)
+            _ = givenSearchGraphsCleaningSucceeds(middleProject)
+            _ = givenProjectAuthSync(middleProject)
 
-        cleaner.removeTriples(middleProject.slug).unsafeRunSync()
-        cleaner.removeTriples(middleProjectFork.slug).unsafeRunSync()
+            _ <- cleaner.removeTriples(middleProject.slug)
 
-        val Some((topSameAs, topTopmostSameAs)) = findSameAs(topProjectDS.entityId).unsafeRunSync()
-        topSameAs              shouldBe None
-        topTopmostSameAs.value shouldBe topProjectDS.entityId.value
+            _ <- findSameAs(topProjectDS.entityId).map(_.value).asserting { case (topSameAs, topTopmostSameAs) =>
+                   topSameAs              shouldBe None
+                   topTopmostSameAs.value shouldBe topProjectDS.entityId.value
+                 }
 
-        findProject(middleProject.resourceId).unsafeRunSync()     shouldBe List.empty
-        findProject(middleProjectFork.resourceId).unsafeRunSync() shouldBe List.empty
-        findSameAs(middleProjectDS.entityId).unsafeRunSync()      shouldBe None
+            _ <- findProject(middleProject.resourceId).asserting(_ shouldBe List.empty)
+            _ <- findProject(middleProjectFork.resourceId).asserting(_.size should be > 0)
 
-        val Some((bottomSameAs, bottomTopmostSameAs)) = findSameAs(bottomProjectDS.entityId).unsafeRunSync()
-        bottomSameAs.map(_.value) shouldBe topProjectDS.entityId.value.some
-        bottomTopmostSameAs.value shouldBe topProjectDS.entityId.value
-      }
+            _ <-
+              findSameAs(middleProjectDS.entityId).map(_.value).asserting { case (middleSameAs, middleTopmostSameAs) =>
+                middleSameAs.map(_.value) shouldBe topProjectDS.entityId.value.some
+                middleTopmostSameAs.value shouldBe topProjectDS.entityId.value
+              }
 
-    "remove project with all the entities " +
-      "and update the sameAs hierarchy " +
-      "when project containing a fork and a DS with multiple direct descendants is removed" in new TestCase {
+            _ <- findSameAs(bottomProject1DS.entityId).map(_.value).asserting {
+                   case (bottom1SameAs, bottom1TopmostSameAs) =>
+                     bottom1SameAs.map(_.value) shouldBe middleProjectDS.entityId.value.some
+                     bottom1TopmostSameAs.value shouldBe topProjectDS.entityId.value
+                 }
 
-        val (topProjectDS, topProject) =
-          renkuProjectEntities(anyVisibility).addDataset(datasetEntities(provenanceInternal)).generateOne
-
-        val (middleProjectDS, middleProjectBeforeForking) =
-          renkuProjectEntities(anyVisibility).importDataset(topProjectDS).generateOne
-
-        val (middleProject, middleProjectFork) = middleProjectBeforeForking.forkOnce()
-
-        val (bottomProject1DS, bottomProject1) =
-          renkuProjectEntities(anyVisibility).importDataset(middleProjectDS).generateOne
-
-        val (bottomProject2DS, bottomProject2) =
-          renkuProjectEntities(anyVisibility).importDataset(middleProjectDS).generateOne
-
-        upload(to = projectsDataset, topProject, middleProject, middleProjectFork, bottomProject1, bottomProject2)
-
-        givenProjectIdFindingSucceeds(middleProject)
-        givenSearchGraphsCleaningSucceeds(middleProject)
-        givenProjectAuthSync(middleProject)
-
-        cleaner.removeTriples(middleProject.slug).unsafeRunSync()
-
-        val Some((topSameAs, topTopmostSameAs)) = findSameAs(topProjectDS.entityId).unsafeRunSync()
-        topSameAs              shouldBe None
-        topTopmostSameAs.value shouldBe topProjectDS.entityId.value
-
-        findProject(middleProject.resourceId).unsafeRunSync()        shouldBe List.empty
-        findProject(middleProjectFork.resourceId).unsafeRunSync().size should be > 0
-
-        val Some((middleSameAs, middleTopmostSameAs)) = findSameAs(middleProjectDS.entityId).unsafeRunSync()
-        middleSameAs.map(_.value) shouldBe topProjectDS.entityId.value.some
-        middleTopmostSameAs.value shouldBe topProjectDS.entityId.value
-
-        val Some((bottom1SameAs, bottom1TopmostSameAs)) = findSameAs(bottomProject1DS.entityId).unsafeRunSync()
-        bottom1SameAs.map(_.value) shouldBe middleProjectDS.entityId.value.some
-        bottom1TopmostSameAs.value shouldBe topProjectDS.entityId.value
-
-        val Some((bottom2SameAs, bottom2TopmostSameAs)) = findSameAs(bottomProject2DS.entityId).unsafeRunSync()
-        bottom2SameAs.map(_.value) shouldBe middleProjectDS.entityId.value.some
-        bottom2TopmostSameAs.value shouldBe topProjectDS.entityId.value
+            _ <- findSameAs(bottomProject2DS.entityId).map(_.value).asserting {
+                   case (bottom2SameAs, bottom2TopmostSameAs) =>
+                     bottom2SameAs.map(_.value) shouldBe middleProjectDS.entityId.value.some
+                     bottom2TopmostSameAs.value shouldBe topProjectDS.entityId.value
+                 }
+          } yield Succeeded
       }
   }
 
-  private def findAllData(projectId: projects.ResourceId) = runSelect(
-    on = projectsDataset,
-    SparqlQuery.of(
-      "find all data",
-      s"""|SELECT ?s ?p ?o
-          |WHERE {
-          |  GRAPH <${GraphClass.Project.id(projectId)}> { ?s ?p ?o }
-          |}""".stripMargin
-    )
-  ).map(_.map(_.values.toList))
+  private def findAllData(projectId: projects.ResourceId)(implicit pcc: ProjectsConnectionConfig) =
+    runSelect(
+      SparqlQuery.of(
+        "find all data",
+        s"""|SELECT ?s ?p ?o
+            |WHERE {
+            |  GRAPH <${GraphClass.Project.id(projectId)}> { ?s ?p ?o }
+            |}""".stripMargin
+      )
+    ).map(_.map(_.values.toList))
 
-  private def findProject(projectId: projects.ResourceId) = runSelect(
-    on = projectsDataset,
-    SparqlQuery.of(
-      "find project triples",
-      s"""SELECT ?p ?o
+  private def findProject(projectId: projects.ResourceId)(implicit pcc: ProjectsConnectionConfig) =
+    runSelect(
+      SparqlQuery.of(
+        "find project triples",
+        s"""SELECT ?p ?o
           WHERE {
             GRAPH <${GraphClass.Project.id(projectId)}> {
               ${projectId.showAs[RdfResource]} ?p ?o
             }
           }"""
-    )
-  ).map(_.map(_.values.toList))
+      )
+    ).map(_.map(_.values.toList))
 
-  private def findProjectParent(projectId: projects.ResourceId) = runSelect(
-    on = projectsDataset,
-    SparqlQuery.of(
-      "find project parent",
-      Prefixes of prov -> "prov",
-      s"""SELECT ?parentId
+  private def findProjectParent(projectId: projects.ResourceId)(implicit pcc: ProjectsConnectionConfig) =
+    runSelect(
+      SparqlQuery.of(
+        "find project parent",
+        Prefixes of prov -> "prov",
+        s"""SELECT ?parentId
           WHERE {
             GRAPH <${GraphClass.Project.id(projectId)}> {
               ${projectId.showAs[RdfResource]} prov:wasDerivedFrom ?parentId
             }
           }"""
-    )
-  ).map(_.map(row => row.get("parentId").map(projects.ResourceId))).map {
-    case Nil                => None
-    case maybeParent :: Nil => maybeParent
-    case _                  => fail(s"Multiple wasDerivedFrom for $projectId")
-  }
+      )
+    ).map(_.map(row => row.get("parentId").map(projects.ResourceId))).map {
+      case Nil                => None
+      case maybeParent :: Nil => maybeParent
+      case _                  => fail(s"Multiple wasDerivedFrom for $projectId")
+    }
 
-  private def findDataset(datasetId: EntityId) = runSelect(
-    on = projectsDataset,
-    SparqlQuery.of(
-      "find DS triples",
-      s"""SELECT ?p ?o
+  private def findDataset(datasetId: EntityId)(implicit pcc: ProjectsConnectionConfig) =
+    runSelect(
+      SparqlQuery.of(
+        "find DS triples",
+        s"""SELECT ?p ?o
           WHERE {
             GRAPH ?g { <$datasetId> ?p ?o }
           }"""
-    )
-  ).map(_.map(_.values.toList))
+      )
+    ).map(_.map(_.values.toList))
 
-  private def findSameAs(datasetId: EntityId): IO[Option[(Option[datasets.SameAs], TopmostSameAs)]] = runSelect(
-    on = projectsDataset,
-    SparqlQuery.of(
-      "find DS sameAs",
-      Prefixes.of(renku -> "renku", schema -> "schema"),
-      s"""SELECT ?sameAs ?topmostSameAs
+  private def findSameAs(datasetId: EntityId)(implicit
+      pcc: ProjectsConnectionConfig
+  ): IO[Option[(Option[datasets.SameAs], TopmostSameAs)]] =
+    runSelect(
+      SparqlQuery.of(
+        "find DS sameAs",
+        Prefixes.of(renku -> "renku", schema -> "schema"),
+        s"""SELECT ?sameAs ?topmostSameAs
           WHERE {
             GRAPH ?g {
               <$datasetId> renku:topmostSameAs ?topmostSameAs .
               OPTIONAL {<$datasetId> schema:sameAs/schema:url ?sameAs }
             }
           }"""
-    )
-  ) map {
-    case Nil => None
-    case props :: Nil =>
-      Some(props.get("sameAs").map(datasets.SameAs) -> datasets.TopmostSameAs(props("topmostSameAs")))
-    case _ => fail(s"There multiple (SameAs, TopmostSameAs) tuples for the DS $datasetId")
+      )
+    ) map {
+      case Nil => None
+      case props :: Nil =>
+        Some(props.get("sameAs").map(datasets.SameAs) -> datasets.TopmostSameAs(props("topmostSameAs")))
+      case _ => fail(s"There multiple (SameAs, TopmostSameAs) tuples for the DS $datasetId")
+    }
+
+  private implicit lazy val logger: TestLogger[IO] = TestLogger[IO]()
+  private val projectIdFinder      = mock[ProjectIdFinder[IO]]
+  private val searchGraphsCleaner  = mock[SearchGraphsCleaner[IO]]
+  private lazy val projectAuthSync = mock[ProjectAuthSync[IO]]
+  private def cleaner(implicit pcc: ProjectsConnectionConfig) = {
+    implicit val tr: SparqlQueryTimeRecorder[IO] = TestSparqlQueryTimeRecorder.createUnsafe
+    new TSCleanerImpl[IO](projectIdFinder, searchGraphsCleaner, projectAuthSync, pcc)
   }
 
-  private trait TestCase {
-    private implicit val logger:       TestLogger[IO]              = TestLogger[IO]()
-    private implicit val timeRecorder: SparqlQueryTimeRecorder[IO] = TestSparqlQueryTimeRecorder[IO].unsafeRunSync()
-    private val projectIdFinder     = mock[ProjectIdFinder[IO]]
-    private val searchGraphsCleaner = mock[SearchGraphsCleaner[IO]]
-    val projectAuthSync             = mock[ProjectAuthSync[IO]]
-    val cleaner = new TSCleanerImpl[IO](projectIdFinder, searchGraphsCleaner, projectAuthSync, projectsDSConnectionInfo)
+  private def givenProjectIdFindingSucceeds(project: Project) =
+    (projectIdFinder.findProjectId _)
+      .expects(project.slug)
+      .returning(project.identification.some.pure[IO])
 
-    def givenProjectIdFindingSucceeds(project: Project) =
-      (projectIdFinder.findProjectId _)
-        .expects(project.slug)
-        .returning(project.identification.some.pure[IO])
+  private def givenSearchGraphsCleaningSucceeds(project: Project) =
+    (searchGraphsCleaner.cleanSearchGraphs _)
+      .expects(project.identification)
+      .returning(().pure[IO])
 
-    def givenSearchGraphsCleaningSucceeds(project: Project) =
-      (searchGraphsCleaner.cleanSearchGraphs _)
-        .expects(project.identification)
-        .returning(().pure[IO])
+  private def givenProjectAuthSync(project: Project) =
+    (projectAuthSync.removeAuthData _)
+      .expects(project.slug)
+      .returning(IO.unit)
 
-    def givenProjectAuthSync(project: Project) =
-      (projectAuthSync.removeAuthData _)
-        .expects(project.slug)
-        .returning(IO.unit)
-  }
-
-  private def findOutNewlyNominatedTopDS(ds1: Dataset[Dataset.Provenance], ds2: Dataset[Dataset.Provenance]): EntityId =
-    findSameAs(ds1.entityId).unsafeRunSync() match {
+  private def findOutNewlyNominatedTopDS(ds1: Dataset[Dataset.Provenance], ds2: Dataset[Dataset.Provenance])(implicit
+      pcc: ProjectsConnectionConfig
+  ): IO[EntityId] =
+    findSameAs(ds1.entityId).map {
       case Some(None -> _) => ds1.entityId
       case Some(Some(_) -> _) =>
         findSameAs(ds2.entityId).unsafeRunSync() match {

@@ -19,8 +19,9 @@
 package io.renku.knowledgegraph.projects.files.lineage
 
 import cats.effect.IO
+import cats.effect.testing.scalatest.AsyncIOSpec
 import cats.syntax.all._
-import io.renku.entities.searchgraphs.SearchInfoDatasets
+import io.renku.entities.searchgraphs.TestSearchInfoDatasets
 import io.renku.generators.CommonGraphGenerators.authUsers
 import io.renku.generators.Generators.Implicits._
 import io.renku.generators.Generators.fixed
@@ -32,61 +33,59 @@ import io.renku.graph.model.testentities.generators.EntitiesGenerators.ProjectBa
 import io.renku.interpreters.TestLogger
 import io.renku.interpreters.TestLogger.Level.Warn
 import io.renku.jsonld.syntax._
+import io.renku.knowledgegraph.KnowledgeGraphJenaSpec
 import io.renku.logging.TestExecutionTimeRecorder
-import io.renku.stubbing.ExternalServiceStubbing
-import io.renku.testtools.IOSpec
-import io.renku.triplesstore.{InMemoryJenaForSpec, ProjectsDataset, SparqlQueryTimeRecorder}
+import io.renku.triplesstore.{ProjectsConnectionConfig, SparqlQueryTimeRecorder}
 import model._
+import org.scalatest.Succeeded
 import org.scalatest.matchers.should
-import org.scalatest.wordspec.AnyWordSpec
-import org.typelevel.log4cats.Logger
+import org.scalatest.wordspec.AsyncWordSpec
 
 class EdgesFinderSpec
-    extends AnyWordSpec
-    with should.Matchers
-    with InMemoryJenaForSpec
-    with ProjectsDataset
-    with SearchInfoDatasets
-    with ExternalServiceStubbing
-    with IOSpec {
+    extends AsyncWordSpec
+    with AsyncIOSpec
+    with KnowledgeGraphJenaSpec
+    with TestSearchInfoDatasets
+    with should.Matchers {
 
-  implicit override val ioLogger: Logger[IO] = TestLogger[IO]()
+  implicit override val ioLogger: TestLogger[IO] = TestLogger[IO]()
 
   "findEdges" should {
 
     "return all the edges of the given project " +
-      "case when the user is not authenticated and the project is public" in new TestCase {
-
+      "case when the user is not authenticated and the project is public" in projectsDSConfig.use { implicit pcc =>
         val exemplarData = LineageExemplarData(renkuProjectEntities(visibilityPublic).generateOne)
 
         import exemplarData._
 
-        provisionTestProject(project).unsafeRunSync()
+        for {
+          _ <- provisionTestProject(project)
 
-        edgesFinder
-          .findEdges(project.slug, maybeUser = None)
-          .unsafeRunSync() shouldBe Map(
-          ExecutionInfo(activity1.asEntityId.show, RunDate(activity1.startTime.value)) -> (
-            Set(`zhbikes folder`.toNodeLocation, `clean_data entity`.toNodeLocation),
-            Set(`bikesparquet entity`.toNodeLocation)
-          ),
-          ExecutionInfo(activity2.asEntityId.show, RunDate(activity2.startTime.value)) -> (
-            Set(`plot_data entity`.toNodeLocation, `bikesparquet entity`.toNodeLocation),
-            Set(`grid_plot entity`.toNodeLocation, `cumulative entity`.toNodeLocation)
-          ),
-          ExecutionInfo(activity3.asEntityId.show, RunDate(activity3.startTime.value)) -> (
-            Set(`zhbikes folder`.toNodeLocation, `clean_data entity`.toNodeLocation),
-            Set(`bikesparquet entity`.toNodeLocation)
-          ),
-          ExecutionInfo(activity4.asEntityId.show, RunDate(activity4.startTime.value)) -> (
-            Set(`plot_data entity`.toNodeLocation, `bikesparquet entity`.toNodeLocation),
-            Set(`grid_plot entity`.toNodeLocation, `cumulative entity`.toNodeLocation)
-          )
-        )
+          _ <- edgesFinder
+                 .findEdges(project.slug, maybeUser = None)
+                 .asserting {
+                   _ shouldBe Map(
+                     ExecutionInfo(activity1.asEntityId.show, RunDate(activity1.startTime.value)) -> (
+                       Set(`zhbikes folder`.toNodeLocation, `clean_data entity`.toNodeLocation),
+                       Set(`bikesparquet entity`.toNodeLocation)
+                     ),
+                     ExecutionInfo(activity2.asEntityId.show, RunDate(activity2.startTime.value)) -> (
+                       Set(`plot_data entity`.toNodeLocation, `bikesparquet entity`.toNodeLocation),
+                       Set(`grid_plot entity`.toNodeLocation, `cumulative entity`.toNodeLocation)
+                     ),
+                     ExecutionInfo(activity3.asEntityId.show, RunDate(activity3.startTime.value)) -> (
+                       Set(`zhbikes folder`.toNodeLocation, `clean_data entity`.toNodeLocation),
+                       Set(`bikesparquet entity`.toNodeLocation)
+                     ),
+                     ExecutionInfo(activity4.asEntityId.show, RunDate(activity4.startTime.value)) -> (
+                       Set(`plot_data entity`.toNodeLocation, `bikesparquet entity`.toNodeLocation),
+                       Set(`grid_plot entity`.toNodeLocation, `cumulative entity`.toNodeLocation)
+                     )
+                   )
+                 }
 
-        logger.logged(
-          Warn(s"lineage - edges finished${executionTimeRecorder.executionTimeInfo}")
-        )
+          _ <- ioLogger.loggedF(Warn(s"lineage - edges finished${executionTimeRecorder.executionTimeInfo}"))
+        } yield Succeeded
       }
 
     /** in1 in2 in3 in2 
@@ -95,8 +94,7 @@ class EdgesFinderSpec
      *     |     |
      *    out1  out2
      */
-    "return all the edges including executions with overridden inputs/outputs" in new TestCase {
-
+    "return all the edges including executions with overridden inputs/outputs" in projectsDSConfig.use { implicit pcc =>
       val project = renkuProjectEntities(visibilityPublic).generateOne
 
       val in1  = entityLocations.generateOne
@@ -119,60 +117,57 @@ class EdgesFinderSpec
         .planOutputParameterOverrides(out1 -> out2)
         .buildProvenanceUnsafe()
 
-      provisionTestProject(project.addActivities(activity1, activity2)).unsafeRunSync()
-
-      edgesFinder
-        .findEdges(project.slug, maybeUser = None)
-        .unsafeRunSync() shouldBe Map(
-        ExecutionInfo(activity1.asEntityId.show, RunDate(activity1.startTime.value)) -> (
-          Set(Node.Location(in1.value), Node.Location(in2.value)),
-          Set(Node.Location(out1.value))
-        ),
-        ExecutionInfo(activity2.asEntityId.show, RunDate(activity2.startTime.value)) -> (
-          Set(Node.Location(in3.value), Node.Location(in2.value)),
-          Set(Node.Location(out2.value))
-        )
-      )
+      provisionTestProject(project.addActivities(activity1, activity2)) >>
+        edgesFinder
+          .findEdges(project.slug, maybeUser = None)
+          .asserting {
+            _ shouldBe Map(
+              ExecutionInfo(activity1.asEntityId.show, RunDate(activity1.startTime.value)) -> (
+                Set(Node.Location(in1.value), Node.Location(in2.value)),
+                Set(Node.Location(out1.value))
+              ),
+              ExecutionInfo(activity2.asEntityId.show, RunDate(activity2.startTime.value)) -> (
+                Set(Node.Location(in3.value), Node.Location(in2.value)),
+                Set(Node.Location(out2.value))
+              )
+            )
+          }
     }
 
     "return None if there's no lineage for the project " +
-      "case when the user is not authenticated and the project is public" in new TestCase {
+      "case when the user is not authenticated and the project is public" in projectsDSConfig.use { implicit pcc =>
         edgesFinder
           .findEdges(projectSlugs.generateOne, maybeUser = None)
-          .unsafeRunSync() shouldBe empty
+          .asserting(_ shouldBe empty)
       }
 
     Visibility.Internal :: Visibility.Private :: Nil foreach { visibility =>
       s"return None if the project is $visibility " +
-        "case when the user is not authenticated" in new TestCase {
+        "case when the user is not authenticated" in projectsDSConfig.use { implicit pcc =>
           val exemplarData = LineageExemplarData(renkuProjectEntities(fixed(visibility)).generateOne)
 
-          provisionTestProject(exemplarData.project).unsafeRunSync()
-
-          edgesFinder
-            .findEdges(projectSlugs.generateOne, authUsers.generateOption)
-            .unsafeRunSync() shouldBe empty
-
-          logger.logged(Warn(s"lineage - edges finished${executionTimeRecorder.executionTimeInfo}"))
+          provisionTestProject(exemplarData.project) >>
+            edgesFinder
+              .findEdges(projectSlugs.generateOne, authUsers.generateOption)
+              .asserting(_ shouldBe empty) >>
+            ioLogger.loggedF(Warn(s"lineage - edges finished${executionTimeRecorder.executionTimeInfo}"))
         }
     }
 
     "return None if the project is private " +
-      "case when the user is authenticated but he's not the project member" in new TestCase {
+      "case when the user is authenticated but he's not the project member" in projectsDSConfig.use { implicit pcc =>
         val exemplarData = LineageExemplarData(renkuProjectEntities(fixed(Visibility.Private)).generateOne)
 
-        provisionTestProject(exemplarData.project).unsafeRunSync()
-
-        edgesFinder
-          .findEdges(projectSlugs.generateOne, authUsers.generateSome)
-          .unsafeRunSync() shouldBe empty
-
-        logger.logged(Warn(s"lineage - edges finished${executionTimeRecorder.executionTimeInfo}"))
+        provisionTestProject(exemplarData.project) >>
+          edgesFinder
+            .findEdges(projectSlugs.generateOne, authUsers.generateSome)
+            .asserting(_ shouldBe empty) >>
+          ioLogger.loggedF(Warn(s"lineage - edges finished${executionTimeRecorder.executionTimeInfo}"))
       }
 
     Visibility.Internal :: Visibility.Private :: Nil foreach { visibility =>
       s"return all the edges of the $visibility project " +
-        "case when the user is authenticated and he's a member of the project" in new TestCase {
+        "case when the user is authenticated and he's a member of the project" in projectsDSConfig.use { implicit pcc =>
           val authUser = authUsers.generateOne
 
           val exemplarData = LineageExemplarData(
@@ -183,86 +178,82 @@ class EdgesFinderSpec
 
           import exemplarData._
 
-          provisionTestProject(project).unsafeRunSync()
-
-          edgesFinder
-            .findEdges(project.slug, Some(authUser))
-            .unsafeRunSync() shouldBe Map(
-            ExecutionInfo(activity1.asEntityId.show, RunDate(activity1.startTime.value)) -> (
-              Set(`zhbikes folder`.toNodeLocation, `clean_data entity`.toNodeLocation),
-              Set(`bikesparquet entity`.toNodeLocation)
-            ),
-            ExecutionInfo(activity2.asEntityId.show, RunDate(activity2.startTime.value)) -> (
-              Set(`plot_data entity`.toNodeLocation, `bikesparquet entity`.toNodeLocation),
-              Set(`grid_plot entity`.toNodeLocation, `cumulative entity`.toNodeLocation)
-            ),
-            ExecutionInfo(activity3.asEntityId.show, RunDate(activity3.startTime.value)) -> (
-              Set(`zhbikes folder`.toNodeLocation, `clean_data entity`.toNodeLocation),
-              Set(`bikesparquet entity`.toNodeLocation)
-            ),
-            ExecutionInfo(activity4.asEntityId.show, RunDate(activity4.startTime.value)) -> (
-              Set(`plot_data entity`.toNodeLocation, `bikesparquet entity`.toNodeLocation),
-              Set(`grid_plot entity`.toNodeLocation, `cumulative entity`.toNodeLocation)
-            )
-          )
+          provisionTestProject(project) >>
+            edgesFinder
+              .findEdges(project.slug, Some(authUser))
+              .asserting {
+                _ shouldBe Map(
+                  ExecutionInfo(activity1.asEntityId.show, RunDate(activity1.startTime.value)) -> (
+                    Set(`zhbikes folder`.toNodeLocation, `clean_data entity`.toNodeLocation),
+                    Set(`bikesparquet entity`.toNodeLocation)
+                  ),
+                  ExecutionInfo(activity2.asEntityId.show, RunDate(activity2.startTime.value)) -> (
+                    Set(`plot_data entity`.toNodeLocation, `bikesparquet entity`.toNodeLocation),
+                    Set(`grid_plot entity`.toNodeLocation, `cumulative entity`.toNodeLocation)
+                  ),
+                  ExecutionInfo(activity3.asEntityId.show, RunDate(activity3.startTime.value)) -> (
+                    Set(`zhbikes folder`.toNodeLocation, `clean_data entity`.toNodeLocation),
+                    Set(`bikesparquet entity`.toNodeLocation)
+                  ),
+                  ExecutionInfo(activity4.asEntityId.show, RunDate(activity4.startTime.value)) -> (
+                    Set(`plot_data entity`.toNodeLocation, `bikesparquet entity`.toNodeLocation),
+                    Set(`grid_plot entity`.toNodeLocation, `cumulative entity`.toNodeLocation)
+                  )
+                )
+              }
         }
     }
 
     "return all the edges of the internal project " +
-      "case when the user is authenticated and he's not a member of the project" in new TestCase {
-        val authUser = authUsers.generateOne
+      "case when the user is authenticated and he's not a member of the project" in projectsDSConfig.use {
+        implicit pcc =>
+          val authUser = authUsers.generateOne
 
-        val exemplarData = LineageExemplarData(renkuProjectEntities(fixed(Visibility.Internal)).generateOne)
+          val exemplarData = LineageExemplarData(renkuProjectEntities(fixed(Visibility.Internal)).generateOne)
 
-        import exemplarData._
+          import exemplarData._
 
-        provisionTestProject(project).unsafeRunSync()
-
-        edgesFinder
-          .findEdges(project.slug, Some(authUser))
-          .unsafeRunSync() shouldBe Map(
-          ExecutionInfo(activity1.asEntityId.show, RunDate(activity1.startTime.value)) -> (
-            Set(`zhbikes folder`.toNodeLocation, `clean_data entity`.toNodeLocation),
-            Set(`bikesparquet entity`.toNodeLocation)
-          ),
-          ExecutionInfo(activity2.asEntityId.show, RunDate(activity2.startTime.value)) -> (
-            Set(`plot_data entity`.toNodeLocation, `bikesparquet entity`.toNodeLocation),
-            Set(`grid_plot entity`.toNodeLocation, `cumulative entity`.toNodeLocation)
-          ),
-          ExecutionInfo(activity3.asEntityId.show, RunDate(activity3.startTime.value)) -> (
-            Set(`zhbikes folder`.toNodeLocation, `clean_data entity`.toNodeLocation),
-            Set(`bikesparquet entity`.toNodeLocation)
-          ),
-          ExecutionInfo(activity4.asEntityId.show, RunDate(activity4.startTime.value)) -> (
-            Set(`plot_data entity`.toNodeLocation, `bikesparquet entity`.toNodeLocation),
-            Set(`grid_plot entity`.toNodeLocation, `cumulative entity`.toNodeLocation)
-          )
-        )
+          provisionTestProject(project) >>
+            edgesFinder
+              .findEdges(project.slug, Some(authUser))
+              .asserting {
+                _ shouldBe Map(
+                  ExecutionInfo(activity1.asEntityId.show, RunDate(activity1.startTime.value)) -> (
+                    Set(`zhbikes folder`.toNodeLocation, `clean_data entity`.toNodeLocation),
+                    Set(`bikesparquet entity`.toNodeLocation)
+                  ),
+                  ExecutionInfo(activity2.asEntityId.show, RunDate(activity2.startTime.value)) -> (
+                    Set(`plot_data entity`.toNodeLocation, `bikesparquet entity`.toNodeLocation),
+                    Set(`grid_plot entity`.toNodeLocation, `cumulative entity`.toNodeLocation)
+                  ),
+                  ExecutionInfo(activity3.asEntityId.show, RunDate(activity3.startTime.value)) -> (
+                    Set(`zhbikes folder`.toNodeLocation, `clean_data entity`.toNodeLocation),
+                    Set(`bikesparquet entity`.toNodeLocation)
+                  ),
+                  ExecutionInfo(activity4.asEntityId.show, RunDate(activity4.startTime.value)) -> (
+                    Set(`plot_data entity`.toNodeLocation, `bikesparquet entity`.toNodeLocation),
+                    Set(`grid_plot entity`.toNodeLocation, `cumulative entity`.toNodeLocation)
+                  )
+                )
+              }
       }
 
     "return no the edges of the internal project " +
-      "case when the user is anonymous" in new TestCase {
-        val authUser = authUsers.generateOne
-
+      "case when the user is anonymous" in projectsDSConfig.use { implicit pcc =>
         val exemplarData = LineageExemplarData(renkuProjectEntities(fixed(Visibility.Internal)).generateOne)
 
         import exemplarData._
 
-        provisionTestProject(project).unsafeRunSync()
-
-        edgesFinder
-          .findEdges(project.slug, None)
-          .unsafeRunSync() shouldBe Map()
+        provisionTestProject(project) >>
+          edgesFinder
+            .findEdges(project.slug, None)
+            .asserting(_ shouldBe Map())
       }
   }
 
-  private trait TestCase {
-    implicit val logger: TestLogger[IO] = TestLogger[IO]()
-    val executionTimeRecorder = TestExecutionTimeRecorder[IO]()
-    private implicit val timeRecorder: SparqlQueryTimeRecorder[IO] =
-      new SparqlQueryTimeRecorder[IO](executionTimeRecorder)
-    val edgesFinder = new EdgesFinderImpl[IO](projectsDSConnectionInfo, renkuUrl)
-  }
+  private lazy val executionTimeRecorder = TestExecutionTimeRecorder[IO]()
+  private implicit lazy val tr: SparqlQueryTimeRecorder[IO] = new SparqlQueryTimeRecorder[IO](executionTimeRecorder)
+  private def edgesFinder(implicit pcc: ProjectsConnectionConfig) = new EdgesFinderImpl[IO](pcc, renkuUrl)
 
   private implicit class NodeDefOps(nodeDef: NodeDef) {
     lazy val toNodeLocation: Node.Location = Node.Location(nodeDef.location)

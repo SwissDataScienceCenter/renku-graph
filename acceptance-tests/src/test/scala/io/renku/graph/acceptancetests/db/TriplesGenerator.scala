@@ -30,9 +30,8 @@ object TriplesGenerator {
   private val dbConfig: DBConfigProvider.DBConfig[TgDB] =
     new TgDbConfigProvider[Try].get().fold(throw _, identity)
 
-  def startDB()(implicit logger: Logger[IO]): IO[Unit] = for {
-    _ <- PostgresDB.startPostgres
+  def initDB()(implicit logger: Logger[IO]): IO[Unit] = for {
     _ <- PostgresDB.initializeDatabase(dbConfig)
-    _ <- logger.info("triples_generator DB started")
+    _ <- logger.info("triples_generator DB initialised")
   } yield ()
 }

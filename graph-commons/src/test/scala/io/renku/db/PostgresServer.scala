@@ -63,6 +63,7 @@ class PostgresServer(module: String, port: Int) {
       while (rc != 0) {
         Thread.sleep(500)
         rc = isReadyCmd.!
+        if (rc == 0) println(s"PostgreSQL container for module '$module' started on port $port")
       }
     }
 
@@ -72,14 +73,17 @@ class PostgresServer(module: String, port: Int) {
     wasRunning
   }
 
-  def stop(): Any =
+  def stop(): Unit =
     if (!skipServer && !wasRunning) {
       println(s"Stopping PostgreSQL container for module '$module'")
       stopCmd.!!
+      ()
     }
 
-  def forceStop(): Any = {
-    println(s"Stopping PostgreSQL container for module '$module'")
-    stopCmd.!!
-  }
+  def forceStop(): Unit =
+    if (!skipServer) {
+      println(s"Stopping PostgreSQL container for module '$module'")
+      stopCmd.!!
+      ()
+    }
 }

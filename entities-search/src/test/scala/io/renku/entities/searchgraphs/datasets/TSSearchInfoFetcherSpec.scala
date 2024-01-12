@@ -22,7 +22,8 @@ import cats.effect.IO
 import cats.effect.testing.scalatest.AsyncIOSpec
 import cats.syntax.all._
 import commands.Encoders._
-import io.renku.entities.searchgraphs.SearchInfoDatasets
+import io.renku.entities.EntitiesSearchJenaSpec
+import io.renku.entities.searchgraphs.TestSearchInfoDatasets
 import io.renku.entities.searchgraphs.datasets.Generators._
 import io.renku.entities.searchgraphs.datasets.SearchInfoLens._
 import io.renku.generators.Generators.Implicits._
@@ -31,7 +32,7 @@ import io.renku.graph.model.testentities._
 import io.renku.interpreters.TestLogger
 import io.renku.logging.TestSparqlQueryTimeRecorder
 import io.renku.triplesstore.client.syntax._
-import io.renku.triplesstore.{InMemoryJenaForSpec, ProjectsDataset, SparqlQueryTimeRecorder}
+import io.renku.triplesstore.{ProjectsConnectionConfig, SparqlQueryTimeRecorder}
 import org.scalatest.OptionValues
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AsyncWordSpec
@@ -39,16 +40,14 @@ import org.scalatest.wordspec.AsyncWordSpec
 class TSSearchInfoFetcherSpec
     extends AsyncWordSpec
     with AsyncIOSpec
-    with should.Matchers
+    with EntitiesSearchJenaSpec
+    with TestSearchInfoDatasets
     with OptionValues
-    with InMemoryJenaForSpec
-    with ProjectsDataset
-    with SearchInfoDatasets {
+    with should.Matchers {
 
   "findTSInfosByProject" should {
 
-    "find info about all Datasets that are linked to the Project" in {
-
+    "find info about all Datasets that are linked to the Project" in projectsDSConfig.use { implicit pcc =>
       val project      = anyRenkuProjectEntities.generateOne.to[entities.RenkuProject]
       val otherProject = anyRenkuProjectEntities.generateOne.to[entities.RenkuProject]
       val infos = datasetSearchInfoObjects(project)
@@ -60,24 +59,23 @@ class TSSearchInfoFetcherSpec
           searchInfoLinks.modify(_ append linkToOtherProject)(si)
         }
 
-      insertIO(projectsDataset, infos.flatMap(_.asQuads)) >>
-        insertIO(projectsDataset, datasetSearchInfoObjects.generateOne.asQuads.toList) >>
+      insert(infos.flatMap(_.asQuads)) >>
+        insert(datasetSearchInfoObjects.generateOne.asQuads.toList) >>
         List(project, otherProject).traverse_(insertProjectAuth) >>
         fetcher
           .findTSInfosByProject(project.resourceId)
           .asserting(_ should contain theSameElementsAs infos.map(toTSSearchInfo).map(orderValues))
     }
 
-    "return nothing if no Datasets for the Project" in {
-      insertIO(projectsDataset, datasetSearchInfoObjects.generateOne.asQuads.toList) >>
+    "return nothing if no Datasets for the Project" in projectsDSConfig.use { implicit pcc =>
+      insert(datasetSearchInfoObjects.generateOne.asQuads.toList) >>
         fetcher.findTSInfosByProject(projectResourceIds.generateOne).asserting(_ shouldBe Nil)
     }
   }
 
   "findTSInfoBySameAs" should {
 
-    "find an info if exists in the TS" in {
-
+    "find an info if exists in the TS" in projectsDSConfig.use { implicit pcc =>
       val project      = anyRenkuProjectEntities.generateOne.to[entities.RenkuProject]
       val otherProject = anyRenkuProjectEntities.generateOne.to[entities.RenkuProject]
       val info = datasetSearchInfoObjects(project).map { si =>
@@ -86,24 +84,26 @@ class TSSearchInfoFetcherSpec
         searchInfoLinks.modify(_ append linkToOtherProject)(si)
       }.generateOne
 
-      insertIO(projectsDataset, info.asQuads.toList) >>
-        insertIO(projectsDataset, datasetSearchInfoObjects.generateOne.asQuads.toList) >>
+      insert(info.asQuads.toList) >>
+        insert(datasetSearchInfoObjects.generateOne.asQuads.toList) >>
         List(project, otherProject).traverse_(insertProjectAuth) >>
         fetcher
           .findTSInfoBySameAs(info.topmostSameAs)
           .asserting(_.value shouldBe orderValues(toTSSearchInfo(info)))
     }
 
-    "return None if there's no DS with the given topmostSameAs" in {
+    "return None if there's no DS with the given topmostSameAs" in projectsDSConfig.use { implicit pcc =>
       fetcher
         .findTSInfoBySameAs(datasetTopmostSameAs.generateOne)
         .asserting(_ shouldBe None)
     }
   }
 
-  implicit val ioLogger:             TestLogger[IO]              = TestLogger[IO]()
-  private implicit val timeRecorder: SparqlQueryTimeRecorder[IO] = TestSparqlQueryTimeRecorder[IO].unsafeRunSync()
-  private lazy val fetcher = new TSSearchInfoFetcherImpl[IO](projectsDSConnectionInfo)
+  implicit val ioLogger: TestLogger[IO] = TestLogger[IO]()
+  private def fetcher(implicit pcc: ProjectsConnectionConfig) = {
+    implicit val tr: SparqlQueryTimeRecorder[IO] = TestSparqlQueryTimeRecorder.createUnsafe
+    new TSSearchInfoFetcherImpl[IO](pcc)
+  }
 
   private def toTSSearchInfo(info: DatasetSearchInfo): TSDatasetSearchInfo =
     TSDatasetSearchInfo(info.topmostSameAs, info.links.toList)

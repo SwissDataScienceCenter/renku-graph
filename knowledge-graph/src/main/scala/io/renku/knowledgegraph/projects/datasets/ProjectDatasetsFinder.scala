@@ -45,7 +45,7 @@ private object ProjectDatasetsFinder {
   ): ProjectDatasetsFinder[F] = new ProjectDatasetsFinderImpl[F](TSClient[F](conCfg))
 }
 
-private class ProjectDatasetsFinderImpl[F[_]: Async: NonEmptyParallel: Logger: SparqlQueryTimeRecorder](
+private class ProjectDatasetsFinderImpl[F[_]: Async: NonEmptyParallel: Logger](
     tsClient: TSClient[F]
 )(implicit renkuUrl: RenkuUrl)
     extends ProjectDatasetsFinder[F]

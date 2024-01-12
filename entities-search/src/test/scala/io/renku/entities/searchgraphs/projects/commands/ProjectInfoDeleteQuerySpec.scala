@@ -20,13 +20,14 @@ package io.renku.entities.searchgraphs
 package projects.commands
 
 import cats.effect.IO
+import cats.effect.testing.scalatest.AsyncIOSpec
 import eu.timepit.refined.auto._
+import io.renku.entities.EntitiesSearchJenaSpec
 import io.renku.generators.Generators.Implicits._
 import io.renku.graph.model
 import io.renku.graph.model.testentities._
 import io.renku.graph.model.{GraphClass, entities}
 import io.renku.interpreters.TestLogger
-import io.renku.testtools.CustomAsyncIOSpec
 import io.renku.triplesstore.SparqlQuery.Prefixes
 import io.renku.triplesstore._
 import io.renku.triplesstore.client.syntax._
@@ -36,38 +37,34 @@ import org.typelevel.log4cats.Logger
 
 class ProjectInfoDeleteQuerySpec
     extends AsyncFlatSpec
-    with CustomAsyncIOSpec
-    with should.Matchers
-    with InMemoryJenaForSpec
-    with ProjectsDataset
-    with SearchInfoDatasets {
+    with AsyncIOSpec
+    with EntitiesSearchJenaSpec
+    with TestSearchInfoDatasets
+    with should.Matchers {
 
-  it should "generate query that removes data of a single project info" in {
-
+  it should "generate query that removes data of a single project info" in projectsDSConfig.use { implicit pcc =>
     val project1 = anyProjectEntities.generateOne.to[entities.Project]
     val project2 = anyProjectEntities.generateOne.to[entities.Project]
 
     insertSearchInfo(project1) >>
       insertSearchInfo(project2) >>
       findProjects.asserting(_ should contain only (project1.resourceId, project2.resourceId)) >>
-      runUpdate(on = projectsDataset, ProjectInfoDeleteQuery(project1.resourceId)) >>
+      runUpdate(ProjectInfoDeleteQuery(project1.resourceId)) >>
       findProjects.asserting(_ shouldBe List(project2.resourceId))
   }
 
-  it should "generate query that removes all the data of the project" in {
-
+  it should "generate query that removes all the data of the project" in projectsDSConfig.use { implicit pcc =>
     val project = anyProjectEntities.generateOne.to[entities.Project]
 
     insertSearchInfo(project) >>
       findProjects.asserting(_ shouldBe List(project.resourceId)) >>
-      runUpdate(on = projectsDataset, ProjectInfoDeleteQuery(project.resourceId)) >>
-      triplesCount(on = projectsDataset, graphId = GraphClass.Projects.id).asserting(_ shouldBe 0L)
+      runUpdate(ProjectInfoDeleteQuery(project.resourceId)) >>
+      triplesCount(graphId = GraphClass.Projects.id).asserting(_ shouldBe 0L)
   }
 
   implicit override val ioLogger: Logger[IO] = TestLogger[IO]()
 
-  private def findProjects = runSelect(
-    on = projectsDataset,
+  private def findProjects(implicit pcc: ProjectsConnectionConfig) = runSelect(
     SparqlQuery.ofUnsafe(
       "find Discoverable Projects",
       Prefixes of renku -> "renku",
