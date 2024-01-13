@@ -249,7 +249,6 @@ lazy val tinyTypes = project
         Dependencies.catsFree
   )
   .dependsOn(generators % "test->test")
-//  .dependsOn(triplesStoreClient % "compile->compile; test->test") <-- why this?
   .enablePlugins(AutomateHeaderPlugin)
 
 lazy val renkuModelTinyTypes = project
@@ -513,7 +512,10 @@ lazy val triplesGenerator = project
     entitiesViewingsCollector % "compile->compile; test->test",
     projectAuth               % "compile->compile; test->test"
   )
-  .enablePlugins(AutomateHeaderPlugin)
+  .enablePlugins(
+    JavaAppPackaging,
+    AutomateHeaderPlugin
+  )
 
 lazy val tokenRepositoryApi = project
   .in(file("token-repository-api"))
