@@ -24,5 +24,5 @@ import org.scalatest.Suite
 
 trait KnowledgeGraphJenaSpec extends GraphJenaSpec {
   self: Suite =>
-  lazy val server: JenaServer = KnowledgeGraphJenaServer
+  lazy val server: JenaServer = JenaServer
 }

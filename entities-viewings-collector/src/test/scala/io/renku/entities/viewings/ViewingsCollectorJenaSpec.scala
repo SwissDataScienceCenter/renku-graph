@@ -24,5 +24,5 @@ import org.scalatest.Suite
 
 trait ViewingsCollectorJenaSpec extends GraphJenaSpec {
   self: Suite =>
-  lazy val server: JenaServer = ViewingsCollectorJenaServer
+  lazy val server: JenaServer = JenaServer
 }

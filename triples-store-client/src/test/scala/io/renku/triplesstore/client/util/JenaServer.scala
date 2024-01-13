@@ -24,6 +24,8 @@ import org.http4s.{BasicCredentials, Uri}
 
 import scala.sys.process._
 
+object JenaServer extends JenaServer("graph", port = 3030)
+
 class JenaServer(module: String, port: Int) {
 
   val conConfig: ConnectionConfig = ConnectionConfig(
@@ -53,13 +55,13 @@ class JenaServer(module: String, port: Int) {
     if (skipServer) println("Not starting Jena via docker")
     else if (checkRunning) ()
     else {
-      println(s"Starting Jena container for module '$module' from '$image' image")
+      println(s"Starting Jena container for '$module' from '$image' image")
       startCmd.!!
       var rc = 1
       while (rc != 0) {
         Thread.sleep(500)
         rc = isReadyCmd.!
-        if (rc == 0) println(s"Jena container for module '$module' started on port $port")
+        if (rc == 0) println(s"Jena container for '$module' started on port $port")
       }
     }
 
@@ -71,14 +73,14 @@ class JenaServer(module: String, port: Int) {
 
   def stop(): Unit =
     if (!skipServer && !wasRunning) {
-      println(s"Stopping Jena container for module '$module'")
+      println(s"Stopping Jena container for '$module'")
       stopCmd.!!
       ()
     }
 
   def forceStop(): Unit =
     if (!skipServer) {
-      println(s"Stopping Jena container for module '$module'")
+      println(s"Stopping Jena container for '$module'")
       stopCmd.!!
       ()
     }

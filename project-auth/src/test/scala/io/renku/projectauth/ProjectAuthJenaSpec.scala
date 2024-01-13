@@ -23,5 +23,5 @@ import org.scalatest.Suite
 
 trait ProjectAuthJenaSpec extends ProjectAuthServiceSupport {
   self: Suite =>
-  lazy val server: JenaServer = ProjectAuthJenaServer
+  lazy val server: JenaServer = JenaServer
 }

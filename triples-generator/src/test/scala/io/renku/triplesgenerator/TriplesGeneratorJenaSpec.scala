@@ -24,5 +24,5 @@ import org.scalatest.Suite
 
 trait TriplesGeneratorJenaSpec extends GraphJenaSpec {
   self: Suite =>
-  lazy val server: JenaServer = TriplesGeneratorJenaServer
+  lazy val server: JenaServer = JenaServer
 }

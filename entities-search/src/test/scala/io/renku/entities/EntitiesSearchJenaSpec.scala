@@ -24,5 +24,5 @@ import org.scalatest.Suite
 
 trait EntitiesSearchJenaSpec extends GraphJenaSpec {
   self: Suite =>
-  lazy val server: JenaServer = EntitiesSearchJenaServer
+  lazy val server: JenaServer = JenaServer
 }

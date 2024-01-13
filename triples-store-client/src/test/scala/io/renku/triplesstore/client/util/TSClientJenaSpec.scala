@@ -22,6 +22,5 @@ import org.scalatest.Suite
 
 trait TSClientJenaSpec extends JenaSpec {
   self: Suite =>
-
-  lazy val server: JenaServer = TSClientJenaServer
+  lazy val server: JenaServer = JenaServer
 }

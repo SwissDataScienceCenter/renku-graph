@@ -23,5 +23,5 @@ import org.scalatest.Suite
 
 trait CommonsJenaSpec extends GraphJenaSpec {
   self: Suite =>
-  lazy val server: JenaServer = CommonsJenaServer
+  lazy val server: JenaServer = JenaServer
 }

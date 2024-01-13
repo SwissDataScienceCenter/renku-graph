@@ -24,6 +24,8 @@ import io.renku.db.DBConfigProvider.DBConfig
 
 import scala.sys.process._
 
+object PostgresServer extends PostgresServer("graph", port = 5432)
+
 class PostgresServer(module: String, port: Int) {
 
   val dbConfig: DBConfigProvider.DBConfig[PostgresServer] = DBConfig[PostgresServer](
@@ -57,13 +59,13 @@ class PostgresServer(module: String, port: Int) {
     if (skipServer) println("Not starting postgres via docker")
     else if (checkRunning) ()
     else {
-      println(s"Starting PostgreSQL container for module '$module' from '$image' image")
+      println(s"Starting PostgreSQL container for '$module' from '$image' image")
       startCmd.!!
       var rc = 1
       while (rc != 0) {
         Thread.sleep(500)
         rc = isReadyCmd.!
-        if (rc == 0) println(s"PostgreSQL container for module '$module' started on port $port")
+        if (rc == 0) println(s"PostgreSQL container for '$module' started on port $port")
       }
     }
 
@@ -75,14 +77,14 @@ class PostgresServer(module: String, port: Int) {
 
   def stop(): Unit =
     if (!skipServer && !wasRunning) {
-      println(s"Stopping PostgreSQL container for module '$module'")
+      println(s"Stopping PostgreSQL container for '$module'")
       stopCmd.!!
       ()
     }
 
   def forceStop(): Unit =
     if (!skipServer) {
-      println(s"Stopping PostgreSQL container for module '$module'")
+      println(s"Stopping PostgreSQL container for '$module'")
       stopCmd.!!
       ()
     }

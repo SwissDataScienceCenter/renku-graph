@@ -29,15 +29,12 @@ import org.typelevel.log4cats.Logger
 
 object TriplesStore extends JenaServerSupport {
 
-  override lazy val server: JenaServer = new JenaServer("acceptance_tests", port = 3030)
+  override lazy val server: JenaServer = JenaServer
 
   lazy val fusekiUrl: FusekiUrl = FusekiUrl(server.conConfig.baseUrl.renderString)
 
-  def startUnsafe(): Unit = server.start()
-  def forceStop():   Unit = server.forceStop()
-
   def start(): IO[Unit] =
-    IO(startUnsafe())
+    IO(server.start())
 
   def findProjectAuth(
       slug: projects.Slug

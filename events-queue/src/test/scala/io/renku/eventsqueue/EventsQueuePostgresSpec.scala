@@ -38,7 +38,7 @@ trait EventsQueuePostgresSpec extends PostgresSpec[TestDB] { self: Suite =>
 
   private type IOChannel = Channel[IO, String, String]
 
-  lazy val server: PostgresServer = EventsQueuePostgresServer
+  lazy val server: PostgresServer = PostgresServer
 
   implicit val logger: TestLogger[IO] = TestLogger()
   private val timeout     = 10 seconds
