@@ -1,5 +1,3 @@
-import java.util.concurrent.atomic.AtomicInteger
-
 /*
  * Copyright 2024 Swiss Data Science Center (SDSC)
  * A partnership between École Polytechnique Fédérale de Lausanne (EPFL) and
@@ -18,6 +16,8 @@ import java.util.concurrent.atomic.AtomicInteger
  * limitations under the License.
  */
 
+import java.util.concurrent.atomic.AtomicInteger
+
 object JenaServer {
 
   private val startRequests = new AtomicInteger(0)
@@ -27,7 +27,7 @@ object JenaServer {
   }
 
   def stop: ClassLoader => Unit = { cl =>
-    if (startRequests.decrementAndGet() == 0) call("forceStop")
+    if (startRequests.decrementAndGet() == 0) call("forceStop")(cl)
   }
 
   private def call(methodName: String): ClassLoader => Unit = classLoader => {
