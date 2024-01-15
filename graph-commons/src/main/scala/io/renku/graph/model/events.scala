@@ -82,17 +82,17 @@ object events {
 
       import io.circe.parser.parse
       import io.circe.{Decoder, DecodingFailure, Json}
-      import io.renku.tinytypes.json.TinyTypeDecoders._
+      import io.renku.tinytypes.json.TinyTypeDecoders.blankStringToNoneDecoder
 
       lazy val maybeAuthorEmail: Option[persons.Email] =
         bodyAsJson
-          .flatMap(_.hcursor.downField("author").downField("email").as[Option[persons.Email]])
+          .flatMap(_.hcursor.downField("author").downField("email").as(blankStringToNoneDecoder(persons.Email)))
           .toOption
           .flatten
 
       lazy val maybeCommitterEmail: Option[persons.Email] =
         bodyAsJson
-          .flatMap(_.hcursor.downField("committer").downField("email").as[Option[persons.Email]])
+          .flatMap(_.hcursor.downField("committer").downField("email").as(blankStringToNoneDecoder(persons.Email)))
           .toOption
           .flatten
 
