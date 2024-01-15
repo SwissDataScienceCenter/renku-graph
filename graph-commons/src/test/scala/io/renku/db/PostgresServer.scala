@@ -22,7 +22,6 @@ import eu.timepit.refined.api.Refined
 import eu.timepit.refined.auto._
 import io.renku.db.DBConfigProvider.DBConfig
 
-import java.util.concurrent.atomic.AtomicBoolean
 import scala.sys.process._
 
 object PostgresServer extends PostgresServer("graph", port = 5432)
@@ -55,29 +54,21 @@ class PostgresServer(module: String, port: Int) {
   private val stopCmd      = s"docker stop -t5 $containerName"
   private val isReadyCmd   = s"docker exec $containerName pg_isready"
   private var wasRunning: Boolean = false
-  private val starting = new AtomicBoolean(false)
 
-  def start(): Unit =
-    if (skipServer) println("Not starting postgres via docker")
-    else if (starting.get())
-      while (starting.get())
-        Thread.sleep(500)
+  def start(): Unit = synchronized {
+    if (skipServer) println("Not starting Postgres via docker")
     else if (checkRunning) ()
     else {
-      if (starting.compareAndSet(false, true)) {
-        println(s"Starting PostgreSQL container for '$module' from '$image' image")
-        startCmd.!!
-        var rc = 1
-        while (rc != 0) {
-          Thread.sleep(500)
-          rc = isReadyCmd.!
-          if (rc == 0) {
-            starting.set(false)
-            println(s"PostgreSQL container for '$module' started on port $port")
-          }
-        }
-      } else start()
+      println(s"Starting PostgreSQL container for '$module' from '$image' image")
+      startCmd.!!
+      var rc = 1
+      while (rc != 0) {
+        Thread.sleep(500)
+        rc = isReadyCmd.!
+        if (rc == 0) println(s"PostgreSQL container for '$module' started on port $port")
+      }
     }
+  }
 
   private def checkRunning: Boolean = {
     val out = isRunningCmd.lazyLines.toList
