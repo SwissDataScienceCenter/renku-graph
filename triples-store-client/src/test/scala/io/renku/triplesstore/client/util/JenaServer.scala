@@ -22,6 +22,7 @@ import cats.syntax.all._
 import io.renku.triplesstore.client.http.ConnectionConfig
 import org.http4s.{BasicCredentials, Uri}
 
+import java.util.concurrent.atomic.AtomicBoolean
 import scala.sys.process._
 
 object JenaServer extends JenaServer("graph", port = 3030)
@@ -49,7 +50,7 @@ class JenaServer(module: String, port: Int) {
   private val stopCmd      = s"docker stop -t5 $containerName"
   private val readyCmd     = "curl http://localhost:3030/$/ping --no-progress-meter --fail 1> /dev/null"
   private val isReadyCmd   = s"docker exec $containerName sh -c '$readyCmd'"
-  private var wasRunning: Boolean = false
+  private val wasRunning   = new AtomicBoolean(false)
 
   def start(): Unit = synchronized {
     if (skipServer) println("Not starting Jena via docker")
@@ -67,13 +68,14 @@ class JenaServer(module: String, port: Int) {
   }
 
   private def checkRunning: Boolean = {
-    val out = isRunningCmd.lazyLines.toList
-    wasRunning = out.exists(_ contains containerName)
-    wasRunning
+    val out       = isRunningCmd.lazyLines.toList
+    val isRunning = out.exists(_ contains containerName)
+    wasRunning.set(isRunning)
+    isRunning
   }
 
   def stop(): Unit =
-    if (!skipServer && !wasRunning) {
+    if (!skipServer && !wasRunning.get()) {
       println(s"Stopping Jena container for '$module'")
       stopCmd.!!
       ()
@@ -83,6 +85,7 @@ class JenaServer(module: String, port: Int) {
     if (!skipServer) {
       println(s"Stopping Jena container for '$module'")
       stopCmd.!!
+      wasRunning.set(false)
       ()
     }
 }
