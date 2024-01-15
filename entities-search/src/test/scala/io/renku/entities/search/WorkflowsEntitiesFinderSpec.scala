@@ -22,7 +22,6 @@ import Criteria._
 import EntityConverters._
 import cats.effect.testing.scalatest.AsyncIOSpec
 import cats.syntax.all._
-import io.renku.entities.EntitiesSearchJenaSpec
 import io.renku.entities.search.model.Entity.Workflow.WorkflowType
 import io.renku.entities.searchgraphs.TestSearchInfoDatasets
 import io.renku.generators.Generators.Implicits._
@@ -30,6 +29,7 @@ import io.renku.generators.Generators._
 import io.renku.graph.model._
 import io.renku.graph.model.testentities.RenkuProject.CreateCompositePlan
 import io.renku.graph.model.testentities.generators.EntitiesGenerators
+import io.renku.triplesstore.GraphJenaSpec
 import org.scalatest.Succeeded
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AsyncWordSpec
@@ -39,7 +39,7 @@ class WorkflowsEntitiesFinderSpec
     with AsyncIOSpec
     with EntitiesGenerators
     with FinderSpec
-    with EntitiesSearchJenaSpec
+    with GraphJenaSpec
     with TestSearchInfoDatasets
     with should.Matchers {
 

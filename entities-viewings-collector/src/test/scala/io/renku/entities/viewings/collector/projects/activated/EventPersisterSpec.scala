@@ -23,7 +23,6 @@ import cats.effect.IO
 import cats.effect.testing.scalatest.AsyncIOSpec
 import cats.syntax.all._
 import io.renku.entities.searchgraphs.TestSearchInfoDatasets
-import io.renku.entities.viewings.ViewingsCollectorJenaSpec
 import io.renku.generators.Generators.Implicits._
 import io.renku.generators.Generators.timestampsNotInTheFuture
 import io.renku.graph.model.projects
@@ -40,7 +39,7 @@ import org.scalatest.wordspec.AsyncWordSpec
 class EventPersisterSpec
     extends AsyncWordSpec
     with AsyncIOSpec
-    with ViewingsCollectorJenaSpec
+    with GraphJenaSpec
     with TestSearchInfoDatasets
     with EventPersisterSpecTools
     with AsyncMockFactory

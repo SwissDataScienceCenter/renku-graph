@@ -33,7 +33,7 @@ trait EventLogPostgresSpec
     with EventLogDBFetching {
   self: Suite =>
 
-  lazy val server: PostgresServer = EventLogPostgresServer
+  lazy val server: PostgresServer = PostgresServer
 
   implicit val logger: TestLogger[IO] = TestLogger()
 

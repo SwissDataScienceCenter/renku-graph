@@ -30,15 +30,11 @@ import skunk.implicits._
 
 object PostgresDB {
 
-  lazy val server: PostgresServer = new PostgresServer("acceptance_tests", port = 5432)
-
+  private lazy val server   = PostgresServer
   private lazy val dbConfig = server.dbConfig
 
-  def startUnsafe(): Unit = server.start()
-  def forceStop():   Unit = server.forceStop()
-
   def start(): IO[Unit] =
-    IO(startUnsafe())
+    IO(server.start())
 
   def sessionPool(dbCfg: DBConfig[_]): Resource[IO, Resource[IO, Session[IO]]] =
     Session

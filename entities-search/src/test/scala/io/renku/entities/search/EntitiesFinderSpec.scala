@@ -22,6 +22,7 @@ import cats.data.NonEmptyList
 import cats.effect.testing.scalatest.AsyncIOSpec
 import cats.syntax.all._
 import eu.timepit.refined.auto._
+import io.renku.entities.search
 import io.renku.entities.search.Criteria.Filters._
 import io.renku.entities.search.Criteria.{Filters, Sort}
 import io.renku.entities.search.EntityConverters._
@@ -29,7 +30,6 @@ import io.renku.entities.search.Generators._
 import io.renku.entities.search.diff.SearchDiffInstances
 import io.renku.entities.search.model.Entity
 import io.renku.entities.searchgraphs.TestSearchInfoDatasets
-import io.renku.entities.{EntitiesSearchJenaSpec, search}
 import io.renku.generators.CommonGraphGenerators.{authUsers, sortingDirections}
 import io.renku.generators.Generators.Implicits._
 import io.renku.generators.Generators._
@@ -41,6 +41,7 @@ import io.renku.graph.model.tools.AdditionalMatchers
 import io.renku.http.rest.paging.PagingRequest
 import io.renku.http.rest.paging.model._
 import io.renku.http.rest.{SortBy, Sorting}
+import io.renku.triplesstore.GraphJenaSpec
 import org.scalacheck.Gen.alphaLowerChar
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AsyncWordSpec
@@ -52,7 +53,7 @@ import scala.util.Random
 class EntitiesFinderSpec
     extends AsyncWordSpec
     with AsyncIOSpec
-    with EntitiesSearchJenaSpec
+    with GraphJenaSpec
     with FinderSpec
     with TestSearchInfoDatasets
     with EntitiesGenerators

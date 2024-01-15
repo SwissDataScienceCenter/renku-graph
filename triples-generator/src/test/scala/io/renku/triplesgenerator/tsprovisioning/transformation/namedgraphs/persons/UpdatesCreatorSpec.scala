@@ -29,10 +29,9 @@ import io.renku.graph.model.testentities.generators.EntitiesGenerators
 import io.renku.graph.model.{GraphClass, entities}
 import io.renku.http.client.UrlEncoder
 import io.renku.interpreters.TestLogger
-import io.renku.triplesgenerator.TriplesGeneratorJenaSpec
 import io.renku.triplesgenerator.tsprovisioning.transformation.namedgraphs.persons.UpdatesCreatorSpec.PersonData
 import io.renku.triplesstore.SparqlQuery.Prefixes
-import io.renku.triplesstore.{ProjectsConnectionConfig, SparqlQuery}
+import io.renku.triplesstore.{GraphJenaSpec, ProjectsConnectionConfig, SparqlQuery}
 import org.scalatest.Succeeded
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AsyncWordSpec
@@ -40,7 +39,7 @@ import org.scalatest.wordspec.AsyncWordSpec
 class UpdatesCreatorSpec
     extends AsyncWordSpec
     with AsyncIOSpec
-    with TriplesGeneratorJenaSpec
+    with GraphJenaSpec
     with EntitiesGenerators
     with should.Matchers {
 

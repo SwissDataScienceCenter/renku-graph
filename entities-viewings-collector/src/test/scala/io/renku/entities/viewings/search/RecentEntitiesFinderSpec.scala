@@ -20,18 +20,17 @@ package io.renku.entities.viewings.search
 
 import cats.effect.IO
 import io.renku.entities.search.model.{MatchingScore, Entity => SearchEntity}
-import io.renku.entities.viewings.ViewingsCollectorJenaSpec
 import io.renku.entities.viewings.search.RecentEntitiesFinder.{Criteria, EntityType}
 import io.renku.generators.Generators.Implicits._
 import io.renku.graph.model.entities
 import io.renku.http.server.security.model.AuthUser
-import io.renku.triplesstore.ProjectsConnectionConfig
+import io.renku.triplesstore.{GraphJenaSpec, ProjectsConnectionConfig}
 import org.scalatest.Succeeded
 
 import java.time.Instant
 import java.time.temporal.ChronoUnit
 
-class RecentEntitiesFinderSpec extends SearchSpec with ViewingsCollectorJenaSpec {
+class RecentEntitiesFinderSpec extends SearchSpec with GraphJenaSpec {
 
   private def recentEntitiesFinder(implicit pcc: ProjectsConnectionConfig) =
     new RecentEntitiesFinderImpl[IO](tsClient)

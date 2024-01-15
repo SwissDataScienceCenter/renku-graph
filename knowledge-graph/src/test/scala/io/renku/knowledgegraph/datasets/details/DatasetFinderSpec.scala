@@ -33,10 +33,9 @@ import io.renku.graph.model.projects.Visibility
 import io.renku.graph.model.testentities._
 import io.renku.http.server.security.model.AuthUser
 import io.renku.interpreters.TestLogger
-import io.renku.knowledgegraph.KnowledgeGraphJenaSpec
 import io.renku.knowledgegraph.datasets.details.Dataset._
 import io.renku.logging.TestSparqlQueryTimeRecorder
-import io.renku.triplesstore.{ProjectsConnectionConfig, SparqlQueryTimeRecorder}
+import io.renku.triplesstore.{GraphJenaSpec, ProjectsConnectionConfig, SparqlQueryTimeRecorder}
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AsyncWordSpec
 import org.scalatest.{OptionValues, Succeeded}
@@ -47,7 +46,7 @@ import scala.util.Random
 class DatasetFinderSpec
     extends AsyncWordSpec
     with AsyncIOSpec
-    with KnowledgeGraphJenaSpec
+    with GraphJenaSpec
     with TestSearchInfoDatasets
     with ScalaCheckPropertyChecks
     with should.Matchers

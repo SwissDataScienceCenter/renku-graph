@@ -24,20 +24,15 @@ import io.renku.graph.triplesstore.DatasetTTLs.ProjectsTTL
 import io.renku.http.client.BasicAuthCredentials
 import io.renku.projectauth.{ProjectAuthData, QueryFilter}
 import io.renku.triplesstore._
-import io.renku.triplesstore.client.util.{JenaServer, JenaServerSupport}
+import io.renku.triplesstore.client.util.JenaServerSupport
 import org.typelevel.log4cats.Logger
 
 object TriplesStore extends JenaServerSupport {
 
-  override lazy val server: JenaServer = new JenaServer("acceptance_tests", port = 3030)
-
   lazy val fusekiUrl: FusekiUrl = FusekiUrl(server.conConfig.baseUrl.renderString)
 
-  def startUnsafe(): Unit = server.start()
-  def forceStop():   Unit = server.forceStop()
-
   def start(): IO[Unit] =
-    IO(startUnsafe())
+    IO(server.start())
 
   def findProjectAuth(
       slug: projects.Slug

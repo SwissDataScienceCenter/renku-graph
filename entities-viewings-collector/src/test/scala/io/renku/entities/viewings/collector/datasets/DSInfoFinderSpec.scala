@@ -22,7 +22,7 @@ import cats.effect.IO
 import cats.effect.testing.scalatest.AsyncIOSpec
 import cats.syntax.all._
 import io.renku.entities.searchgraphs.TestSearchInfoDatasets
-import io.renku.entities.viewings.{ViewingsCollectorJenaSpec, collector}
+import io.renku.entities.viewings.collector
 import io.renku.generators.Generators.Implicits._
 import io.renku.graph.model.entities
 import io.renku.graph.model.testentities._
@@ -35,7 +35,7 @@ import org.scalatest.wordspec.AsyncWordSpec
 class DSInfoFinderSpec
     extends AsyncWordSpec
     with AsyncIOSpec
-    with ViewingsCollectorJenaSpec
+    with GraphJenaSpec
     with TestSearchInfoDatasets
     with should.Matchers
     with OptionValues {

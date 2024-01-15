@@ -22,7 +22,10 @@ import cats.syntax.all._
 import io.renku.triplesstore.client.http.ConnectionConfig
 import org.http4s.{BasicCredentials, Uri}
 
+import java.util.concurrent.atomic.AtomicBoolean
 import scala.sys.process._
+
+object JenaServer extends JenaServer("graph", port = 3030)
 
 class JenaServer(module: String, port: Int) {
 
@@ -47,39 +50,42 @@ class JenaServer(module: String, port: Int) {
   private val stopCmd      = s"docker stop -t5 $containerName"
   private val readyCmd     = "curl http://localhost:3030/$/ping --no-progress-meter --fail 1> /dev/null"
   private val isReadyCmd   = s"docker exec $containerName sh -c '$readyCmd'"
-  private var wasRunning: Boolean = false
+  private val wasRunning   = new AtomicBoolean(false)
 
-  def start(): Unit =
+  def start(): Unit = synchronized {
     if (skipServer) println("Not starting Jena via docker")
     else if (checkRunning) ()
     else {
-      println(s"Starting Jena container for module '$module' from '$image' image")
+      println(s"Starting Jena container for '$module' from '$image' image")
       startCmd.!!
       var rc = 1
       while (rc != 0) {
         Thread.sleep(500)
         rc = isReadyCmd.!
-        if (rc == 0) println(s"Jena container for module '$module' started on port $port")
+        if (rc == 0) println(s"Jena container for '$module' started on port $port")
       }
     }
+  }
 
   private def checkRunning: Boolean = {
-    val out = isRunningCmd.lazyLines.toList
-    wasRunning = out.exists(_ contains containerName)
-    wasRunning
+    val out       = isRunningCmd.lazyLines.toList
+    val isRunning = out.exists(_ contains containerName)
+    wasRunning.set(isRunning)
+    isRunning
   }
 
   def stop(): Unit =
-    if (!skipServer && !wasRunning) {
-      println(s"Stopping Jena container for module '$module'")
+    if (!skipServer && !wasRunning.get()) {
+      println(s"Stopping Jena container for '$module'")
       stopCmd.!!
       ()
     }
 
   def forceStop(): Unit =
     if (!skipServer) {
-      println(s"Stopping Jena container for module '$module'")
+      println(s"Stopping Jena container for '$module'")
       stopCmd.!!
+      wasRunning.set(false)
       ()
     }
 }

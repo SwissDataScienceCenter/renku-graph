@@ -28,12 +28,18 @@ import io.renku.graph.model.{RenkuUrl, Schemas, persons}
 import io.renku.projectauth._
 import io.renku.triplesstore.client.sparql.Fragment
 import io.renku.triplesstore.client.syntax._
+import io.renku.triplesstore.client.util.JenaSpec
 import org.scalatest.flatspec.AsyncFlatSpec
 import org.scalatest.matchers.should
 import org.typelevel.log4cats.Logger
 import org.typelevel.log4cats.slf4j.Slf4jLogger
 
-class SparqlSnippetsSpec extends AsyncFlatSpec with AsyncIOSpec with ProjectAuthJenaSpec with should.Matchers {
+class SparqlSnippetsSpec
+    extends AsyncFlatSpec
+    with AsyncIOSpec
+    with JenaSpec
+    with ProjectAuthServiceSupport
+    with should.Matchers {
 
   implicit val logger:   Logger[IO] = Slf4jLogger.getLogger[IO]
   implicit val renkuUrl: RenkuUrl   = RenkuUrl("http://localhost/renku")

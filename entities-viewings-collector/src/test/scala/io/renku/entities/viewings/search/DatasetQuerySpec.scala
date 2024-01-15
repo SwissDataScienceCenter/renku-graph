@@ -19,17 +19,17 @@
 package io.renku.entities.viewings.search
 
 import io.renku.entities.search.model.{MatchingScore, Entity => SearchEntity}
-import io.renku.entities.viewings.ViewingsCollectorJenaSpec
 import io.renku.entities.viewings.search.RecentEntitiesFinder.Criteria
 import io.renku.generators.Generators.Implicits._
 import io.renku.graph.model.entities
 import io.renku.http.server.security.model.AuthUser
+import io.renku.triplesstore.GraphJenaSpec
 import org.scalatest.{OptionValues, Succeeded}
 
 import java.time.Instant
 import java.time.temporal.ChronoUnit
 
-class DatasetQuerySpec extends SearchSpec with ViewingsCollectorJenaSpec with OptionValues {
+class DatasetQuerySpec extends SearchSpec with GraphJenaSpec with OptionValues {
 
   it should "return multiple datasets" in projectsDSConfig.use { implicit pcc =>
     val project1 = renkuProjectEntities(visibilityPublic)

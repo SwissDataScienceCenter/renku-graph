@@ -28,7 +28,6 @@ import eu.timepit.refined.auto._
 import io.renku.graph.model.versions.{CliVersion, RenkuVersionPair, SchemaVersion}
 import io.renku.interpreters.TestLogger
 import io.renku.logging.TestSparqlQueryTimeRecorder
-import io.renku.triplesgenerator.TriplesGeneratorJenaSpec
 import io.renku.triplesgenerator.generators.VersionGenerators._
 import io.renku.triplesstore.SparqlQuery.Prefixes
 import io.renku.triplesstore._
@@ -36,7 +35,7 @@ import org.scalatest.Succeeded
 import org.scalatest.matchers.should.Matchers
 import org.scalatest.wordspec.AsyncWordSpec
 
-class RenkuVersionPairUpdaterSpec extends AsyncWordSpec with AsyncIOSpec with TriplesGeneratorJenaSpec with Matchers {
+class RenkuVersionPairUpdaterSpec extends AsyncWordSpec with AsyncIOSpec with GraphJenaSpec with Matchers {
 
   "update" should {
     "create a renku:VersionPair with the given version pair" in migrationsDSConfig.use { implicit mcc =>

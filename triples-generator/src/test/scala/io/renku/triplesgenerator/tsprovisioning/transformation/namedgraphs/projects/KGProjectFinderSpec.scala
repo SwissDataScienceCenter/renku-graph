@@ -28,8 +28,7 @@ import io.renku.graph.model.testentities.generators.EntitiesGenerators
 import io.renku.graph.model.tools.AdditionalMatchers
 import io.renku.interpreters.TestLogger
 import io.renku.logging.TestSparqlQueryTimeRecorder
-import io.renku.triplesgenerator.TriplesGeneratorJenaSpec
-import io.renku.triplesstore.{ProjectsConnectionConfig, SparqlQueryTimeRecorder}
+import io.renku.triplesstore.{GraphJenaSpec, ProjectsConnectionConfig, SparqlQueryTimeRecorder}
 import org.scalatest.flatspec.AsyncFlatSpec
 import org.scalatest.matchers.should
 import org.scalatestplus.scalacheck.ScalaCheckPropertyChecks
@@ -37,7 +36,7 @@ import org.scalatestplus.scalacheck.ScalaCheckPropertyChecks
 class KGProjectFinderSpec
     extends AsyncFlatSpec
     with AsyncIOSpec
-    with TriplesGeneratorJenaSpec
+    with GraphJenaSpec
     with should.Matchers
     with EntitiesGenerators
     with AdditionalMatchers

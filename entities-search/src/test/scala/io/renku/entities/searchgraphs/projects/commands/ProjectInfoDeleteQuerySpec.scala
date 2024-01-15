@@ -22,7 +22,6 @@ package projects.commands
 import cats.effect.IO
 import cats.effect.testing.scalatest.AsyncIOSpec
 import eu.timepit.refined.auto._
-import io.renku.entities.EntitiesSearchJenaSpec
 import io.renku.generators.Generators.Implicits._
 import io.renku.graph.model
 import io.renku.graph.model.testentities._
@@ -38,7 +37,7 @@ import org.typelevel.log4cats.Logger
 class ProjectInfoDeleteQuerySpec
     extends AsyncFlatSpec
     with AsyncIOSpec
-    with EntitiesSearchJenaSpec
+    with GraphJenaSpec
     with TestSearchInfoDatasets
     with should.Matchers {
 
