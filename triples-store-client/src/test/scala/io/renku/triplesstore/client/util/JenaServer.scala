@@ -85,7 +85,6 @@ class JenaServer(module: String, port: Int) {
     if (!skipServer) {
       println(s"Stopping Jena container for '$module'")
       stopCmd.!!
-      wasRunning.set(false)
       ()
     }
 }

@@ -89,7 +89,6 @@ class PostgresServer(module: String, port: Int) {
     if (!skipServer) {
       println(s"Stopping PostgreSQL container for '$module'")
       stopCmd.!!
-      wasRunning.set(false)
       ()
     }
 }
