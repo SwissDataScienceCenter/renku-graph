@@ -396,9 +396,7 @@ object events {
   }
 
   final class LastSyncedDate private (val value: Instant) extends AnyVal with InstantTinyType
-  object LastSyncedDate
-      extends TinyTypeFactory[LastSyncedDate](new LastSyncedDate(_))
-      with InstantNotInTheFuture[LastSyncedDate] {
+  object LastSyncedDate extends TinyTypeFactory[LastSyncedDate](new LastSyncedDate(_)) {
     implicit val decoder: Decoder[LastSyncedDate] = instantDecoder(LastSyncedDate)
   }
 }
