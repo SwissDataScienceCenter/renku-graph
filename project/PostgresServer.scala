@@ -17,6 +17,7 @@
  */
 
 import java.util.concurrent.atomic.AtomicInteger
+import scala.util.Try
 
 object PostgresServer {
 
@@ -27,7 +28,9 @@ object PostgresServer {
   }
 
   def stop: ClassLoader => Unit = { cl =>
-    if (startRequests.decrementAndGet() == 0) call("forceStop")(cl)
+    if (startRequests.decrementAndGet() == 0)
+      Try(call("forceStop")(cl))
+        .recover { case err => err.printStackTrace() }
   }
 
   private def call(methodName: String): ClassLoader => Unit = classLoader => {
