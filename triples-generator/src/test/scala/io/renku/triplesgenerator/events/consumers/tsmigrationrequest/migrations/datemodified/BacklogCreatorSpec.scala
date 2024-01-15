@@ -29,7 +29,6 @@ import io.renku.graph.model.testentities._
 import io.renku.interpreters.TestLogger
 import io.renku.jsonld.syntax._
 import io.renku.logging.TestSparqlQueryTimeRecorder
-import io.renku.triplesgenerator.TriplesGeneratorJenaSpec
 import io.renku.triplesstore.SparqlQuery.Prefixes
 import io.renku.triplesstore._
 import io.renku.triplesstore.client.syntax._
@@ -42,7 +41,7 @@ import tooling.RecordsFinder
 class BacklogCreatorSpec
     extends AsyncFlatSpec
     with AsyncIOSpec
-    with TriplesGeneratorJenaSpec
+    with GraphJenaSpec
     with TestSearchInfoDatasets
     with should.Matchers
     with TSTooling {

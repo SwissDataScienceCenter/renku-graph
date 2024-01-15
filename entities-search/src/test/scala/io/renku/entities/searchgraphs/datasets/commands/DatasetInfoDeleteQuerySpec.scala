@@ -23,7 +23,6 @@ import cats.effect.IO
 import cats.effect.testing.scalatest.AsyncIOSpec
 import cats.syntax.all._
 import eu.timepit.refined.auto._
-import io.renku.entities.EntitiesSearchJenaSpec
 import io.renku.entities.searchgraphs.TestSearchInfoDatasets
 import io.renku.entities.searchgraphs.datasets.Generators._
 import io.renku.entities.searchgraphs.datasets.SearchInfoLens._
@@ -35,14 +34,14 @@ import io.renku.interpreters.TestLogger
 import io.renku.jsonld.syntax._
 import io.renku.triplesstore.SparqlQuery.Prefixes
 import io.renku.triplesstore.client.syntax._
-import io.renku.triplesstore.{DatasetConnectionConfig, SparqlQuery}
+import io.renku.triplesstore.{DatasetConnectionConfig, GraphJenaSpec, SparqlQuery}
 import org.scalatest.flatspec.AsyncFlatSpec
 import org.scalatest.matchers.should
 
 class DatasetInfoDeleteQuerySpec
     extends AsyncFlatSpec
     with AsyncIOSpec
-    with EntitiesSearchJenaSpec
+    with GraphJenaSpec
     with TestSearchInfoDatasets
     with should.Matchers {
 

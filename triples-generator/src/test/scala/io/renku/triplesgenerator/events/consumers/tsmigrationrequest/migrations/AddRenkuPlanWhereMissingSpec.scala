@@ -31,7 +31,6 @@ import io.renku.jsonld.syntax._
 import io.renku.jsonld.{EntityId, EntityType}
 import io.renku.logging.TestSparqlQueryTimeRecorder
 import io.renku.metrics.MetricsRegistry
-import io.renku.triplesgenerator.TriplesGeneratorJenaSpec
 import io.renku.triplesstore.SparqlQuery.Prefixes
 import io.renku.triplesstore._
 import io.renku.triplesstore.client.model.Quad
@@ -44,7 +43,7 @@ import tooling._
 class AddRenkuPlanWhereMissingSpec
     extends AsyncWordSpec
     with AsyncIOSpec
-    with TriplesGeneratorJenaSpec
+    with GraphJenaSpec
     with should.Matchers
     with AsyncMockFactory {
 

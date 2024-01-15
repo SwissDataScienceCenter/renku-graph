@@ -30,7 +30,6 @@ import io.renku.interpreters.TestLogger
 import io.renku.jsonld.syntax._
 import io.renku.logging.TestSparqlQueryTimeRecorder
 import io.renku.metrics.TestMetricsRegistry
-import io.renku.triplesgenerator.TriplesGeneratorJenaSpec
 import io.renku.triplesstore.SparqlQuery.Prefixes
 import io.renku.triplesstore._
 import io.renku.triplesstore.client.model.Quad
@@ -44,7 +43,7 @@ import tooling.RegisteredUpdateQueryMigration
 class ProjectsGraphPersonRemoverSpec
     extends AsyncFlatSpec
     with AsyncIOSpec
-    with TriplesGeneratorJenaSpec
+    with GraphJenaSpec
     with TestSearchInfoDatasets
     with should.Matchers
     with AsyncMockFactory {

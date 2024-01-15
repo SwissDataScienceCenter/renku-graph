@@ -26,14 +26,13 @@ import io.renku.graph.model.GraphModelGenerators.projectSlugs
 import io.renku.graph.model.testentities._
 import io.renku.http.rest.paging.model.Total
 import io.renku.interpreters.TestLogger
-import io.renku.knowledgegraph.KnowledgeGraphJenaSpec
 import io.renku.logging.TestSparqlQueryTimeRecorder
-import io.renku.triplesstore.{ProjectsConnectionConfig, SparqlQueryTimeRecorder}
+import io.renku.triplesstore.{GraphJenaSpec, ProjectsConnectionConfig, SparqlQueryTimeRecorder}
 import org.scalatest.Succeeded
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AsyncWordSpec
 
-class TagsFinderSpec extends AsyncWordSpec with AsyncIOSpec with KnowledgeGraphJenaSpec with should.Matchers {
+class TagsFinderSpec extends AsyncWordSpec with AsyncIOSpec with GraphJenaSpec with should.Matchers {
 
   "findTags" should {
 

@@ -33,7 +33,6 @@ import io.renku.graph.model.testentities._
 import io.renku.http.rest.paging.model.PerPage
 import io.renku.interpreters.TestLogger
 import io.renku.triplesgenerator
-import io.renku.triplesgenerator.TriplesGeneratorJenaSpec
 import io.renku.triplesgenerator.api.events.ProjectViewedEvent
 import io.renku.triplesgenerator.errors.ErrorGenerators.processingRecoverableErrors
 import io.renku.triplesstore._
@@ -46,7 +45,7 @@ import tooling.{MigrationExecutionRegister, RecoverableErrorsRecovery}
 class ProjectsDateViewedCreatorSpec
     extends AsyncWordSpec
     with AsyncIOSpec
-    with TriplesGeneratorJenaSpec
+    with GraphJenaSpec
     with should.Matchers
     with EitherValues
     with AsyncMockFactory {

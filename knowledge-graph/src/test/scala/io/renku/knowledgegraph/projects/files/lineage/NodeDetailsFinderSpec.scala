@@ -30,10 +30,9 @@ import io.renku.graph.model.testentities.StepPlanCommandParameter._
 import io.renku.graph.model.testentities._
 import io.renku.interpreters.TestLogger
 import io.renku.jsonld.syntax._
-import io.renku.knowledgegraph.KnowledgeGraphJenaSpec
 import io.renku.logging.TestSparqlQueryTimeRecorder
 import io.renku.stubbing.ExternalServiceStubbing
-import io.renku.triplesstore.{ProjectsConnectionConfig, SparqlQueryTimeRecorder}
+import io.renku.triplesstore.{GraphJenaSpec, ProjectsConnectionConfig, SparqlQueryTimeRecorder}
 import model._
 import org.scalatest.Succeeded
 import org.scalatest.matchers.should
@@ -42,7 +41,7 @@ import org.scalatest.wordspec.AsyncWordSpec
 class NodeDetailsFinderSpec
     extends AsyncWordSpec
     with AsyncIOSpec
-    with KnowledgeGraphJenaSpec
+    with GraphJenaSpec
     with ExternalServiceStubbing
     with should.Matchers {
 

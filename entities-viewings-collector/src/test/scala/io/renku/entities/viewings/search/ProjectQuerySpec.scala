@@ -19,15 +19,15 @@
 package io.renku.entities.viewings.search
 
 import io.renku.entities.search.model.{MatchingScore, Entity => SearchEntity}
-import io.renku.entities.viewings.ViewingsCollectorJenaSpec
 import io.renku.entities.viewings.search.RecentEntitiesFinder.Criteria
 import io.renku.generators.Generators.Implicits._
 import io.renku.http.server.security.model.AuthUser
+import io.renku.triplesstore.GraphJenaSpec
 import org.scalatest.Succeeded
 
 import java.time.Instant
 
-class ProjectQuerySpec extends SearchSpec with ViewingsCollectorJenaSpec {
+class ProjectQuerySpec extends SearchSpec with GraphJenaSpec {
 
   it should "return one project entry if viewed multiple times" in projectsDSConfig.use { implicit pcc =>
     val project = renkuProjectEntities(visibilityPublic)

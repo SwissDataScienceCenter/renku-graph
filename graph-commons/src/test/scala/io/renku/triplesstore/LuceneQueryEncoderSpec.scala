@@ -36,7 +36,7 @@ import org.scalatest.matchers.should
 import org.scalatest.wordspec.AsyncWordSpec
 import org.typelevel.log4cats.Logger
 
-class LuceneQueryEncoderSpec extends AsyncWordSpec with AsyncIOSpec with CommonsJenaSpec with should.Matchers {
+class LuceneQueryEncoderSpec extends AsyncWordSpec with AsyncIOSpec with GraphJenaSpec with should.Matchers {
 
   private val specialChars =
     List[NonBlank]("\\", "+", "-", "&", "|", "!", "(", ")", "{", "}", "[", "]", "^", "\"", "~", "*", "?", ":", "/")

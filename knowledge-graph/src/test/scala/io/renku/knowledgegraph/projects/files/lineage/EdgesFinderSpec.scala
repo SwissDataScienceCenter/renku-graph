@@ -33,9 +33,8 @@ import io.renku.graph.model.testentities.generators.EntitiesGenerators.ProjectBa
 import io.renku.interpreters.TestLogger
 import io.renku.interpreters.TestLogger.Level.Warn
 import io.renku.jsonld.syntax._
-import io.renku.knowledgegraph.KnowledgeGraphJenaSpec
 import io.renku.logging.TestExecutionTimeRecorder
-import io.renku.triplesstore.{ProjectsConnectionConfig, SparqlQueryTimeRecorder}
+import io.renku.triplesstore.{GraphJenaSpec, ProjectsConnectionConfig, SparqlQueryTimeRecorder}
 import model._
 import org.scalatest.Succeeded
 import org.scalatest.matchers.should
@@ -44,7 +43,7 @@ import org.scalatest.wordspec.AsyncWordSpec
 class EdgesFinderSpec
     extends AsyncWordSpec
     with AsyncIOSpec
-    with KnowledgeGraphJenaSpec
+    with GraphJenaSpec
     with TestSearchInfoDatasets
     with should.Matchers {
 

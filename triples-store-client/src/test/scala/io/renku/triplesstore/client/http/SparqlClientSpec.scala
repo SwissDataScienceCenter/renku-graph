@@ -23,7 +23,7 @@ import cats.effect.testing.scalatest.AsyncIOSpec
 import io.renku.jsonld._
 import io.renku.jsonld.syntax._
 import io.renku.triplesstore.client.syntax._
-import io.renku.triplesstore.client.util.TSClientJenaSpec
+import io.renku.triplesstore.client.util.JenaSpec
 import org.scalatest.flatspec.AsyncFlatSpec
 import org.scalatest.matchers.should
 import org.typelevel.log4cats.Logger
@@ -31,7 +31,7 @@ import org.typelevel.log4cats.slf4j.Slf4jLogger
 
 import java.time.Instant
 
-class SparqlClientSpec extends AsyncFlatSpec with AsyncIOSpec with TSClientJenaSpec with should.Matchers {
+class SparqlClientSpec extends AsyncFlatSpec with AsyncIOSpec with JenaSpec with should.Matchers {
   implicit val logger: Logger[IO] = Slf4jLogger.getLogger[IO]
 
   val testQuery = sparql"""PREFIX schema: <http://schema.org/>

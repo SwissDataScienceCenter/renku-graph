@@ -32,15 +32,14 @@ import io.renku.http.rest.SortBy.Direction
 import io.renku.http.rest.paging.PagingRequest
 import io.renku.http.rest.paging.model.{Page, PerPage}
 import io.renku.interpreters.TestLogger
-import io.renku.knowledgegraph.KnowledgeGraphJenaSpec
-import io.renku.triplesstore.ProjectsConnectionConfig
+import io.renku.triplesstore.{GraphJenaSpec, ProjectsConnectionConfig}
 import org.scalatest.flatspec.AsyncFlatSpec
 import org.scalatest.matchers.should
 
 class ProjectDatasetsFinderSpec
     extends AsyncFlatSpec
     with AsyncIOSpec
-    with KnowledgeGraphJenaSpec
+    with GraphJenaSpec
     with TestSearchInfoDatasets
     with should.Matchers {
 

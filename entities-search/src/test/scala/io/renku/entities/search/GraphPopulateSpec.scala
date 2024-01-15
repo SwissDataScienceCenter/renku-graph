@@ -20,21 +20,20 @@ package io.renku.entities.search
 
 import cats.effect.testing.scalatest.AsyncIOSpec
 import eu.timepit.refined.auto._
-import io.renku.entities.EntitiesSearchJenaSpec
 import io.renku.entities.searchgraphs.TestSearchInfoDatasets
 import io.renku.generators.Generators.Implicits._
 import io.renku.graph.model.testentities.generators.EntitiesGenerators
 import io.renku.graph.model.{GraphClass, Schemas}
-import io.renku.triplesstore.SparqlQuery
 import io.renku.triplesstore.SparqlQuery.Prefixes
 import io.renku.triplesstore.client.syntax._
+import io.renku.triplesstore.{GraphJenaSpec, SparqlQuery}
 import org.scalatest.flatspec.AsyncFlatSpec
 import org.scalatest.matchers.should
 
 class GraphPopulateSpec
     extends AsyncFlatSpec
     with AsyncIOSpec
-    with EntitiesSearchJenaSpec
+    with GraphJenaSpec
     with FinderSpec
     with TestSearchInfoDatasets
     with EntitiesGenerators

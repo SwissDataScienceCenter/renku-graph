@@ -30,8 +30,8 @@ import io.renku.generators.Generators.timestamps
 import io.renku.graph.model.testentities._
 import io.renku.graph.model.{datasets, projects}
 import io.renku.interpreters.TestLogger
-import io.renku.triplesgenerator.TriplesGeneratorJenaSpec
 import io.renku.triplesgenerator.api.events.{DatasetViewedEvent, ProjectViewedEvent, UserId}
+import io.renku.triplesstore.GraphJenaSpec
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AsyncWordSpec
 import org.scalatest.{OptionValues, Succeeded}
@@ -39,7 +39,7 @@ import org.scalatest.{OptionValues, Succeeded}
 class PersonViewedProjectDeduplicatorSpec
     extends AsyncWordSpec
     with AsyncIOSpec
-    with TriplesGeneratorJenaSpec
+    with GraphJenaSpec
     with TestSearchInfoDatasets
     with PersonViewedProjectSpecTools
     with TestEntityViewings
@@ -109,7 +109,7 @@ class PersonViewedProjectDeduplicatorSpec
 class PersonViewedDatasetDeduplicatorSpec
     extends AsyncWordSpec
     with AsyncIOSpec
-    with TriplesGeneratorJenaSpec
+    with GraphJenaSpec
     with TestSearchInfoDatasets
     with PersonViewedDatasetSpecTools
     with TestEntityViewings

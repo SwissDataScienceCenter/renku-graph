@@ -27,7 +27,6 @@ import io.renku.graph.model.RenkuUrl
 import io.renku.graph.model.Schemas.renku
 import io.renku.interpreters.TestLogger
 import io.renku.jsonld.syntax._
-import io.renku.triplesgenerator.TriplesGeneratorJenaSpec
 import io.renku.triplesstore.SparqlQuery.Prefixes
 import io.renku.triplesstore._
 import io.renku.triplesstore.client.syntax._
@@ -39,11 +38,7 @@ import org.typelevel.log4cats.Logger
 import java.time.Instant
 import scala.concurrent.duration._
 
-class MigrationStartTimeFinderSpec
-    extends AsyncWordSpec
-    with AsyncIOSpec
-    with TriplesGeneratorJenaSpec
-    with should.Matchers {
+class MigrationStartTimeFinderSpec extends AsyncWordSpec with AsyncIOSpec with GraphJenaSpec with should.Matchers {
 
   "findMigrationStartDate" should {
 

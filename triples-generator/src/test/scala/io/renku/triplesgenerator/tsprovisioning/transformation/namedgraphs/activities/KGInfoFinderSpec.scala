@@ -31,7 +31,6 @@ import io.renku.interpreters.TestLogger
 import io.renku.jsonld.syntax._
 import io.renku.jsonld.{JsonLDEncoder, NamedGraph}
 import io.renku.logging.TestSparqlQueryTimeRecorder
-import io.renku.triplesgenerator.TriplesGeneratorJenaSpec
 import io.renku.triplesstore._
 import io.renku.triplesstore.client.model.Quad
 import monocle.Lens
@@ -39,7 +38,7 @@ import org.scalatest.Succeeded
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AsyncWordSpec
 
-class KGInfoFinderSpec extends AsyncWordSpec with AsyncIOSpec with TriplesGeneratorJenaSpec with should.Matchers {
+class KGInfoFinderSpec extends AsyncWordSpec with AsyncIOSpec with GraphJenaSpec with should.Matchers {
 
   "findActivityAuthors" should {
 

@@ -26,14 +26,13 @@ import io.renku.graph.model.testentities.generators.EntitiesGenerators
 import io.renku.graph.model.{GitLabApiUrl, RenkuUrl}
 import io.renku.interpreters.TestLogger
 import io.renku.logging.TestExecutionTimeRecorder
-import io.renku.triplesgenerator.TriplesGeneratorJenaSpec
 import io.renku.triplesgenerator.events.consumers.tsmigrationrequest.migrations.tooling.AllProjects.ProjectMetadata
-import io.renku.triplesstore.{ProjectsConnectionConfig, SparqlQueryTimeRecorder}
+import io.renku.triplesstore.{GraphJenaSpec, ProjectsConnectionConfig, SparqlQueryTimeRecorder}
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AsyncWordSpec
 import org.typelevel.log4cats.Logger
 
-class AllProjectsSpec extends AsyncWordSpec with AsyncIOSpec with TriplesGeneratorJenaSpec with should.Matchers {
+class AllProjectsSpec extends AsyncWordSpec with AsyncIOSpec with GraphJenaSpec with should.Matchers {
 
   implicit val renkuUrl:  RenkuUrl     = EntitiesGenerators.renkuUrl
   implicit val gitlabUrl: GitLabApiUrl = EntitiesGenerators.gitLabApiUrl

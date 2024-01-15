@@ -20,7 +20,6 @@ package io.renku.entities.search
 
 import cats.effect.testing.scalatest.AsyncIOSpec
 import cats.syntax.all._
-import io.renku.entities.EntitiesSearchJenaSpec
 import io.renku.entities.search.Criteria.{Filters, Sort}
 import io.renku.entities.search.EntityConverters._
 import io.renku.entities.search.diff.SearchDiffInstances
@@ -31,13 +30,14 @@ import io.renku.graph.model._
 import io.renku.graph.model.testentities.generators.EntitiesGenerators
 import io.renku.graph.model.tools.AdditionalMatchers
 import io.renku.http.rest.{SortBy, Sorting}
+import io.renku.triplesstore.GraphJenaSpec
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AsyncWordSpec
 
 class DatasetsEntitiesFinderSpec
     extends AsyncWordSpec
     with AsyncIOSpec
-    with EntitiesSearchJenaSpec
+    with GraphJenaSpec
     with FinderSpec
     with TestSearchInfoDatasets
     with EntitiesGenerators

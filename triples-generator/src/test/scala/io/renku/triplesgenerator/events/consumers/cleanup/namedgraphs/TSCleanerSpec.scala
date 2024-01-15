@@ -33,7 +33,6 @@ import io.renku.graph.model.views.RdfResource
 import io.renku.interpreters.TestLogger
 import io.renku.jsonld.EntityId
 import io.renku.logging.TestSparqlQueryTimeRecorder
-import io.renku.triplesgenerator.TriplesGeneratorJenaSpec
 import io.renku.triplesgenerator.events.consumers.membersync.ProjectAuthSync
 import io.renku.triplesstore.SparqlQuery.Prefixes
 import io.renku.triplesstore._
@@ -46,7 +45,7 @@ import org.scalatestplus.scalacheck.ScalaCheckPropertyChecks
 class TSCleanerSpec
     extends AsyncWordSpec
     with AsyncIOSpec
-    with TriplesGeneratorJenaSpec
+    with GraphJenaSpec
     with ScalaCheckPropertyChecks
     with EntitiesGenerators
     with should.Matchers

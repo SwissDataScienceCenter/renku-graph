@@ -27,8 +27,8 @@ import scala.concurrent.duration._
 
 trait JenaServerSupport {
 
-  def server:            JenaServer
-  protected val timeout: Duration = 2.minutes
+  lazy val server:       JenaServer = JenaServer
+  protected val timeout: Duration   = 2.minutes
 
   def clientResource(implicit L: Logger[IO]): Resource[IO, FusekiClient[IO]] =
     FusekiClient[IO](connectionConfig, timeout)
