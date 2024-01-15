@@ -30,8 +30,8 @@ object JenaServer {
     if (startRequests.decrementAndGet() == 0) call("forceStop")(cl)
   }
 
-  private def call(methodName: String): ClassLoader => Unit = classLoader => {
-    val clazz    = classLoader.loadClass("io.renku.triplesstore.client.util.JenaServer$")
+  private def call(methodName: String): ClassLoader => Unit = cl => {
+    val clazz    = cl.loadClass("io.renku.triplesstore.client.util.JenaServer$")
     val method   = clazz.getMethod(methodName)
     val instance = clazz.getField("MODULE$").get(null)
     method.invoke(instance)
