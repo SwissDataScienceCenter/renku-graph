@@ -21,7 +21,10 @@ package io.renku.core.client
 import io.renku.tinytypes.constraints.{NonBlank, Url}
 import io.renku.tinytypes.{StringTinyType, TinyTypeFactory, UrlTinyType}
 
-final case class Template(repositoryUrl: templates.RepositoryUrl, identifier: templates.Identifier)
+final case class Template(repositoryUrl: templates.RepositoryUrl,
+                          identifier:    templates.Identifier,
+                          maybeRef:      Option[templates.Ref]
+)
 
 object templates {
 
@@ -30,4 +33,7 @@ object templates {
 
   final class Identifier private (val value: String) extends AnyVal with StringTinyType
   implicit object Identifier extends TinyTypeFactory[Identifier](new Identifier(_)) with NonBlank[Identifier]
+
+  final class Ref private (val value: String) extends AnyVal with StringTinyType
+  implicit object Ref                         extends TinyTypeFactory[Ref](new Ref(_)) with NonBlank[Ref]
 }

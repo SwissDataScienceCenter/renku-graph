@@ -556,6 +556,10 @@ Content-Disposition: form-data; name="templateId"
 
 python-minimal
 ------WebKitFormBoundary7MA4YWxkTrZu0gW
+Content-Disposition: form-data; name="templateRef"
+
+0.6.0
+------WebKitFormBoundary7MA4YWxkTrZu0gW
 Content-Disposition: form-data; name="image"; filename="image.png"
 Content-Type: image/png
 

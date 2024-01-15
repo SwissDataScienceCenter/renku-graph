@@ -95,9 +95,10 @@ object Generators {
 
   implicit val templateRepositoryUrls: Gen[templates.RepositoryUrl] = httpUrls().toGeneratorOf(templates.RepositoryUrl)
   implicit val templateIdentifiers:    Gen[templates.Identifier]    = noDashUuid.toGeneratorOf(templates.Identifier)
+  implicit val templateRefs:           Gen[templates.Ref]           = semanticVersions.toGeneratorOf(templates.Ref)
 
   implicit val templatesGen: Gen[Template] =
-    (templateRepositoryUrls, templateIdentifiers).mapN(Template.apply)
+    (templateRepositoryUrls, templateIdentifiers, templateRefs.toGeneratorOfOptions).mapN(Template.apply)
 
   implicit lazy val newProjectsGen: Gen[NewProject] =
     (projectRepositories,

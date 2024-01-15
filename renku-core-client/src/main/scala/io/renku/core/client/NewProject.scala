@@ -38,8 +38,9 @@ object NewProject {
     case NewProject(projectRepository, namespace, name, maybeDescription, keywords, template, branch, _) =>
       Json.obj(
         List(
-          ("url"                -> template.repositoryUrl.asJson).some,
-          ("identifier"         -> template.identifier.asJson).some,
+          ("url"        -> template.repositoryUrl.asJson).some,
+          ("identifier" -> template.identifier.asJson).some,
+          template.maybeRef.map("ref" -> _.asJson),
           ("project_repository" -> projectRepository.asJson).some,
           ("project_namespace"  -> namespace.asJson).some,
           ("project_name"       -> name.asJson).some,

@@ -51,6 +51,7 @@ private object MultipartRequestCodec {
     val image                 = "image"
     val templateRepositoryUrl = "templateRepositoryUrl"
     val templateId            = "templateId"
+    val templateRef           = "templateRef"
   }
 }
 
@@ -70,7 +71,8 @@ private class MultipartRequestEncoderImpl[F[_]: Sync] extends MultipartRequestEn
     val parts =
       Vector(
         newProject.maybeDescription.asParts[F](PartName.description),
-        newProject.maybeImage.asParts[F](PartName.image)
+        newProject.maybeImage.asParts[F](PartName.image),
+        newProject.template.maybeRef.asParts[F](PartName.templateRef)
       ).flatten
         .appended(newProject.name.asPart[F](PartName.name))
         .appended(newProject.namespace.identifier.asPart[F](PartName.namespaceId))
@@ -106,6 +108,7 @@ private class MultipartRequestDecoderImpl[F[_]: Async] extends MultipartRequestD
 
   private def templateDecoder(multipart: Multipart[F]) =
     (multipart.part(PartName.templateRepositoryUrl).flatMap(_.as[templates.RepositoryUrl]),
-     multipart.part(PartName.templateId).flatMap(_.as[templates.Identifier])
+     multipart.part(PartName.templateId).flatMap(_.as[templates.Identifier]),
+     multipart.findPart(PartName.templateRef).map(_.as[Option[templates.Ref]]).sequence.map(_.flatten)
     ).mapN(Template.apply)
 }
