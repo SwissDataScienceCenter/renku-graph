@@ -23,6 +23,7 @@ import cats.syntax.all._
 import cats.{Functor, MonadThrow}
 import eu.timepit.refined.api.{RefType, Refined}
 import eu.timepit.refined.collection.NonEmpty
+import io.circe.Json
 import io.renku.tinytypes.{From, TinyType, TinyTypeFactory}
 import org.http4s.multipart.{Multipart, Part}
 import org.http4s.{DecodeFailure, DecodeResult, EntityDecoder, MalformedMessageBodyFailure}
@@ -126,4 +127,7 @@ object syntax {
           .pure[F]
       }
     }
+
+  implicit def jsonEntityDecoder[F[_]: Concurrent]: EntityDecoder[F, Json] =
+    org.http4s.circe.jsonOf[F, Json]
 }

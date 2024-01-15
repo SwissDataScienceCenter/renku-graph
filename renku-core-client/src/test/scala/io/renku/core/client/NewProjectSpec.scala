@@ -35,6 +35,7 @@ class NewProjectSpec extends AnyFlatSpec with should.Matchers with EitherValues 
           "url":                 ${newProject.template.repositoryUrl},
           "identifier":          ${newProject.template.identifier},
           "ref":                 ${newProject.template.maybeRef},
+          "parameters":          ${newProject.template.maybeParameters.map(_.value)},
           "project_repository":  ${newProject.projectRepository},
           "project_namespace":   ${newProject.namespace},
           "project_name":        ${newProject.name},

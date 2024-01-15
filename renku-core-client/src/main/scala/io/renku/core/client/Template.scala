@@ -18,12 +18,14 @@
 
 package io.renku.core.client
 
+import io.circe.Json
 import io.renku.tinytypes.constraints.{NonBlank, Url}
 import io.renku.tinytypes.{StringTinyType, TinyTypeFactory, UrlTinyType}
 
-final case class Template(repositoryUrl: templates.RepositoryUrl,
-                          identifier:    templates.Identifier,
-                          maybeRef:      Option[templates.Ref]
+final case class Template(repositoryUrl:   templates.RepositoryUrl,
+                          identifier:      templates.Identifier,
+                          maybeRef:        Option[templates.Ref],
+                          maybeParameters: Option[templates.Parameters]
 )
 
 object templates {
@@ -36,4 +38,6 @@ object templates {
 
   final class Ref private (val value: String) extends AnyVal with StringTinyType
   implicit object Ref                         extends TinyTypeFactory[Ref](new Ref(_)) with NonBlank[Ref]
+
+  final case class Parameters(value: List[Json])
 }

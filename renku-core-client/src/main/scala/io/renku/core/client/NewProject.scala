@@ -41,6 +41,7 @@ object NewProject {
           ("url"        -> template.repositoryUrl.asJson).some,
           ("identifier" -> template.identifier.asJson).some,
           template.maybeRef.map("ref" -> _.asJson),
+          template.maybeParameters.map("parameters" -> _.value.asJson),
           ("project_repository" -> projectRepository.asJson).some,
           ("project_namespace"  -> namespace.asJson).some,
           ("project_name"       -> name.asJson).some,
