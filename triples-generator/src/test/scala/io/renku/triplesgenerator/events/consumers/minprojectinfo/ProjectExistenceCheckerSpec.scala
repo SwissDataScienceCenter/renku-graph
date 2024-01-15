@@ -23,7 +23,6 @@ import cats.effect.testing.scalatest.AsyncIOSpec
 import io.renku.generators.Generators.Implicits._
 import io.renku.graph.model.testentities._
 import io.renku.interpreters.TestLogger
-import io.renku.triplesgenerator.TriplesGeneratorJenaSpec
 import io.renku.triplesstore._
 import org.scalatest.Succeeded
 import org.scalatest.matchers.should
@@ -32,7 +31,7 @@ import org.scalatest.wordspec.AsyncWordSpec
 class ProjectExistenceCheckerSpec
     extends AsyncWordSpec
     with AsyncIOSpec
-    with TriplesGeneratorJenaSpec
+    with GraphJenaSpec
     with should.Matchers {
 
   "checkProjectExists" should {

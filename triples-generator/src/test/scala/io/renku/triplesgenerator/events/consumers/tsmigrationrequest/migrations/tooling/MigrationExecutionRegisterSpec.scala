@@ -30,16 +30,11 @@ import io.renku.graph.model.GraphModelGenerators.renkuUrls
 import io.renku.graph.model.RenkuUrl
 import io.renku.interpreters.TestLogger
 import io.renku.logging.TestSparqlQueryTimeRecorder
-import io.renku.triplesgenerator.TriplesGeneratorJenaSpec
-import io.renku.triplesstore.{MigrationsConnectionConfig, SparqlQueryTimeRecorder}
+import io.renku.triplesstore.{GraphJenaSpec, MigrationsConnectionConfig, SparqlQueryTimeRecorder}
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AsyncWordSpec
 
-class MigrationExecutionRegisterSpec
-    extends AsyncWordSpec
-    with AsyncIOSpec
-    with TriplesGeneratorJenaSpec
-    with should.Matchers {
+class MigrationExecutionRegisterSpec extends AsyncWordSpec with AsyncIOSpec with GraphJenaSpec with should.Matchers {
 
   private val migrationName  = migrationNames.generateOne
   private val serviceVersion = serviceVersions.generateOne

@@ -27,9 +27,8 @@ import io.renku.graph.model.RenkuUrl
 import io.renku.interpreters.TestLogger
 import io.renku.interpreters.TestLogger.Level.Warn
 import io.renku.logging.TestExecutionTimeRecorder
-import io.renku.triplesgenerator.TriplesGeneratorJenaSpec
 import io.renku.triplesgenerator.generators.VersionGenerators.renkuVersionPairs
-import io.renku.triplesstore.{MigrationsConnectionConfig, SparqlQueryTimeRecorder}
+import io.renku.triplesstore.{GraphJenaSpec, MigrationsConnectionConfig, SparqlQueryTimeRecorder}
 import org.scalatest._
 import matchers._
 import org.scalatest.wordspec.AsyncWordSpec
@@ -37,7 +36,7 @@ import org.scalatest.wordspec.AsyncWordSpec
 class RenkuVersionPairFinderSpec
     extends AsyncWordSpec
     with AsyncIOSpec
-    with TriplesGeneratorJenaSpec
+    with GraphJenaSpec
     with should.Matchers
     with BeforeAndAfterEach {
 

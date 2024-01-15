@@ -23,11 +23,11 @@ import Criteria._
 import EntityConverters._
 import cats.effect.testing.scalatest.AsyncIOSpec
 import cats.syntax.all._
-import io.renku.entities.EntitiesSearchJenaSpec
 import io.renku.generators.Generators.Implicits._
 import io.renku.generators.Generators._
 import io.renku.graph.model._
 import io.renku.graph.model.testentities._
+import io.renku.triplesstore.GraphJenaSpec
 import org.scalacheck.Gen.alphaLowerChar
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AsyncWordSpec
@@ -36,7 +36,7 @@ class PersonsEntitiesFinderSpec
     extends AsyncWordSpec
     with AsyncIOSpec
     with FinderSpec
-    with EntitiesSearchJenaSpec
+    with GraphJenaSpec
     with should.Matchers {
 
   "findEntities - persons" should {

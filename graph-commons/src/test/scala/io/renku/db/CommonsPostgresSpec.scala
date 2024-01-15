@@ -24,6 +24,6 @@ import org.scalatest.Suite
 trait TestDB
 
 trait CommonsPostgresSpec extends PostgresSpec[TestDB] { self: Suite =>
-  lazy val server:     PostgresServer                          = CommonsPostgresServer
+  lazy val server:     PostgresServer                          = PostgresServer
   lazy val migrations: SessionResource[IO, TestDB] => IO[Unit] = _ => IO.unit
 }

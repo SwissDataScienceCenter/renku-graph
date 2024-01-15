@@ -29,9 +29,8 @@ import io.renku.graph.model.projects
 import io.renku.graph.model.testentities._
 import io.renku.http.server.security.model.AuthUser
 import io.renku.interpreters.TestLogger
-import io.renku.knowledgegraph.KnowledgeGraphJenaSpec
 import io.renku.logging.TestSparqlQueryTimeRecorder
-import io.renku.triplesstore.{ProjectsConnectionConfig, SparqlQueryTimeRecorder}
+import io.renku.triplesstore.{GraphJenaSpec, ProjectsConnectionConfig, SparqlQueryTimeRecorder}
 import org.scalacheck.Gen
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AsyncWordSpec
@@ -40,7 +39,7 @@ import org.typelevel.log4cats.Logger
 class TSProjectFinderSpec
     extends AsyncWordSpec
     with AsyncIOSpec
-    with KnowledgeGraphJenaSpec
+    with GraphJenaSpec
     with TestSearchInfoDatasets
     with should.Matchers {
 

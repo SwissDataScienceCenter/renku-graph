@@ -25,8 +25,7 @@ import io.renku.generators.Generators.Implicits._
 import io.renku.graph.model.entities
 import io.renku.graph.model.testentities._
 import io.renku.interpreters.TestLogger
-import io.renku.triplesgenerator.TriplesGeneratorJenaSpec
-import io.renku.triplesstore.ProjectsConnectionConfig
+import io.renku.triplesstore.{GraphJenaSpec, ProjectsConnectionConfig}
 import org.scalatest.OptionValues
 import org.scalatest.flatspec.AsyncFlatSpec
 import org.scalatest.matchers.should
@@ -35,7 +34,7 @@ import org.scalatestplus.scalacheck.ScalaCheckPropertyChecks
 class TSDataFinderSpec
     extends AsyncFlatSpec
     with AsyncIOSpec
-    with TriplesGeneratorJenaSpec
+    with GraphJenaSpec
     with should.Matchers
     with OptionValues
     with ScalaCheckPropertyChecks {

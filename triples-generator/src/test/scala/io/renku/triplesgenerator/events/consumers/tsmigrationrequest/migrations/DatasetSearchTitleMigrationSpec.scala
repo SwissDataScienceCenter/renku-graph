@@ -26,7 +26,6 @@ import io.renku.generators.Generators.Implicits._
 import io.renku.graph.model.datasets
 import io.renku.graph.model.testentities._
 import io.renku.interpreters.TestLogger
-import io.renku.triplesgenerator.TriplesGeneratorJenaSpec
 import io.renku.triplesstore.SparqlQuery.Prefixes
 import io.renku.triplesstore._
 import org.scalatest.Succeeded
@@ -37,7 +36,7 @@ import org.typelevel.log4cats.Logger
 class DatasetSearchTitleMigrationSpec
     extends AsyncWordSpec
     with AsyncIOSpec
-    with TriplesGeneratorJenaSpec
+    with GraphJenaSpec
     with TestSearchInfoDatasets
     with should.Matchers {
 

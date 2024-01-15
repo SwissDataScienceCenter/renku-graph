@@ -35,7 +35,6 @@ import io.renku.graph.model.views.RdfResource
 import io.renku.interpreters.TestLogger
 import io.renku.jsonld.syntax._
 import io.renku.jsonld.{EntityId, NamedGraph}
-import io.renku.triplesgenerator.TriplesGeneratorJenaSpec
 import io.renku.triplesstore.SparqlQuery.Prefixes
 import io.renku.triplesstore._
 import io.renku.triplesstore.client.model.Quad
@@ -52,7 +51,7 @@ import scala.util.Random
 class UpdatesCreatorSpec
     extends AsyncWordSpec
     with AsyncIOSpec
-    with TriplesGeneratorJenaSpec
+    with GraphJenaSpec
     with should.Matchers
     with EntitiesGenerators
     with ModelOps

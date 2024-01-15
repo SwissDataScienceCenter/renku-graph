@@ -21,7 +21,6 @@ package io.renku.entities.viewings.collector.persons
 import cats.effect.IO
 import cats.effect.testing.scalatest.AsyncIOSpec
 import io.renku.entities.searchgraphs.TestSearchInfoDatasets
-import io.renku.entities.viewings.ViewingsCollectorJenaSpec
 import io.renku.entities.viewings.collector.persons.Generators._
 import io.renku.generators.Generators.Implicits._
 import io.renku.generators.Generators.timestamps
@@ -38,7 +37,7 @@ import org.scalatest.{OptionValues, Succeeded}
 class PersonViewedProjectDeduplicatorSpec
     extends AsyncWordSpec
     with AsyncIOSpec
-    with ViewingsCollectorJenaSpec
+    with GraphJenaSpec
     with TestSearchInfoDatasets
     with should.Matchers
     with OptionValues

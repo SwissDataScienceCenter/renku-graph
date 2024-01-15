@@ -25,7 +25,6 @@ import io.renku.graph.model.GraphModelGenerators.renkuUrls
 import io.renku.graph.model.RenkuTinyTypeGenerators.projectSlugs
 import io.renku.graph.model.RenkuUrl
 import io.renku.interpreters.TestLogger
-import io.renku.triplesgenerator.TriplesGeneratorJenaSpec
 import io.renku.triplesstore._
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AsyncWordSpec
@@ -36,7 +35,7 @@ import scala.util.Random
 class ProjectDonePersisterSpec
     extends AsyncWordSpec
     with AsyncIOSpec
-    with TriplesGeneratorJenaSpec
+    with GraphJenaSpec
     with should.Matchers
     with OptionValues {
 

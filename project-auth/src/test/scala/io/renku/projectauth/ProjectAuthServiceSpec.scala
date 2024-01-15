@@ -25,12 +25,18 @@ import io.renku.generators.Generators.Implicits._
 import io.renku.graph.model.persons.GitLabId
 import io.renku.graph.model.projects.{Role, Slug, Visibility}
 import io.renku.graph.model.{RenkuTinyTypeGenerators, RenkuUrl}
+import io.renku.triplesstore.client.util.JenaSpec
 import org.scalatest.flatspec.AsyncFlatSpec
 import org.scalatest.matchers.should
 import org.typelevel.log4cats.Logger
 import org.typelevel.log4cats.slf4j.Slf4jLogger
 
-class ProjectAuthServiceSpec extends AsyncFlatSpec with AsyncIOSpec with ProjectAuthJenaSpec with should.Matchers {
+class ProjectAuthServiceSpec
+    extends AsyncFlatSpec
+    with AsyncIOSpec
+    with JenaSpec
+    with ProjectAuthServiceSupport
+    with should.Matchers {
   implicit val logger:   Logger[IO] = Slf4jLogger.getLogger[IO]
   implicit val renkuUrl: RenkuUrl   = RenkuUrl("http://localhost/renku")
 

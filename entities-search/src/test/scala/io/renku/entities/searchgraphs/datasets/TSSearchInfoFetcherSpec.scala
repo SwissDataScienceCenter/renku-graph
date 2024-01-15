@@ -22,7 +22,6 @@ import cats.effect.IO
 import cats.effect.testing.scalatest.AsyncIOSpec
 import cats.syntax.all._
 import commands.Encoders._
-import io.renku.entities.EntitiesSearchJenaSpec
 import io.renku.entities.searchgraphs.TestSearchInfoDatasets
 import io.renku.entities.searchgraphs.datasets.Generators._
 import io.renku.entities.searchgraphs.datasets.SearchInfoLens._
@@ -32,7 +31,7 @@ import io.renku.graph.model.testentities._
 import io.renku.interpreters.TestLogger
 import io.renku.logging.TestSparqlQueryTimeRecorder
 import io.renku.triplesstore.client.syntax._
-import io.renku.triplesstore.{ProjectsConnectionConfig, SparqlQueryTimeRecorder}
+import io.renku.triplesstore.{GraphJenaSpec, ProjectsConnectionConfig, SparqlQueryTimeRecorder}
 import org.scalatest.OptionValues
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AsyncWordSpec
@@ -40,7 +39,7 @@ import org.scalatest.wordspec.AsyncWordSpec
 class TSSearchInfoFetcherSpec
     extends AsyncWordSpec
     with AsyncIOSpec
-    with EntitiesSearchJenaSpec
+    with GraphJenaSpec
     with TestSearchInfoDatasets
     with OptionValues
     with should.Matchers {

@@ -30,9 +30,8 @@ import io.renku.graph.model.projects.Visibility
 import io.renku.graph.model.testentities.Project
 import io.renku.graph.model.testentities.generators.EntitiesGenerators
 import io.renku.interpreters.TestLogger
-import io.renku.knowledgegraph.KnowledgeGraphJenaSpec
 import io.renku.logging.TestSparqlQueryTimeRecorder
-import io.renku.triplesstore.{ProjectsConnectionConfig, SparqlQueryTimeRecorder}
+import io.renku.triplesstore.{GraphJenaSpec, ProjectsConnectionConfig, SparqlQueryTimeRecorder}
 import org.scalacheck.Gen
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AsyncWordSpec
@@ -42,7 +41,7 @@ import org.typelevel.log4cats.Logger
 class KGProjectFinderSpec
     extends AsyncWordSpec
     with AsyncIOSpec
-    with KnowledgeGraphJenaSpec
+    with GraphJenaSpec
     with TestSearchInfoDatasets
     with EntitiesGenerators
     with ScalaCheckPropertyChecks

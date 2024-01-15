@@ -28,7 +28,6 @@ import io.renku.graph.model.RenkuTinyTypeGenerators.projectSlugs
 import io.renku.graph.model._
 import io.renku.interpreters.TestLogger
 import io.renku.logging.TestSparqlQueryTimeRecorder
-import io.renku.triplesgenerator.TriplesGeneratorJenaSpec
 import io.renku.triplesstore._
 import org.scalacheck.Gen
 import org.scalamock.scalatest.AsyncMockFactory
@@ -40,7 +39,7 @@ import tooling.RecordsFinder
 class ProjectsPageFinderSpec
     extends AsyncWordSpec
     with AsyncIOSpec
-    with TriplesGeneratorJenaSpec
+    with GraphJenaSpec
     with AsyncMockFactory
     with should.Matchers
     with OptionValues {

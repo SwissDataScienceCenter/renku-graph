@@ -29,8 +29,8 @@ import io.renku.generators.Generators.timestamps
 import io.renku.graph.model.testentities._
 import io.renku.graph.model.{entities, projects}
 import io.renku.interpreters.TestLogger
-import io.renku.triplesgenerator.TriplesGeneratorJenaSpec
 import io.renku.triplesgenerator.api.events.Generators.projectViewedEvents
+import io.renku.triplesstore.GraphJenaSpec
 import org.scalatest.Succeeded
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AsyncWordSpec
@@ -38,7 +38,7 @@ import org.scalatest.wordspec.AsyncWordSpec
 class ProjectDateViewedDeduplicatorSpec
     extends AsyncWordSpec
     with AsyncIOSpec
-    with TriplesGeneratorJenaSpec
+    with GraphJenaSpec
     with TestSearchInfoDatasets
     with EventPersisterSpecTools
     with TestEntityViewings

@@ -30,7 +30,6 @@ import io.renku.graph.model.{GraphClass, entities, persons}
 import io.renku.interpreters.TestLogger
 import io.renku.jsonld.syntax._
 import io.renku.logging.TestSparqlQueryTimeRecorder
-import io.renku.triplesgenerator.TriplesGeneratorJenaSpec
 import io.renku.triplesstore.SparqlQuery._
 import io.renku.triplesstore._
 import io.renku.triplesstore.client.model.Quad
@@ -42,7 +41,7 @@ import org.scalatest.wordspec.AsyncWordSpec
 class KGPersonFinderSpec
     extends AsyncWordSpec
     with AsyncIOSpec
-    with TriplesGeneratorJenaSpec
+    with GraphJenaSpec
     with should.Matchers
     with OptionValues {
 

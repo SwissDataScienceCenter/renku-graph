@@ -27,7 +27,6 @@ import io.renku.graph.model.testentities._
 import io.renku.interpreters.TestLogger
 import io.renku.logging.TestSparqlQueryTimeRecorder
 import io.renku.metrics.MetricsRegistry
-import io.renku.triplesgenerator.TriplesGeneratorJenaSpec
 import io.renku.triplesstore.SparqlQuery.Prefixes
 import io.renku.triplesstore._
 import org.scalamock.scalatest.AsyncMockFactory
@@ -39,7 +38,7 @@ import tooling._
 class RemoveNotLinkedPersonsSpec
     extends AsyncWordSpec
     with AsyncIOSpec
-    with TriplesGeneratorJenaSpec
+    with GraphJenaSpec
     with should.Matchers
     with AsyncMockFactory {
 

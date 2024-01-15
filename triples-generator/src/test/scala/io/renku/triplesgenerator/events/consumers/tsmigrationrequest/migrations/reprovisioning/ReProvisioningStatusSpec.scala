@@ -32,7 +32,6 @@ import io.renku.graph.model.RenkuUrl
 import io.renku.graph.model.Schemas._
 import io.renku.interpreters.TestLogger
 import io.renku.logging.TestSparqlQueryTimeRecorder
-import io.renku.triplesgenerator.TriplesGeneratorJenaSpec
 import io.renku.triplesstore.SparqlQuery.Prefixes
 import io.renku.triplesstore._
 import org.scalamock.scalatest.AsyncMockFactory
@@ -45,7 +44,7 @@ import scala.concurrent.duration._
 class ReProvisioningStatusSpec
     extends AsyncWordSpec
     with AsyncIOSpec
-    with TriplesGeneratorJenaSpec
+    with GraphJenaSpec
     with AsyncMockFactory
     with should.Matchers {
 

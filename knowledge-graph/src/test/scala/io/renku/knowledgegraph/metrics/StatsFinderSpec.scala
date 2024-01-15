@@ -25,9 +25,8 @@ import io.renku.generators.Generators.Implicits._
 import io.renku.graph.model.testentities._
 import io.renku.interpreters.TestLogger
 import io.renku.jsonld.Property
-import io.renku.knowledgegraph.KnowledgeGraphJenaSpec
 import io.renku.logging.TestSparqlQueryTimeRecorder
-import io.renku.triplesstore.{ProjectsConnectionConfig, SparqlQueryTimeRecorder}
+import io.renku.triplesstore.{GraphJenaSpec, ProjectsConnectionConfig, SparqlQueryTimeRecorder}
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AsyncWordSpec
 import org.scalatestplus.scalacheck.ScalaCheckPropertyChecks
@@ -35,7 +34,7 @@ import org.scalatestplus.scalacheck.ScalaCheckPropertyChecks
 class StatsFinderSpec
     extends AsyncWordSpec
     with AsyncIOSpec
-    with KnowledgeGraphJenaSpec
+    with GraphJenaSpec
     with ScalaCheckPropertyChecks
     with should.Matchers {
 

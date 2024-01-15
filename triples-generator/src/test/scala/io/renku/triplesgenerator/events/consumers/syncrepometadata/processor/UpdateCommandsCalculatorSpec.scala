@@ -32,10 +32,9 @@ import io.renku.graph.model.testentities._
 import io.renku.graph.model.{GraphClass, entities, projects}
 import io.renku.interpreters.TestLogger
 import io.renku.jsonld.syntax._
-import io.renku.triplesgenerator.TriplesGeneratorJenaSpec
 import io.renku.triplesstore.SparqlQuery.Prefixes
 import io.renku.triplesstore.client.syntax._
-import io.renku.triplesstore.{ProjectsConnectionConfig, SparqlQuery}
+import io.renku.triplesstore.{GraphJenaSpec, ProjectsConnectionConfig, SparqlQuery}
 import org.scalamock.scalatest.AsyncMockFactory
 import org.scalatest.flatspec.AsyncFlatSpec
 import org.scalatest.matchers.should
@@ -47,7 +46,7 @@ import java.time.Instant
 class UpdateCommandsCalculatorSpec
     extends AsyncFlatSpec
     with AsyncIOSpec
-    with TriplesGeneratorJenaSpec
+    with GraphJenaSpec
     with TestSearchInfoDatasets
     with should.Matchers
     with OptionValues

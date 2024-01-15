@@ -26,13 +26,12 @@ import io.renku.graph.model.Schemas.{renku, schema}
 import io.renku.graph.model.testentities._
 import io.renku.interpreters.TestLogger
 import io.renku.logging.TestSparqlQueryTimeRecorder
-import io.renku.triplesgenerator.TriplesGeneratorJenaSpec
 import io.renku.triplesstore.SparqlQuery.Prefixes
 import io.renku.triplesstore._
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AsyncWordSpec
 
-class ProjectsFinderSpec extends AsyncWordSpec with AsyncIOSpec with TriplesGeneratorJenaSpec with should.Matchers {
+class ProjectsFinderSpec extends AsyncWordSpec with AsyncIOSpec with GraphJenaSpec with should.Matchers {
 
   "findProjects" should {
 

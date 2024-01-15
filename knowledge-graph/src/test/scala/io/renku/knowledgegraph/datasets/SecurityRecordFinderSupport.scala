@@ -25,9 +25,9 @@ import io.renku.graph.http.server.security.Authorizer
 import io.renku.graph.model.testentities.generators.EntitiesGenerators
 import io.renku.graph.model.{GitLabApiUrl, RenkuUrl, testentities}
 import io.renku.interpreters.TestLogger
-import io.renku.knowledgegraph.{DatasetProvision, KnowledgeGraphJenaSpec}
+import io.renku.knowledgegraph.DatasetProvision
 import io.renku.logging.TestSparqlQueryTimeRecorder
-import io.renku.triplesstore.SparqlQueryTimeRecorder
+import io.renku.triplesstore.{GraphJenaSpec, SparqlQueryTimeRecorder}
 import org.scalatest.flatspec.AsyncFlatSpec
 import org.scalatest.matchers.should
 import org.typelevel.log4cats.Logger
@@ -35,7 +35,7 @@ import org.typelevel.log4cats.Logger
 abstract class SecurityRecordFinderSupport
     extends AsyncFlatSpec
     with AsyncIOSpec
-    with KnowledgeGraphJenaSpec
+    with GraphJenaSpec
     with TestSearchInfoDatasets
     with should.Matchers
     with DatasetProvision {

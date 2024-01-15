@@ -28,7 +28,6 @@ import io.renku.graph.model.versions.SchemaVersion
 import io.renku.graph.model.{GraphClass, entities, projects}
 import io.renku.interpreters.TestLogger
 import io.renku.jsonld.syntax._
-import io.renku.triplesgenerator.TriplesGeneratorJenaSpec
 import io.renku.triplesstore.SparqlQuery.Prefixes
 import io.renku.triplesstore._
 import io.renku.triplesstore.client.model.Quad
@@ -40,7 +39,7 @@ import org.typelevel.log4cats.Logger
 class FixMultipleProjectVersionsSpec
     extends AsyncFlatSpec
     with AsyncIOSpec
-    with TriplesGeneratorJenaSpec
+    with GraphJenaSpec
     with TestSearchInfoDatasets
     with should.Matchers {
 

@@ -27,7 +27,7 @@ import org.scalacheck.Gen
 import org.scalatest.Suite
 import org.typelevel.log4cats.Logger
 
-trait ProjectAuthServiceSupport extends JenaSpec { self: Suite =>
+trait ProjectAuthServiceSupport { self: Suite with JenaSpec =>
 
   def withProjectAuthService(implicit renkuUrl: RenkuUrl, L: Logger[IO]): Resource[IO, ProjectAuthService[IO]] =
     testDSResource.map(ProjectAuthService[IO](_, renkuUrl))

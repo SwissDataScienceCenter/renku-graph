@@ -44,7 +44,7 @@ import org.scalatest.{OptionValues, Succeeded}
 class ViewingRemoverSpec
     extends AsyncWordSpec
     with AsyncIOSpec
-    with ViewingsCollectorJenaSpec
+    with GraphJenaSpec
     with TestSearchInfoDatasets
     with should.Matchers
     with OptionValues {

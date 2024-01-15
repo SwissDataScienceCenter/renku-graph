@@ -34,7 +34,7 @@ import org.scalatest.flatspec.AsyncFlatSpec
 import org.scalatest.matchers.should
 import org.typelevel.log4cats.Logger
 
-class ProjectSparqlClientSpec extends AsyncFlatSpec with AsyncIOSpec with CommonsJenaSpec with should.Matchers {
+class ProjectSparqlClientSpec extends AsyncFlatSpec with AsyncIOSpec with GraphJenaSpec with should.Matchers {
 
   implicit val logger: Logger[IO] = TestLogger()
 

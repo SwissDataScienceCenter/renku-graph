@@ -22,7 +22,6 @@ import cats.effect.IO
 import cats.effect.testing.scalatest.AsyncIOSpec
 import cats.syntax.all._
 import io.renku.entities.searchgraphs.TestSearchInfoDatasets
-import io.renku.entities.viewings.ViewingsCollectorJenaSpec
 import io.renku.entities.viewings.collector.persons.PersonViewedProjectPersister
 import io.renku.entities.viewings.collector.projects.viewed.EventPersisterImpl
 import io.renku.events.Generators.categoryNames
@@ -41,7 +40,7 @@ import org.scalatest.wordspec.AsyncWordSpec
 class EventDeduplicatorSpec
     extends AsyncWordSpec
     with AsyncIOSpec
-    with ViewingsCollectorJenaSpec
+    with GraphJenaSpec
     with TestSearchInfoDatasets
     with EventPersisterSpecTools
     with should.Matchers

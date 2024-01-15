@@ -216,8 +216,8 @@ lazy val triplesStoreClient = project
   .settings(commonSettings)
   .settings(
     name := "triples-store-client",
-    Test / testOptions += Tests.Setup(JenaServer.triplesStoreClient("start")),
-    Test / testOptions += Tests.Cleanup(JenaServer.triplesStoreClient("forceStop")),
+    Test / testOptions += Tests.Setup(JenaServer.start),
+    Test / testOptions += Tests.Cleanup(JenaServer.stop),
     libraryDependencies ++=
       Dependencies.jsonld4s ++
         Dependencies.luceneQueryParser ++
@@ -251,7 +251,6 @@ lazy val tinyTypes = project
         Dependencies.catsFree
   )
   .dependsOn(generators % "test->test")
-//  .dependsOn(triplesStoreClient % "compile->compile; test->test") <-- why this?
   .enablePlugins(AutomateHeaderPlugin)
 
 lazy val renkuModelTinyTypes = project
@@ -302,12 +301,12 @@ lazy val graphCommons = project
   .settings(
     name := "graph-commons",
     Test / testOptions += Tests.Setup { cl =>
-      PostgresServer.commons("start")(cl)
-      JenaServer.commons("start")(cl)
+      PostgresServer.start(cl)
+      JenaServer.start(cl)
     },
     Test / testOptions += Tests.Cleanup { cl =>
-      PostgresServer.commons("forceStop")(cl)
-      JenaServer.commons("forceStop")(cl)
+      PostgresServer.stop(cl)
+      JenaServer.stop(cl)
     },
     libraryDependencies ++=
       Dependencies.pureconfig ++
@@ -349,8 +348,8 @@ lazy val eventsQueue = project
   .settings(commonSettings)
   .settings(
     name := "events-queue",
-    Test / testOptions += Tests.Setup(PostgresServer.eventsQueue("start")),
-    Test / testOptions += Tests.Cleanup(PostgresServer.eventsQueue("forceStop"))
+    Test / testOptions += Tests.Setup(PostgresServer.start),
+    Test / testOptions += Tests.Cleanup(PostgresServer.stop)
   )
   .dependsOn(
     graphCommons % "compile->compile; test->test"
@@ -376,8 +375,8 @@ lazy val eventLog = project
   .settings(commonSettings)
   .settings(
     name := "event-log",
-    Test / testOptions += Tests.Setup(PostgresServer.eventLog("start")),
-    Test / testOptions += Tests.Cleanup(PostgresServer.eventLog("forceStop")),
+    Test / testOptions += Tests.Setup(PostgresServer.start),
+    Test / testOptions += Tests.Cleanup(PostgresServer.stop),
     libraryDependencies ++= Dependencies.logbackClassic ++ Dependencies.circeGenericExtras
   )
   .dependsOn(
@@ -442,8 +441,8 @@ lazy val entitiesSearch = project
   .settings(commonSettings)
   .settings(
     name := "entities-search",
-    Test / testOptions += Tests.Setup(JenaServer.entitiesSearch("start")),
-    Test / testOptions += Tests.Cleanup(JenaServer.entitiesSearch("forceStop"))
+    Test / testOptions += Tests.Setup(JenaServer.start),
+    Test / testOptions += Tests.Cleanup(JenaServer.stop)
   )
   .dependsOn(graphCommons % "compile->compile; test->test")
   .enablePlugins(AutomateHeaderPlugin)
@@ -454,8 +453,8 @@ lazy val projectAuth = project
   .settings(commonSettings)
   .settings(
     name := "project-auth",
-    Test / testOptions += Tests.Setup(JenaServer.projectAuth("start")),
-    Test / testOptions += Tests.Cleanup(JenaServer.projectAuth("forceStop")),
+    Test / testOptions += Tests.Setup(JenaServer.start),
+    Test / testOptions += Tests.Cleanup(JenaServer.stop),
     libraryDependencies ++= Dependencies.http4sClient
   )
   .dependsOn(
@@ -480,8 +479,8 @@ lazy val entitiesViewingsCollector = project
   .settings(commonSettings)
   .settings(
     name := "entities-viewings-collector",
-    Test / testOptions += Tests.Setup(JenaServer.viewingsCollector("start")),
-    Test / testOptions += Tests.Cleanup(JenaServer.viewingsCollector("forceStop"))
+    Test / testOptions += Tests.Setup(JenaServer.start),
+    Test / testOptions += Tests.Cleanup(JenaServer.stop)
   )
   .dependsOn(
     eventsQueue         % "compile->compile; test->test",
@@ -496,8 +495,8 @@ lazy val triplesGenerator = project
   .settings(commonSettings)
   .settings(
     name := "triples-generator",
-    Test / testOptions += Tests.Setup(JenaServer.triplesGenerator("start")),
-    Test / testOptions += Tests.Cleanup(JenaServer.triplesGenerator("forceStop")),
+    Test / testOptions += Tests.Setup(JenaServer.start),
+    Test / testOptions += Tests.Cleanup(JenaServer.stop),
     libraryDependencies ++=
       Dependencies.logbackClassic ++
         Dependencies.ammoniteOps,
@@ -515,7 +514,10 @@ lazy val triplesGenerator = project
     entitiesViewingsCollector % "compile->compile; test->test",
     projectAuth               % "compile->compile; test->test"
   )
-  .enablePlugins(AutomateHeaderPlugin)
+  .enablePlugins(
+    JavaAppPackaging,
+    AutomateHeaderPlugin
+  )
 
 lazy val tokenRepositoryApi = project
   .in(file("token-repository-api"))
@@ -533,8 +535,8 @@ lazy val tokenRepository = project
   .settings(commonSettings)
   .settings(
     name := "token-repository",
-    Test / testOptions += Tests.Setup(PostgresServer.tokenRepository("start")),
-    Test / testOptions += Tests.Cleanup(PostgresServer.tokenRepository("forceStop")),
+    Test / testOptions += Tests.Setup(PostgresServer.start),
+    Test / testOptions += Tests.Cleanup(PostgresServer.stop),
     libraryDependencies ++= Dependencies.logbackClassic
   )
   .dependsOn(
@@ -559,8 +561,8 @@ lazy val knowledgeGraph = project
   .settings(commonSettings)
   .settings(
     name := "knowledge-graph",
-    Test / testOptions += Tests.Setup(JenaServer.knowledgeGraph("start")),
-    Test / testOptions += Tests.Cleanup(JenaServer.knowledgeGraph("forceStop")),
+    Test / testOptions += Tests.Setup(JenaServer.start),
+    Test / testOptions += Tests.Cleanup(JenaServer.stop),
     libraryDependencies ++=
       Dependencies.logbackClassic ++
         Dependencies.widoco ++
@@ -595,12 +597,12 @@ lazy val acceptanceTests = project
     name := "acceptance-tests",
     Test / parallelExecution := false,
     Test / testOptions += Tests.Setup { cl =>
-      PostgresServer.acceptanceTests("startUnsafe")(cl)
-      JenaServer.acceptanceTests("startUnsafe")(cl)
+      PostgresServer.start(cl)
+      JenaServer.start(cl)
     },
     Test / testOptions += Tests.Cleanup { cl =>
-      PostgresServer.acceptanceTests("forceStop")(cl)
-      JenaServer.acceptanceTests("forceStop")(cl)
+      PostgresServer.stop(cl)
+      JenaServer.stop(cl)
     }
   )
   .dependsOn(
