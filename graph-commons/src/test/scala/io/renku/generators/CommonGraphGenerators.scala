@@ -27,7 +27,7 @@ import io.renku.config.certificates.Certificate
 import io.renku.config.sentry.SentryConfig
 import io.renku.config.sentry.SentryConfig.{Dsn, Environment}
 import io.renku.control.{RateLimit, RateLimitUnit}
-import io.renku.crypto.AesCrypto.Secret
+import io.renku.crypto.Secret
 import io.renku.data.Message
 import io.renku.generators.Generators.Implicits._
 import io.renku.generators.Generators._

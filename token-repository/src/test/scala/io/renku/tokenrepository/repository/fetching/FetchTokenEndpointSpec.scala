@@ -21,7 +21,7 @@ package io.renku.tokenrepository.repository.fetching
 import cats.data.OptionT
 import cats.effect.IO
 import io.circe.Json
-import io.circe.syntax.EncoderOps
+import io.circe.syntax._
 import io.renku.data.Message
 import io.renku.generators.CommonGraphGenerators._
 import io.renku.generators.Generators.Implicits._
@@ -29,9 +29,8 @@ import io.renku.generators.Generators._
 import io.renku.graph.model.GraphModelGenerators._
 import io.renku.graph.model.projects
 import io.renku.graph.model.projects.GitLabId
+import io.renku.http.RenkuEntityCodec
 import io.renku.http.client.AccessToken
-import io.renku.http.client.AccessToken._
-import io.renku.http.server.EndpointTester._
 import io.renku.interpreters.TestLogger
 import io.renku.interpreters.TestLogger.Level.Error
 import io.renku.testtools.IOSpec
@@ -147,7 +146,7 @@ class FetchTokenEndpointSpec extends AnyWordSpec with IOSpec with MockFactory wi
     }
   }
 
-  private trait TestCase {
+  private trait TestCase extends RenkuEntityCodec {
     implicit val logger: TestLogger[IO] = TestLogger[IO]()
     val tokensFinder = mock[TokenFinder[IO]]
     val endpoint     = new FetchTokenEndpointImpl[IO](tokensFinder)

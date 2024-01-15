@@ -29,12 +29,12 @@ import io.renku.generators.Generators.Implicits._
 import io.renku.graph.model.RenkuTinyTypeGenerators.{personGitLabIds, projectIds}
 import io.renku.graph.model.projects.Role
 import io.renku.graph.model.{persons, projects}
+import io.renku.http.RenkuEntityCodec
 import io.renku.http.client.RestClient.ResponseMappingF
 import io.renku.http.client.{AccessToken, GitLabClient}
 import io.renku.http.tinytypes.TinyTypeURIEncoder._
 import io.renku.testtools.{GitLabClientTools, IOSpec}
 import org.http4s.Status.{BadRequest, Forbidden, NotFound, Ok, Unauthorized}
-import org.http4s.circe._
 import org.http4s.implicits._
 import org.http4s.{Request, Response, Uri}
 import org.scalacheck.Gen
@@ -112,7 +112,8 @@ class UserIdFinderSpec
     with MockFactory
     with GitLabClientTools[IO]
     with TableDrivenPropertyChecks
-    with should.Matchers {
+    with should.Matchers
+    with RenkuEntityCodec {
 
   "checkValid" should {
 
@@ -176,7 +177,8 @@ class MemberRightsCheckerSpec
     with MockFactory
     with GitLabClientTools[IO]
     with TableDrivenPropertyChecks
-    with should.Matchers {
+    with should.Matchers
+    with RenkuEntityCodec {
 
   def accessLevel(r: Role): Int = Role.toGitLabAccessLevel(r)
 

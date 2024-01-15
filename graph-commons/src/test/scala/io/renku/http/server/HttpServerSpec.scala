@@ -23,7 +23,7 @@ import eu.timepit.refined.auto._
 import io.renku.data.Message
 import io.renku.generators.Generators.Implicits._
 import io.renku.generators.Generators.httpPorts
-import io.renku.http.server.EndpointTester._
+import io.renku.http.RenkuEntityCodec
 import io.renku.testtools.CustomAsyncIOSpec
 import org.http4s._
 import org.http4s.client.Client
@@ -32,7 +32,12 @@ import org.http4s.headers.`Content-Type`
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AsyncWordSpec
 
-class HttpServerSpec extends AsyncWordSpec with CustomAsyncIOSpec with Http4sDsl[IO] with should.Matchers {
+class HttpServerSpec
+    extends AsyncWordSpec
+    with CustomAsyncIOSpec
+    with Http4sDsl[IO]
+    with should.Matchers
+    with RenkuEntityCodec {
 
   "run" should {
 

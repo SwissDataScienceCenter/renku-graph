@@ -25,12 +25,12 @@ import cats.syntax.all._
 import eu.timepit.refined.auto._
 import io.renku.data.Message
 import io.renku.graph.model.projects
+import io.renku.http.RenkuEntityCodec
 import io.renku.http.client.GitLabClient
 import io.renku.http.server.security.model.AuthUser
 import io.renku.knowledgegraph.Failure
 import io.renku.metrics.MetricsRegistry
 import org.http4s.MediaType.{application, multipartType}
-import org.http4s.circe.CirceEntityDecoder._
 import org.http4s.dsl.Http4sDsl
 import org.http4s.headers.`Content-Type`
 import org.http4s.multipart.Multipart
@@ -48,6 +48,7 @@ object Endpoint {
 
 private class EndpointImpl[F[_]: Async: Logger](projectUpdater: ProjectUpdater[F])
     extends Http4sDsl[F]
+    with RenkuEntityCodec
     with Endpoint[F] {
 
   override def `PATCH /projects/:slug`(slug: projects.Slug, request: Request[F], authUser: AuthUser): F[Response[F]] =
@@ -64,7 +65,7 @@ private class EndpointImpl[F[_]: Async: Logger](projectUpdater: ProjectUpdater[F
   private lazy val decodePayload: Request[F] => F[Either[Response[F], ProjectUpdates]] = {
     case req if req.contentType contains `Content-Type`(application.json) =>
       req
-        .as[ProjectUpdates]
+        .asJson(ProjectUpdates.jsonDecoder)
         .map(_.asRight[Response[F]])
         .handleError(badRequest(_).asLeft[ProjectUpdates])
     case req if req.contentType.map(_.mediaType).exists(_.satisfies(multipartType("form-data"))) =>

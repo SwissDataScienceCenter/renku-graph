@@ -21,20 +21,20 @@ package io.renku.graph.http.server.security
 import cats.effect.Async
 import cats.syntax.all._
 import eu.timepit.refined.auto._
+import io.circe._
+import io.renku.graph.model.persons
+import io.renku.tinytypes.json.TinyTypeDecoders._
+import io.renku.http.RenkuEntityCodec
 import io.renku.http.client.{GitLabClient, UserAccessToken}
 import io.renku.http.server.security.EndpointSecurityException.AuthenticationFailure
 import io.renku.http.server.security.model.AuthUser
 import io.renku.http.server.security.{Authenticator, EndpointSecurityException}
+import org.http4s._
+import org.http4s.dsl.io._
 import org.http4s.implicits.http4sLiteralsSyntax
 import org.typelevel.log4cats.Logger
 
-class GLAuthenticatorImpl[F[_]: Async: GitLabClient: Logger] extends Authenticator[F] {
-
-  import cats.syntax.all._
-  import io.circe._
-  import org.http4s._
-  import org.http4s.circe.jsonOf
-  import org.http4s.dsl.io._
+class GLAuthenticatorImpl[F[_]: Async: GitLabClient: Logger] extends Authenticator[F] with RenkuEntityCodec {
 
   override def authenticate(accessToken: UserAccessToken): F[Either[EndpointSecurityException, AuthUser]] =
     GitLabClient[F].get(uri"user", "user")(mapResponse(accessToken))(accessToken.some)
@@ -43,22 +43,13 @@ class GLAuthenticatorImpl[F[_]: Async: GitLabClient: Logger] extends Authenticat
       accessToken: UserAccessToken
   ): PartialFunction[(Status, Request[F], Response[F]), F[Either[EndpointSecurityException, AuthUser]]] = {
     case (Ok, _, response) =>
-      implicit val entityDecoder: EntityDecoder[F, AuthUser] = decoder(accessToken)
-      response.as[AuthUser] map (_.asRight[EndpointSecurityException])
+      response.asJson(userDecoder(accessToken)) map (_.asRight[EndpointSecurityException])
     case (NotFound | Unauthorized | Forbidden, _, _) =>
       AuthenticationFailure.asLeft[AuthUser].leftWiden[EndpointSecurityException].pure[F]
   }
 
-  private def decoder(accessToken: UserAccessToken): EntityDecoder[F, AuthUser] = {
-
-    import io.renku.graph.model.persons
-    import io.renku.tinytypes.json.TinyTypeDecoders._
-
-    implicit lazy val userDecoder: Decoder[AuthUser] = { cursor =>
-      cursor.downField("id").as[persons.GitLabId].map(AuthUser(_, accessToken))
-    }
-
-    jsonOf[F, AuthUser]
+  private def userDecoder(accessToken: UserAccessToken): Decoder[AuthUser] = { cursor =>
+    cursor.downField("id").as[persons.GitLabId].map(AuthUser(_, accessToken))
   }
 }
 

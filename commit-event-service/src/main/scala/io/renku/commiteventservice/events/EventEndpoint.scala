@@ -21,13 +21,14 @@ package io.renku.commiteventservice.events
 import cats.MonadThrow
 import cats.data.EitherT
 import cats.data.EitherT.right
-import cats.effect.kernel.Concurrent
+import cats.effect.Concurrent
 import cats.syntax.all._
 import eu.timepit.refined.auto._
 import io.circe.Json
 import io.renku.data.Message
 import io.renku.events.EventRequestContent
 import io.renku.events.consumers.{EventConsumersRegistry, EventSchedulingResult}
+import io.renku.http.RenkuEntityCodec
 import org.http4s.dsl.Http4sDsl
 import org.http4s.multipart.Multipart
 import org.http4s.{Request, Response}
@@ -40,9 +41,8 @@ trait EventEndpoint[F[_]] {
 
 class EventEndpointImpl[F[_]: Concurrent](eventConsumersRegistry: EventConsumersRegistry[F])
     extends Http4sDsl[F]
+    with RenkuEntityCodec
     with EventEndpoint[F] {
-
-  import org.http4s.circe._
 
   def processEvent(request: Request[F]): F[Response[F]] = {
     for {

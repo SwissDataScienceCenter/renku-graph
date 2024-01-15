@@ -33,9 +33,9 @@ import io.renku.generators.Generators.nonBlankStrings
 import io.renku.graph.model.EventsGenerators.commitIds
 import io.renku.graph.model.GraphModelGenerators._
 import io.renku.graph.model.persons
+import io.renku.http.RenkuEntityCodec
 import io.renku.http.client.RestClient.ResponseMappingF
 import io.renku.http.client.{AccessToken, GitLabClient}
-import io.renku.http.server.EndpointTester._
 import io.renku.interpreters.TestLogger
 import io.renku.testtools.{GitLabClientTools, IOSpec}
 import io.renku.triplesgenerator.errors.ProcessingRecoverableError
@@ -54,6 +54,7 @@ class CommitAuthorFinderSpec
     with should.Matchers
     with MockFactory
     with ScalaCheckPropertyChecks
+    with RenkuEntityCodec
     with GitLabClientTools[IO] {
 
   "findCommitAuthor" should {

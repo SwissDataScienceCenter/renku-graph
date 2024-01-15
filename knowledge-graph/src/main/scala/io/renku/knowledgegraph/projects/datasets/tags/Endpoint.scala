@@ -26,6 +26,7 @@ import cats.syntax.all._
 import io.renku.config.renku
 import io.renku.graph
 import io.renku.graph.model.{RenkuUrl, datasets}
+import io.renku.http.RenkuEntityCodec
 import io.renku.http.rest.Links.Href
 import io.renku.http.rest.paging.PagingRequest
 import io.renku.http.server.security.model.AuthUser
@@ -62,16 +63,15 @@ private class EndpointImpl[F[_]: Async: Logger](tagsFinder: TagsFinder[F],
                                                 renkuUrl:    RenkuUrl,
                                                 renkuApiUrl: renku.ApiUrl
 ) extends Http4sDsl[F]
+    with RenkuEntityCodec
     with Endpoint[F] {
 
   import eu.timepit.refined.auto._
   import io.circe.Encoder._
-  import io.circe.Json
   import io.circe.syntax._
   import io.renku.data.Message
   import io.renku.http.rest.paging.{PagingHeaders, PagingResponse}
-  import org.http4s.circe.jsonEncoderOf
-  import org.http4s.{EntityEncoder, Header, Status}
+  import org.http4s.{Header, Status}
 
   import scala.util.control.NonFatal
 
@@ -87,8 +87,6 @@ private class EndpointImpl[F[_]: Async: Logger](tagsFinder: TagsFinder[F],
       .withEntity(response.results.asJson)
       .putHeaders(PagingHeaders.from(response)(resourceUrl, renku.ResourceUrl).toSeq.map(Header.ToRaw.rawToRaw): _*)
   }
-
-  private implicit lazy val responseEntityEncoder: EntityEncoder[F, Json] = jsonEncoderOf[F, Json]
 
   private lazy val httpResult: PartialFunction[Throwable, F[Response[F]]] = { case NonFatal(exception) =>
     val errorMessage = Message.Error("Project Dataset Tags search failed")

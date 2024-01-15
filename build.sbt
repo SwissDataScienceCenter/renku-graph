@@ -98,7 +98,8 @@ lazy val jsonldUtils = project
       Dependencies.jsonld4s
   )
   .dependsOn(
-    tinyTypes % "compile->compile;test->test"
+    tinyTypes % "compile->compile;test->test",
+    commonUtils % "compile->compile;test->test"
   )
 
 lazy val metricUtils = project
@@ -228,7 +229,8 @@ lazy val triplesStoreClient = project
   )
   .dependsOn(
     generators % "test->test",
-    tinyTypes  % "compile->compile; test->test"
+    tinyTypes  % "compile->compile; test->test",
+    http4sClientUtils % "compile->compile;test->test"
   )
   .enablePlugins(AutomateHeaderPlugin)
 

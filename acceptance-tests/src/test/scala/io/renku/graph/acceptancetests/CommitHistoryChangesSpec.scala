@@ -30,9 +30,10 @@ import io.renku.graph.acceptancetests.tooling.{AcceptanceSpec, ApplicationServic
 import io.renku.graph.model.EventsGenerators.commitIds
 import io.renku.graph.model.projects.Role
 import io.renku.graph.model.testentities._
+import io.renku.http.RenkuEntityCodec
 import io.renku.http.client.AccessToken
 import io.renku.http.rest.Links
-import io.renku.http.server.EndpointTester.{JsonOps, jsonEntityDecoder}
+import io.renku.http.server.EndpointTester.JsonOps
 import org.http4s.Status._
 import org.scalatest.EitherValues
 
@@ -44,6 +45,7 @@ class CommitHistoryChangesSpec
     with ApplicationServices
     with TSProvisioning
     with DatasetsApiEncoders
+    with RenkuEntityCodec
     with EitherValues {
 
   private val user = authUsers.generateOne

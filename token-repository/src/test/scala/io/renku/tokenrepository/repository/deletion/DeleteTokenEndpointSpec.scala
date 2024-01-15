@@ -27,6 +27,7 @@ import io.renku.generators.CommonGraphGenerators.accessTokens
 import io.renku.generators.Generators.Implicits._
 import io.renku.generators.Generators._
 import io.renku.graph.model.GraphModelGenerators._
+import io.renku.http.RenkuEntityCodec
 import io.renku.interpreters.TestLogger
 import io.renku.interpreters.TestLogger.Level.{Error, Info}
 import io.renku.testtools.CustomAsyncIOSpec
@@ -42,7 +43,8 @@ class DeleteTokenEndpointSpec
     with CustomAsyncIOSpec
     with AsyncMockFactory
     with should.Matchers
-    with BeforeAndAfterEach {
+    with BeforeAndAfterEach
+    with RenkuEntityCodec {
 
   it should "respond with NO_CONTENT if the token removal was successful" in {
 

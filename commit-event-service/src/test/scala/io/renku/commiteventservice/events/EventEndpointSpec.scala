@@ -29,13 +29,14 @@ import io.renku.events.consumers.ConsumersModelGenerators.badRequests
 import io.renku.events.consumers.{EventConsumersRegistry, EventSchedulingResult}
 import io.renku.generators.Generators.Implicits._
 import io.renku.generators.Generators.{exceptions, jsons, nonEmptyStrings}
+import io.renku.http.RenkuEntityCodec
 import io.renku.http.client.RestClient.PartEncoder
-import io.renku.http.server.EndpointTester._
+import io.renku.http.server.EndpointTester.RequestOps
 import io.renku.testtools.IOSpec
 import io.renku.tinytypes.ByteArrayTinyType
 import io.renku.tinytypes.contenttypes.ZippedContent
 import org.http4s.MediaType._
-import org.http4s.Status.{Accepted, BadRequest, InternalServerError, ServiceUnavailable, TooManyRequests}
+import org.http4s.Status._
 import org.http4s.headers.`Content-Type`
 import org.http4s.implicits._
 import org.http4s.multipart.Part
@@ -50,6 +51,7 @@ class EventEndpointSpec
     with IOSpec
     with MockFactory
     with should.Matchers
+    with RenkuEntityCodec
     with TableDrivenPropertyChecks {
 
   "processEvent" should {

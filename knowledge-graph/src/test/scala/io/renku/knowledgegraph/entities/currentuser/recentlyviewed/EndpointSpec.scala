@@ -36,6 +36,7 @@ import io.renku.generators.Generators._
 import io.renku.graph.model.GraphModelGenerators.{gitLabUrls, renkuUrls}
 import io.renku.graph.model.tools.AdditionalMatchers
 import io.renku.graph.model.{GitLabUrl, RenkuUrl}
+import io.renku.http.RenkuEntityCodec
 import io.renku.http.rest.paging.model.{Page, PerPage}
 import io.renku.http.rest.paging.{PagingHeaders, PagingRequest, PagingResponse}
 import io.renku.interpreters.TestLogger
@@ -45,7 +46,6 @@ import io.renku.testtools.IOSpec
 import io.renku.triplesstore.SparqlQueryTimeRecorder
 import org.http4s.MediaType.application
 import org.http4s.Status._
-import org.http4s.circe.CirceEntityCodec._
 import org.http4s.headers.`Content-Type`
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.matchers.should
@@ -60,7 +60,8 @@ class EndpointSpec
     with SearchDiffInstances
     with should.Matchers
     with IOSpec
-    with ModelEncoders {
+    with ModelEncoders
+    with RenkuEntityCodec {
 
   implicit val logger:      TestLogger[IO] = TestLogger[IO]()
   implicit val renkuUrl:    RenkuUrl       = renkuUrls.generateOne

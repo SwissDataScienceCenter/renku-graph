@@ -29,9 +29,9 @@ import io.renku.generators.CommonGraphGenerators.{accessTokens, personalAccessTo
 import io.renku.generators.Generators.Implicits._
 import io.renku.graph.model.GraphModelGenerators._
 import io.renku.graph.model.projects
+import io.renku.http.RenkuEntityCodec
 import io.renku.http.client.RestClient.ResponseMappingF
 import io.renku.http.client.{AccessToken, GitLabClient}
-import io.renku.http.server.EndpointTester._
 import io.renku.http.tinytypes.TinyTypeURIEncoder._
 import io.renku.interpreters.TestLogger
 import io.renku.testtools.{CustomAsyncIOSpec, GitLabClientTools}
@@ -48,7 +48,8 @@ class ProjectSlugFinderSpec
     with should.Matchers
     with AsyncMockFactory
     with GitLabClientTools[IO]
-    with TableDrivenPropertyChecks {
+    with TableDrivenPropertyChecks
+    with RenkuEntityCodec {
 
   forAll {
     Table(

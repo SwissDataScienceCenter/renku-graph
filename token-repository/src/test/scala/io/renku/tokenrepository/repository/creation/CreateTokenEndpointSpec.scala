@@ -29,8 +29,8 @@ import io.renku.generators.Generators._
 import io.renku.graph.model.GraphModelGenerators._
 import io.renku.graph.model.projects
 import io.renku.graph.model.projects.GitLabId
+import io.renku.http.RenkuEntityCodec
 import io.renku.http.client.AccessToken
-import io.renku.http.server.EndpointTester._
 import io.renku.http.tinytypes.TinyTypeURIEncoder._
 import io.renku.interpreters.TestLogger
 import io.renku.interpreters.TestLogger.Level.Error
@@ -43,7 +43,12 @@ import org.scalamock.scalatest.MockFactory
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
 
-class CreateTokenEndpointSpec extends AnyWordSpec with IOSpec with MockFactory with should.Matchers {
+class CreateTokenEndpointSpec
+    extends AnyWordSpec
+    with IOSpec
+    with MockFactory
+    with should.Matchers
+    with RenkuEntityCodec {
 
   "createToken" should {
 
@@ -52,7 +57,7 @@ class CreateTokenEndpointSpec extends AnyWordSpec with IOSpec with MockFactory w
       val accessToken = personalAccessTokens.generateOne
       givenTokenCreation(projectId, accessToken, returning = ().pure[IO])
 
-      val request = Request(POST, uri"projects" / projectId / "tokens")
+      val request = Request[IO](POST, uri"projects" / projectId / "tokens")
         .withEntity(accessToken.asJson)
 
       val response = endpoint.createToken(projectId, request).unsafeRunSync()
@@ -68,7 +73,7 @@ class CreateTokenEndpointSpec extends AnyWordSpec with IOSpec with MockFactory w
       val accessToken = userOAuthAccessTokens.generateOne
       givenTokenCreation(projectId, accessToken, returning = ().pure[IO])
 
-      val request = Request(POST, uri"projects" / projectId / "tokens")
+      val request = Request[IO](POST, uri"projects" / projectId / "tokens")
         .withEntity(accessToken.asJson)
 
       val response = endpoint.createToken(projectId, request).unsafeRunSync()
@@ -98,7 +103,7 @@ class CreateTokenEndpointSpec extends AnyWordSpec with IOSpec with MockFactory w
       val exception   = exceptions.generateOne
       givenTokenCreation(projectId, accessToken, returning = exception.raiseError[IO, Unit])
 
-      val request = Request(POST, uri"projects" / projectId / "tokens")
+      val request = Request[IO](POST, uri"projects" / projectId / "tokens")
         .withEntity(accessToken.asJson)
 
       val response = endpoint.createToken(projectId, request).unsafeRunSync()

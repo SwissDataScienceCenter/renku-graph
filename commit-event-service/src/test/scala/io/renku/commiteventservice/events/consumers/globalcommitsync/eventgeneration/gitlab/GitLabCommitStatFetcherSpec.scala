@@ -35,9 +35,9 @@ import io.renku.graph.model.EventsGenerators.commitIds
 import io.renku.graph.model.GraphModelGenerators.projectIds
 import io.renku.graph.model.events.CommitId
 import io.renku.graph.model.projects
+import io.renku.http.RenkuEntityCodec
 import io.renku.http.client.RestClient.ResponseMappingF
 import io.renku.http.client.{AccessToken, GitLabClient}
-import io.renku.http.server.EndpointTester._
 import io.renku.interpreters.TestLogger
 import io.renku.stubbing.ExternalServiceStubbing
 import io.renku.testtools.{GitLabClientTools, IOSpec}
@@ -55,6 +55,7 @@ class GitLabCommitStatFetcherSpec
     with ExternalServiceStubbing
     with should.Matchers
     with ScalaCheckPropertyChecks
+    with RenkuEntityCodec
     with GitLabClientTools[IO] {
 
   "fetchCommitStats" should {

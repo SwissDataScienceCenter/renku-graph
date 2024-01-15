@@ -27,18 +27,11 @@ import io.renku.http.rest.Links.{Href, Rel}
 import io.renku.http.server.security.model.{AuthUser, MaybeAuthUser}
 import io.renku.json.JsonOps.JsonExt
 import org.http4s._
-import org.http4s.circe.{jsonEncoderOf, jsonOf}
 import org.http4s.headers.`Content-Type`
 import org.http4s.multipart.{Multipart, Multiparts, Part}
 import org.http4s.server.AuthMiddleware
 
 object EndpointTester {
-
-  implicit val jsonEntityDecoder:     EntityDecoder[IO, Json]       = jsonOf[IO, Json]
-  implicit val jsonListEntityDecoder: EntityDecoder[IO, List[Json]] = jsonOf[IO, List[Json]]
-  implicit val jsonEntityEncoder:     EntityEncoder[IO, Json]       = jsonEncoderOf[IO, Json]
-
-  implicit val stringEntityDecoder: EntityDecoder[IO, String] = EntityDecoder.text
 
   implicit class ResourceEndpointOps(routes: Resource[IO, Kleisli[IO, Request[IO], Response[IO]]]) {
 

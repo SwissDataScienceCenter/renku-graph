@@ -27,6 +27,7 @@ import eu.timepit.refined.auto._
 import io.circe.literal._
 import io.renku.data.Message
 import io.renku.graph.model.projects
+import io.renku.http.RenkuEntityCodec
 import io.renku.http.client.GitLabClient
 import io.renku.http.server.security.model.AuthUser
 import io.renku.knowledgegraph.Failure
@@ -45,7 +46,9 @@ object Endpoint {
     ProjectCreator[F](config).map(new EndpointImpl[F](_))
 }
 
-private class EndpointImpl[F[_]: Async: Logger](projectCreator: ProjectCreator[F]) extends Endpoint[F] {
+private class EndpointImpl[F[_]: Async: Logger](projectCreator: ProjectCreator[F])
+    extends Endpoint[F]
+    with RenkuEntityCodec {
 
   override def `POST /projects`(request: Request[F], authUser: AuthUser): F[Response[F]] =
     EitherT(decodePayload(request))

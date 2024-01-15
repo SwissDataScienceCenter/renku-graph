@@ -31,11 +31,11 @@ import io.renku.core.client.Generators.userInfos
 import io.renku.core.client.UserInfo
 import io.renku.generators.CommonGraphGenerators.userAccessTokens
 import io.renku.generators.Generators.Implicits._
+import io.renku.http.RenkuEntityCodec
 import io.renku.http.client.RestClient.ResponseMappingF
 import io.renku.http.client.{AccessToken, GitLabClient}
 import io.renku.testtools.GitLabClientTools
 import org.http4s.Status.{NotFound, Ok}
-import org.http4s.circe._
 import org.http4s.implicits._
 import org.http4s.{Request, Response, Uri}
 import org.scalamock.scalatest.AsyncMockFactory
@@ -49,6 +49,7 @@ class UserInfoFinderSpec
     with AsyncMockFactory
     with should.Matchers
     with EitherValues
+    with RenkuEntityCodec
     with GitLabClientTools[IO] {
 
   it should "call GL's GET gl/user and return the user info" in {

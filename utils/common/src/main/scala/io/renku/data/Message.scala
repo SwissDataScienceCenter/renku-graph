@@ -22,7 +22,8 @@ import cats.Show
 import cats.syntax.all._
 import eu.timepit.refined.api.Refined
 import eu.timepit.refined.collection.NonEmpty
-import io.circe.Json
+import io.circe.syntax._
+import io.circe.{Decoder, Encoder, Json}
 
 import java.io.{PrintWriter, StringWriter}
 
@@ -35,7 +36,7 @@ sealed trait Message {
   override lazy val toString: String = show
 }
 
-object Message extends MessageCodecs {
+object Message {
 
   sealed trait Severity extends Product {
     lazy val widen:             Severity = this
@@ -46,6 +47,14 @@ object Message extends MessageCodecs {
     case object Error extends Severity
     case object Info  extends Severity
     implicit def show[S <: Severity]: Show[S] = Show.fromToString
+
+    def fromString(str: String): Either[String, Severity] =
+      List(Error, Info)
+        .find(_.value.equalsIgnoreCase(str))
+        .toRight(s"unknown Message.Severity '$str'")
+
+    implicit lazy val severityDecoder: Decoder[Severity] = Decoder.decodeString.emap(fromString)
+    implicit lazy val severityEncoder: Encoder[Severity] = Encoder.encodeString.contramap(_.value)
   }
 
   def unsafeApply(message: String, severity: Severity): Message =
@@ -152,5 +161,28 @@ object Message extends MessageCodecs {
   implicit def show[T <: Message]: Show[T] = Show.show[T] {
     case m: Message.StringMessage => m.show
     case m: Message.JsonMessage   => m.show
+  }
+
+  implicit lazy val messageJsonDecoder: Decoder[Message] = Decoder.instance[Message] { cur =>
+    def toMessage(severity: Severity): Json => Decoder.Result[Message] = { messageJson =>
+      if (messageJson.isString)
+        messageJson.as[String].map(Message.unsafeApply(_, severity))
+      else
+        Message.fromJsonUnsafe(messageJson, severity).asRight
+    }
+
+    cur.downField("severity").as[Message.Severity] >>= { severity =>
+      cur.keys.toList.flatMap(_.filterNot(_ == "severity").toList) match {
+        case "message" :: Nil =>
+          cur.downField("message").as[Json] >>= toMessage(severity)
+        case _ =>
+          cur.downField("severity").delete.as[Json] >>= toMessage(severity)
+      }
+    }
+  }
+
+  implicit def messageJsonEncoder[T <: Message]: Encoder[T] = Encoder.instance[T] {
+    case Message.StringMessage(v, s) => Json.obj("severity" -> s.asJson, "message" -> Json.fromString(v))
+    case Message.JsonMessage(v, s)   => Json.obj("severity" -> s.asJson).deepMerge(v)
   }
 }

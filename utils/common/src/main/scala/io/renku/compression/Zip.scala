@@ -26,8 +26,8 @@ import java.io.{ByteArrayInputStream, ByteArrayOutputStream}
 import java.nio.charset.StandardCharsets
 import java.util.zip._
 import scala.io.{Codec, Source}
-import scala.util.control.NonFatal
 import scala.util.Try
+import scala.util.control.NonFatal
 
 trait Zip {
   def zip[F[_]: Sync](content: String): F[Array[Byte]]

@@ -25,12 +25,12 @@ import eu.timepit.refined.auto._
 import io.circe.syntax._
 import io.renku.data.Message
 import io.renku.graph.model.projects
+import io.renku.http.RenkuEntityCodec
 import io.renku.http.server.security.model.AuthUser
 import io.renku.triplesstore.SparqlQueryTimeRecorder
 import model.Lineage
 import model.Node.Location
 import org.http4s.Response
-import org.http4s.circe.jsonEncoder
 import org.http4s.dsl.Http4sDsl
 import org.typelevel.log4cats.Logger
 
@@ -40,7 +40,10 @@ trait Endpoint[F[_]] {
   def `GET /lineage`(projectSlug: projects.Slug, location: Location, maybeUser: Option[AuthUser]): F[Response[F]]
 }
 
-private class EndpointImpl[F[_]: Async: Logger](lineageFinder: LineageFinder[F]) extends Http4sDsl[F] with Endpoint[F] {
+private class EndpointImpl[F[_]: Async: Logger](lineageFinder: LineageFinder[F])
+    extends Http4sDsl[F]
+    with Endpoint[F]
+    with RenkuEntityCodec {
 
   override def `GET /lineage`(projectSlug: projects.Slug,
                               location:    Location,

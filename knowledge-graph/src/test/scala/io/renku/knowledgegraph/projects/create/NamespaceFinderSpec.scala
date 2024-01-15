@@ -30,12 +30,12 @@ import io.circe.literal._
 import io.circe.syntax._
 import io.renku.generators.CommonGraphGenerators.accessTokens
 import io.renku.generators.Generators.Implicits._
+import io.renku.http.RenkuEntityCodec
 import io.renku.http.client.RestClient.ResponseMappingF
 import io.renku.http.client.{AccessToken, GitLabClient}
 import io.renku.http.tinytypes.TinyTypeURIEncoder._
 import io.renku.testtools.GitLabClientTools
 import org.http4s.Status.{Forbidden, NotFound, Ok}
-import org.http4s.circe._
 import org.http4s.implicits._
 import org.http4s.{Request, Response, Uri}
 import org.scalamock.scalatest.AsyncMockFactory
@@ -49,6 +49,7 @@ class NamespaceFinderSpec
     with AsyncMockFactory
     with should.Matchers
     with EitherValues
+    with RenkuEntityCodec
     with GitLabClientTools[IO] {
 
   it should "call GL's GET gl/namespaces/:id and return Namespace.WithName " +

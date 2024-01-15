@@ -30,10 +30,10 @@ import io.renku.generators.Generators.Implicits._
 import io.renku.generators.Generators.exceptions
 import io.renku.graph.model.GraphModelGenerators._
 import io.renku.graph.model.projects
+import io.renku.http.RenkuEntityCodec
 import io.renku.http.client.RestClient.ResponseMappingF
 import io.renku.http.client.RestClientError.UnauthorizedException
 import io.renku.http.client.{AccessToken, GitLabClient}
-import io.renku.http.server.EndpointTester._
 import io.renku.http.tinytypes.TinyTypeURIEncoder._
 import io.renku.testtools.{GitLabClientTools, IOSpec}
 import io.renku.tokenrepository.api.TokenRepositoryClient
@@ -49,6 +49,7 @@ class GitLabProjectFetcherSpec
     with IOSpec
     with MockFactory
     with should.Matchers
+    with RenkuEntityCodec
     with GitLabClientTools[IO] {
 
   private val apiName: String Refined NonEmpty = "single-project"

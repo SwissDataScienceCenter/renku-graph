@@ -26,9 +26,9 @@ import io.renku.generators.CommonGraphGenerators.authUsers
 import io.renku.generators.Generators._
 import io.renku.generators.Generators.Implicits._
 import io.renku.generators.jsonld.JsonLDGenerators.jsonLDEntities
-import io.renku.graph.model.{projects, GitLabUrl}
+import io.renku.graph.model.{GitLabUrl, projects}
 import io.renku.graph.model.testentities.generators.EntitiesGenerators
-import io.renku.http.server.EndpointTester._
+import io.renku.http.RenkuEntityCodec
 import io.renku.interpreters.TestLogger
 import io.renku.interpreters.TestLogger.Level.{Error, Warn}
 import io.renku.knowledgegraph.projects.details.model.Project
@@ -39,7 +39,7 @@ import io.renku.triplesgenerator.api.events.ProjectViewedEvent
 import org.http4s.{Headers, Request}
 import org.http4s.MediaType.application
 import org.http4s.Status._
-import org.http4s.headers.{`Content-Type`, Accept}
+import org.http4s.headers.{Accept, `Content-Type`}
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.matchers.should
 import org.scalatest.prop.TableDrivenPropertyChecks
@@ -52,7 +52,8 @@ class EndpointSpec
     with MockFactory
     with TableDrivenPropertyChecks
     with should.Matchers
-    with IOSpec {
+    with IOSpec
+    with RenkuEntityCodec {
 
   "GET /projects/:slug" should {
 

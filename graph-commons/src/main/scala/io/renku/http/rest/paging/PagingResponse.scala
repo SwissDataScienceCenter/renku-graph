@@ -20,6 +20,7 @@ package io.renku.http.rest.paging
 
 import cats.MonadThrow
 import cats.syntax.all._
+import io.renku.http.RenkuEntityCodec
 import io.renku.http.rest.paging.PagingResponse.PagingInfo
 import io.renku.http.rest.paging.model.Total
 import io.renku.tinytypes.UrlTinyType
@@ -107,12 +108,11 @@ object PagingResponse {
     override lazy val toString: String = s"PagingInfo(request: $pagingRequest, total: $total)"
   }
 
-  implicit class ResponseOps[Result](response: PagingResponse[Result]) {
+  final implicit class ResponseOps[Result](response: PagingResponse[Result]) extends RenkuEntityCodec {
 
-    import io.circe.{Encoder, Json}
+    import io.circe.Encoder
     import io.circe.syntax._
-    import org.http4s.{EntityEncoder, Response, Status}
-    import org.http4s.circe.jsonEncoderOf
+    import org.http4s.{Response, Status}
 
     def updateResults[F[_]: MonadThrow](newResults: List[Result]): F[PagingResponse[Result]] =
       if (response.results.size == newResults.size)
@@ -129,7 +129,5 @@ object PagingResponse {
       .withEntity(response.results.asJson)
       .putHeaders(PagingHeaders.from(response).toSeq.map(Header.ToRaw.rawToRaw): _*)
 
-    private implicit def resultsEntityEncoder[F[_]](implicit encoder: Encoder[Result]): EntityEncoder[F, Json] =
-      jsonEncoderOf[F, Json]
   }
 }

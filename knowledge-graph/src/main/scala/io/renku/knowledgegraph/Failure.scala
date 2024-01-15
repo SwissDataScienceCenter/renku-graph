@@ -20,6 +20,7 @@ package io.renku.knowledgegraph
 
 import io.renku.core.client.Result.{Failure => CoreFailure}
 import io.renku.data.Message
+import io.renku.http.RenkuEntityCodec._
 import org.http4s.{Response, Status}
 
 private sealed trait Failure extends Exception {

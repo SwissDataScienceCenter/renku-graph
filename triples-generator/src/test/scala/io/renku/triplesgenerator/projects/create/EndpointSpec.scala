@@ -26,6 +26,7 @@ import io.circe.syntax._
 import io.renku.data.Message
 import io.renku.generators.Generators.Implicits._
 import io.renku.generators.Generators.exceptions
+import io.renku.http.RenkuEntityCodec
 import io.renku.interpreters.TestLogger
 import io.renku.testtools.CustomAsyncIOSpec
 import io.renku.triplesgenerator.api.Generators.newProjectsGen
@@ -33,13 +34,17 @@ import io.renku.triplesgenerator.api.NewProject
 import org.http4s.MediaType.application
 import org.http4s.Request
 import org.http4s.Status.{BadRequest, Created, InternalServerError}
-import org.http4s.circe._
 import org.http4s.headers.`Content-Type`
 import org.scalamock.scalatest.AsyncMockFactory
 import org.scalatest.flatspec.AsyncFlatSpec
 import org.scalatest.matchers.should
 
-class EndpointSpec extends AsyncFlatSpec with CustomAsyncIOSpec with should.Matchers with AsyncMockFactory {
+class EndpointSpec
+    extends AsyncFlatSpec
+    with CustomAsyncIOSpec
+    with should.Matchers
+    with AsyncMockFactory
+    with RenkuEntityCodec {
 
   it should "decode the payload, pass it to the project creator and return Ok on success" in {
 

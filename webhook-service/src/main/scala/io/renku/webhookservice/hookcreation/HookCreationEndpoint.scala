@@ -24,6 +24,7 @@ import cats.syntax.all._
 import eu.timepit.refined.auto._
 import io.renku.data.Message
 import io.renku.graph.model.projects.GitLabId
+import io.renku.http.RenkuEntityCodec
 import io.renku.http.client.GitLabClient
 import io.renku.http.client.RestClientError.UnauthorizedException
 import io.renku.http.server.security.model.AuthUser
@@ -46,7 +47,8 @@ trait HookCreationEndpoint[F[_]] {
 class HookCreationEndpointImpl[F[_]: MonadThrow: Logger](
     hookCreator: HookCreator[F]
 ) extends Http4sDsl[F]
-    with HookCreationEndpoint[F] {
+    with HookCreationEndpoint[F]
+    with RenkuEntityCodec {
 
   def createHook(projectId: GitLabId, authUser: AuthUser): F[Response[F]] = {
     hookCreator.createHook(projectId, authUser) >>= toHttpResponse

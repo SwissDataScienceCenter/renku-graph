@@ -33,6 +33,7 @@ import io.renku.graph.config.RenkuUrlLoader
 import io.renku.graph.http.server.security._
 import io.renku.graph.model
 import io.renku.graph.model.{RenkuUrl, persons}
+import io.renku.http.RenkuEntityCodec
 import io.renku.http.client.GitLabClient
 import io.renku.http.rest.Sorting
 import io.renku.http.rest.paging.PagingRequest
@@ -72,7 +73,8 @@ private class MicroserviceRoutes[F[_]: Async](
     routesMetrics:              RoutesMetrics[F],
     versionRoutes:              version.Routes[F]
 )(implicit ru: RenkuUrl)
-    extends Http4sDsl[F] {
+    extends Http4sDsl[F]
+    with RenkuEntityCodec {
 
   import datasetDetailsEndpoint._
   import datasetIdAuthorizer.{authorize => authorizeDatasetId}

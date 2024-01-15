@@ -28,7 +28,7 @@ import eu.timepit.refined.string.MatchesRegex
 import io.circe._
 import io.circe.parser._
 import io.renku.crypto.AesCrypto
-import io.renku.crypto.AesCrypto.Secret
+import io.renku.crypto.Secret
 import io.renku.http.client.AccessToken
 import io.renku.http.client.AccessToken._
 
@@ -111,6 +111,7 @@ private class AccessTokenCryptoImpl[F[_]: MonadThrow](
 private object AccessTokenCrypto {
 
   import io.renku.config.ConfigLoader._
+  import io.renku.crypto.SecretConfigReader._
 
   def apply[F[_]: MonadThrow](config: Config = ConfigFactory.load()): F[AccessTokenCrypto[F]] = for {
     secret <- find[F, Secret]("projects-tokens.secret", config)

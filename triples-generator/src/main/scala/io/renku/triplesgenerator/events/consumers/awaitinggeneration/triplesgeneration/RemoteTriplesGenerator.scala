@@ -32,6 +32,7 @@ import io.renku.tinytypes.{StringTinyType, TinyTypeFactory}
 import io.renku.tinytypes.constraints.Url
 import io.renku.triplesgenerator.errors.ProcessingRecoverableError
 import ProcessingRecoverableError._
+import io.renku.http.RenkuEntityCodec
 import io.renku.triplesgenerator.events.consumers.awaitinggeneration.CommitEvent
 import org.typelevel.log4cats.Logger
 
@@ -50,14 +51,15 @@ private[events] object RemoteTriplesGenerator {
 private[awaitinggeneration] class RemoteTriplesGenerator[F[_]: Async: Logger](
     serviceUrl: TriplesGenerationServiceUrl
 ) extends RestClient(Throttler.noThrottling)
-    with TriplesGenerator[F] {
+    with TriplesGenerator[F]
+    with RenkuEntityCodec {
 
   import cats.data.EitherT
   import io.renku.http.client.RestClientError.UnauthorizedException
   import org.http4s._
   import org.http4s.Method.GET
   import org.http4s.Status.Unauthorized
-  import org.http4s.circe._
+
   import org.http4s.dsl.io._
 
   override def generateTriples(

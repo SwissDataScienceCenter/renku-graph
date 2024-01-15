@@ -30,11 +30,11 @@ import io.renku.generators.CommonGraphGenerators.accessTokens
 import io.renku.generators.Generators.Implicits._
 import io.renku.graph.model.GraphModelGenerators._
 import io.renku.graph.model.projects
+import io.renku.http.RenkuEntityCodec
 import io.renku.http.client.RestClient.ResponseMappingF
 import io.renku.http.client.{AccessToken, GitLabClient}
 import io.renku.http.tinytypes.TinyTypeURIEncoder._
 import io.renku.testtools.{CustomAsyncIOSpec, GitLabClientTools}
-import org.http4s.circe._
 import org.http4s.implicits._
 import org.http4s.{Request, Response, Status, Uri}
 import org.scalamock.scalatest.AsyncMockFactory
@@ -46,6 +46,7 @@ class GLProjectVisibilityFinderSpec
     with CustomAsyncIOSpec
     with should.Matchers
     with AsyncMockFactory
+    with RenkuEntityCodec
     with GitLabClientTools[IO] {
 
   it should s"return fetched Project's visibility if GL responds with OK and a valid body" in {

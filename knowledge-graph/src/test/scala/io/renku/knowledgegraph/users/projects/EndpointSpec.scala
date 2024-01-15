@@ -30,6 +30,7 @@ import io.renku.generators.Generators.Implicits._
 import io.renku.generators.Generators.{exceptions, relativePaths}
 import io.renku.graph.model.GraphModelGenerators.renkuUrls
 import io.renku.graph.model.{persons, projects}
+import io.renku.http.RenkuEntityCodec
 import io.renku.http.rest.Links
 import io.renku.http.rest.paging.{PagingHeaders, PagingResponse}
 import io.renku.http.server.EndpointTester._
@@ -39,7 +40,6 @@ import io.renku.testtools.IOSpec
 import org.http4s.MediaType.application
 import org.http4s.Method.GET
 import org.http4s.Status.{InternalServerError, Ok}
-import org.http4s.circe.jsonOf
 import org.http4s.headers.`Content-Type`
 import org.http4s.{EntityDecoder, Request, Uri}
 import org.scalamock.scalatest.MockFactory
@@ -47,7 +47,13 @@ import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
 import org.scalatestplus.scalacheck.ScalaCheckPropertyChecks
 
-class EndpointSpec extends AnyWordSpec with should.Matchers with IOSpec with MockFactory with ScalaCheckPropertyChecks {
+class EndpointSpec
+    extends AnyWordSpec
+    with should.Matchers
+    with IOSpec
+    with MockFactory
+    with ScalaCheckPropertyChecks
+    with RenkuEntityCodec {
 
   "GET /users/:id/projects" should {
 
@@ -110,7 +116,7 @@ class EndpointSpec extends AnyWordSpec with should.Matchers with IOSpec with Moc
 
   private implicit def httpEntityDecoder(implicit
       projectDecoder: Decoder[model.Project]
-  ): EntityDecoder[IO, List[model.Project]] = jsonOf[IO, List[model.Project]]
+  ): EntityDecoder[IO, List[model.Project]] = jsonEntityDecoderFor[IO, List[model.Project]]
 
   private implicit val projectDecoder: Decoder[model.Project] = cursor => {
     import io.renku.tinytypes.json.TinyTypeDecoders._

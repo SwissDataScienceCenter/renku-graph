@@ -24,6 +24,7 @@ import cats.syntax.all._
 import io.renku.data.Message
 import io.renku.generators.CommonGraphGenerators._
 import io.renku.generators.Generators.Implicits._
+import io.renku.http.RenkuEntityCodec
 import io.renku.http.client.AccessToken.UserOAuthAccessToken
 import io.renku.http.server.security.EndpointSecurityException.AuthenticationFailure
 import io.renku.http.server.security.model.{AuthUser, MaybeAuthUser}
@@ -43,6 +44,7 @@ class AuthenticationSpec
     with IOSpec
     with should.Matchers
     with MockFactory
+    with RenkuEntityCodec
     with ScalaCheckPropertyChecks {
 
   "authenticateInNeeded" should {

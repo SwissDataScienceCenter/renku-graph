@@ -30,9 +30,9 @@ import io.renku.commiteventservice.events.consumers.common.Generators._
 import io.renku.generators.CommonGraphGenerators.accessTokens
 import io.renku.generators.Generators.Implicits._
 import io.renku.graph.model.GraphModelGenerators._
+import io.renku.http.RenkuEntityCodec
 import io.renku.http.client.RestClient.ResponseMappingF
 import io.renku.http.client.{AccessToken, GitLabClient}
-import io.renku.http.server.EndpointTester._
 import io.renku.interpreters.TestLogger
 import io.renku.stubbing.ExternalServiceStubbing
 import io.renku.testtools.{GitLabClientTools, IOSpec}
@@ -49,6 +49,7 @@ class LatestCommitFinderSpec
     with MockFactory
     with ExternalServiceStubbing
     with should.Matchers
+    with RenkuEntityCodec
     with GitLabClientTools[IO] {
 
   "findLatestCommit" should {

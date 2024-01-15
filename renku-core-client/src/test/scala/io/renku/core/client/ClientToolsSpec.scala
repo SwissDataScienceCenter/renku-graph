@@ -23,14 +23,14 @@ import cats.effect.IO
 import io.circe.literal._
 import io.renku.generators.Generators.Implicits._
 import io.renku.generators.Generators.nonEmptyStrings
+import io.renku.http.RenkuEntityCodec
 import io.renku.testtools.CustomAsyncIOSpec
 import org.http4s.Response
 import org.http4s.Status.Ok
-import org.http4s.circe._
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AsyncWordSpec
 
-class ClientToolsSpec extends AsyncWordSpec with CustomAsyncIOSpec with should.Matchers {
+class ClientToolsSpec extends AsyncWordSpec with CustomAsyncIOSpec with should.Matchers with RenkuEntityCodec {
 
   "toResult" should {
 

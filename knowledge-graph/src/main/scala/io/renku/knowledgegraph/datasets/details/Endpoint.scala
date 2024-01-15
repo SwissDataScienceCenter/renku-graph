@@ -28,6 +28,7 @@ import io.renku.data.Message
 import io.renku.graph.config.{GitLabUrlLoader, RenkuUrlLoader}
 import io.renku.graph.http.server.security.Authorizer.AuthContext
 import io.renku.graph.model.{GitLabUrl, RenkuUrl}
+import io.renku.http.RenkuEntityCodec
 import io.renku.http.rest.Links.Href
 import io.renku.logging.{ExecutionTimeRecorder, ExecutionTimeRecorderLoader}
 import io.renku.metrics.MetricsRegistry
@@ -52,10 +53,10 @@ class EndpointImpl[F[_]: MonadThrow: Logger](
     now:                   () => Instant = () => Instant.now()
 )(implicit gitLabUrl: GitLabUrl, renkuApiUrl: renku.ApiUrl, renkuUrl: RenkuUrl)
     extends Http4sDsl[F]
+    with RenkuEntityCodec
     with Endpoint[F] {
 
   import executionTimeRecorder._
-  import org.http4s.circe._
 
   def `GET /datasets/:id`(identifier: RequestedDataset, authContext: AuthContext[RequestedDataset]): F[Response[F]] =
     measureAndLogTime(finishedSuccessfully(identifier)) {

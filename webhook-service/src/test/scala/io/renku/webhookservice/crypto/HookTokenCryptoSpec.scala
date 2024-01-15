@@ -20,7 +20,7 @@ package io.renku.webhookservice.crypto
 
 import com.typesafe.config.ConfigFactory
 import io.renku.config.ConfigLoader.ConfigLoadingException
-import io.renku.crypto.AesCrypto.Secret
+import io.renku.crypto.Secret
 import io.renku.generators.CommonGraphGenerators._
 import io.renku.generators.Generators.Implicits._
 import io.renku.generators.Generators._
