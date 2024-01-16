@@ -21,12 +21,14 @@ package io.renku.knowledgegraph.projects.create
 import MultipartRequestCodec.PartName
 import cats.effect.{Async, Sync}
 import cats.syntax.all._
+import io.circe.Json
 import io.renku.core.client.{Template, templates}
 import io.renku.graph.model.projects
+import io.renku.http.RenkuEntityCodec.jsonEntityDecoder
 import io.renku.knowledgegraph.multipart.syntax._
 import io.renku.knowledgegraph.projects.images.Image
 import io.renku.knowledgegraph.projects.images.MultipartImageCodecs._
-import org.http4s.multipart.{Multipart, Multiparts}
+import org.http4s.multipart.{Multipart, Multiparts, Part}
 
 private trait MultipartRequestCodec[F[_]] extends MultipartRequestEncoder[F] with MultipartRequestDecoder[F]
 
@@ -51,6 +53,8 @@ private object MultipartRequestCodec {
     val image                 = "image"
     val templateRepositoryUrl = "templateRepositoryUrl"
     val templateId            = "templateId"
+    val templateRef           = "templateRef"
+    val templateParameters    = "templateParameters"
   }
 }
 
@@ -70,7 +74,11 @@ private class MultipartRequestEncoderImpl[F[_]: Sync] extends MultipartRequestEn
     val parts =
       Vector(
         newProject.maybeDescription.asParts[F](PartName.description),
-        newProject.maybeImage.asParts[F](PartName.image)
+        newProject.maybeImage.asParts[F](PartName.image),
+        newProject.template.maybeRef.asParts[F](PartName.templateRef),
+        newProject.template.maybeParameters
+          .map(prms => Json.arr(prms.value: _*))
+          .asParts[F](PartName.templateParameters)
       ).flatten
         .appended(newProject.name.asPart[F](PartName.name))
         .appended(newProject.namespace.identifier.asPart[F](PartName.namespaceId))
@@ -106,6 +114,11 @@ private class MultipartRequestDecoderImpl[F[_]: Async] extends MultipartRequestD
 
   private def templateDecoder(multipart: Multipart[F]) =
     (multipart.part(PartName.templateRepositoryUrl).flatMap(_.as[templates.RepositoryUrl]),
-     multipart.part(PartName.templateId).flatMap(_.as[templates.Identifier])
+     multipart.part(PartName.templateId).flatMap(_.as[templates.Identifier]),
+     multipart.findPart(PartName.templateRef).map(_.as[Option[templates.Ref]]).sequence.map(_.flatten),
+     multipart.findPart(PartName.templateParameters).map(templateParameterValueDecoder).sequence
     ).mapN(Template.apply)
+
+  private def templateParameterValueDecoder: Part[F] => F[templates.Parameters] =
+    _.as[Json].map(_.asArray.map(_.toList).sequence.flatten).map(templates.Parameters)
 }

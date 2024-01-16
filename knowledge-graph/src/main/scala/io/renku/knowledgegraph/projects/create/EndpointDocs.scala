@@ -82,6 +82,15 @@ object EndpointDocs extends docs.EndpointDocs {
                |
                |python-minimal
                |------WebKitFormBoundary7MA4YWxkTrZu0gW
+               |Content-Disposition: form-data; name="templateRef"
+               |
+               |0.6.0
+               |------WebKitFormBoundary7MA4YWxkTrZu0gW
+               |Content-Disposition: form-data; name="templateParameters"
+               |Content-Type: application/json
+               |
+               |[{"key":"archive_url","value":"http://host/path"}]
+               |------WebKitFormBoundary7MA4YWxkTrZu0gW
                |Content-Disposition: form-data; name="image"; filename="image.png"
                |Content-Type: image/png
                |

@@ -57,14 +57,12 @@ class EndpointSpec
     MultipartRequestEncoder[IO].encode(newProject).map(mp => Request[IO]().withEntity(mp).putHeaders(mp.headers)) >>=
       (req => endpoint.`POST /projects`(req, authUser)) >>= { response =>
       response.pure[IO].asserting(_.status shouldBe Status.Created) >>
-        response
-          .as[Message]
-          .asserting {
-            _ shouldBe Message.Info.fromJsonUnsafe(json"""{
+        response.as[Message].asserting {
+          _ shouldBe Message.Info.fromJsonUnsafe(json"""{
               "message": "Project created",
               "slug":     $slug
             }""")
-          }
+        }
     }
   }
 
