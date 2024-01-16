@@ -1,5 +1,5 @@
 /*
- * Copyright 2023 Swiss Data Science Center (SDSC)
+ * Copyright 2024 Swiss Data Science Center (SDSC)
  * A partnership between École Polytechnique Fédérale de Lausanne (EPFL) and
  * Eidgenössische Technische Hochschule Zürich (ETHZ).
  *
@@ -78,7 +78,7 @@ class ProjectEventsFinderSpec
           uri"projects" / project.id.show / "events" withQueryParams Map("action" -> "pushed", "page" -> page.toString),
           endpointName,
           *,
-          maybeAccessToken
+          accessToken.some
         )
         .returning(expectation.pure[IO])
 
@@ -150,7 +150,7 @@ class ProjectEventsFinderSpec
 
     val project = Project(projectIds.generateOne, projectSlugs.generateOne)
     val member  = projectMembersNoEmail.generateOne
-    implicit val maybeAccessToken: Option[AccessToken] = accessTokens.generateOption
+    implicit val accessToken: AccessToken = accessTokens.generateOne
 
     private implicit val logger: TestLogger[IO]   = TestLogger[IO]()
     implicit val gitLabClient:   GitLabClient[IO] = mock[GitLabClient[IO]]

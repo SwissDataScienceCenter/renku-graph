@@ -1,5 +1,5 @@
 /*
- * Copyright 2023 Swiss Data Science Center (SDSC)
+ * Copyright 2024 Swiss Data Science Center (SDSC)
  * A partnership between École Polytechnique Fédérale de Lausanne (EPFL) and
  * Eidgenössische Technische Hochschule Zürich (ETHZ).
  *
@@ -41,7 +41,7 @@ private object TransformationResultsUploader {
   def apply[F[_]: Async: SparqlQueryTimeRecorder: Logger]: F[TransformationResultsUploader[F]] = for {
     implicit0(renkuUrl: RenkuUrl)     <- RenkuUrlLoader[F]()
     implicit0(glApiUrl: GitLabApiUrl) <- GitLabUrlLoader[F]().map(_.apiV4)
-    projectsConnectionConfig          <- ProjectsConnectionConfig[F]()
+    projectsConnectionConfig          <- ProjectsConnectionConfig.fromConfig[F]()
   } yield new TransformationResultsUploaderImpl[F](new JsonLDUploaderImpl[F](projectsConnectionConfig),
                                                    new UpdateQueryRunnerImpl(projectsConnectionConfig)
   )

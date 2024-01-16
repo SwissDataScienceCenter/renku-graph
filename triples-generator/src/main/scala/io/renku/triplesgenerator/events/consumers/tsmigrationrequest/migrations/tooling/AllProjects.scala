@@ -1,5 +1,5 @@
 /*
- * Copyright 2023 Swiss Data Science Center (SDSC)
+ * Copyright 2024 Swiss Data Science Center (SDSC)
  * A partnership between École Polytechnique Fédérale de Lausanne (EPFL) and
  * Eidgenössische Technische Hochschule Zürich (ETHZ).
  *
@@ -37,7 +37,7 @@ trait AllProjects[F[_]] {
 
 object AllProjects {
   def create[F[_]: Async: Logger: SparqlQueryTimeRecorder]: F[AllProjects[F]] =
-    ProjectsConnectionConfig[F]().map(apply[F])
+    ProjectsConnectionConfig.fromConfig[F]().map(apply[F])
 
   final case class ProjectMetadata(slug: ProjectSlug)
 

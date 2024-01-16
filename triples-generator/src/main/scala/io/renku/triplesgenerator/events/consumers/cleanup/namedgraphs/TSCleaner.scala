@@ -1,5 +1,5 @@
 /*
- * Copyright 2023 Swiss Data Science Center (SDSC)
+ * Copyright 2024 Swiss Data Science Center (SDSC)
  * A partnership between École Polytechnique Fédérale de Lausanne (EPFL) and
  * Eidgenössische Technische Hochschule Zürich (ETHZ).
  *
@@ -57,7 +57,7 @@ private[cleanup] object TSCleaner {
   def default[F[_]: Async: Logger: SparqlQueryTimeRecorder](topSameAsLock:       Lock[F, datasets.TopmostSameAs],
                                                             projectSparqlClient: ProjectSparqlClient[F]
   )(implicit renkuUrl: RenkuUrl): F[TSCleaner[F]] =
-    ProjectsConnectionConfig[F]().map(apply(ProjectAuthSync(projectSparqlClient), topSameAsLock, _))
+    ProjectsConnectionConfig.fromConfig[F]().map(apply(ProjectAuthSync(projectSparqlClient), topSameAsLock, _))
 }
 
 private class TSCleanerImpl[F[_]: Async: Logger: SparqlQueryTimeRecorder](

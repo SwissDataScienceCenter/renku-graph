@@ -1,5 +1,5 @@
 /*
- * Copyright 2023 Swiss Data Science Center (SDSC)
+ * Copyright 2024 Swiss Data Science Center (SDSC)
  * A partnership between École Polytechnique Fédérale de Lausanne (EPFL) and
  * Eidgenössische Technische Hochschule Zürich (ETHZ).
  *
@@ -42,7 +42,7 @@ private object ProjectCreator {
       projectSparqlClient: ProjectSparqlClient[F]
   )(implicit renkuUrl: RenkuUrl): F[ProjectCreator[F]] =
     for {
-      connectionConfig <- ProjectsConnectionConfig[F]()
+      connectionConfig <- ProjectsConnectionConfig.fromConfig[F]()
       payloadConverter <- PayloadConverter[F]
       tsProvisioner    <- TSProvisioner[F](topSameAsLock, projectSparqlClient)
     } yield new ProjectCreatorImpl[F](ProjectExistenceChecker[F](connectionConfig),

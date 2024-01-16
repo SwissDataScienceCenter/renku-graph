@@ -1,5 +1,5 @@
 /*
- * Copyright 2023 Swiss Data Science Center (SDSC)
+ * Copyright 2024 Swiss Data Science Center (SDSC)
  * A partnership between École Polytechnique Fédérale de Lausanne (EPFL) and
  * Eidgenössische Technische Hochschule Zürich (ETHZ).
  *
@@ -19,53 +19,47 @@
 package io.renku.eventlog.init
 
 import cats.effect.IO
-import io.renku.interpreters.TestLogger
+import cats.effect.testing.scalatest.AsyncIOSpec
+import io.renku.db.DBConfigProvider.DBConfig
+import io.renku.eventlog.EventLogDB
 import io.renku.interpreters.TestLogger.Level.Info
-import io.renku.testtools.IOSpec
+import org.scalatest.Succeeded
+import org.scalatest.flatspec.AsyncFlatSpec
 import org.scalatest.matchers.should
-import org.scalatest.wordspec.AnyWordSpec
-import skunk.implicits._
 
-class SubscriberTableCreatorSpec extends AnyWordSpec with IOSpec with DbInitSpec with should.Matchers {
+class SubscriberTableCreatorSpec extends AsyncFlatSpec with AsyncIOSpec with DbInitSpec with should.Matchers {
 
-  protected[init] override lazy val migrationsToRun: List[DbMigrator[IO]] = allMigrations.takeWhile {
-    case _: SubscriberTableCreatorImpl[IO] => false
-    case _ => true
+  protected[init] override val runMigrationsUpTo: Class[_ <: DbMigrator[IO]] = classOf[SubscriberTableCreator[IO]]
+
+  it should "do nothing if the 'subscriber' table already exists" in testDBResource.use { implicit cfg =>
+    for {
+      _ <- tableExists("subscriber").asserting(_ shouldBe false)
+
+      _ <- tableCreator.run.assertNoException
+
+      _ <- tableExists("subscriber").asserting(_ shouldBe true)
+
+      _ <- logger.loggedOnlyF(Info("'subscriber' table created"))
+
+      _ <- logger.resetF()
+
+      _ <- tableCreator.run.assertNoException
+
+      _ <- logger.loggedOnlyF(Info("'subscriber' table exists"))
+    } yield Succeeded
   }
 
-  "run" should {
+  it should "create indices for all the columns" in testDBResource.use { implicit cfg =>
+    for {
+      _ <- tableCreator.run.assertNoException
 
-    "do nothing if the 'subscriber' table already exists" in new TestCase {
+      _ <- tableExists("subscriber").asserting(_ shouldBe true)
 
-      tableExists("subscriber") shouldBe false
-
-      tableCreator.run.unsafeRunSync() shouldBe ((): Unit)
-
-      tableExists("subscriber") shouldBe true
-
-      logger.loggedOnly(Info("'subscriber' table created"))
-
-      logger.reset()
-
-      tableCreator.run.unsafeRunSync() shouldBe ((): Unit)
-
-      logger.loggedOnly(Info("'subscriber' table exists"))
-    }
-
-    "create indices for all the columns" in new TestCase {
-
-      tableCreator.run.unsafeRunSync() shouldBe ((): Unit)
-
-      tableExists("subscriber") shouldBe true
-
-      verifyTrue(sql"DROP INDEX idx_delivery_id".command)
-      verifyTrue(sql"DROP INDEX idx_delivery_url".command)
-      verifyTrue(sql"DROP INDEX idx_source_url".command)
-    }
+      _ <- verifyIndexExists("subscriber", "idx_delivery_id").asserting(_ shouldBe true)
+      _ <- verifyIndexExists("subscriber", "idx_delivery_url").asserting(_ shouldBe true)
+      _ <- verifyIndexExists("subscriber", "idx_source_url").asserting(_ shouldBe true)
+    } yield Succeeded
   }
 
-  private trait TestCase {
-    implicit val logger: TestLogger[IO] = TestLogger[IO]()
-    val tableCreator = new SubscriberTableCreatorImpl[IO]
-  }
+  private def tableCreator(implicit cfg: DBConfig[EventLogDB]) = new SubscriberTableCreatorImpl[IO]
 }

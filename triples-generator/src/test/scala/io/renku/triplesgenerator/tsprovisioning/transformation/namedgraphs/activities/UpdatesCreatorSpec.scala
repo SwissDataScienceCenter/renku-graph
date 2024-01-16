@@ -1,5 +1,5 @@
 /*
- * Copyright 2023 Swiss Data Science Center (SDSC)
+ * Copyright 2024 Swiss Data Science Center (SDSC)
  * A partnership between École Polytechnique Fédérale de Lausanne (EPFL) and
  * Eidgenössische Technische Hochschule Zürich (ETHZ).
  *
@@ -22,93 +22,101 @@ import cats.syntax.all._
 import io.renku.generators.Generators.Implicits._
 import io.renku.graph.model._
 import GraphModelGenerators.personResourceIds
+import cats.effect.IO
+import cats.effect.testing.scalatest.AsyncIOSpec
 import eu.timepit.refined.auto._
 import io.renku.graph.model.entities.{ActivityLens, AssociationLens, EntityFunctions}
 import io.renku.graph.model.testentities._
 import io.renku.graph.model.views.RdfResource
+import io.renku.interpreters.TestLogger
 import io.renku.jsonld.syntax._
 import io.renku.jsonld.{JsonLDEncoder, NamedGraph}
-import io.renku.testtools.IOSpec
 import io.renku.triplesstore.SparqlQuery.Prefixes
 import io.renku.triplesstore._
 import io.renku.triplesstore.client.model.Quad
 import org.apache.jena.util.URIref
+import org.scalatest.Succeeded
 import org.scalatest.matchers.should
-import org.scalatest.wordspec.AnyWordSpec
+import org.scalatest.wordspec.AsyncWordSpec
 import org.scalatestplus.scalacheck.ScalaCheckPropertyChecks
+import org.typelevel.log4cats.Logger
 
 class UpdatesCreatorSpec
-    extends AnyWordSpec
-    with IOSpec
+    extends AsyncWordSpec
+    with AsyncIOSpec
+    with GraphJenaSpec
     with should.Matchers
-    with InMemoryJenaForSpec
-    with ProjectsDataset
     with ScalaCheckPropertyChecks {
 
   "queriesUnlinkingAuthors" should {
 
-    "prepare delete query if new activity has different author that it's set in the TS" in {
-      val project = anyRenkuProjectEntities
-        .withActivities(activityEntities(stepPlanEntities()))
-        .map(_.to[entities.RenkuProject])
-        .generateOne
+    "prepare delete query if new activity has different author that it's set in the TS" in projectsDSConfig.use {
+      implicit pcc =>
+        val project = anyRenkuProjectEntities
+          .withActivities(activityEntities(stepPlanEntities()))
+          .map(_.to[entities.RenkuProject])
+          .generateOne
 
-      upload(to = projectsDataset, project)
+        for {
+          _ <- uploadToProjects(project)
 
-      val activity = project.activities.headOption.getOrElse(fail("Expected activity"))
-      findAuthors(project.resourceId, activity.resourceId).map(_.value) shouldBe Set(activity.author.resourceId)
-        .map(id => URIref.encode(id.value))
+          activity = project.activities.headOption.getOrElse(fail("Expected activity"))
+          _ <- findAuthors(project.resourceId, activity.resourceId)
+                 .asserting(_.map(_.value) shouldBe Set(activity.author.resourceId).map(id => URIref.encode(id.value)))
 
-      val modelActivity = activity.copy(author = personEntities.generateOne.to[entities.Person])
+          modelActivity = activity.copy(author = personEntities.generateOne.to[entities.Person])
 
-      UpdatesCreator
-        .queriesUnlinkingAuthors(project.resourceId, modelActivity, Set(activity.author.resourceId))
-        .runAll(on = projectsDataset)
-        .unsafeRunSync()
+          _ <- runUpdates {
+                 UpdatesCreator.queriesUnlinkingAuthors(project.resourceId,
+                                                        modelActivity,
+                                                        Set(activity.author.resourceId)
+                 )
+               }
 
-      findAuthors(project.resourceId, activity.resourceId) shouldBe Set.empty
+          _ <- findAuthors(project.resourceId, activity.resourceId).asserting(_ shouldBe Set.empty)
+        } yield Succeeded
     }
 
-    "prepare delete query if there's more than one author for the activity in the TS" in {
-      val project = anyRenkuProjectEntities
-        .withActivities(activityEntities(stepPlanEntities()))
-        .map(_.to[entities.RenkuProject])
-        .generateOne
+    "prepare delete query if there's more than one author for the activity in the TS" in projectsDSConfig.use {
+      implicit pcc =>
+        val project = anyRenkuProjectEntities
+          .withActivities(activityEntities(stepPlanEntities()))
+          .map(_.to[entities.RenkuProject])
+          .generateOne
 
-      upload(to = projectsDataset, project)
+        for {
+          _ <- uploadToProjects(project)
 
-      val activity = project.activities.headOption.getOrElse(fail("Expected activity"))
+          activity = project.activities.headOption.getOrElse(fail("Expected activity"))
 
-      val person = personEntities.generateOne.to[entities.Person]
-      upload(
-        to = projectsDataset, {
-          implicit val enc: JsonLDEncoder[entities.Person] =
-            EntityFunctions[entities.Person].encoder(GraphClass.Persons)
-          NamedGraph.fromJsonLDsUnsafe(GraphClass.Persons.id, person.asJsonLD)
-        }
-      )
-      insert(
-        to = projectsDataset,
-        Quad(GraphClass.Project.id(project.resourceId),
-             activity.resourceId.asEntityId,
-             prov / "wasAssociatedWith",
-             person.resourceId.asEntityId
-        )
-      )
+          person = personEntities.generateOne.to[entities.Person]
+          _ <- uploadToProjects {
+                 implicit val enc: JsonLDEncoder[entities.Person] =
+                   EntityFunctions[entities.Person].encoder(GraphClass.Persons)
+                 NamedGraph.fromJsonLDsUnsafe(GraphClass.Persons.id, person.asJsonLD)
+               }
+          _ <- insert(
+                 Quad(GraphClass.Project.id(project.resourceId),
+                      activity.resourceId.asEntityId,
+                      prov / "wasAssociatedWith",
+                      person.resourceId.asEntityId
+                 )
+               )
 
-      findAuthors(project.resourceId, activity.resourceId).map(_.value) shouldBe Set(activity.author.resourceId,
-                                                                                     person.resourceId
-      ).map(id => URIref.encode(id.value))
+          _ <- findAuthors(project.resourceId, activity.resourceId).asserting {
+                 _.map(_.value) shouldBe
+                   Set(activity.author.resourceId, person.resourceId).map(id => URIref.encode(id.value))
+               }
 
-      UpdatesCreator
-        .queriesUnlinkingAuthors(project.resourceId,
-                                 activity,
-                                 Set(activity.author.resourceId, personResourceIds.generateOne)
-        )
-        .runAll(on = projectsDataset)
-        .unsafeRunSync()
+          _ <- runUpdates {
+                 UpdatesCreator.queriesUnlinkingAuthors(project.resourceId,
+                                                        activity,
+                                                        Set(activity.author.resourceId, personResourceIds.generateOne)
+                 )
+               }
 
-      findAuthors(project.resourceId, activity.resourceId) shouldBe Set.empty
+          _ <- findAuthors(project.resourceId, activity.resourceId).asserting(_ shouldBe Set.empty)
+        } yield Succeeded
     }
 
     "prepare no queries if there's no author in KG" in {
@@ -136,74 +144,77 @@ class UpdatesCreatorSpec
 
   "queriesUnlinkingAgents" should {
 
-    "prepare delete query if the new Association's person agent is different from what's set in the TS" in {
-      val project = anyRenkuProjectEntities
-        .withActivities(activityEntities(stepPlanEntities()).map(toAssociationPersonAgent))
-        .map(_.to[entities.RenkuProject])
-        .generateOne
+    "prepare delete query if the new Association's person agent is different from what's set in the TS" in projectsDSConfig
+      .use { implicit pcc =>
+        val project = anyRenkuProjectEntities
+          .withActivities(activityEntities(stepPlanEntities()).map(toAssociationPersonAgent))
+          .map(_.to[entities.RenkuProject])
+          .generateOne
 
-      upload(to = projectsDataset, project)
+        for {
+          _ <- uploadToProjects(project)
 
-      val activity = project.activities.headOption.getOrElse(fail("Expected activity"))
-      findPersonAgents(project.resourceId,
-                       activity.association.resourceId
-      ) shouldBe activity.association.maybePersonAgentResourceId.toSet
+          activity = project.activities.headOption.getOrElse(fail("Expected activity"))
+          _ <- findPersonAgents(project.resourceId, activity.association.resourceId)
+                 .asserting(_ shouldBe activity.association.maybePersonAgentResourceId.toSet)
 
-      val newAgent = personEntities.generateOne.to[entities.Person]
-      val modelActivity = ActivityLens.activityAssociationAgent.modify(
-        _.requireRight("Expected Association.WithPersonAgent").as(newAgent)
-      )(activity)
+          newAgent = personEntities.generateOne.to[entities.Person]
+          modelActivity = ActivityLens.activityAssociationAgent.modify(
+                            _.requireRight("Expected Association.WithPersonAgent").as(newAgent)
+                          )(activity)
 
-      UpdatesCreator
-        .queriesUnlinkingAgents(project.resourceId,
-                                modelActivity,
-                                activity.association.maybePersonAgentResourceId.toSet
-        )
-        .runAll(on = projectsDataset)
-        .unsafeRunSync()
+          _ <- runUpdates {
+                 UpdatesCreator.queriesUnlinkingAgents(project.resourceId,
+                                                       modelActivity,
+                                                       activity.association.maybePersonAgentResourceId.toSet
+                 )
+               }
 
-      findPersonAgents(project.resourceId, activity.association.resourceId) shouldBe Set.empty
-    }
+          _ <- findPersonAgents(project.resourceId, activity.association.resourceId).asserting(_ shouldBe Set.empty)
+        } yield Succeeded
+      }
 
-    "prepare delete query if there's more than one person agent for the Association set in the TS" in {
-      val project = anyRenkuProjectEntities
-        .withActivities(activityEntities(stepPlanEntities()).map(toAssociationPersonAgent))
-        .map(_.to[entities.RenkuProject])
-        .generateOne
+    "prepare delete query if there's more than one person agent for the Association set in the TS" in projectsDSConfig
+      .use { implicit pcc =>
+        val project = anyRenkuProjectEntities
+          .withActivities(activityEntities(stepPlanEntities()).map(toAssociationPersonAgent))
+          .map(_.to[entities.RenkuProject])
+          .generateOne
 
-      upload(to = projectsDataset, project)
+        for {
+          _ <- uploadToProjects(project)
 
-      val activity = project.activities.headOption.getOrElse(fail("Expected activity"))
-      val person   = personEntities.generateOne.to[entities.Person]
-      upload(
-        to = projectsDataset, {
-          implicit val enc: JsonLDEncoder[entities.Person] =
-            EntityFunctions[entities.Person].encoder(GraphClass.Persons)
-          NamedGraph.fromJsonLDsUnsafe(GraphClass.Persons.id, person.asJsonLD)
-        }
-      )
-      insert(
-        to = projectsDataset,
-        Quad(GraphClass.Project.id(project.resourceId),
-             activity.association.resourceId.asEntityId,
-             prov / "agent",
-             person.resourceId.asEntityId
-        )
-      )
+          activity = project.activities.headOption.getOrElse(fail("Expected activity"))
+          person   = personEntities.generateOne.to[entities.Person]
+          _ <- uploadToProjects {
+                 implicit val enc: JsonLDEncoder[entities.Person] =
+                   EntityFunctions[entities.Person].encoder(GraphClass.Persons)
+                 NamedGraph.fromJsonLDsUnsafe(GraphClass.Persons.id, person.asJsonLD)
+               }
+          _ <- insert(
+                 Quad(GraphClass.Project.id(project.resourceId),
+                      activity.association.resourceId.asEntityId,
+                      prov / "agent",
+                      person.resourceId.asEntityId
+                 )
+               )
 
-      findPersonAgents(project.resourceId, activity.association.resourceId) shouldBe
-        activity.association.maybePersonAgentResourceId.toSet + person.resourceId
+          _ <- findPersonAgents(project.resourceId, activity.association.resourceId).asserting(
+                 _ shouldBe
+                   activity.association.maybePersonAgentResourceId.toSet + person.resourceId
+               )
 
-      UpdatesCreator
-        .queriesUnlinkingAgents(project.resourceId,
-                                activity,
-                                activity.association.maybePersonAgentResourceId.toSet + person.resourceId
-        )
-        .runAll(on = projectsDataset)
-        .unsafeRunSync()
+          _ <- runUpdates {
+                 UpdatesCreator.queriesUnlinkingAgents(
+                   project.resourceId,
+                   activity,
+                   activity.association.maybePersonAgentResourceId.toSet + person.resourceId
+                 )
+               }
 
-      findPersonAgents(project.resourceId, activity.association.resourceId) shouldBe Set.empty
-    }
+          _ <- findPersonAgents(project.resourceId, activity.association.resourceId).asserting(_ shouldBe Set.empty)
+        } yield Succeeded
+      }
 
     "prepare no queries for association with SoftwareAgent" in {
       val project = anyRenkuProjectEntities
@@ -213,11 +224,10 @@ class UpdatesCreatorSpec
 
       val activity = project.activities.headOption.getOrElse(fail("Expected activity"))
 
-      UpdatesCreator
-        .queriesUnlinkingAgents(project.resourceId,
-                                activity,
-                                kgAgents = Set(personResourceIds.generateOne)
-        ) shouldBe Nil
+      UpdatesCreator.queriesUnlinkingAgents(project.resourceId,
+                                            activity,
+                                            kgAgents = Set(personResourceIds.generateOne)
+      ) shouldBe Nil
     }
 
     "prepare no queries if there's no Person agent in KG" in {
@@ -246,9 +256,10 @@ class UpdatesCreatorSpec
     }
   }
 
-  private def findAuthors(projectId: projects.ResourceId, resourceId: activities.ResourceId): Set[persons.ResourceId] =
+  private def findAuthors(projectId: projects.ResourceId, resourceId: activities.ResourceId)(implicit
+      pcc: ProjectsConnectionConfig
+  ): IO[Set[persons.ResourceId]] =
     runSelect(
-      on = projectsDataset,
       SparqlQuery.of(
         "fetch activity creator",
         Prefixes of (prov -> "prov", schema -> "schema"),
@@ -261,33 +272,35 @@ class UpdatesCreatorSpec
             |}
             |""".stripMargin
       )
-    ).unsafeRunSync()
-      .map(row => persons.ResourceId.from(row("personId")))
-      .sequence
-      .fold(throw _, identity)
-      .toSet
-
-  private def findPersonAgents(projectId:  projects.ResourceId,
-                               resourceId: associations.ResourceId
-  ): Set[persons.ResourceId] = runSelect(
-    on = projectsDataset,
-    SparqlQuery.of(
-      "fetch agent",
-      Prefixes.of(prov -> "prov", schema -> "schema"),
-      s"""|SELECT ?agentId
-          |FROM <${GraphClass.Project.id(projectId)}>
-          |FROM <${GraphClass.Persons.id}> {
-          |  ${resourceId.showAs[RdfResource]} a prov:Association;
-          |                                    prov:agent ?agentId.
-          |  ?agentId a schema:Person.
-          |}
-          |""".stripMargin
+    ).map(
+      _.map(row => persons.ResourceId.from(row("personId"))).sequence
+        .fold(throw _, identity)
+        .toSet
     )
-  ).unsafeRunSync()
-    .map(row => persons.ResourceId.from(row("agentId")))
-    .sequence
-    .fold(throw _, identity)
-    .toSet
+
+  private def findPersonAgents(projectId: projects.ResourceId, resourceId: associations.ResourceId)(implicit
+      pcc: ProjectsConnectionConfig
+  ): IO[Set[persons.ResourceId]] =
+    runSelect(
+      SparqlQuery.of(
+        "fetch agent",
+        Prefixes.of(prov -> "prov", schema -> "schema"),
+        s"""|SELECT ?agentId
+            |FROM <${GraphClass.Project.id(projectId)}>
+            |FROM <${GraphClass.Persons.id}> {
+            |  ${resourceId.showAs[RdfResource]} a prov:Association;
+            |                                    prov:agent ?agentId.
+            |  ?agentId a schema:Person.
+            |}
+            |""".stripMargin
+      )
+    ).map(
+      _.map(row => persons.ResourceId.from(row("agentId"))).sequence
+        .fold(throw _, identity)
+        .toSet
+    )
+
+  private implicit lazy val logger: Logger[IO] = TestLogger()
 
   private implicit class AssociationOps(association: entities.Association) {
     lazy val maybePersonAgentResourceId: Option[persons.ResourceId] =

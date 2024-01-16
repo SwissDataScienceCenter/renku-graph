@@ -1,5 +1,5 @@
 /*
- * Copyright 2023 Swiss Data Science Center (SDSC)
+ * Copyright 2024 Swiss Data Science Center (SDSC)
  * A partnership between École Polytechnique Fédérale de Lausanne (EPFL) and
  * Eidgenössische Technische Hochschule Zürich (ETHZ).
  *
@@ -24,6 +24,7 @@ import cats.syntax.all._
 import eu.timepit.refined.auto._
 import io.renku.data.Message
 import io.renku.graph.model.projects.GitLabId
+import io.renku.http.RenkuEntityCodec
 import io.renku.http.client.GitLabClient
 import io.renku.http.client.RestClientError.UnauthorizedException
 import io.renku.http.server.security.model.AuthUser
@@ -44,7 +45,8 @@ class HookDeletionEndpointImpl[F[_]: MonadThrow: Logger](
     projectHookUrl: ProjectHookUrl,
     hookDeletor:    HookRemover[F]
 ) extends Http4sDsl[F]
-    with HookDeletionEndpoint[F] {
+    with HookDeletionEndpoint[F]
+    with RenkuEntityCodec {
 
   def deleteHook(projectId: GitLabId, authUser: AuthUser): F[Response[F]] = {
     hookDeletor

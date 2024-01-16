@@ -1,5 +1,5 @@
 /*
- * Copyright 2023 Swiss Data Science Center (SDSC)
+ * Copyright 2024 Swiss Data Science Center (SDSC)
  * A partnership between École Polytechnique Fédérale de Lausanne (EPFL) and
  * Eidgenössische Technische Hochschule Zürich (ETHZ).
  *
@@ -19,7 +19,9 @@
 package io.renku.entities.viewings.collector.persons
 
 import cats.effect.IO
+import cats.effect.testing.scalatest.AsyncIOSpec
 import cats.syntax.all._
+import io.renku.entities.searchgraphs.TestSearchInfoDatasets
 import io.renku.entities.viewings.collector
 import io.renku.entities.viewings.collector.persons.Generators._
 import io.renku.generators.Generators.Implicits._
@@ -27,164 +29,195 @@ import io.renku.generators.Generators.{timestamps, timestampsNotInTheFuture}
 import io.renku.graph.model._
 import io.renku.graph.model.testentities._
 import io.renku.interpreters.TestLogger
-import io.renku.logging.TestSparqlQueryTimeRecorder
-import io.renku.testtools.IOSpec
 import io.renku.triplesgenerator.api.events.Generators.userIds
 import io.renku.triplesgenerator.api.events.UserId
 import io.renku.triplesstore._
-import org.scalamock.scalatest.MockFactory
-import org.scalatest.OptionValues
+import org.scalamock.scalatest.AsyncMockFactory
 import org.scalatest.matchers.should
-import org.scalatest.wordspec.AnyWordSpec
+import org.scalatest.wordspec.AsyncWordSpec
+import org.scalatest.{OptionValues, Succeeded}
 
 class PersonViewedDatasetPersisterSpec
-    extends AnyWordSpec
+    extends AsyncWordSpec
+    with AsyncIOSpec
+    with GraphJenaSpec
+    with TestSearchInfoDatasets
+    with PersonViewedDatasetSpecTools
     with should.Matchers
     with OptionValues
-    with PersonViewedDatasetSpecTools
-    with IOSpec
-    with InMemoryJenaForSpec
-    with ProjectsDataset
-    with MockFactory {
+    with AsyncMockFactory {
 
   "persist" should {
 
     "insert the given GLUserViewedDataset to the TS and run the deduplicate query " +
       "if the viewing doesn't exist yet " +
-      "- case with a user identified with GitLab id" in new TestCase {
-
+      "- case with a user identified with GitLab id" in projectsDSConfig.use { implicit pcc =>
         val userId             = UserId(personGitLabIds.generateOne)
         val dataset -> project = generateProjectWithCreatorAndDataset(userId)
 
-        upload(to = projectsDataset, project)
+        for {
+          _ <- provisionProject(project)
 
-        val dateViewed = datasetViewedDates(dataset.provenance.date.instant).generateOne
-        val event      = GLUserViewedDataset(userId, toCollectorDataset(dataset), dateViewed)
+          dateViewed = datasetViewedDates(dataset.provenance.date.instant).generateOne
+          event      = GLUserViewedDataset(userId, toCollectorDataset(dataset), dateViewed)
 
-        givenEventDeduplication(project.maybeCreator.value.resourceId, dataset.resourceId, returning = ().pure[IO])
+          _ =
+            givenEventDeduplication(project.maybeCreator.value.resourceId, dataset.resourceId, returning = ().pure[IO])
 
-        persister.persist(event).unsafeRunSync() shouldBe ()
+          _ <- persister.persist(event).assertNoException
 
-        findAllViewings shouldBe Set(
-          ViewingRecord(project.maybeCreator.value.resourceId, dataset.resourceId, dateViewed)
-        )
+          _ <- findAllViewings.asserting {
+                 _ shouldBe Set(
+                   ViewingRecord(project.maybeCreator.value.resourceId, dataset.resourceId, dateViewed)
+                 )
+               }
+        } yield Succeeded
       }
 
     "insert the given GLUserViewedDataset to the TS and run the deduplicate query " +
       "if the viewing doesn't exist yet " +
-      "- case with a user identified with email" in new TestCase {
-
+      "- case with a user identified with email" in projectsDSConfig.use { implicit pcc =>
         val userId             = UserId(personEmails.generateOne)
         val dataset -> project = generateProjectWithCreatorAndDataset(userId)
 
-        upload(to = projectsDataset, project)
+        for {
+          _ <- provisionProject(project)
 
-        val dateViewed = datasetViewedDates(dataset.provenance.date.instant).generateOne
-        val event      = GLUserViewedDataset(userId, toCollectorDataset(dataset), dateViewed)
+          dateViewed = datasetViewedDates(dataset.provenance.date.instant).generateOne
+          event      = GLUserViewedDataset(userId, toCollectorDataset(dataset), dateViewed)
 
-        givenEventDeduplication(project.maybeCreator.value.resourceId, dataset.resourceId, returning = ().pure[IO])
+          _ =
+            givenEventDeduplication(project.maybeCreator.value.resourceId, dataset.resourceId, returning = ().pure[IO])
 
-        persister.persist(event).unsafeRunSync() shouldBe ()
+          _ <- persister.persist(event).assertNoException
 
-        findAllViewings shouldBe Set(
-          ViewingRecord(project.maybeCreator.value.resourceId, dataset.resourceId, dateViewed)
-        )
+          _ <- findAllViewings.asserting {
+                 _ shouldBe Set(
+                   ViewingRecord(project.maybeCreator.value.resourceId, dataset.resourceId, dateViewed)
+                 )
+               }
+        } yield Succeeded
       }
 
     "update the date for the user and ds from the GLUserViewedDataset and run the deduplicate query " +
       "if an event for the ds already exists in the TS " +
-      "and the date from the new event is newer than this in the TS" in new TestCase {
-
+      "and the date from the new event is newer than this in the TS" in projectsDSConfig.use { implicit pcc =>
         val userId             = userIds.generateOne
         val dataset -> project = generateProjectWithCreatorAndDataset(userId)
 
-        upload(to = projectsDataset, project)
+        for {
+          _ <- provisionProject(project)
 
-        val dateViewed = datasetViewedDates(dataset.provenance.date.instant).generateOne
-        val event      = GLUserViewedDataset(userId, toCollectorDataset(dataset), dateViewed)
+          dateViewed = datasetViewedDates(dataset.provenance.date.instant).generateOne
+          event      = GLUserViewedDataset(userId, toCollectorDataset(dataset), dateViewed)
 
-        givenEventDeduplication(project.maybeCreator.value.resourceId, dataset.resourceId, returning = ().pure[IO])
+          _ =
+            givenEventDeduplication(project.maybeCreator.value.resourceId, dataset.resourceId, returning = ().pure[IO])
 
-        persister.persist(event).unsafeRunSync() shouldBe ()
+          _ <- persister.persist(event).assertNoException
 
-        findAllViewings shouldBe Set(
-          ViewingRecord(project.maybeCreator.value.resourceId, dataset.resourceId, dateViewed)
-        )
+          _ <- findAllViewings.asserting {
+                 _ shouldBe Set(
+                   ViewingRecord(project.maybeCreator.value.resourceId, dataset.resourceId, dateViewed)
+                 )
+               }
 
-        val newDate = timestampsNotInTheFuture(butYoungerThan = event.date.value).generateAs(datasets.DateViewed)
+          newDate = timestampsNotInTheFuture(butYoungerThan = event.date.value).generateAs(datasets.DateViewed)
 
-        givenEventDeduplication(project.maybeCreator.value.resourceId, dataset.resourceId, returning = ().pure[IO])
+          _ =
+            givenEventDeduplication(project.maybeCreator.value.resourceId, dataset.resourceId, returning = ().pure[IO])
 
-        persister.persist(event.copy(date = newDate)).unsafeRunSync() shouldBe ()
+          _ <- persister.persist(event.copy(date = newDate)).assertNoException
 
-        findAllViewings shouldBe Set(ViewingRecord(project.maybeCreator.value.resourceId, dataset.resourceId, newDate))
+          _ <- findAllViewings.asserting {
+                 _ shouldBe Set(ViewingRecord(project.maybeCreator.value.resourceId, dataset.resourceId, newDate))
+               }
+        } yield Succeeded
       }
 
-    "do nothing if the event date is older than the date in the TS" in new TestCase {
-
+    "do nothing if the event date is older than the date in the TS" in projectsDSConfig.use { implicit pcc =>
       val userId             = userIds.generateOne
       val dataset -> project = generateProjectWithCreatorAndDataset(userId)
 
-      upload(to = projectsDataset, project)
+      for {
+        _ <- provisionProject(project)
 
-      val dateViewed = datasetViewedDates(dataset.provenance.date.instant).generateOne
-      val event      = GLUserViewedDataset(userId, toCollectorDataset(dataset), dateViewed)
+        dateViewed = datasetViewedDates(dataset.provenance.date.instant).generateOne
+        event      = GLUserViewedDataset(userId, toCollectorDataset(dataset), dateViewed)
 
-      givenEventDeduplication(project.maybeCreator.value.resourceId, dataset.resourceId, returning = ().pure[IO])
+        _ = givenEventDeduplication(project.maybeCreator.value.resourceId, dataset.resourceId, returning = ().pure[IO])
 
-      persister.persist(event).unsafeRunSync() shouldBe ()
+        _ <- persister.persist(event).assertNoException
 
-      findAllViewings shouldBe Set(
-        ViewingRecord(project.maybeCreator.value.resourceId, dataset.resourceId, dateViewed)
-      )
+        _ <- findAllViewings.asserting(
+               _ shouldBe Set(
+                 ViewingRecord(project.maybeCreator.value.resourceId, dataset.resourceId, dateViewed)
+               )
+             )
 
-      val newDate = timestamps(max = event.date.value.minusSeconds(1)).generateAs(datasets.DateViewed)
+        newDate = timestamps(max = event.date.value.minusSeconds(1)).generateAs(datasets.DateViewed)
 
-      persister.persist(event.copy(date = newDate)).unsafeRunSync() shouldBe ()
+        _ <- persister.persist(event.copy(date = newDate)).assertNoException
 
-      findAllViewings shouldBe Set(ViewingRecord(project.maybeCreator.value.resourceId, dataset.resourceId, dateViewed))
+        _ <- findAllViewings.asserting(
+               _ shouldBe Set(ViewingRecord(project.maybeCreator.value.resourceId, dataset.resourceId, dateViewed))
+             )
+      } yield Succeeded
     }
 
     "update the date for the user and project from the GLUserViewedProject, run the deduplicate query" +
-      "and leave other user viewings if they exist" in new TestCase {
-
+      "and leave other user viewings if they exist" in projectsDSConfig.use { implicit pcc =>
         val userId               = userIds.generateOne
         val dataset1 -> project1 = generateProjectWithCreatorAndDataset(userId)
         val dataset2 -> project2 = generateProjectWithCreatorAndDataset(userId)
 
-        upload(to = projectsDataset, project1, project2)
+        for {
+          _ <- provisionProjects(project1, project2)
 
-        val dataset1DateViewed = datasetViewedDates(dataset1.provenance.date.instant).generateOne
-        val dataset1Event =
-          collector.persons.GLUserViewedDataset(userId, toCollectorDataset(dataset1), dataset1DateViewed)
-        givenEventDeduplication(project1.maybeCreator.value.resourceId, dataset1.resourceId, returning = ().pure[IO])
-        persister.persist(dataset1Event).unsafeRunSync() shouldBe ()
+          dataset1DateViewed = datasetViewedDates(dataset1.provenance.date.instant).generateOne
+          dataset1Event =
+            collector.persons.GLUserViewedDataset(userId, toCollectorDataset(dataset1), dataset1DateViewed)
+          _ = givenEventDeduplication(project1.maybeCreator.value.resourceId,
+                                      dataset1.resourceId,
+                                      returning = ().pure[IO]
+              )
+          _ <- persister.persist(dataset1Event).assertNoException
 
-        val dataset2DateViewed = datasetViewedDates(dataset2.provenance.date.instant).generateOne
-        val dataset2Event =
-          collector.persons.GLUserViewedDataset(userId, toCollectorDataset(dataset2), dataset2DateViewed)
-        givenEventDeduplication(project2.maybeCreator.value.resourceId, dataset2.resourceId, returning = ().pure[IO])
-        persister.persist(dataset2Event).unsafeRunSync() shouldBe ()
+          dataset2DateViewed = datasetViewedDates(dataset2.provenance.date.instant).generateOne
+          dataset2Event =
+            collector.persons.GLUserViewedDataset(userId, toCollectorDataset(dataset2), dataset2DateViewed)
+          _ = givenEventDeduplication(project2.maybeCreator.value.resourceId,
+                                      dataset2.resourceId,
+                                      returning = ().pure[IO]
+              )
+          _ <- persister.persist(dataset2Event).assertNoException
 
-        findAllViewings shouldBe Set(
-          ViewingRecord(project1.maybeCreator.value.resourceId, dataset1.resourceId, dataset1DateViewed),
-          ViewingRecord(project2.maybeCreator.value.resourceId, dataset2.resourceId, dataset2DateViewed)
-        )
+          _ <- findAllViewings.asserting {
+                 _ shouldBe Set(
+                   ViewingRecord(project1.maybeCreator.value.resourceId, dataset1.resourceId, dataset1DateViewed),
+                   ViewingRecord(project2.maybeCreator.value.resourceId, dataset2.resourceId, dataset2DateViewed)
+                 )
+               }
 
-        val newDate =
-          timestampsNotInTheFuture(butYoungerThan = dataset1Event.date.value).generateAs(datasets.DateViewed)
+          newDate =
+            timestampsNotInTheFuture(butYoungerThan = dataset1Event.date.value).generateAs(datasets.DateViewed)
 
-        givenEventDeduplication(project1.maybeCreator.value.resourceId, dataset1.resourceId, returning = ().pure[IO])
-        persister.persist(dataset1Event.copy(date = newDate)).unsafeRunSync() shouldBe ()
+          _ = givenEventDeduplication(project1.maybeCreator.value.resourceId,
+                                      dataset1.resourceId,
+                                      returning = ().pure[IO]
+              )
+          _ <- persister.persist(dataset1Event.copy(date = newDate)).assertNoException
 
-        findAllViewings shouldBe Set(
-          ViewingRecord(project1.maybeCreator.value.resourceId, dataset1.resourceId, newDate),
-          ViewingRecord(project2.maybeCreator.value.resourceId, dataset2.resourceId, dataset2DateViewed)
-        )
+          _ <- findAllViewings.asserting {
+                 _ shouldBe Set(
+                   ViewingRecord(project1.maybeCreator.value.resourceId, dataset1.resourceId, newDate),
+                   ViewingRecord(project2.maybeCreator.value.resourceId, dataset2.resourceId, dataset2DateViewed)
+                 )
+               }
+        } yield Succeeded
       }
 
-    "do nothing if the given event is for a non-existing user" in new TestCase {
-
+    "do nothing if the given event is for a non-existing user" in projectsDSConfig.use { implicit pcc =>
       val dataset -> _ = generateProjectWithCreatorAndDataset(userIds.generateOne)
 
       val event = collector.persons.GLUserViewedDataset(userIds.generateOne,
@@ -192,24 +225,20 @@ class PersonViewedDatasetPersisterSpec
                                                         datasetViewedDates(dataset.provenance.date.instant).generateOne
       )
 
-      persister.persist(event).unsafeRunSync() shouldBe ()
-
-      findAllViewings shouldBe Set.empty
+      persister.persist(event).assertNoException >>
+        findAllViewings.asserting(_ shouldBe Set.empty)
     }
   }
 
-  private trait TestCase {
-    private implicit val logger: TestLogger[IO]              = TestLogger[IO]()
-    private implicit val sqtr:   SparqlQueryTimeRecorder[IO] = TestSparqlQueryTimeRecorder[IO].unsafeRunSync()
-    private val tsClient          = TSClient[IO](projectsDSConnectionInfo)
-    private val eventDeduplicator = mock[PersonViewedDatasetDeduplicator[IO]]
-    val persister = new PersonViewedDatasetPersisterImpl[IO](tsClient, PersonFinder(tsClient), eventDeduplicator)
+  implicit val ioLogger: TestLogger[IO] = TestLogger[IO]()
+  private val eventDeduplicator = mock[PersonViewedDatasetDeduplicator[IO]]
+  private def persister(implicit pcc: ProjectsConnectionConfig) =
+    new PersonViewedDatasetPersisterImpl[IO](tsClient, PersonFinder(tsClient), eventDeduplicator)
 
-    def givenEventDeduplication(personResourceId:  persons.ResourceId,
-                                datasetResourceId: datasets.ResourceId,
-                                returning:         IO[Unit]
-    ) = (eventDeduplicator.deduplicate _)
-      .expects(personResourceId, datasetResourceId)
-      .returning(returning)
-  }
+  private def givenEventDeduplication(personResourceId:  persons.ResourceId,
+                                      datasetResourceId: datasets.ResourceId,
+                                      returning:         IO[Unit]
+  ) = (eventDeduplicator.deduplicate _)
+    .expects(personResourceId, datasetResourceId)
+    .returning(returning)
 }

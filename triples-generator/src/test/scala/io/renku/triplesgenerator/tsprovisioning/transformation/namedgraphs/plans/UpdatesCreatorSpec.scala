@@ -1,5 +1,5 @@
 /*
- * Copyright 2023 Swiss Data Science Center (SDSC)
+ * Copyright 2024 Swiss Data Science Center (SDSC)
  * A partnership between École Polytechnique Fédérale de Lausanne (EPFL) and
  * Eidgenössische Technische Hochschule Zürich (ETHZ).
  *
@@ -18,75 +18,78 @@
 
 package io.renku.triplesgenerator.tsprovisioning.transformation.namedgraphs.plans
 
+import cats.effect.IO
+import cats.effect.testing.scalatest.AsyncIOSpec
 import eu.timepit.refined.auto._
 import io.renku.generators.Generators.Implicits._
 import io.renku.generators.Generators.timestampsNotInTheFuture
 import io.renku.graph.model._
 import io.renku.graph.model.entities.ProjectLens._
 import io.renku.graph.model.testentities._
+import io.renku.interpreters.TestLogger
 import io.renku.jsonld.syntax._
-import io.renku.testtools.IOSpec
 import io.renku.triplesstore.SparqlQuery.Prefixes
 import io.renku.triplesstore.client.syntax._
-import io.renku.triplesstore.{InMemoryJenaForSpec, ProjectsDataset, SparqlQuery}
+import io.renku.triplesstore.{GraphJenaSpec, ProjectsConnectionConfig, SparqlQuery}
+import org.scalatest.Succeeded
 import org.scalatest.matchers.should
-import org.scalatest.wordspec.AnyWordSpec
+import org.scalatest.wordspec.AsyncWordSpec
 
 import java.time.Instant
 
-class UpdatesCreatorSpec
-    extends AnyWordSpec
-    with IOSpec
-    with should.Matchers
-    with InMemoryJenaForSpec
-    with ProjectsDataset {
+class UpdatesCreatorSpec extends AsyncWordSpec with AsyncIOSpec with GraphJenaSpec with should.Matchers {
 
   "queriesDeletingDate" should {
 
-    "prepare delete query if the new Plan has different dateCreated that found in the TS" in {
-      val project = anyRenkuProjectEntities
-        .withActivities(activityEntities(stepPlanEntities()))
-        .map(_.to[entities.RenkuProject])
-        .generateOne
+    "prepare delete query if the new Plan has different dateCreated that found in the TS" in projectsDSConfig.use {
+      implicit pcc =>
+        val project = anyRenkuProjectEntities
+          .withActivities(activityEntities(stepPlanEntities()))
+          .map(_.to[entities.RenkuProject])
+          .generateOne
 
-      upload(to = projectsDataset, project)
+        for {
+          _ <- uploadToProjects(project)
 
-      val plan = collectStepPlans(project.plans).headOption.getOrElse(fail("Expected plan"))
+          plan = collectStepPlans(project.plans).headOption.getOrElse(fail("Expected plan"))
 
-      findPlanDateCreated(project.resourceId, plan.resourceId) shouldBe List(plan.dateCreated)
+          _ <- findPlanDateCreated(project.resourceId, plan.resourceId).asserting(_ shouldBe List(plan.dateCreated))
 
-      UpdatesCreator
-        .queriesDeletingDate(project.resourceId,
-                             plan,
-                             timestampsNotInTheFuture.toGeneratorOf(plans.DateCreated).generateFixedSizeList(ofSize = 1)
-        )
-        .runAll(on = projectsDataset)
-        .unsafeRunSync()
+          _ <- runUpdates {
+                 UpdatesCreator.queriesDeletingDate(
+                   project.resourceId,
+                   plan,
+                   timestampsNotInTheFuture.toGeneratorOf(plans.DateCreated).generateFixedSizeList(ofSize = 1)
+                 )
+               }
 
-      findPlanDateCreated(project.resourceId, plan.resourceId) shouldBe List.empty
+          _ <- findPlanDateCreated(project.resourceId, plan.resourceId).asserting(_ shouldBe List.empty)
+        } yield Succeeded
     }
 
-    "prepare delete query if there are multiple dates found in the TS" in {
+    "prepare delete query if there are multiple dates found in the TS" in projectsDSConfig.use { implicit pcc =>
       val project = anyRenkuProjectEntities
         .withActivities(activityEntities(stepPlanEntities()))
         .map(_.to[entities.RenkuProject])
         .generateOne
 
-      upload(to = projectsDataset, project)
+      for {
+        _ <- uploadToProjects(project)
 
-      val plan = collectStepPlans(project.plans).headOption.getOrElse(fail("Expected plan"))
+        plan = collectStepPlans(project.plans).headOption.getOrElse(fail("Expected plan"))
 
-      findPlanDateCreated(project.resourceId, plan.resourceId) shouldBe List(plan.dateCreated)
+        _ <- findPlanDateCreated(project.resourceId, plan.resourceId).asserting(_ shouldBe List(plan.dateCreated))
 
-      UpdatesCreator
-        .queriesDeletingDate(project.resourceId,
-                             plan,
-                             timestampsNotInTheFuture.toGeneratorOf(plans.DateCreated).generateList(min = 2)
-        )
-        .runAll(on = projectsDataset)
-        .unsafeRunSync()
+        _ <- runUpdates {
+               UpdatesCreator.queriesDeletingDate(
+                 project.resourceId,
+                 plan,
+                 timestampsNotInTheFuture.toGeneratorOf(plans.DateCreated).generateList(min = 2)
+               )
+             }
 
-      findPlanDateCreated(project.resourceId, plan.resourceId) shouldBe List.empty
+        _ <- findPlanDateCreated(project.resourceId, plan.resourceId).asserting(_ shouldBe List.empty)
+      } yield Succeeded
     }
 
     "do nothing if there's no date set for the Plan in the TS" in {
@@ -112,9 +115,10 @@ class UpdatesCreatorSpec
     }
   }
 
-  private def findPlanDateCreated(projectId: projects.ResourceId, planId: plans.ResourceId): List[plans.DateCreated] =
+  private def findPlanDateCreated(projectId: projects.ResourceId, planId: plans.ResourceId)(implicit
+      pcc: ProjectsConnectionConfig
+  ): IO[List[plans.DateCreated]] =
     runSelect(
-      on = projectsDataset,
       SparqlQuery.of(
         "fetch agent",
         Prefixes of (prov -> "prov", schema -> "schema"),
@@ -125,8 +129,11 @@ class UpdatesCreatorSpec
                  |}
                  |""".stripMargin
       )
-    ).unsafeRunSync()
-      .flatMap(row =>
+    ).map(
+      _.flatMap(row =>
         row.get("dateCreated").map(Instant.parse).map(plans.DateCreated.from).map(_.fold(throw _, identity))
       )
+    )
+
+  private implicit lazy val ioLogger: TestLogger[IO] = TestLogger()
 }

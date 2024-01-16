@@ -1,5 +1,5 @@
 /*
- * Copyright 2023 Swiss Data Science Center (SDSC)
+ * Copyright 2024 Swiss Data Science Center (SDSC)
  * A partnership between École Polytechnique Fédérale de Lausanne (EPFL) and
  * Eidgenössische Technische Hochschule Zürich (ETHZ).
  *
@@ -31,9 +31,9 @@ import io.renku.generators.CommonGraphGenerators.accessTokens
 import io.renku.generators.Generators.Implicits._
 import io.renku.generators.Generators.{durations, nonEmptyStrings}
 import io.renku.graph.model.GraphModelGenerators.projectIds
+import io.renku.http.RenkuEntityCodec
 import io.renku.http.client.RestClient.ResponseMappingF
 import io.renku.http.client.{AccessToken, GitLabClient}
-import io.renku.http.server.EndpointTester._
 import io.renku.testtools.{GitLabClientTools, IOSpec}
 import org.http4s.Status.{BadRequest, Created, Forbidden, InternalServerError, NotFound}
 import org.http4s.implicits._
@@ -50,6 +50,7 @@ class NewTokensCreatorSpec
     with MockFactory
     with GitLabClientTools[IO]
     with IOSpec
+    with RenkuEntityCodec
     with should.Matchers {
 
   "createProjectAccessToken" should {

@@ -1,5 +1,5 @@
 /*
- * Copyright 2023 Swiss Data Science Center (SDSC)
+ * Copyright 2024 Swiss Data Science Center (SDSC)
  * A partnership between École Polytechnique Fédérale de Lausanne (EPFL) and
  * Eidgenössische Technische Hochschule Zürich (ETHZ).
  *
@@ -45,14 +45,17 @@ private class TSMigrationTableCreatorImpl[F[_]: MonadCancelThrow: Logger: Sessio
     }
   }
 
-  private def createTable(): Kleisli[F, Session[F], Unit] = for {
-    _ <- execute(createTableSql)
-    _ <- execute(sql"CREATE INDEX IF NOT EXISTS idx_subscriber_version ON ts_migration(subscriber_version)".command)
-    _ <- execute(sql"CREATE INDEX IF NOT EXISTS idx_subscriber_url ON ts_migration(subscriber_url)".command)
-    _ <- execute(sql"CREATE INDEX IF NOT EXISTS idx_status ON ts_migration(status)".command)
-    _ <- execute(sql"CREATE INDEX IF NOT EXISTS idx_change_date ON ts_migration(change_date)".command)
-    _ <- Kleisli.liftF(Logger[F] info "'ts_migration' table created")
-  } yield ()
+  private def createTable(): Kleisli[F, Session[F], Unit] =
+    execute(createTableSql) >>
+      execute(
+        sql"CREATE INDEX IF NOT EXISTS idx_ts_migration_subscriber_version ON ts_migration(subscriber_version)".command
+      ) >>
+      execute(
+        sql"CREATE INDEX IF NOT EXISTS idx_ts_migration_subscriber_url ON ts_migration(subscriber_url)".command
+      ) >>
+      execute(sql"CREATE INDEX IF NOT EXISTS idx_ts_migration_status ON ts_migration(status)".command) >>
+      execute(sql"CREATE INDEX IF NOT EXISTS idx_ts_migration_change_date ON ts_migration(change_date)".command) >>
+      Kleisli.liftF(Logger[F] info "'ts_migration' table created")
 
   private lazy val createTableSql: Command[Void] = sql"""
     CREATE TABLE IF NOT EXISTS ts_migration(

@@ -1,5 +1,5 @@
 /*
- * Copyright 2023 Swiss Data Science Center (SDSC)
+ * Copyright 2024 Swiss Data Science Center (SDSC)
  * A partnership between École Polytechnique Fédérale de Lausanne (EPFL) and
  * Eidgenössische Technische Hochschule Zürich (ETHZ).
  *
@@ -18,17 +18,9 @@
 
 package io.renku.knowledgegraph
 
-import io.renku.generators.CommonGraphGenerators.sortBys
-import io.renku.generators.Generators.nonBlankStrings
 import io.renku.graph.model.testentities.Person
-import io.renku.http.rest.Sorting
-import io.renku.knowledgegraph.datasets.Endpoint.Query.Phrase
-import org.scalacheck.Gen
 
 package object datasets {
-
-  val phrases: Gen[Phrase] = nonBlankStrings(minLength = 5) map (_.value) map Phrase.apply
-  implicit val searchEndpointSorts: Gen[Sorting[Endpoint.Sort.type]] = sortBys(Endpoint.Sort)
 
   implicit lazy val personToCreator: Person => DatasetCreator =
     person => DatasetCreator(person.maybeEmail, person.name, person.maybeAffiliation)

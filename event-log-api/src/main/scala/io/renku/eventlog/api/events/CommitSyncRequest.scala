@@ -1,5 +1,5 @@
 /*
- * Copyright 2023 Swiss Data Science Center (SDSC)
+ * Copyright 2024 Swiss Data Science Center (SDSC)
  * A partnership between École Polytechnique Fédérale de Lausanne (EPFL) and
  * Eidgenössische Technische Hochschule Zürich (ETHZ).
  *
@@ -31,6 +31,8 @@ final case class CommitSyncRequest(project: Project)
 object CommitSyncRequest {
 
   val categoryName: CategoryName = CategoryName("COMMIT_SYNC_REQUEST")
+
+  implicit def dispatcher[F[_]]: Dispatcher[F, CommitSyncRequest] = Dispatcher.instance(categoryName)
 
   implicit val encoder: Encoder[CommitSyncRequest] = Encoder.instance { case CommitSyncRequest(project) =>
     json"""{

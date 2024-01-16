@@ -1,5 +1,5 @@
 /*
- * Copyright 2023 Swiss Data Science Center (SDSC)
+ * Copyright 2024 Swiss Data Science Center (SDSC)
  * A partnership between École Polytechnique Fédérale de Lausanne (EPFL) and
  * Eidgenössische Technische Hochschule Zürich (ETHZ).
  *
@@ -25,7 +25,6 @@ import io.circe.literal._
 import io.circe.syntax._
 import io.renku.core.client.Branch
 import io.renku.data.Message
-import io.renku.data.MessageCodecs._
 import io.renku.graph.model.projects
 import io.renku.knowledgegraph.docs.model.Operation.PATCH
 import io.renku.knowledgegraph.docs.model._

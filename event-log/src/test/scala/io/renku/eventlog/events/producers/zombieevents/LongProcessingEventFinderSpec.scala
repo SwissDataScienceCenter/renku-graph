@@ -1,5 +1,5 @@
 /*
- * Copyright 2023 Swiss Data Science Center (SDSC)
+ * Copyright 2024 Swiss Data Science Center (SDSC)
  * A partnership between École Polytechnique Fédérale de Lausanne (EPFL) and
  * Eidgenössische Technische Hochschule Zürich (ETHZ).
  *
@@ -19,112 +19,100 @@
 package io.renku.eventlog.events.producers.zombieevents
 
 import cats.effect.IO
-import io.renku.eventlog.InMemoryEventLogDbSpec
-import io.renku.eventlog.metrics.QueriesExecutionTimes
+import cats.effect.testing.scalatest.AsyncIOSpec
+import cats.syntax.all._
+import io.renku.db.DBConfigProvider.DBConfig
+import io.renku.eventlog.metrics.{QueriesExecutionTimes, TestQueriesExecutionTimes}
+import io.renku.eventlog.{EventLogDB, EventLogPostgresSpec}
+import io.renku.events.consumers.ConsumersModelGenerators.consumerProjects
+import io.renku.events.consumers.Project
 import io.renku.generators.Generators.Implicits._
 import io.renku.generators.Generators._
 import io.renku.graph.model.EventContentGenerators._
-import io.renku.graph.model.EventsGenerators._
-import io.renku.graph.model.GraphModelGenerators.projectSlugs
 import io.renku.graph.model.events.EventStatus._
-import io.renku.graph.model.events.{CompoundEventId, EventStatus, ExecutionDate}
-import io.renku.metrics.TestMetricsRegistry
-import io.renku.testtools.IOSpec
-import org.scalamock.scalatest.MockFactory
+import io.renku.graph.model.events.{EventStatus, ExecutionDate}
+import org.scalamock.scalatest.AsyncMockFactory
+import org.scalatest.flatspec.AsyncFlatSpec
 import org.scalatest.matchers.should
-import org.scalatest.prop.TableDrivenPropertyChecks
-import org.scalatest.wordspec.AnyWordSpec
 
 import java.time.Duration
 
 class LongProcessingEventFinderSpec
-    extends AnyWordSpec
-    with IOSpec
-    with InMemoryEventLogDbSpec
-    with TableDrivenPropertyChecks
-    with MockFactory
+    extends AsyncFlatSpec
+    with AsyncIOSpec
+    with EventLogPostgresSpec
+    with AsyncMockFactory
     with should.Matchers {
 
-  "popEvent" should {
-
-    forAll {
-      Table(
-        "status"            -> "grace period",
+  it should "return an event " +
+    s"if it's in one of the 'running' statuses for more than the relevant grace period " +
+    "and there's info about its delivery" in testDBResource.use { implicit cfg =>
+      List(
         GeneratingTriples   -> Duration.ofDays(6 * 7),
         TransformingTriples -> Duration.ofDays(1),
         Deleting            -> Duration.ofDays(1)
-      )
-    } { (status, gracePeriod) =>
-      "return an event " +
-        s"if it's in the $status status for more than $gracePeriod " +
-        "and there's info about its delivery" in new TestCase {
-
-          val oldEnoughEventId = compoundEventIds.generateOne
-          addEvent(
-            oldEnoughEventId,
-            status,
-            relativeTimestamps(moreThanAgo = gracePeriod plusHours 1).generateAs(ExecutionDate)
-          )
-          upsertEventDeliveryInfo(oldEnoughEventId)
-
-          val tooYoungEventId = compoundEventIds.generateOne
-          addEvent(
-            tooYoungEventId,
-            status,
-            relativeTimestamps(lessThanAgo = gracePeriod minusHours 1).generateAs(ExecutionDate)
-          )
-          upsertEventDeliveryInfo(tooYoungEventId)
-
-          finder.popEvent().unsafeRunSync() shouldBe Some(
-            ZombieEvent(finder.processName, oldEnoughEventId, projectSlug, status)
-          )
-          finder.popEvent().unsafeRunSync() shouldBe None
-        }
+      ).traverse_ { case (status, gracePeriod) =>
+        `return an event in the presence of delivery info`(status, gracePeriod)
+      }
     }
 
-    GeneratingTriples :: TransformingTriples :: Deleting :: Nil foreach { status =>
-      "return an event " +
-        s"if it's in the $status status " +
-        "there's no info about its delivery " +
-        "and it's in status for more than 10 minutes" in new TestCase {
+  private def `return an event in the presence of delivery info`(status: ProcessingStatus, gracePeriod: Duration)(
+      implicit cfg: DBConfig[EventLogDB]
+  ) = {
+    val project = consumerProjects.generateOne
+    for {
+      oldEnoughEvent <- addEvent(
+                          status,
+                          relativeTimestamps(moreThanAgo = gracePeriod plusHours 1).generateAs(ExecutionDate),
+                          project
+                        )
+      _ <- upsertEventDeliveryInfo(oldEnoughEvent.eventId)
 
-          val eventId = compoundEventIds.generateOne
-          addEvent(
-            eventId,
-            status,
-            relativeTimestamps(moreThanAgo = Duration ofMinutes 11).generateAs(ExecutionDate)
-          )
+      tooYoungEvent <- addEvent(
+                         status,
+                         relativeTimestamps(lessThanAgo = gracePeriod minusHours 1).generateAs(ExecutionDate),
+                         project
+                       )
+      _ <- upsertEventDeliveryInfo(tooYoungEvent.eventId)
 
-          addEvent(
-            compoundEventIds.generateOne,
-            status,
-            relativeTimestamps(lessThanAgo = Duration ofMinutes 9).generateAs(ExecutionDate)
-          )
+      _ <- finder
+             .popEvent()
+             .asserting(_ shouldBe Some(ZombieEvent(finder.processName, oldEnoughEvent.eventId, project.slug, status)))
+      res <- finder.popEvent().asserting(_ shouldBe None)
+    } yield res
+  }
 
-          finder.popEvent().unsafeRunSync() shouldBe Some(
-            ZombieEvent(finder.processName, eventId, projectSlug, status)
-          )
-          finder.popEvent().unsafeRunSync() shouldBe None
-        }
+  it should "return an event " +
+    "if it's in one of the 'running' statuses " +
+    "there's no info about its delivery " +
+    "and it's in status for more than 10 minutes" in testDBResource.use { implicit cfg =>
+      List(GeneratingTriples, TransformingTriples, Deleting).traverse_ { status =>
+        val project = consumerProjects.generateOne
+        for {
+          event <- addEvent(
+                     status,
+                     relativeTimestamps(moreThanAgo = Duration ofMinutes 11).generateAs(ExecutionDate),
+                     project
+                   )
+          _ <- addEvent(
+                 status,
+                 relativeTimestamps(lessThanAgo = Duration ofMinutes 9).generateAs(ExecutionDate),
+                 project
+               )
+          _ <- finder
+                 .popEvent()
+                 .asserting(_ shouldBe Some(ZombieEvent(finder.processName, event.eventId, project.slug, status)))
+          res <- finder.popEvent().asserting(_ shouldBe None)
+        } yield res
+      }
     }
+
+  private def finder(implicit cfg: DBConfig[EventLogDB]) = {
+    implicit val qet: QueriesExecutionTimes[IO] = TestQueriesExecutionTimes[IO]
+    new LongProcessingEventFinder[IO]
   }
 
-  private trait TestCase {
-
-    val projectSlug = projectSlugs.generateOne
-
-    private implicit val metricsRegistry:  TestMetricsRegistry[IO]   = TestMetricsRegistry[IO]
-    private implicit val queriesExecTimes: QueriesExecutionTimes[IO] = QueriesExecutionTimes[IO]().unsafeRunSync()
-    val finder = new LongProcessingEventFinder[IO]
-
-    def addEvent(eventId: CompoundEventId, status: EventStatus, executionDate: ExecutionDate): Unit =
-      storeEvent(
-        eventId,
-        status,
-        executionDate,
-        eventDates.generateOne,
-        eventBodies.generateOne,
-        projectSlug = projectSlug
-      )
-  }
+  private def addEvent(status: EventStatus, executionDate: ExecutionDate, project: Project)(implicit
+      cfg: DBConfig[EventLogDB]
+  ) = storeGeneratedEvent(status, eventDates.generateOne, project, executionDate)
 }

@@ -1,5 +1,5 @@
 /*
- * Copyright 2023 Swiss Data Science Center (SDSC)
+ * Copyright 2024 Swiss Data Science Center (SDSC)
  * A partnership between École Polytechnique Fédérale de Lausanne (EPFL) and
  * Eidgenössische Technische Hochschule Zürich (ETHZ).
  *
@@ -75,5 +75,5 @@ private object TriplesRemoverImpl {
 
   def apply[F[_]: Async: Logger: SparqlQueryTimeRecorder](
       config: Config = ConfigFactory.load()
-  ): F[TriplesRemover[F]] = ProjectsConnectionConfig[F](config).map(new TriplesRemoverImpl(_))
+  ): F[TriplesRemover[F]] = ProjectsConnectionConfig.fromConfig[F](config).map(new TriplesRemoverImpl(_))
 }

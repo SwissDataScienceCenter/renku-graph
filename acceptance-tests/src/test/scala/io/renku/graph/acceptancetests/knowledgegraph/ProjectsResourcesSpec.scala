@@ -1,5 +1,5 @@
 /*
- * Copyright 2023 Swiss Data Science Center (SDSC)
+ * Copyright 2024 Swiss Data Science Center (SDSC)
  * A partnership between École Polytechnique Fédérale de Lausanne (EPFL) and
  * Eidgenössische Technische Hochschule Zürich (ETHZ).
  *
@@ -28,8 +28,9 @@ import io.renku.graph.acceptancetests.tooling.{AcceptanceSpec, ApplicationServic
 import io.renku.graph.model.EventsGenerators.commitIds
 import io.renku.graph.model.projects.{Role, Visibility}
 import io.renku.graph.model.testentities._
+import io.renku.http.RenkuEntityCodec
 import io.renku.http.rest.Links
-import io.renku.http.server.EndpointTester.{JsonOps, jsonEntityDecoder}
+import io.renku.http.server.EndpointTester.JsonOps
 import org.http4s.Status._
 import org.scalatest.EitherValues
 
@@ -38,6 +39,7 @@ class ProjectsResourcesSpec
     with ApplicationServices
     with TSProvisioning
     with DatasetsApiEncoders
+    with RenkuEntityCodec
     with EitherValues {
 
   private val user        = authUsers.generateOne

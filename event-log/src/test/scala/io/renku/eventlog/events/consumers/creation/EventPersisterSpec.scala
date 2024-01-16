@@ -1,5 +1,5 @@
 /*
- * Copyright 2023 Swiss Data Science Center (SDSC)
+ * Copyright 2024 Swiss Data Science Center (SDSC)
  * A partnership between École Polytechnique Fédérale de Lausanne (EPFL) and
  * Eidgenössische Technische Hochschule Zürich (ETHZ).
  *
@@ -18,347 +18,305 @@
 
 package io.renku.eventlog.events.consumers.creation
 
-import cats.data.Kleisli
 import cats.effect.IO
+import cats.syntax.all._
 import io.renku.eventlog.events.consumers.creation.EventPersister.Result._
 import io.renku.eventlog.events.consumers.creation.Generators._
-import io.renku.eventlog.metrics.{EventStatusGauges, QueriesExecutionTimes, TestEventStatusGauges}
+import io.renku.eventlog.metrics.{EventStatusGauges, QueriesExecutionTimes, TestEventStatusGauges, TestQueriesExecutionTimes}
 import TestEventStatusGauges._
-import io.renku.eventlog.{InMemoryEventLogDbSpec, TypeSerializers}
+import cats.effect.testing.scalatest.AsyncIOSpec
+import io.renku.db.DBConfigProvider.DBConfig
+import io.renku.eventlog.{EventLogDB, EventLogPostgresSpec}
+import io.renku.events.consumers.Project
 import io.renku.generators.Generators.Implicits._
 import io.renku.graph.model.EventsGenerators._
 import io.renku.graph.model.GraphModelGenerators.projectSlugs
 import io.renku.graph.model.events.EventStatus._
 import io.renku.graph.model.events._
-import io.renku.graph.model.projects
-import io.renku.metrics.TestMetricsRegistry
-import io.renku.testtools.IOSpec
-import org.scalamock.scalatest.MockFactory
+import org.scalamock.scalatest.AsyncMockFactory
 import org.scalatest.matchers.should
-import org.scalatest.wordspec.AnyWordSpec
-import skunk._
-import skunk.implicits._
+import org.scalatest.wordspec.AsyncWordSpec
+import org.scalatest.{OptionValues, Succeeded}
 
 import java.time.Instant
 import java.time.temporal.ChronoUnit.{HOURS, MICROS}
 
 class EventPersisterSpec
-    extends AnyWordSpec
-    with IOSpec
-    with InMemoryEventLogDbSpec
-    with MockFactory
-    with TypeSerializers
-    with should.Matchers {
+    extends AsyncWordSpec
+    with AsyncIOSpec
+    with EventLogPostgresSpec
+    with AsyncMockFactory
+    with should.Matchers
+    with OptionValues {
 
   "storeNewEvent" should {
 
     "add a *new* event if there is no event with the given id for the given project " +
-      "and there's no batch waiting or under processing" in new TestCase {
+      "and there's no batch waiting or under processing" in testDBResource.use { implicit cfg =>
+        for {
+          // storeNewEvent 1
+          event1 <- newEvents.generateOne.pure[IO]
+          _      <- persister(now).storeNewEvent(event1).asserting(_ shouldBe Created(event1))
 
-        // storeNewEvent 1
-        val event1 = newEvents.generateOne
+          _ <- gauges.awaitingGeneration.getValue(event1.project.slug).asserting(_ shouldBe 1d)
 
-        persister.storeNewEvent(event1).unsafeRunSync() shouldBe Created(event1)
+          _ <- findEvent(event1.compoundEventId).map(_.value).asserting {
+                 _ shouldBe FoundEvent(event1.compoundEventId,
+                                       ExecutionDate(now),
+                                       CreatedDate(now),
+                                       event1.date,
+                                       New,
+                                       event1.body,
+                                       event1.batchDate,
+                                       None
+                 )
+               }
+          _ <- findProjects.asserting(_ shouldBe List(FoundProject(event1.project, event1.date)))
 
-        gauges.awaitingGeneration.getValue(event1.project.slug).unsafeRunSync() shouldBe 1d
+          // storeNewEvent 2 - different event id and different project
+          event2       = newEvents.generateOne
+          nowForEvent2 = Instant.now().truncatedTo(MICROS)
+          _ <- persister(nowForEvent2).storeNewEvent(event2).asserting(_ shouldBe Created(event2))
 
-        storedEvent(event1.compoundEventId) shouldBe (
-          event1.compoundEventId,
-          New,
-          CreatedDate(now),
-          ExecutionDate(now),
-          event1.date,
-          event1.body,
-          None
-        )
-        storedProjects shouldBe List((event1.project.id, event1.project.slug, event1.date))
+          _ <- gauges.awaitingGeneration.getValue(event2.project.slug).asserting(_ shouldBe 1d)
 
-        // storeNewEvent 2 - different event id and different project
-        val event2 = newEvents.generateOne
-
-        val nowForEvent2 = Instant.now().truncatedTo(MICROS)
-        currentTime.expects().returning(nowForEvent2)
-
-        persister.storeNewEvent(event2).unsafeRunSync() shouldBe Created(event2)
-
-        gauges.awaitingGeneration.getValue(event2.project.slug).unsafeRunSync() shouldBe 1d
-
-        val save2Event1 +: save2Event2 +: Nil = findEvents(status = New)
-        save2Event1 shouldBe (event1.compoundEventId, ExecutionDate(now), event1.batchDate)
-        save2Event2 shouldBe (event2.compoundEventId, ExecutionDate(nowForEvent2), event2.batchDate)
+          _ <- findEvents(status = New).asserting {
+                 _.map(_.select(Field.Id, Field.ExecutionDate, Field.BatchDate)) shouldBe List(
+                   FoundEvent(event1.compoundEventId, ExecutionDate(now), event1.batchDate),
+                   FoundEvent(event2.compoundEventId, ExecutionDate(nowForEvent2), event2.batchDate)
+                 )
+               }
+        } yield Succeeded
       }
 
     "add a new event if there is no event with the given id for the given project " +
-      "and there's a batch for that project waiting and under processing" in new TestCase {
+      "and there's a batch for that project waiting and under processing" in testDBResource.use { implicit cfg =>
+        for {
+          // storeNewEvent 1
+          event1 <- newEvents.generateOne.pure[IO]
+          _      <- persister(now).storeNewEvent(event1).asserting(_ shouldBe a[Created])
 
-        // storeNewEvent 1
-        val event1 = newEvents.generateOne
+          _ <- gauges.awaitingGeneration.getValue(event1.project.slug).asserting(_ shouldBe 1d)
 
-        persister.storeNewEvent(event1).unsafeRunSync() shouldBe a[Created]
+          _ <- findEvents(status = New).asserting(
+                 _.head.select(Field.Id, Field.ExecutionDate, Field.BatchDate) shouldBe
+                   FoundEvent(event1.compoundEventId, ExecutionDate(now), event1.batchDate)
+               )
 
-        gauges.awaitingGeneration.getValue(event1.project.slug).unsafeRunSync() shouldBe 1d
+          // storeNewEvent 2 - different event id and batch date but same project
+          event2       = event1.copy(id = eventIds.generateOne, batchDate = batchDates.generateOne)
+          nowForEvent2 = Instant.now().truncatedTo(MICROS)
+          _ <- persister(nowForEvent2).storeNewEvent(event2).asserting(_ shouldBe a[Created])
 
-        findEvents(status = New).head shouldBe (
-          event1.compoundEventId, ExecutionDate(now), event1.batchDate
-        )
+          _ <- gauges.awaitingGeneration.getValue(event2.project.slug).asserting(_ shouldBe 2d)
 
-        // storeNewEvent 2 - different event id and batch date but same project
-        val event2 = event1.copy(id = eventIds.generateOne, batchDate = batchDates.generateOne)
-
-        val nowForEvent2 = Instant.now().truncatedTo(MICROS)
-        currentTime.expects().returning(nowForEvent2)
-
-        persister.storeNewEvent(event2).unsafeRunSync() shouldBe a[Created]
-
-        gauges.awaitingGeneration.getValue(event2.project.slug).unsafeRunSync() shouldBe 2d
-
-        val save2Event1 +: save2Event2 +: Nil = findEvents(status = New)
-        save2Event1 shouldBe (event1.compoundEventId, ExecutionDate(now), event1.batchDate)
-        save2Event2 shouldBe (event2.compoundEventId, ExecutionDate(nowForEvent2), event1.batchDate)
+          _ <- findEvents(status = New).asserting {
+                 _.map(_.select(Field.Id, Field.ExecutionDate, Field.BatchDate)) shouldBe List(
+                   FoundEvent(event1.compoundEventId, ExecutionDate(now), event1.batchDate),
+                   FoundEvent(event2.compoundEventId, ExecutionDate(nowForEvent2), event1.batchDate)
+                 )
+               }
+        } yield Succeeded
       }
 
     "update latest_event_date for a project " +
-      "only if there's an event with more recent Event Date added" in new TestCase {
+      "only if there's an event with more recent Event Date added" in testDBResource.use { implicit cfg =>
+        for {
+          // storing event 1
+          event1 <- newEvents.generateOne.copy(date = EventDate(now.minus(2, HOURS))).pure[IO]
+          _      <- persister(now).storeNewEvent(event1).asserting(_ shouldBe a[Created])
+          _      <- gauges.awaitingGeneration.getValue(event1.project.slug).asserting(_ shouldBe 1d)
 
-        // storing event 1
-        val event1 = newEvents.generateOne.copy(date = EventDate(now.minus(2, HOURS)))
+          // storing event 2 for the same project but more recent Event Date
+          event2       = newEvents.generateOne.copy(project = event1.project, date = EventDate(now.minus(1, HOURS)))
+          nowForEvent2 = Instant.now().truncatedTo(MICROS)
+          _ <- persister(nowForEvent2).storeNewEvent(event2).asserting(_ shouldBe a[Created])
+          _ <- gauges.awaitingGeneration.getValue(event2.project.slug).asserting(_ shouldBe 2d)
 
-        persister.storeNewEvent(event1).unsafeRunSync() shouldBe a[Created]
+          // storing event 3 for the same project but less recent Event Date
+          event3       = newEvents.generateOne.copy(project = event1.project, date = EventDate(now.minus(3, HOURS)))
+          nowForEvent3 = Instant.now().truncatedTo(MICROS)
+          _ <- persister(nowForEvent3).storeNewEvent(event3).asserting(_ shouldBe a[Created])
+          _ <- gauges.awaitingGeneration.getValue(event3.project.slug).asserting(_ shouldBe 3d)
 
-        gauges.awaitingGeneration.getValue(event1.project.slug).unsafeRunSync() shouldBe 1d
-
-        // storing event 2 for the same project but more recent Event Date
-        val event2       = newEvents.generateOne.copy(project = event1.project, date = EventDate(now.minus(1, HOURS)))
-        val nowForEvent2 = Instant.now().truncatedTo(MICROS)
-        currentTime.expects().returning(nowForEvent2)
-
-        persister.storeNewEvent(event2).unsafeRunSync() shouldBe a[Created]
-
-        gauges.awaitingGeneration.getValue(event2.project.slug).unsafeRunSync() shouldBe 2d
-
-        // storing event 3 for the same project but less recent Event Date
-        val event3       = newEvents.generateOne.copy(project = event1.project, date = EventDate(now.minus(3, HOURS)))
-        val nowForEvent3 = Instant.now().truncatedTo(MICROS)
-        currentTime.expects().returning(nowForEvent3)
-
-        persister.storeNewEvent(event3).unsafeRunSync() shouldBe a[Created]
-
-        gauges.awaitingGeneration.getValue(event3.project.slug).unsafeRunSync() shouldBe 3d
-
-        val savedEvent1 +: savedEvent2 +: savedEvent3 +: Nil = findEvents(status = New).noBatchDate
-        savedEvent1    shouldBe (event1.compoundEventId, ExecutionDate(now))
-        savedEvent2    shouldBe (event2.compoundEventId, ExecutionDate(nowForEvent2))
-        savedEvent3    shouldBe (event3.compoundEventId, ExecutionDate(nowForEvent3))
-        storedProjects shouldBe List((event1.project.id, event1.project.slug, event2.date))
+          _ <- findEvents(status = New).asserting {
+                 _.map(_.select(Field.Id, Field.ExecutionDate)) shouldBe List(
+                   FoundEvent(event1.compoundEventId, ExecutionDate(now)),
+                   FoundEvent(event2.compoundEventId, ExecutionDate(nowForEvent2)),
+                   FoundEvent(event3.compoundEventId, ExecutionDate(nowForEvent3))
+                 )
+               }
+          _ <- findProjects.asserting(_ shouldBe List(FoundProject(event1.project, event2.date)))
+        } yield Succeeded
       }
 
     "update latest_event_date and project_slug for a project " +
-      "only if there's an event with more recent Event Date added" in new TestCase {
+      "only if there's an event with more recent Event Date added" in testDBResource.use { implicit cfg =>
+        for {
+          // storing event 1
+          event1 <- newEvents.generateOne.copy(date = EventDate(now.minus(2, HOURS))).pure[IO]
+          _      <- persister(now).storeNewEvent(event1).asserting(_ shouldBe a[Created])
+          _      <- gauges.awaitingGeneration.getValue(event1.project.slug).asserting(_ shouldBe 1d)
 
-        // storing event 1
-        val event1 = newEvents.generateOne.copy(date = EventDate(now.minus(2, HOURS)))
+          // storing event 2 for the same project but with different slug and more recent Event Date
+          event2 = newEvents.generateOne.copy(project = event1.project.copy(slug = projectSlugs.generateOne),
+                                              date = EventDate(now.minus(1, HOURS))
+                   )
+          nowForEvent2 = Instant.now().truncatedTo(MICROS)
+          _ <- persister(nowForEvent2).storeNewEvent(event2).asserting(_ shouldBe a[Created])
+          _ <- gauges.awaitingGeneration.getValue(event2.project.slug).asserting(_ shouldBe 1d)
 
-        persister.storeNewEvent(event1).unsafeRunSync() shouldBe a[Created]
-
-        gauges.awaitingGeneration.getValue(event1.project.slug).unsafeRunSync() shouldBe 1d
-
-        // storing event 2 for the same project but with different slug and more recent Event Date
-        val event2 = newEvents.generateOne.copy(project = event1.project.copy(slug = projectSlugs.generateOne),
-                                                date = EventDate(now.minus(1, HOURS))
-        )
-        val nowForEvent2 = Instant.now().truncatedTo(MICROS)
-        currentTime.expects().returning(nowForEvent2)
-
-        persister.storeNewEvent(event2).unsafeRunSync() shouldBe a[Created]
-
-        gauges.awaitingGeneration.getValue(event2.project.slug).unsafeRunSync() shouldBe 1d
-
-        val savedEvent1 +: savedEvent2 +: Nil = findEvents(status = New).noBatchDate
-        savedEvent1    shouldBe (event1.compoundEventId, ExecutionDate(now))
-        savedEvent2    shouldBe (event2.compoundEventId, ExecutionDate(nowForEvent2))
-        storedProjects shouldBe List((event1.project.id, event2.project.slug, event2.date))
+          _ <- findEvents(status = New).asserting {
+                 _.map(_.select(Field.Id, Field.ExecutionDate)) shouldBe List(
+                   FoundEvent(event1.compoundEventId, ExecutionDate(now)),
+                   FoundEvent(event2.compoundEventId, ExecutionDate(nowForEvent2))
+                 )
+               }
+          _ <- findProjects.asserting(
+                 _ shouldBe List(FoundProject(Project(event1.project.id, event2.project.slug), event2.date))
+               )
+        } yield Succeeded
       }
 
     "do not update latest_event_date and project_slug for a project " +
-      "only if there's an event with less recent Event Date added" in new TestCase {
+      "only if there's an event with less recent Event Date added" in testDBResource.use { implicit cfg =>
+        for {
+          // storing event 1
+          event1 <- newEvents.generateOne.copy(date = EventDate(now.minus(2, HOURS))).pure[IO]
+          _      <- persister(now).storeNewEvent(event1).asserting(_ shouldBe a[Created])
+          _      <- gauges.awaitingGeneration.getValue(event1.project.slug).asserting(_ shouldBe 1d)
 
-        // storing event 1
-        val event1 = newEvents.generateOne.copy(date = EventDate(now.minus(2, HOURS)))
+          // storing event 2 for the same project but with different slug and less recent Event Date
+          event2 = newEvents.generateOne.copy(project = event1.project.copy(slug = projectSlugs.generateOne),
+                                              date = EventDate(now.minus(3, HOURS))
+                   )
+          nowForEvent2 = Instant.now().truncatedTo(MICROS)
+          _ <- persister(nowForEvent2).storeNewEvent(event2).asserting(_ shouldBe a[Created])
+          _ <- gauges.awaitingGeneration.getValue(event2.project.slug).asserting(_ shouldBe 1d)
 
-        persister.storeNewEvent(event1).unsafeRunSync() shouldBe a[Created]
-
-        gauges.awaitingGeneration.getValue(event1.project.slug).unsafeRunSync() shouldBe 1d
-
-        // storing event 2 for the same project but with different slug and less recent Event Date
-        val event2 = newEvents.generateOne.copy(project = event1.project.copy(slug = projectSlugs.generateOne),
-                                                date = EventDate(now.minus(3, HOURS))
-        )
-        val nowForEvent2 = Instant.now().truncatedTo(MICROS)
-        currentTime.expects().returning(nowForEvent2)
-
-        persister.storeNewEvent(event2).unsafeRunSync() shouldBe a[Created]
-
-        gauges.awaitingGeneration.getValue(event2.project.slug).unsafeRunSync() shouldBe 1d
-
-        val savedEvent1 +: savedEvent2 +: Nil = findEvents(status = New).noBatchDate
-        savedEvent1    shouldBe (event1.compoundEventId, ExecutionDate(now))
-        savedEvent2    shouldBe (event2.compoundEventId, ExecutionDate(nowForEvent2))
-        storedProjects shouldBe List((event1.project.id, event1.project.slug, event1.date))
+          _ <- findEvents(status = New).asserting {
+                 _.map(_.select(Field.Id, Field.ExecutionDate)) shouldBe List(
+                   FoundEvent(event1.compoundEventId, ExecutionDate(now)),
+                   FoundEvent(event2.compoundEventId, ExecutionDate(nowForEvent2))
+                 )
+               }
+          _ <- findProjects.asserting(_ shouldBe List(FoundProject(event1.project, event1.date)))
+        } yield Succeeded
       }
 
-    "create event with the TRIPLES_STORE status if a newer event has the TRIPLES_STORE status already" in new TestCase {
-      val event1 = newEvents.generateOne.copy(date = EventDate(now.minus(2, HOURS)), status = TriplesStore)
+    "create event with the TRIPLES_STORE status if a newer event has the TRIPLES_STORE status already" in testDBResource
+      .use { implicit cfg =>
+        for {
+          // storing event 1
+          event1 <- newEvents.generateOne.copy(date = EventDate(now.minus(2, HOURS)), status = TriplesStore).pure[IO]
+          _      <- persister(now).storeNewEvent(event1).asserting(_ shouldBe a[Created])
 
-      // storing event 1
-      persister.storeNewEvent(event1).unsafeRunSync() shouldBe a[Created]
+          // storing event 2 older than event1
+          event2       = newEvents.generateOne.copy(project = event1.project, date = EventDate(now.minus(3, HOURS)))
+          nowForEvent2 = Instant.now().truncatedTo(MICROS)
+          _ <- persister(nowForEvent2).storeNewEvent(event2).asserting(_ shouldBe a[Created])
 
-      // storing event 2 older than event1
-      val event2 = newEvents.generateOne.copy(project = event1.project, date = EventDate(now.minus(3, HOURS)))
+          _ <- findEvents(status = New).asserting(_ shouldBe Nil)
+          _ <- findEvents(status = TriplesStore).asserting(
+                 _.map(_.id) should contain theSameElementsAs (event1.compoundEventId :: event2.compoundEventId :: Nil)
+               )
+        } yield Succeeded
+      }
 
-      val nowForEvent2 = Instant.now().truncatedTo(MICROS)
-      currentTime.expects().returning(nowForEvent2)
+    "add a *SKIPPED* event if there is no event with the given id for the given project " in testDBResource.use {
+      implicit cfg =>
+        val skippedEvent = skippedEvents.generateOne
 
-      persister.storeNewEvent(event2).unsafeRunSync() shouldBe a[Created]
+        for {
+          // storeNewEvent 1
+          _ <- persister(now).storeNewEvent(skippedEvent).asserting(_ shouldBe a[Created])
 
-      findEvents(status = New) shouldBe Nil
+          _ <- findEvent(skippedEvent.compoundEventId).map(_.value).asserting {
+                 _ shouldBe FoundEvent(
+                   skippedEvent.compoundEventId,
+                   ExecutionDate(now),
+                   CreatedDate(now),
+                   skippedEvent.date,
+                   Skipped,
+                   skippedEvent.body,
+                   skippedEvent.batchDate,
+                   Some(skippedEvent.message)
+                 )
+               }
+          _ <- findProjects.asserting(_ shouldBe List(FoundProject(skippedEvent.project, skippedEvent.date)))
 
-      findEvents(status =
-        TriplesStore
-      ).eventIdsOnly should contain theSameElementsAs event1.compoundEventId :: event2.compoundEventId :: Nil
+          // storeNewEvent 2 - different event id and different project
+          skippedEvent2 = skippedEvents.generateOne
+          nowForEvent2  = Instant.now().truncatedTo(MICROS)
+          _ <- persister(nowForEvent2).storeNewEvent(skippedEvent2).asserting(_ shouldBe a[Created])
+
+          _ <- findEvents(status = Skipped).asserting {
+                 _.map(_.select(Field.Id, Field.ExecutionDate, Field.BatchDate)) shouldBe List(
+                   FoundEvent(skippedEvent.compoundEventId, ExecutionDate(now), skippedEvent.batchDate),
+                   FoundEvent(skippedEvent2.compoundEventId, ExecutionDate(nowForEvent2), skippedEvent2.batchDate)
+                 )
+               }
+        } yield Succeeded
     }
 
-    "add a *SKIPPED* event if there is no event with the given id for the given project " in new TestCase {
-      val skippedEvent = skippedEvents.generateOne
+    "add a new event if there is another event with the same id but for a different project" in testDBResource.use {
+      implicit cfg =>
+        for {
+          // Save 1
+          event1 <- newEvents.generateOne.pure[IO]
+          _      <- persister(now).storeNewEvent(event1).asserting(_ shouldBe a[Created])
+          _      <- gauges.awaitingGeneration.getValue(event1.project.slug).asserting(_ shouldBe 1d)
 
-      // storeNewEvent 1
-      persister.storeNewEvent(skippedEvent).unsafeRunSync() shouldBe a[Created]
+          _ <- findEvents(status = New).asserting {
+                 _.map(_.select(Field.Id, Field.ExecutionDate, Field.BatchDate)) shouldBe List(
+                   FoundEvent(event1.compoundEventId, ExecutionDate(now), event1.batchDate)
+                 )
+               }
 
-      storedEvent(skippedEvent.compoundEventId) shouldBe (
-        skippedEvent.compoundEventId,
-        Skipped,
-        CreatedDate(now),
-        ExecutionDate(now),
-        skippedEvent.date,
-        skippedEvent.body,
-        Some(skippedEvent.message)
-      )
-      storedProjects shouldBe List((skippedEvent.project.id, skippedEvent.project.slug, skippedEvent.date))
+          // Save 2 - the same event id but different project
+          event2       = newEvents.generateOne.copy(id = event1.id)
+          nowForEvent2 = Instant.now().truncatedTo(MICROS)
+          _ <- persister(nowForEvent2).storeNewEvent(event2).asserting(_ shouldBe a[Created])
+          _ <- gauges.awaitingGeneration.getValue(event2.project.slug).asserting(_ shouldBe 1d)
 
-      // storeNewEvent 2 - different event id and different project
-      val skippedEvent2 = skippedEvents.generateOne
-
-      val nowForEvent2 = Instant.now().truncatedTo(MICROS)
-      currentTime.expects().returning(nowForEvent2)
-
-      persister.storeNewEvent(skippedEvent2).unsafeRunSync() shouldBe a[Created]
-
-      val save2Event1 +: save2Event2 +: Nil = findEvents(status = Skipped)
-      save2Event1 shouldBe (skippedEvent.compoundEventId, ExecutionDate(now), skippedEvent.batchDate)
-      save2Event2 shouldBe (skippedEvent2.compoundEventId, ExecutionDate(nowForEvent2), skippedEvent2.batchDate)
+          _ <- findEvents(status = New).asserting {
+                 _.map(_.select(Field.Id, Field.ExecutionDate, Field.BatchDate)) shouldBe List(
+                   FoundEvent(event1.compoundEventId, ExecutionDate(now), event1.batchDate),
+                   FoundEvent(event2.compoundEventId, ExecutionDate(nowForEvent2), event2.batchDate)
+                 )
+               }
+        } yield Succeeded
     }
 
-    "add a new event if there is another event with the same id but for a different project" in new TestCase {
+    "do nothing if there is an event with the same id and project in the DB already" in testDBResource.use {
+      implicit cfg =>
+        for {
+          event <- newEvents.generateOne.pure[IO]
+          _     <- persister(now).storeNewEvent(event).asserting(_ shouldBe a[Created])
+          _     <- findEvent(event.compoundEventId).asserting(_.map(_.id) shouldBe event.compoundEventId.some)
 
-      // Save 1
-      val event1 = newEvents.generateOne
+          _ <- persister(now).storeNewEvent(event.copy(body = eventBodies.generateOne)).asserting(_ shouldBe Existed)
+          _ <- gauges.awaitingGeneration.getValue(event.project.slug).asserting(_ shouldBe 1d)
 
-      persister.storeNewEvent(event1).unsafeRunSync() shouldBe a[Created]
-
-      gauges.awaitingGeneration.getValue(event1.project.slug).unsafeRunSync() shouldBe 1d
-
-      val save1Event1 +: Nil = findEvents(status = New)
-      save1Event1 shouldBe (event1.compoundEventId, ExecutionDate(now), event1.batchDate)
-
-      // Save 2 - the same event id but different project
-      val event2 = newEvents.generateOne.copy(id = event1.id)
-
-      val nowForEvent2 = Instant.now().truncatedTo(MICROS)
-      currentTime.expects().returning(nowForEvent2)
-
-      persister.storeNewEvent(event2).unsafeRunSync() shouldBe a[Created]
-
-      gauges.awaitingGeneration.getValue(event2.project.slug).unsafeRunSync() shouldBe 1d
-
-      val save2Event1 +: save2Event2 +: Nil = findEvents(status = New)
-      save2Event1 shouldBe (event1.compoundEventId, ExecutionDate(now), event1.batchDate)
-      save2Event2 shouldBe (event2.compoundEventId, ExecutionDate(nowForEvent2), event2.batchDate)
-    }
-
-    "do nothing if there is an event with the same id and project in the DB already" in new TestCase {
-
-      val event = newEvents.generateOne
-
-      persister.storeNewEvent(event).unsafeRunSync() shouldBe a[Created]
-
-      storedEvent(event.compoundEventId)._1 shouldBe event.compoundEventId
-
-      persister.storeNewEvent(event.copy(body = eventBodies.generateOne)).unsafeRunSync() shouldBe Existed
-
-      gauges.awaitingGeneration.getValue(event.project.slug).unsafeRunSync() shouldBe 1d
-
-      storedEvent(event.compoundEventId) shouldBe (
-        event.compoundEventId,
-        New,
-        CreatedDate(now),
-        ExecutionDate(now),
-        event.date,
-        event.body,
-        None
-      )
+          _ <- findEvent(event.compoundEventId).map(_.value).asserting {
+                 _ shouldBe FoundEvent(event.compoundEventId,
+                                       ExecutionDate(now),
+                                       CreatedDate(now),
+                                       event.date,
+                                       New,
+                                       event.body,
+                                       event.batchDate,
+                                       None
+                 )
+               }
+        } yield Succeeded
     }
   }
 
-  private trait TestCase {
-
-    implicit val gauges:                   EventStatusGauges[IO]     = TestEventStatusGauges[IO]
-    private implicit val metricsRegistry:  TestMetricsRegistry[IO]   = TestMetricsRegistry[IO]
-    private implicit val queriesExecTimes: QueriesExecutionTimes[IO] = QueriesExecutionTimes[IO]().unsafeRunSync()
-    val currentTime = mockFunction[Instant]
-    val persister   = new EventPersisterImpl[IO](currentTime)
-
-    val now = Instant.now().truncatedTo(MICROS)
-    currentTime.expects().returning(now)
-
-    def storedEvent(
-        compoundEventId: CompoundEventId
-    ): (CompoundEventId, EventStatus, CreatedDate, ExecutionDate, EventDate, EventBody, Option[EventMessage]) =
-      execute {
-        Kleisli { session =>
-          val query: Query[
-            EventId *: projects.GitLabId *: EmptyTuple,
-            (CompoundEventId, EventStatus, CreatedDate, ExecutionDate, EventDate, EventBody, Option[EventMessage])
-          ] = sql"""SELECT event_id, project_id, status, created_date, execution_date, event_date, event_body, message
-                  FROM event  
-                  WHERE event_id = $eventIdEncoder AND project_id = $projectIdEncoder
-                  """
-            .query(
-              eventIdDecoder ~ projectIdDecoder ~ eventStatusDecoder ~ createdDateDecoder ~ executionDateDecoder ~ eventDateDecoder ~ eventBodyDecoder ~ eventMessageDecoder.opt
-            )
-            .map {
-              case eventId ~ projectId ~ eventStatus ~ createdDate ~ executionDate ~ eventDate ~ eventBody ~ maybeEventMessage =>
-                (
-                  CompoundEventId(eventId, projectId),
-                  eventStatus,
-                  createdDate,
-                  executionDate,
-                  eventDate,
-                  eventBody,
-                  maybeEventMessage
-                )
-            }
-          session.prepare(query).flatMap(_.unique(compoundEventId.id *: compoundEventId.projectId *: EmptyTuple))
-        }
-      }
-  }
-
-  private def storedProjects: List[(projects.GitLabId, projects.Slug, EventDate)] = execute {
-    Kleisli { session =>
-      val query: Query[Void, (projects.GitLabId, projects.Slug, EventDate)] =
-        sql"""SELECT project_id, project_slug, latest_event_date
-              FROM project"""
-          .query(projectIdDecoder ~ projectSlugDecoder ~ eventDateDecoder)
-          .map { case projectId ~ projectSlug ~ eventDate => (projectId, projectSlug, eventDate) }
-      session.execute(query)
-    }
+  private implicit lazy val gauges: EventStatusGauges[IO] = TestEventStatusGauges[IO]
+  private lazy val now = Instant.now().truncatedTo(MICROS)
+  private def persister(currentTime: Instant = now)(implicit cfg: DBConfig[EventLogDB]) = {
+    implicit val queriesExecTimes: QueriesExecutionTimes[IO] = TestQueriesExecutionTimes[IO]
+    new EventPersisterImpl[IO](() => currentTime)
   }
 }

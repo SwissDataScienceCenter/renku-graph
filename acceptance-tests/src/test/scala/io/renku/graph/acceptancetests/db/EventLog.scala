@@ -1,5 +1,5 @@
 /*
- * Copyright 2023 Swiss Data Science Center (SDSC)
+ * Copyright 2024 Swiss Data Science Center (SDSC)
  * A partnership between École Polytechnique Fédérale de Lausanne (EPFL) and
  * Eidgenössische Technische Hochschule Zürich (ETHZ).
  *
@@ -118,10 +118,9 @@ object EventLog extends TypeSerializers {
     session.prepare(command).flatMap(_.execute(projectId)).void
   }
 
-  def startDB()(implicit logger: Logger[IO]): IO[Unit] = for {
-    _ <- PostgresDB.startPostgres
+  def initDB()(implicit logger: Logger[IO]): IO[Unit] = for {
     _ <- PostgresDB.initializeDatabase(dbConfig)
-    _ <- logger.info("event_log DB started")
+    _ <- logger.info("event_log DB initialised")
   } yield ()
 
   private lazy val sessionResource: Resource[IO, SessionResource[IO, EventLogDB]] =

@@ -1,5 +1,5 @@
 /*
- * Copyright 2023 Swiss Data Science Center (SDSC)
+ * Copyright 2024 Swiss Data Science Center (SDSC)
  * A partnership between École Polytechnique Fédérale de Lausanne (EPFL) and
  * Eidgenössische Technische Hochschule Zürich (ETHZ).
  *
@@ -18,10 +18,11 @@
 
 package io.renku.triplesstore.client.http
 
+import io.renku.http.RenkuEntityCodec
 import org.http4s.{BasicCredentials, Request}
 import org.http4s.headers.Authorization
 
-trait MoreClientDsl[F[_]] {
+trait MoreClientDsl[F[_]] extends RenkuEntityCodec {
 
   final implicit class MoreRequestDsl(req: Request[F]) {
     def withBasicAuth(cred: Option[BasicCredentials]): Request[F] =

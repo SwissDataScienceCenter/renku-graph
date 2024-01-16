@@ -1,5 +1,5 @@
 /*
- * Copyright 2023 Swiss Data Science Center (SDSC)
+ * Copyright 2024 Swiss Data Science Center (SDSC)
  * A partnership between École Polytechnique Fédérale de Lausanne (EPFL) and
  * Eidgenössische Technische Hochschule Zürich (ETHZ).
  *
@@ -19,347 +19,355 @@
 package io.renku.eventlog.metrics
 
 import cats.effect.IO
+import cats.effect.testing.scalatest.AsyncIOSpec
+import cats.syntax.all._
 import eu.timepit.refined.api.Refined
 import eu.timepit.refined.auto._
 import eu.timepit.refined.numeric.Positive
+import io.renku.db.DBConfigProvider.DBConfig
 import io.renku.eventlog.events.producers._
-import io.renku.eventlog.{CleanUpEventsProvisioning, InMemoryEventLogDbSpec}
+import io.renku.eventlog.{CleanUpEventsProvisioning, EventLogDB, EventLogPostgresSpec}
 import io.renku.events.CategoryName
+import io.renku.events.consumers.ConsumersModelGenerators.consumerProjects
+import io.renku.events.consumers.Project
 import io.renku.generators.Generators.Implicits._
-import io.renku.generators.Generators.{jsons, nonEmptyList, nonEmptyStrings, positiveInts, timestamps, timestampsNotInTheFuture}
+import io.renku.generators.Generators.{jsons, nonEmptyStrings, positiveInts, timestamps, timestampsNotInTheFuture}
 import io.renku.graph.model.EventContentGenerators._
 import io.renku.graph.model.EventsGenerators._
-import io.renku.graph.model.GraphModelGenerators.{projectIds, projectSlugs}
 import io.renku.graph.model.events.EventStatus._
 import io.renku.graph.model.events._
-import io.renku.graph.model.projects.{GitLabId, Slug}
-import io.renku.metrics.TestMetricsRegistry
-import io.renku.testtools.IOSpec
+import org.scalamock.scalatest.AsyncMockFactory
+import org.scalatest.Succeeded
 import org.scalatest.matchers.should
-import org.scalatest.wordspec.AnyWordSpec
+import org.scalatest.wordspec.AsyncWordSpec
 
-import java.time.{Duration, Instant, OffsetDateTime}
+import java.time.{Duration, Instant}
 
 class StatsFinderSpec
-    extends AnyWordSpec
-    with IOSpec
-    with InMemoryEventLogDbSpec
-    with SubscriptionDataProvisioning
+    extends AsyncWordSpec
+    with AsyncIOSpec
+    with EventLogPostgresSpec
+    with AsyncMockFactory
+    with SubscriptionProvisioning
     with CleanUpEventsProvisioning
     with should.Matchers {
 
   "countEventsByCategoryName" should {
 
-    "return info about number of events grouped by categoryName for the memberSync category" in {
+    "return info about number of events grouped by categoryName for the memberSync category" in testDBResource.use {
+      implicit cfg =>
+        for {
+          project1 <- consumerProjects.generateOne.pure[IO]
+          _        <- upsertProject(project1, EventDate(generateInstant(lessThanAgo = Duration.ofMinutes(59))))
+          _ <- upsertCategorySyncTime(project1.id,
+                                      membersync.categoryName,
+                                      LastSyncedDate(generateInstant(moreThanAgo = Duration.ofMinutes(6)))
+               )
 
-      val compoundId1 = compoundEventIds.generateOne
-      val eventDate1  = EventDate(generateInstant(lessThanAgo = Duration.ofMinutes(59)))
-      val lastSynced1 = LastSyncedDate(generateInstant(moreThanAgo = Duration.ofMinutes(6)))
-      upsertProject(compoundId1, projectSlugs.generateOne, eventDate1)
-      upsertCategorySyncTime(compoundId1.projectId, membersync.categoryName, lastSynced1)
+          project2 <- consumerProjects.generateOne.pure[IO]
+          _        <- upsertProject(project2, EventDate(generateInstant(lessThanAgo = Duration.ofHours(23))))
+          _ <- upsertCategorySyncTime(project2.id,
+                                      membersync.categoryName,
+                                      LastSyncedDate(generateInstant(moreThanAgo = Duration.ofMinutes(61)))
+               )
 
-      val compoundId2 = compoundEventIds.generateOne
-      val eventDate2  = EventDate(generateInstant(lessThanAgo = Duration.ofHours(23)))
-      val lastSynced2 = LastSyncedDate(generateInstant(moreThanAgo = Duration.ofMinutes(61)))
-      upsertProject(compoundId2, projectSlugs.generateOne, eventDate2)
-      upsertCategorySyncTime(compoundId2.projectId, membersync.categoryName, lastSynced2)
+          project3 <- consumerProjects.generateOne.pure[IO]
+          _        <- upsertProject(project3, EventDate(generateInstant(moreThanAgo = Duration.ofHours(25))))
+          _ <- upsertCategorySyncTime(project3.id,
+                                      membersync.categoryName,
+                                      LastSyncedDate(generateInstant(moreThanAgo = Duration.ofHours(25)))
+               )
 
-      val compoundId3 = compoundEventIds.generateOne
-      val eventDate3  = EventDate(generateInstant(moreThanAgo = Duration.ofHours(25)))
-      val lastSynced3 = LastSyncedDate(generateInstant(moreThanAgo = Duration.ofHours(25)))
-      upsertProject(compoundId3, projectSlugs.generateOne, eventDate3)
-      upsertCategorySyncTime(compoundId3.projectId, membersync.categoryName, lastSynced3)
+          project4 <- consumerProjects.generateOne.pure[IO]
+          _        <- upsertProject(project4, EventDate(generateInstant()))
 
-      val compoundId4 = compoundEventIds.generateOne
-      val eventDate4  = EventDate(generateInstant())
-      upsertProject(compoundId4, projectSlugs.generateOne, eventDate4)
+          // MEMBER_SYNC should not see this one
+          project5 <- consumerProjects.generateOne.pure[IO]
+          _        <- upsertProject(project5, EventDate(generateInstant(moreThanAgo = Duration.ofHours(25))))
+          _ <- upsertCategorySyncTime(project5.id,
+                                      membersync.categoryName,
+                                      LastSyncedDate(generateInstant(lessThanAgo = Duration.ofHours(23)))
+               )
 
-      // MEMBER_SYNC should not see this one
-      val compoundId5 = compoundEventIds.generateOne
-      val eventDate5  = EventDate(generateInstant(moreThanAgo = Duration.ofHours(25)))
-      val lastSynced5 = LastSyncedDate(generateInstant(lessThanAgo = Duration.ofHours(23)))
-      upsertProject(compoundId5, projectSlugs.generateOne, eventDate5)
-      upsertCategorySyncTime(compoundId5.projectId, membersync.categoryName, lastSynced5)
-
-      stats.countEventsByCategoryName().unsafeRunSync() shouldBe Map(
-        membersync.categoryName        -> 4L,
-        commitsync.categoryName        -> 5L,
-        globalcommitsync.categoryName  -> 5L,
-        projectsync.categoryName       -> 5L,
-        minprojectinfo.categoryName    -> 5L,
-        CategoryName("CLEAN_UP_EVENT") -> 0L
-      )
+          _ <- stats.countEventsByCategoryName().asserting {
+                 _ shouldBe Map(
+                   membersync.categoryName        -> 4L,
+                   commitsync.categoryName        -> 5L,
+                   globalcommitsync.categoryName  -> 5L,
+                   projectsync.categoryName       -> 5L,
+                   minprojectinfo.categoryName    -> 5L,
+                   CategoryName("CLEAN_UP_EVENT") -> 0L
+                 )
+               }
+        } yield Succeeded
     }
 
-    "return info about number of events grouped by categoryName for the commitSync category" in {
+    "return info about number of events grouped by categoryName for the commitSync category" in testDBResource.use {
+      implicit cfg =>
+        for {
+          project1 <- consumerProjects.generateOne.pure[IO]
+          _        <- upsertProject(project1, EventDate(generateInstant(lessThanAgo = Duration.ofDays(7))))
+          _ <- upsertCategorySyncTime(project1.id,
+                                      commitsync.categoryName,
+                                      LastSyncedDate(generateInstant(moreThanAgo = Duration.ofMinutes(61)))
+               )
 
-      val compoundId1   = compoundEventIds.generateOne
-      val eventDate1    = EventDate(generateInstant(lessThanAgo = Duration.ofDays(7)))
-      val lastSyncDate1 = LastSyncedDate(generateInstant(moreThanAgo = Duration.ofMinutes(61)))
-      upsertProject(compoundId1, projectSlugs.generateOne, eventDate1)
-      upsertCategorySyncTime(compoundId1.projectId, commitsync.categoryName, lastSyncDate1)
+          project2 <- consumerProjects.generateOne.pure[IO]
+          _        <- upsertProject(project2, EventDate(generateInstant(moreThanAgo = Duration.ofHours(7 * 24 + 1))))
+          _ <- upsertCategorySyncTime(project2.id,
+                                      commitsync.categoryName,
+                                      LastSyncedDate(generateInstant(moreThanAgo = Duration.ofMinutes(25)))
+               )
 
-      val compoundId2   = compoundEventIds.generateOne
-      val eventDate2    = EventDate(generateInstant(moreThanAgo = Duration.ofHours(7 * 24 + 1)))
-      val lastSyncDate2 = LastSyncedDate(generateInstant(moreThanAgo = Duration.ofMinutes(25)))
-      upsertProject(compoundId2, projectSlugs.generateOne, eventDate2)
-      upsertCategorySyncTime(compoundId2.projectId, commitsync.categoryName, lastSyncDate2)
+          _ <- upsertProject(consumerProjects.generateOne, EventDate(generateInstant()))
 
-      val compoundId3 = compoundEventIds.generateOne
-      val eventDate3  = EventDate(generateInstant())
-      upsertProject(compoundId3, projectSlugs.generateOne, eventDate3)
+          // COMMIT_SYNC should not see this one
+          project4 <- consumerProjects.generateOne.pure[IO]
+          _        <- upsertProject(project4, EventDate(generateInstant(moreThanAgo = Duration.ofHours(7 * 24 + 1))))
+          _ <- upsertCategorySyncTime(project4.id,
+                                      commitsync.categoryName,
+                                      LastSyncedDate(generateInstant(lessThanAgo = Duration.ofHours(23)))
+               )
 
-      // COMMIT_SYNC should not see this one
-      val compoundId4   = compoundEventIds.generateOne
-      val eventDate4    = EventDate(generateInstant(moreThanAgo = Duration.ofHours(7 * 24 + 1)))
-      val lastSyncDate4 = LastSyncedDate(generateInstant(lessThanAgo = Duration.ofHours(23)))
-      upsertProject(compoundId4, projectSlugs.generateOne, eventDate4)
-      upsertCategorySyncTime(compoundId4.projectId, commitsync.categoryName, lastSyncDate4)
-
-      stats.countEventsByCategoryName().unsafeRunSync() shouldBe Map(
-        membersync.categoryName        -> 4L,
-        commitsync.categoryName        -> 3L,
-        globalcommitsync.categoryName  -> 4L,
-        projectsync.categoryName       -> 4L,
-        minprojectinfo.categoryName    -> 4L,
-        CategoryName("CLEAN_UP_EVENT") -> 0L
-      )
+          _ <- stats.countEventsByCategoryName().asserting {
+                 _ shouldBe Map(
+                   membersync.categoryName        -> 4L,
+                   commitsync.categoryName        -> 3L,
+                   globalcommitsync.categoryName  -> 4L,
+                   projectsync.categoryName       -> 4L,
+                   minprojectinfo.categoryName    -> 4L,
+                   CategoryName("CLEAN_UP_EVENT") -> 0L
+                 )
+               }
+        } yield Succeeded
     }
 
-    "return info about number of events grouped by categoryName for the globalCommitSync category" in {
+    "return info about number of events grouped by categoryName for the globalCommitSync category" in testDBResource
+      .use { implicit cfg =>
+        for {
+          project1 <- consumerProjects.generateOne.pure[IO]
+          _        <- upsertProject(project1, EventDate(generateInstant(lessThanAgo = Duration.ofDays(7))))
+          _ <- upsertCategorySyncTime(project1.id,
+                                      globalcommitsync.categoryName,
+                                      LastSyncedDate(generateInstant(moreThanAgo = Duration.ofDays(7)))
+               )
 
-      val compoundId1   = compoundEventIds.generateOne
-      val eventDate1    = EventDate(generateInstant(lessThanAgo = Duration.ofDays(7)))
-      val lastSyncDate1 = LastSyncedDate(generateInstant(moreThanAgo = Duration.ofDays(7)))
-      upsertProject(compoundId1, projectSlugs.generateOne, eventDate1)
-      upsertCategorySyncTime(compoundId1.projectId, globalcommitsync.categoryName, lastSyncDate1)
+          _ <- upsertProject(consumerProjects.generateOne, EventDate(generateInstant()))
 
-      val compoundId2 = compoundEventIds.generateOne
-      val eventDate2  = EventDate(generateInstant())
-      upsertProject(compoundId2, projectSlugs.generateOne, eventDate2)
+          // GLOBAL_COMMIT_SYNC should not see this one
+          project3 <- consumerProjects.generateOne.pure[IO]
+          _        <- upsertProject(project3, EventDate(generateInstant(moreThanAgo = Duration.ofDays(7))))
+          _ <- upsertCategorySyncTime(project3.id,
+                                      globalcommitsync.categoryName,
+                                      LastSyncedDate(generateInstant(lessThanAgo = Duration.ofDays(7)))
+               )
 
-      // GLOBAL_COMMIT_SYNC should not see this one
-      val compoundId3   = compoundEventIds.generateOne
-      val eventDate3    = EventDate(generateInstant(moreThanAgo = Duration.ofDays(7)))
-      val lastSyncDate3 = LastSyncedDate(generateInstant(lessThanAgo = Duration.ofDays(7)))
-      upsertProject(compoundId3, projectSlugs.generateOne, eventDate3)
-      upsertCategorySyncTime(compoundId3.projectId, globalcommitsync.categoryName, lastSyncDate3)
-
-      stats.countEventsByCategoryName().unsafeRunSync() shouldBe Map(
-        membersync.categoryName        -> 3L,
-        commitsync.categoryName        -> 3L,
-        globalcommitsync.categoryName  -> 2L,
-        projectsync.categoryName       -> 3L,
-        minprojectinfo.categoryName    -> 3L,
-        CategoryName("CLEAN_UP_EVENT") -> 0L
-      )
-    }
-
-    "return info about number of events grouped by categoryName for the projectSync category" in {
-
-      val compoundId1   = compoundEventIds.generateOne
-      val eventDate1    = EventDate(generateInstant(lessThanAgo = Duration.ofDays(7)))
-      val lastSyncDate1 = LastSyncedDate(generateInstant(moreThanAgo = Duration.ofDays(7)))
-      upsertProject(compoundId1, projectSlugs.generateOne, eventDate1)
-      upsertCategorySyncTime(compoundId1.projectId, globalcommitsync.categoryName, lastSyncDate1)
-
-      val compoundId2 = compoundEventIds.generateOne
-      val eventDate2  = EventDate(generateInstant())
-      upsertProject(compoundId2, projectSlugs.generateOne, eventDate2)
-
-      // PROJECT_SYNC should not see this one
-      val compoundId3   = compoundEventIds.generateOne
-      val eventDate3    = EventDate(generateInstant(moreThanAgo = Duration.ofDays(7)))
-      val lastSyncDate3 = LastSyncedDate(generateInstant(lessThanAgo = Duration.ofHours(23)))
-      upsertProject(compoundId3, projectSlugs.generateOne, eventDate3)
-      upsertCategorySyncTime(compoundId3.projectId, projectsync.categoryName, lastSyncDate3)
-
-      stats.countEventsByCategoryName().unsafeRunSync() shouldBe Map(
-        membersync.categoryName        -> 3L,
-        commitsync.categoryName        -> 3L,
-        globalcommitsync.categoryName  -> 3L,
-        projectsync.categoryName       -> 2L,
-        minprojectinfo.categoryName    -> 3L,
-        CategoryName("CLEAN_UP_EVENT") -> 0L
-      )
-    }
-
-    "return info about number of events grouped by categoryName for the minProjectInfo category" in {
-
-      val compoundId1   = compoundEventIds.generateOne
-      val eventDate1    = EventDate(generateInstant(lessThanAgo = Duration.ofDays(7)))
-      val lastSyncDate1 = LastSyncedDate(generateInstant(moreThanAgo = Duration.ofDays(7)))
-      upsertProject(compoundId1, projectSlugs.generateOne, eventDate1)
-      upsertCategorySyncTime(compoundId1.projectId, globalcommitsync.categoryName, lastSyncDate1)
-
-      val compoundId2 = compoundEventIds.generateOne
-      val eventDate2  = EventDate(generateInstant())
-      upsertProject(compoundId2, projectSlugs.generateOne, eventDate2)
-
-      // ADD_MIN_PROJECT_INFO should not see this one
-      val compoundId3    = compoundEventIds.generateOne
-      val lastEventDate3 = eventDates.generateOne
-      upsertProject(compoundId3, projectSlugs.generateOne, lastEventDate3)
-      upsertCategorySyncTime(compoundId3.projectId,
-                             minprojectinfo.categoryName,
-                             timestampsNotInTheFuture(lastEventDate3.value).generateAs(LastSyncedDate)
-      )
-
-      stats.countEventsByCategoryName().unsafeRunSync() shouldBe Map(
-        membersync.categoryName        -> 3L,
-        commitsync.categoryName        -> 3L,
-        globalcommitsync.categoryName  -> 3L,
-        projectsync.categoryName       -> 3L,
-        minprojectinfo.categoryName    -> 2L,
-        CategoryName("CLEAN_UP_EVENT") -> 0L
-      )
-    }
-
-    "return info about number of events grouped by event_type in the status_change_events_queue" in {
-
-      val type1 = nonEmptyStrings().generateOne
-      insertEventIntoEventsQueue(type1, jsons.generateOne)
-      insertEventIntoEventsQueue(type1, jsons.generateOne)
-
-      val type2 = nonEmptyStrings().generateOne
-      insertEventIntoEventsQueue(type2, jsons.generateOne)
-
-      stats.countEventsByCategoryName().unsafeRunSync() shouldBe Map(
-        CategoryName(type1)            -> 2L,
-        CategoryName(type2)            -> 1L,
-        membersync.categoryName        -> 0L,
-        commitsync.categoryName        -> 0L,
-        globalcommitsync.categoryName  -> 0L,
-        projectsync.categoryName       -> 0L,
-        minprojectinfo.categoryName    -> 0L,
-        CategoryName("CLEAN_UP_EVENT") -> 0L
-      )
-    }
-
-    "return info about number of events in the clean_up_events_queue" in {
-
-      val eventsCount = positiveInts(max = 20).generateOne.value
-      1 to eventsCount foreach { _ =>
-        insertCleanUpEvent(projectIds.generateOne, projectSlugs.generateOne, OffsetDateTime.now())
+          _ <- stats.countEventsByCategoryName().asserting {
+                 _ shouldBe Map(
+                   membersync.categoryName        -> 3L,
+                   commitsync.categoryName        -> 3L,
+                   globalcommitsync.categoryName  -> 2L,
+                   projectsync.categoryName       -> 3L,
+                   minprojectinfo.categoryName    -> 3L,
+                   CategoryName("CLEAN_UP_EVENT") -> 0L
+                 )
+               }
+        } yield Succeeded
       }
 
-      stats.countEventsByCategoryName().unsafeRunSync() shouldBe Map(
-        CategoryName("CLEAN_UP_EVENT") -> eventsCount.toLong,
-        membersync.categoryName        -> 0L,
-        commitsync.categoryName        -> 0L,
-        globalcommitsync.categoryName  -> 0L,
-        projectsync.categoryName       -> 0L,
-        minprojectinfo.categoryName    -> 0L
-      )
+    "return info about number of events grouped by categoryName for the projectSync category" in testDBResource.use {
+      implicit cfg =>
+        for {
+          project1 <- consumerProjects.generateOne.pure[IO]
+          _        <- upsertProject(project1, EventDate(generateInstant(lessThanAgo = Duration.ofDays(7))))
+          _ <- upsertCategorySyncTime(project1.id,
+                                      globalcommitsync.categoryName,
+                                      LastSyncedDate(generateInstant(moreThanAgo = Duration.ofDays(7)))
+               )
+
+          _ <- upsertProject(consumerProjects.generateOne, EventDate(generateInstant()))
+
+          // PROJECT_SYNC should not see this one
+          project3 <- consumerProjects.generateOne.pure[IO]
+          _        <- upsertProject(project3, EventDate(generateInstant(moreThanAgo = Duration.ofDays(7))))
+          _ <- upsertCategorySyncTime(project3.id,
+                                      projectsync.categoryName,
+                                      LastSyncedDate(generateInstant(lessThanAgo = Duration.ofHours(23)))
+               )
+
+          _ <- stats.countEventsByCategoryName().asserting {
+                 _ shouldBe Map(
+                   membersync.categoryName        -> 3L,
+                   commitsync.categoryName        -> 3L,
+                   globalcommitsync.categoryName  -> 3L,
+                   projectsync.categoryName       -> 2L,
+                   minprojectinfo.categoryName    -> 3L,
+                   CategoryName("CLEAN_UP_EVENT") -> 0L
+                 )
+               }
+        } yield Succeeded
+    }
+
+    "return info about number of events grouped by categoryName for the minProjectInfo category" in testDBResource.use {
+      implicit cfg =>
+        for {
+          project1 <- consumerProjects.generateOne.pure[IO]
+          _        <- upsertProject(project1, EventDate(generateInstant(lessThanAgo = Duration.ofDays(7))))
+          _ <- upsertCategorySyncTime(project1.id,
+                                      globalcommitsync.categoryName,
+                                      LastSyncedDate(generateInstant(moreThanAgo = Duration.ofDays(7)))
+               )
+
+          _ <- upsertProject(consumerProjects.generateOne, EventDate(generateInstant()))
+
+          // ADD_MIN_PROJECT_INFO should not see this one
+          project3 <- consumerProjects.generateOne.pure[IO]
+          lastEventDate3 = eventDates.generateOne
+          _ <- upsertProject(project3, lastEventDate3)
+          _ <- upsertCategorySyncTime(project3.id,
+                                      minprojectinfo.categoryName,
+                                      timestampsNotInTheFuture(lastEventDate3.value).generateAs(LastSyncedDate)
+               )
+
+          _ <- stats.countEventsByCategoryName().asserting {
+                 _ shouldBe Map(
+                   membersync.categoryName        -> 3L,
+                   commitsync.categoryName        -> 3L,
+                   globalcommitsync.categoryName  -> 3L,
+                   projectsync.categoryName       -> 3L,
+                   minprojectinfo.categoryName    -> 2L,
+                   CategoryName("CLEAN_UP_EVENT") -> 0L
+                 )
+               }
+        } yield Succeeded
+    }
+
+    "return info about number of events grouped by event_type in the status_change_events_queue" in testDBResource.use {
+      implicit cfg =>
+        for {
+          type1 <- nonEmptyStrings().generateOne.pure[IO]
+          _     <- insertEventIntoEventsQueue(type1, jsons.generateOne)
+          _     <- insertEventIntoEventsQueue(type1, jsons.generateOne)
+
+          type2 = nonEmptyStrings().generateOne
+          _ <- insertEventIntoEventsQueue(type2, jsons.generateOne)
+
+          _ <- stats.countEventsByCategoryName().asserting {
+                 _ shouldBe Map(
+                   CategoryName(type1)            -> 2L,
+                   CategoryName(type2)            -> 1L,
+                   membersync.categoryName        -> 0L,
+                   commitsync.categoryName        -> 0L,
+                   globalcommitsync.categoryName  -> 0L,
+                   projectsync.categoryName       -> 0L,
+                   minprojectinfo.categoryName    -> 0L,
+                   CategoryName("CLEAN_UP_EVENT") -> 0L
+                 )
+               }
+        } yield Succeeded
+    }
+
+    "return info about number of events in the clean_up_events_queue" in testDBResource.use { implicit cfg =>
+      val eventsCount = positiveInts(max = 20).generateOne.value
+      for {
+        _ <- (1 to eventsCount).toList.traverse_(_ => insertCleanUpEvent(consumerProjects.generateOne))
+
+        _ <- stats.countEventsByCategoryName().asserting {
+               _ shouldBe Map(
+                 CategoryName("CLEAN_UP_EVENT") -> eventsCount.toLong,
+                 membersync.categoryName        -> 0L,
+                 commitsync.categoryName        -> 0L,
+                 globalcommitsync.categoryName  -> 0L,
+                 projectsync.categoryName       -> 0L,
+                 minprojectinfo.categoryName    -> 0L
+               )
+             }
+      } yield Succeeded
     }
   }
 
   "statuses" should {
 
-    "return info about number of events grouped by status" in {
+    "return info about number of events grouped by status" in testDBResource.use { implicit cfg =>
       val statuses = eventStatuses.generateNonEmptyList().toList
 
-      statuses foreach store
-
-      stats.statuses().unsafeRunSync() shouldBe Map(
-        New                                 -> statuses.count(_ == New),
-        GeneratingTriples                   -> statuses.count(_ == GeneratingTriples),
-        TriplesGenerated                    -> statuses.count(_ == TriplesGenerated),
-        TransformingTriples                 -> statuses.count(_ == TransformingTriples),
-        TriplesStore                        -> statuses.count(_ == TriplesStore),
-        Skipped                             -> statuses.count(_ == Skipped),
-        GenerationRecoverableFailure        -> statuses.count(_ == GenerationRecoverableFailure),
-        GenerationNonRecoverableFailure     -> statuses.count(_ == GenerationNonRecoverableFailure),
-        TransformationRecoverableFailure    -> statuses.count(_ == TransformationRecoverableFailure),
-        TransformationNonRecoverableFailure -> statuses.count(_ == TransformationNonRecoverableFailure),
-        Deleting                            -> statuses.count(_ == Deleting),
-        AwaitingDeletion                    -> statuses.count(_ == AwaitingDeletion)
-      )
+      statuses.traverse_(store) >>
+        stats.statuses().asserting {
+          _ shouldBe Map(
+            New                                 -> statuses.count(_ == New),
+            GeneratingTriples                   -> statuses.count(_ == GeneratingTriples),
+            TriplesGenerated                    -> statuses.count(_ == TriplesGenerated),
+            TransformingTriples                 -> statuses.count(_ == TransformingTriples),
+            TriplesStore                        -> statuses.count(_ == TriplesStore),
+            Skipped                             -> statuses.count(_ == Skipped),
+            GenerationRecoverableFailure        -> statuses.count(_ == GenerationRecoverableFailure),
+            GenerationNonRecoverableFailure     -> statuses.count(_ == GenerationNonRecoverableFailure),
+            TransformationRecoverableFailure    -> statuses.count(_ == TransformationRecoverableFailure),
+            TransformationNonRecoverableFailure -> statuses.count(_ == TransformationNonRecoverableFailure),
+            Deleting                            -> statuses.count(_ == Deleting),
+            AwaitingDeletion                    -> statuses.count(_ == AwaitingDeletion)
+          )
+        }
     }
   }
 
   "countEvents" should {
 
-    "return info about number of events with the given status in the queue grouped by projects" in {
-      val events = generateEventsFor(
-        projectSlugs.generateNonEmptyList(min = 2, max = 8).toList
-      )
+    "return info about number of events with the given status in the queue grouped by projects" in testDBResource.use {
+      implicit cfg =>
+        for {
+          events <- generateEventsFor(consumerProjects.generateNonEmptyList(min = 2, max = 8).toList)
 
-      events foreach store
-
-      stats.countEvents(Set(New, GenerationRecoverableFailure)).unsafeRunSync() shouldBe events
-        .groupBy(_._1)
-        .map { case (projectSlug, sameProjectGroup) =>
-          projectSlug -> sameProjectGroup.count { case (_, _, status, _) =>
-            Set(New, GenerationRecoverableFailure) contains status
-          }
-        }
-        .filter { case (_, count) => count > 0 }
+          _ <- stats.countEvents(Set(New, GenerationRecoverableFailure)).asserting {
+                 _ shouldBe events
+                   .groupBy(_.project.slug)
+                   .map { case (projectSlug, sameProjectGroup) =>
+                     projectSlug -> sameProjectGroup.count { ev =>
+                       Set(New, GenerationRecoverableFailure) contains ev.status
+                     }
+                   }
+                   .filter { case (_, count) => count > 0 }
+               }
+        } yield Succeeded
     }
 
-    "return info about number of events with the given status in the queue from the first given number of projects" in {
-      val projectSlugsList = nonEmptyList(projectSlugs, min = 3, max = 8).generateOne
-      val events           = generateEventsFor(projectSlugsList.toList)
+    "return info about number of events with the given status in the queue from the first given number of projects" in testDBResource
+      .use { implicit cfg =>
+        val limit: Int Refined Positive = 2
+        for {
+          events <- generateEventsFor(consumerProjects.generateList(min = 3, max = 8))
 
-      events foreach store
-
-      val limit: Int Refined Positive = 2
-
-      stats.countEvents(Set(New, GenerationRecoverableFailure), Some(limit)).unsafeRunSync() shouldBe events
-        .groupBy(_._1)
-        .toSeq
-        .sortBy { case (_, sameProjectGroup) =>
-          val (_, _, _, maxEventDate) = sameProjectGroup.maxBy { case (_, _, _, eventDate) => eventDate }
-          maxEventDate
-        }
-        .reverse
-        .map { case (projectSlug, sameProjectGroup) =>
-          projectSlug -> sameProjectGroup.count { case (_, _, status, _) =>
-            Set(New, GenerationRecoverableFailure) contains status
-          }
-        }
-        .filter { case (_, count) => count > 0 }
-        .take(limit.value)
-        .toMap
-    }
-  }
-
-  private implicit val metricsRegistry:  TestMetricsRegistry[IO]   = TestMetricsRegistry[IO]
-  private implicit val queriesExecTimes: QueriesExecutionTimes[IO] = QueriesExecutionTimes[IO]().unsafeRunSync()
-  private lazy val stats = new StatsFinderImpl[IO]
-
-  private def store: ((Slug, EventId, EventStatus, EventDate)) => Unit = {
-    case (projectSlug, eventId, status, eventDate) =>
-      storeEvent(
-        CompoundEventId(eventId, GitLabId(Math.abs(projectSlug.value.hashCode))),
-        status,
-        executionDates.generateOne,
-        eventDate,
-        eventBodies.generateOne,
-        projectSlug = projectSlug
-      )
-  }
-
-  private def store(status: EventStatus): Unit =
-    storeEvent(compoundEventIds.generateOne,
-               status,
-               executionDates.generateOne,
-               eventDates.generateOne,
-               eventBodies.generateOne
-    )
-
-  private def generateEventsFor(projectSlugs: List[Slug]) =
-    projectSlugs flatMap { projectSlug =>
-      nonEmptyList(eventData, max = 20).generateOne.toList.map { case (commitId, status, eventDate) =>
-        (projectSlug, commitId, status, eventDate)
+          _ <- stats.countEvents(Set(New, GenerationRecoverableFailure), Some(limit)).asserting {
+                 _ shouldBe events
+                   .groupBy(_.project.slug)
+                   .toSeq
+                   .sortBy { case (_, sameProjectGroup) => sameProjectGroup.maxBy(_.eventDate).eventDate }
+                   .reverse
+                   .map { case (projectSlug, sameProjectGroup) =>
+                     projectSlug -> sameProjectGroup.count { ev =>
+                       Set(New, GenerationRecoverableFailure) contains ev.status
+                     }
+                   }
+                   .filter { case (_, count) => count > 0 }
+                   .take(limit.value)
+                   .toMap
+               }
+        } yield Succeeded
       }
-    }
+  }
 
-  private val eventData = for {
-    eventId   <- eventIds
-    status    <- eventStatuses
-    eventDate <- eventDates
-  } yield (eventId, status, eventDate)
+  private def stats(implicit cfg: DBConfig[EventLogDB]) = {
+    implicit val qet: QueriesExecutionTimes[IO] = TestQueriesExecutionTimes[IO]
+    new StatsFinderImpl[IO]
+  }
+
+  private def store(status: EventStatus)(implicit cfg: DBConfig[EventLogDB]): IO[GeneratedEvent] =
+    storeGeneratedEvent(status, eventDates.generateOne, consumerProjects.generateOne)
+
+  private def generateEventsFor(projects: List[Project])(implicit cfg: DBConfig[EventLogDB]) =
+    projects
+      .map(storeGeneratedEvent(eventStatuses.generateOne, eventDates.generateOne, _))
+      .sequence
 
   private def generateInstant(lessThanAgo: Duration = Duration.ofDays(365 * 5), moreThanAgo: Duration = Duration.ZERO) =
     timestamps(min = Instant.now.minus(lessThanAgo), max = Instant.now.minus(moreThanAgo)).generateOne

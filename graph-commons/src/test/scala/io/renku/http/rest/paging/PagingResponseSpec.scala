@@ -1,5 +1,5 @@
 /*
- * Copyright 2023 Swiss Data Science Center (SDSC)
+ * Copyright 2024 Swiss Data Science Center (SDSC)
  * A partnership between École Polytechnique Fédérale de Lausanne (EPFL) and
  * Eidgenössische Technische Hochschule Zürich (ETHZ).
  *
@@ -20,7 +20,7 @@ package io.renku.http.rest.paging
 
 import cats.syntax.all._
 import eu.timepit.refined.api.Refined
-import io.circe.Json
+import io.circe.{Decoder, Json}
 import io.renku.generators.CommonGraphGenerators._
 import io.renku.generators.Generators._
 import io.renku.generators.Generators.Implicits._
@@ -182,10 +182,10 @@ class PagingResponseSpec
 
     import cats.effect.IO
     import io.circe.syntax._
-    import io.renku.http.server.EndpointTester._
     import org.http4s.MediaType.application
     import org.http4s.Status._
     import org.http4s.headers.`Content-Type`
+    import io.renku.http.RenkuEntityCodec._
 
     "return Ok with response results in Json body and paging headers" in {
 
@@ -194,10 +194,10 @@ class PagingResponseSpec
 
       val httpResponse = response.toHttpResponse[IO, UrlTestType]
 
-      httpResponse.status                         shouldBe Ok
-      httpResponse.contentType                    shouldBe Some(`Content-Type`(application.json))
-      httpResponse.headers.headers                  should contain allElementsOf PagingHeaders.from(response)
-      httpResponse.as[List[Json]].unsafeRunSync() shouldBe response.results.map(_.asJson)
+      httpResponse.status        shouldBe Ok
+      httpResponse.contentType   shouldBe Some(`Content-Type`(application.json))
+      httpResponse.headers.headers should contain allElementsOf PagingHeaders.from(response)
+      httpResponse.asJson(Decoder.decodeList[Json]).unsafeRunSync() shouldBe response.results.map(_.asJson)
     }
   }
 

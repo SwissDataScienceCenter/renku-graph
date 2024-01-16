@@ -1,5 +1,5 @@
 /*
- * Copyright 2023 Swiss Data Science Center (SDSC)
+ * Copyright 2024 Swiss Data Science Center (SDSC)
  * A partnership between École Polytechnique Fédérale de Lausanne (EPFL) and
  * Eidgenössische Technische Hochschule Zürich (ETHZ).
  *
@@ -24,15 +24,15 @@ import cats.data.EitherT
 import cats.effect.kernel.Async
 import cats.syntax.all._
 import io.renku.config.ServiceUrl
-import io.renku.graph.model.{GitLabUrl, projects}
 import io.renku.graph.model.events.CommitId
+import io.renku.graph.model.{GitLabUrl, projects}
 import io.renku.http.client.AccessToken
 import io.renku.http.client.AccessToken._
 import io.renku.jsonld.JsonLD
 import io.renku.jsonld.parser._
 import io.renku.tinytypes.{TinyType, TinyTypeFactory}
-import io.renku.triplesgenerator.errors.{ProcessingNonRecoverableError, ProcessingRecoverableError}
 import io.renku.triplesgenerator.errors.ProcessingRecoverableError._
+import io.renku.triplesgenerator.errors.{ProcessingNonRecoverableError, ProcessingRecoverableError}
 import io.renku.triplesgenerator.events.consumers.awaitinggeneration.CommitEvent
 import org.typelevel.log4cats.Logger
 
@@ -49,23 +49,20 @@ private object Commands {
   object RepositoryPath extends TinyTypeFactory[RepositoryPath](new RepositoryPath(_))
 
   trait GitLabRepoUrlFinder[F[_]] {
-    def findRepositoryUrl(projectSlug: projects.Slug)(implicit maybeAccessToken: Option[AccessToken]): F[ServiceUrl]
+    def findRepositoryUrl(projectSlug: projects.Slug)(implicit at: AccessToken): F[ServiceUrl]
   }
 
   class GitLabRepoUrlFinderImpl[F[_]: MonadThrow](gitLabUrl: GitLabUrl) extends GitLabRepoUrlFinder[F] {
 
     import java.net.URI
 
-    override def findRepositoryUrl(projectSlug: projects.Slug)(implicit
-        maybeAccessToken: Option[AccessToken]
-    ): F[ServiceUrl] =
-      merge(gitLabUrl, findUrlTokenPart(maybeAccessToken), projectSlug)
+    override def findRepositoryUrl(projectSlug: projects.Slug)(implicit at: AccessToken): F[ServiceUrl] =
+      merge(gitLabUrl, findUrlTokenPart(at), projectSlug)
 
-    private lazy val findUrlTokenPart: Option[AccessToken] => String = {
-      case None                              => ""
-      case Some(ProjectAccessToken(token))   => s"oauth2:$token@"
-      case Some(UserOAuthAccessToken(token)) => s"oauth2:$token@"
-      case Some(PersonalAccessToken(token))  => s"gitlab-ci-token:$token@"
+    private lazy val findUrlTokenPart: AccessToken => String = {
+      case ProjectAccessToken(token)   => s"oauth2:$token@"
+      case UserOAuthAccessToken(token) => s"oauth2:$token@"
+      case PersonalAccessToken(token)  => s"gitlab-ci-token:$token@"
     }
 
     private def merge(gitLabUrl: GitLabUrl, urlTokenPart: String, projectSlug: projects.Slug): F[ServiceUrl] =
@@ -92,7 +89,7 @@ private object Commands {
     def apply[F[_]: MonadThrow: Logger]: File[F] = new FileImpl[F]
   }
 
-  class FileImpl[F[_]: MonadThrow: Logger] extends File[F] {
+  private class FileImpl[F[_]: MonadThrow: Logger] extends File[F] {
 
     override def mkdir(newDir: Path): F[Path] = MonadThrow[F].catchNonFatal {
       ops.mkdir ! newDir

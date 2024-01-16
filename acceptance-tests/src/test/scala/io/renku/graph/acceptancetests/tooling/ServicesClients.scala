@@ -1,5 +1,5 @@
 /*
- * Copyright 2023 Swiss Data Science Center (SDSC)
+ * Copyright 2024 Swiss Data Science Center (SDSC)
  * A partnership between École Polytechnique Fédérale de Lausanne (EPFL) and
  * Eidgenössische Technische Hochschule Zürich (ETHZ).
  *
@@ -20,22 +20,24 @@ package io.renku.graph.acceptancetests.tooling
 
 import cats.Monad
 import cats.effect.unsafe.IORuntime
-import cats.effect.{Async, IO, Temporal}
+import cats.effect.{IO, Temporal}
 import cats.syntax.all._
 import eu.timepit.refined.api.Refined
 import eu.timepit.refined.auto._
 import eu.timepit.refined.string.Url
 import io.circe.generic.semiauto.deriveDecoder
-import io.circe.{Decoder, Json}
 import io.circe.literal._
+import io.circe.{Decoder, Json}
 import io.renku.control.Throttler
 import io.renku.graph.acceptancetests.tooling.ServiceClient.ClientResponse
 import io.renku.graph.model.events.{EventId, EventStatus}
 import io.renku.graph.model.projects
-import io.renku.http.client.{AccessToken, BasicAuthCredentials, RestClient}
+import io.renku.http.RenkuEntityCodec
+import io.renku.http.client.{AccessToken, BasicAuthCredentials, GitLabClient, RestClient}
 import io.renku.http.tinytypes.TinyTypeURIEncoder._
 import io.renku.webhookservice.crypto.HookTokenCrypto
 import io.renku.webhookservice.model.HookToken
+import io.renku.tinytypes.json.TinyTypeDecoders._
 import org.http4s.Status.{Accepted, Ok}
 import org.http4s.circe.CirceEntityCodec.circeEntityDecoder
 import org.http4s.implicits._
@@ -105,11 +107,10 @@ object KnowledgeGraphClient {
     override val baseUrl: String Refined Url = "http://localhost:9004"
 
     def `GET /knowledge-graph/ontology`(implicit ioRuntime: IORuntime): (Status, Headers, String) = {
-      import io.renku.http.server.EndpointTester.stringEntityDecoder
       val responseMapping: PartialFunction[(Status, Request[IO], Response[IO]), IO[(Status, Headers, String)]] = {
         case (status, _, response) =>
           response
-            .as[String](implicitly[Async[IO]], stringEntityDecoder)
+            .as[String]
             .map(pageBody => (status, response.headers, pageBody))
       }
 
@@ -128,7 +129,6 @@ object EventLogClient {
       status:  EventStatus
   )
   object ProjectEvent {
-    import io.renku.tinytypes.json.TinyTypeDecoders._
 
     final case class Project(id: projects.GitLabId, slug: projects.Slug)
     object Project {
@@ -188,22 +188,20 @@ object EventLogClient {
 }
 
 abstract class ServiceClient(implicit logger: Logger[IO])
-    extends RestClient[IO, ServiceClient](Throttler.noThrottling, retryInterval = 500 millis, maxRetries = 1) {
+    extends RestClient[IO, ServiceClient](Throttler.noThrottling, retryInterval = 500 millis, maxRetries = 1)
+    with RenkuEntityCodec {
 
   import ServiceClient.ServiceReadiness
   import ServiceClient.ServiceReadiness._
   import cats.syntax.all._
-  import org.http4s.circe.jsonEncoderOf
-  import org.http4s.{EntityEncoder, Method, Request, Response, Status}
-
-  protected implicit val jsonEntityEncoder: EntityEncoder[IO, Json] = jsonEncoderOf[IO, Json]
+  import org.http4s.{Method, Request, Response, Status}
 
   val baseUrl: String Refined Url
 
   def POST(url: String, accessToken: AccessToken)(implicit ioRuntime: IORuntime): ClientResponse = {
     for {
       uri      <- validateUri(s"$baseUrl/$url")
-      response <- send(request(Method.POST, uri, accessToken))(mapResponse)
+      response <- send(GitLabClient.request[IO](Method.POST, uri, accessToken.some))(mapResponse)
     } yield response
   }.unsafeRunSync()
 
@@ -212,7 +210,7 @@ abstract class ServiceClient(implicit logger: Logger[IO])
   ): Status = {
     validateUri(s"$baseUrl/$url") >>=
       (url =>
-        send(request(Method.POST, url, maybeAccessToken).withEntity(payload)) { case (status, _, _) =>
+        send(GitLabClient.request[IO](Method.POST, url, maybeAccessToken).withEntity(payload)) { case (status, _, _) =>
           status.pure[IO]
         }
       )
@@ -223,8 +221,9 @@ abstract class ServiceClient(implicit logger: Logger[IO])
   ): Status = {
     for {
       uri <- validateUri(s"$baseUrl/$url")
-      status <- send(request(Method.PUT, uri, maybeAccessToken) withEntity payload) { case (status, _, _) =>
-                  status.pure[IO]
+      status <- send(GitLabClient.request[IO](Method.PUT, uri, maybeAccessToken) withEntity payload) {
+                  case (status, _, _) =>
+                    status.pure[IO]
                 }
     } yield status
   }.unsafeRunSync()
@@ -239,14 +238,14 @@ abstract class ServiceClient(implicit logger: Logger[IO])
   def DELETE(url: String, accessToken: AccessToken)(implicit ioRuntime: IORuntime): ClientResponse = {
     for {
       uri      <- validateUri(s"$baseUrl/$url")
-      response <- send(request(Method.DELETE, uri, accessToken.some))(mapResponse)
+      response <- send(GitLabClient.request[IO](Method.DELETE, uri, accessToken.some))(mapResponse)
     } yield response
   }.unsafeRunSync()
 
   def GET(url: String, accessToken: AccessToken)(implicit ioRuntime: IORuntime): ClientResponse = {
     for {
       uri      <- validateUri(s"$baseUrl/$url")
-      response <- send(request(Method.GET, uri, accessToken.some))(mapResponse)
+      response <- send(GitLabClient.request[IO](Method.GET, uri, accessToken.some))(mapResponse)
     } yield response
   }.unsafeRunSync()
 

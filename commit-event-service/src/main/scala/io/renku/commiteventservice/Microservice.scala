@@ -1,5 +1,5 @@
 /*
- * Copyright 2023 Swiss Data Science Center (SDSC)
+ * Copyright 2024 Swiss Data Science Center (SDSC)
  * A partnership between École Polytechnique Fédérale de Lausanne (EPFL) and
  * Eidgenössische Technische Hochschule Zürich (ETHZ).
  *
@@ -21,18 +21,18 @@ package io.renku.commiteventservice
 import cats.effect.{Async, ExitCode, IO, Ref, Resource, Spawn}
 import cats.syntax.all._
 import io.renku.config.certificates.CertificateLoader
-import io.renku.config.sentry.SentryInitializer
 import io.renku.events.consumers
 import io.renku.events.consumers.EventConsumersRegistry
-import io.renku.graph.tokenrepository.AccessTokenFinder
 import io.renku.http.client.GitLabClient
 import io.renku.http.server.HttpServer
-import io.renku.logging.{ApplicationLogger, ExecutionTimeRecorder}
-import io.renku.metrics.{MetricsRegistry, RoutesMetrics}
-import io.renku.microservices.{IOMicroservice, ResourceUse, ServiceReadinessChecker}
+import io.renku.logging.{ApplicationLogger, ExecutionTimeRecorder, ExecutionTimeRecorderLoader}
+import io.renku.metrics.{MetricsRegistry, MetricsRegistryLoader, RoutesMetrics}
+import io.renku.microservices.{IOMicroservice, ServiceReadinessChecker}
 import org.typelevel.log4cats.Logger
 import com.comcast.ip4s._
 import fs2.concurrent.{Signal, SignallingRef}
+import io.renku.config.sentry.SentryInitializer
+import io.renku.utils.common.ResourceUse
 import org.http4s.server.Server
 
 object Microservice extends IOMicroservice {
@@ -41,10 +41,9 @@ object Microservice extends IOMicroservice {
   private implicit val logger: Logger[IO] = ApplicationLogger
 
   override def run(args: List[String]): IO[ExitCode] = for {
-    implicit0(mr: MetricsRegistry[IO])        <- MetricsRegistry[IO]()
-    implicit0(etr: ExecutionTimeRecorder[IO]) <- ExecutionTimeRecorder[IO]()
+    implicit0(mr: MetricsRegistry[IO])        <- MetricsRegistryLoader[IO]()
+    implicit0(etr: ExecutionTimeRecorder[IO]) <- ExecutionTimeRecorderLoader[IO]()
     implicit0(gc: GitLabClient[IO])           <- GitLabClient[IO]()
-    implicit0(acf: AccessTokenFinder[IO])     <- AccessTokenFinder[IO]()
     certificateLoader                         <- CertificateLoader[IO]
     sentryInitializer                         <- SentryInitializer[IO]
     commitSyncCategory                        <- events.consumers.commitsync.SubscriptionFactory[IO]

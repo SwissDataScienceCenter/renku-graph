@@ -1,5 +1,5 @@
 /*
- * Copyright 2023 Swiss Data Science Center (SDSC)
+ * Copyright 2024 Swiss Data Science Center (SDSC)
  * A partnership between École Polytechnique Fédérale de Lausanne (EPFL) and
  * Eidgenössische Technische Hochschule Zürich (ETHZ).
  *
@@ -95,9 +95,16 @@ object Generators {
 
   implicit val templateRepositoryUrls: Gen[templates.RepositoryUrl] = httpUrls().toGeneratorOf(templates.RepositoryUrl)
   implicit val templateIdentifiers:    Gen[templates.Identifier]    = noDashUuid.toGeneratorOf(templates.Identifier)
+  implicit val templateRefs:           Gen[templates.Ref]           = semanticVersions.toGeneratorOf(templates.Ref)
+  implicit val templateParams: Gen[templates.Parameters] =
+    jsons.toGeneratorOfList(min = 1).toGeneratorOf(templates.Parameters)
 
   implicit val templatesGen: Gen[Template] =
-    (templateRepositoryUrls, templateIdentifiers).mapN(Template.apply)
+    (templateRepositoryUrls,
+     templateIdentifiers,
+     templateRefs.toGeneratorOfOptions,
+     templateParams.toGeneratorOfOptions
+    ).mapN(Template.apply)
 
   implicit lazy val newProjectsGen: Gen[NewProject] =
     (projectRepositories,

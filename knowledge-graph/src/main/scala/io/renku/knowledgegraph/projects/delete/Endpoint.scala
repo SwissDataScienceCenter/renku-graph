@@ -1,5 +1,5 @@
 /*
- * Copyright 2023 Swiss Data Science Center (SDSC)
+ * Copyright 2024 Swiss Data Science Center (SDSC)
  * A partnership between École Polytechnique Fédérale de Lausanne (EPFL) and
  * Eidgenössische Technische Hochschule Zürich (ETHZ).
  *
@@ -25,6 +25,7 @@ import io.renku.data.Message
 import io.renku.eventlog.api.events.CommitSyncRequest
 import io.renku.events.consumers.Project
 import io.renku.graph.model.projects
+import io.renku.http.RenkuEntityCodec
 import io.renku.http.client.{AccessToken, GitLabClient}
 import io.renku.http.server.security.model.AuthUser
 import io.renku.metrics.MetricsRegistry
@@ -54,6 +55,7 @@ private class EndpointImpl[F[_]: Async: Logger](glProjectFinder: GLProjectFinder
                                                 tgClient:            triplesgenerator.api.events.Client[F],
                                                 waitBeforeNextCheck: Duration = 1 second
 ) extends Http4sDsl[F]
+    with RenkuEntityCodec
     with Endpoint[F] {
 
   import projectRemover.deleteProject

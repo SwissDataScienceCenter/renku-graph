@@ -1,5 +1,5 @@
 /*
- * Copyright 2023 Swiss Data Science Center (SDSC)
+ * Copyright 2024 Swiss Data Science Center (SDSC)
  * A partnership between École Polytechnique Fédérale de Lausanne (EPFL) and
  * Eidgenössische Technische Hochschule Zürich (ETHZ).
  *
@@ -99,8 +99,6 @@ private class EdgesFinderImpl[F[_]: Async: Logger: SparqlQueryTimeRecorder](
   private implicit val edgesDecoder: Decoder[Set[EdgeData]] = {
     import io.renku.tinytypes.json.TinyTypeDecoders._
 
-    implicit val locationDecoder: Decoder[Node.Location] = stringDecoder(Node.Location)
-
     implicit lazy val edgeDecoder: Decoder[EdgeData] = { cursor =>
       for {
         activityId     <- cursor.downField("activity").downField("value").as[EntityId]
@@ -155,7 +153,7 @@ private class EdgesFinderImpl[F[_]: Async: Logger: SparqlQueryTimeRecorder](
 private object EdgesFinder {
 
   def apply[F[_]: Async: Logger: SparqlQueryTimeRecorder]: F[EdgesFinder[F]] = for {
-    config   <- ProjectsConnectionConfig[F]()
+    config   <- ProjectsConnectionConfig.fromConfig[F]()
     renkuUrl <- RenkuUrlLoader[F]()
   } yield new EdgesFinderImpl[F](config, renkuUrl)
 }

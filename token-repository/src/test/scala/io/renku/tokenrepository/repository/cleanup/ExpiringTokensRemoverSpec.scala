@@ -1,5 +1,5 @@
 /*
- * Copyright 2023 Swiss Data Science Center (SDSC)
+ * Copyright 2024 Swiss Data Science Center (SDSC)
  * A partnership between École Polytechnique Fédérale de Lausanne (EPFL) and
  * Eidgenössische Technische Hochschule Zürich (ETHZ).
  *
@@ -46,10 +46,10 @@ class ExpiringTokensRemoverSpec extends AsyncFlatSpec with AsyncIOSpec with shou
     givenTokensFinding(returning = Stream.emits(tokens))
     tokens foreach { et =>
       givenTokenRemoval(et, returning = deletionResults.generateOne.pure[IO])
-      givenGlobalCommitSyncRequestSending(et, returning = ().pure[IO])
     }
 
-    remover.removeExpiringTokens().assertNoException
+    remover.removeExpiringTokens().assertNoException >>
+      elClient.waitForArrival(tokens.map(t => GlobalCommitSyncRequest(t.project))).assertNoException
   }
 
   it should "retry if process fails" in {
@@ -59,24 +59,29 @@ class ExpiringTokensRemoverSpec extends AsyncFlatSpec with AsyncIOSpec with shou
     val token3 = expiringTokens.generateOne
     givenTokensFinding(returning = Stream(token1, token2, token3))
     givenTokenRemoval(token1, returning = deletionResults.generateOne.pure[IO])
-    givenGlobalCommitSyncRequestSending(token1, returning = ().pure[IO])
     val exception = exceptions.generateOne
     givenTokenRemoval(token2, returning = exception.raiseError[IO, Nothing])
 
     givenTokensFinding(returning = Stream(token2, token3))
     givenTokenRemoval(token2, returning = deletionResults.generateOne.pure[IO])
-    givenGlobalCommitSyncRequestSending(token2, returning = ().pure[IO])
     givenTokenRemoval(token3, returning = deletionResults.generateOne.pure[IO])
-    givenGlobalCommitSyncRequestSending(token3, returning = ().pure[IO])
 
-    remover.removeExpiringTokens().assertNoException
+    remover.removeExpiringTokens().assertNoException >>
+      elClient
+        .waitForArrival(
+          List(GlobalCommitSyncRequest(token1.project),
+               GlobalCommitSyncRequest(token2.project),
+               GlobalCommitSyncRequest(token3.project)
+          )
+        )
+        .assertNoException
   }
 
   private implicit val logger: TestLogger[IO] = TestLogger()
   private val tokensFinder   = mock[ExpiringTokensFinder[IO]]
   private val tokenRemover   = mock[TokenRemover[IO]]
   private val dbTokenRemover = mock[PersistedTokenRemover[IO]]
-  private val elClient       = mock[eventlog.api.events.Client[IO]]
+  private lazy val elClient  = eventlog.api.events.TestClient.collectingMode[IO]
   private lazy val remover = new ExpiringTokensRemoverImpl[IO](tokensFinder,
                                                                tokenRemover,
                                                                dbTokenRemover,
@@ -100,12 +105,6 @@ class ExpiringTokensRemoverSpec extends AsyncFlatSpec with AsyncIOSpec with shou
           .expects(project.id)
           .returning(returning)
     }
-
-  private def givenGlobalCommitSyncRequestSending(expiringToken: ExpiringToken, returning: IO[Unit]) =
-    (elClient
-      .send(_: GlobalCommitSyncRequest))
-      .expects(GlobalCommitSyncRequest(expiringToken.project))
-      .returning(returning)
 
   private lazy val expiringTokens: Gen[ExpiringToken] =
     Gen.oneOf(

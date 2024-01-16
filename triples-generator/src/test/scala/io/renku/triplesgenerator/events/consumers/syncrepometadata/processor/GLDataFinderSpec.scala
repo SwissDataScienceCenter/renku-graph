@@ -1,5 +1,5 @@
 /*
- * Copyright 2023 Swiss Data Science Center (SDSC)
+ * Copyright 2024 Swiss Data Science Center (SDSC)
  * A partnership between École Polytechnique Fédérale de Lausanne (EPFL) and
  * Eidgenössische Technische Hochschule Zürich (ETHZ).
  *
@@ -32,11 +32,11 @@ import io.renku.generators.CommonGraphGenerators.accessTokens
 import io.renku.generators.Generators.Implicits._
 import io.renku.graph.model.RenkuTinyTypeGenerators.projectSlugs
 import io.renku.graph.model.projects
-import io.renku.graph.tokenrepository.AccessTokenFinder
 import io.renku.http.client.RestClient.ResponseMappingF
 import io.renku.http.client.{AccessToken, GitLabClient}
 import io.renku.http.tinytypes.TinyTypeURIEncoder._
 import io.renku.testtools.GitLabClientTools
+import io.renku.tokenrepository.api.TokenRepositoryClient
 import org.http4s.Status.{Forbidden, NotFound, Ok, Unauthorized}
 import org.http4s.circe.CirceEntityEncoder._
 import org.http4s.implicits._
@@ -103,14 +103,14 @@ class GLDataFinderSpec
     }
   }
 
-  private implicit val glClient:          GitLabClient[IO]      = mock[GitLabClient[IO]]
-  private implicit val accessTokenFinder: AccessTokenFinder[IO] = mock[AccessTokenFinder[IO]]
-  private lazy val finder = new GLDataFinderImpl[IO]
+  private implicit val glClient: GitLabClient[IO]          = mock[GitLabClient[IO]]
+  val trClient:                  TokenRepositoryClient[IO] = mock[TokenRepositoryClient[IO]]
+  private lazy val finder = new GLDataFinderImpl[IO](trClient)
 
   private def givenAccessTokenFinding(slug: projects.Slug, returning: IO[Option[AccessToken]]) =
-    (accessTokenFinder
-      .findAccessToken(_: projects.Slug)(_: projects.Slug => String))
-      .expects(slug, *)
+    (trClient
+      .findAccessToken(_: projects.Slug))
+      .expects(slug)
       .returning(returning)
 
   private def givenSingleProjectAPICall(slug:        projects.Slug,

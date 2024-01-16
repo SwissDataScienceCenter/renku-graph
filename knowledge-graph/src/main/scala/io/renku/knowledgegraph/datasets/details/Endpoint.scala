@@ -1,5 +1,5 @@
 /*
- * Copyright 2023 Swiss Data Science Center (SDSC)
+ * Copyright 2024 Swiss Data Science Center (SDSC)
  * A partnership between École Polytechnique Fédérale de Lausanne (EPFL) and
  * Eidgenössische Technische Hochschule Zürich (ETHZ).
  *
@@ -28,8 +28,9 @@ import io.renku.data.Message
 import io.renku.graph.config.{GitLabUrlLoader, RenkuUrlLoader}
 import io.renku.graph.http.server.security.Authorizer.AuthContext
 import io.renku.graph.model.{GitLabUrl, RenkuUrl}
+import io.renku.http.RenkuEntityCodec
 import io.renku.http.rest.Links.Href
-import io.renku.logging.ExecutionTimeRecorder
+import io.renku.logging.{ExecutionTimeRecorder, ExecutionTimeRecorderLoader}
 import io.renku.metrics.MetricsRegistry
 import io.renku.triplesgenerator
 import io.renku.triplesgenerator.api.events.DatasetViewedEvent
@@ -52,10 +53,10 @@ class EndpointImpl[F[_]: MonadThrow: Logger](
     now:                   () => Instant = () => Instant.now()
 )(implicit gitLabUrl: GitLabUrl, renkuApiUrl: renku.ApiUrl, renkuUrl: RenkuUrl)
     extends Http4sDsl[F]
+    with RenkuEntityCodec
     with Endpoint[F] {
 
   import executionTimeRecorder._
-  import org.http4s.circe._
 
   def `GET /datasets/:id`(identifier: RequestedDataset, authContext: AuthContext[RequestedDataset]): F[Response[F]] =
     measureAndLogTime(finishedSuccessfully(identifier)) {
@@ -97,7 +98,7 @@ object Endpoint {
   def apply[F[_]: Async: Logger: SparqlQueryTimeRecorder: MetricsRegistry]: F[Endpoint[F]] = for {
     datasetFinder                        <- DatasetFinder[F]
     tgClient                             <- triplesgenerator.api.events.Client[F]
-    executionTimeRecorder                <- ExecutionTimeRecorder[F]()
+    executionTimeRecorder                <- ExecutionTimeRecorderLoader[F]()
     implicit0(renkuApiUrl: renku.ApiUrl) <- renku.ApiUrl[F]()
     implicit0(renkuUrl: RenkuUrl)        <- RenkuUrlLoader[F]()
     implicit0(gitLabUrl: GitLabUrl)      <- GitLabUrlLoader[F]()

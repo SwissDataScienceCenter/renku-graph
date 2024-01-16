@@ -1,5 +1,5 @@
 /*
- * Copyright 2023 Swiss Data Science Center (SDSC)
+ * Copyright 2024 Swiss Data Science Center (SDSC)
  * A partnership between École Polytechnique Fédérale de Lausanne (EPFL) and
  * Eidgenössische Technische Hochschule Zürich (ETHZ).
  *
@@ -22,6 +22,7 @@ import cats.effect.IO
 import io.renku.data.Message
 import io.renku.generators.Generators.Implicits._
 import io.renku.generators.Generators._
+import io.renku.http.RenkuEntityCodec
 import io.renku.testtools.CustomAsyncIOSpec
 import org.http4s.ParseFailure
 import org.http4s.Status._
@@ -29,7 +30,7 @@ import org.scalacheck.Gen
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AsyncWordSpec
 
-class QueryParameterToolsSpec extends AsyncWordSpec with CustomAsyncIOSpec with should.Matchers {
+class QueryParameterToolsSpec extends AsyncWordSpec with CustomAsyncIOSpec with should.Matchers with RenkuEntityCodec {
 
   import QueryParameterTools._
 

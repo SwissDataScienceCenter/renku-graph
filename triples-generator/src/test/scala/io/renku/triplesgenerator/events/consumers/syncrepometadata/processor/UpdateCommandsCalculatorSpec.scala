@@ -1,5 +1,5 @@
 /*
- * Copyright 2023 Swiss Data Science Center (SDSC)
+ * Copyright 2024 Swiss Data Science Center (SDSC)
  * A partnership between École Polytechnique Fédérale de Lausanne (EPFL) and
  * Eidgenössische Technische Hochschule Zürich (ETHZ).
  *
@@ -20,9 +20,10 @@ package io.renku.triplesgenerator.events.consumers.syncrepometadata.processor
 
 import Generators._
 import cats.effect.IO
+import cats.effect.testing.scalatest.AsyncIOSpec
 import cats.syntax.all._
 import eu.timepit.refined.auto._
-import io.renku.entities.searchgraphs.{SearchInfoDatasets, concatSeparator}
+import io.renku.entities.searchgraphs.{TestSearchInfoDatasets, concatSeparator}
 import io.renku.eventlog.api.events.StatusChangeEvent
 import io.renku.generators.Generators.Implicits._
 import io.renku.graph.model.RenkuTinyTypeGenerators.projectNames
@@ -31,10 +32,9 @@ import io.renku.graph.model.testentities._
 import io.renku.graph.model.{GraphClass, entities, projects}
 import io.renku.interpreters.TestLogger
 import io.renku.jsonld.syntax._
-import io.renku.testtools.CustomAsyncIOSpec
 import io.renku.triplesstore.SparqlQuery.Prefixes
 import io.renku.triplesstore.client.syntax._
-import io.renku.triplesstore.{InMemoryJenaForSpec, ProjectsDataset, SparqlQuery}
+import io.renku.triplesstore.{GraphJenaSpec, ProjectsConnectionConfig, SparqlQuery}
 import org.scalamock.scalatest.AsyncMockFactory
 import org.scalatest.flatspec.AsyncFlatSpec
 import org.scalatest.matchers.should
@@ -45,16 +45,14 @@ import java.time.Instant
 
 class UpdateCommandsCalculatorSpec
     extends AsyncFlatSpec
-    with CustomAsyncIOSpec
+    with AsyncIOSpec
+    with GraphJenaSpec
+    with TestSearchInfoDatasets
     with should.Matchers
     with OptionValues
-    with InMemoryJenaForSpec
-    with ProjectsDataset
-    with SearchInfoDatasets
     with AsyncMockFactory {
 
-  it should "create upsert queries when there's a new name" in {
-
+  it should "create upsert queries when there's a new name" in projectsDSConfig.use { implicit pcc =>
     val project = anyProjectEntities.generateOne.to[entities.Project]
 
     val tsData           = tsDataFrom(project)
@@ -78,38 +76,38 @@ class UpdateCommandsCalculatorSpec
     } yield Succeeded
   }
 
-  it should "create RedoTransformation event if there's a change in visibility" in {
+  it should "create RedoTransformation event if there's a change in visibility" in projectsDSConfig.use {
+    implicit pcc =>
+      val project = anyProjectEntities.generateOne.to[entities.Project]
 
-    val project = anyProjectEntities.generateOne.to[entities.Project]
+      val tsData           = tsDataFrom(project)
+      val glData           = glDataExtracts(project.slug).generateOne
+      val maybePayloadData = payloadDataExtracts.generateOption
 
-    val tsData           = tsDataFrom(project)
-    val glData           = glDataExtracts(project.slug).generateOne
-    val maybePayloadData = payloadDataExtracts.generateOption
+      val newValue = projectVisibilities.generateOne
+      givenNewValuesFinding(tsData,
+                            glData,
+                            maybePayloadData,
+                            returning = NewValues.empty.copy(maybeVisibility = newValue.some)
+      )
 
-    val newValue = projectVisibilities.generateOne
-    givenNewValuesFinding(tsData,
-                          glData,
-                          maybePayloadData,
-                          returning = NewValues.empty.copy(maybeVisibility = newValue.some)
-    )
+      for {
+        _ <- provisionProject(project).assertNoException
 
-    for {
-      _ <- provisionProject(project).assertNoException
+        _ <- dataInProjectGraph(project).asserting(_.value shouldBe tsData)
+        _ <- dataInProjectsGraph(project).asserting(_.value shouldBe tsData)
 
-      _ <- dataInProjectGraph(project).asserting(_.value shouldBe tsData)
-      _ <- dataInProjectsGraph(project).asserting(_.value shouldBe tsData)
+        _ <-
+          updatesCalculator
+            .calculateUpdateCommands(tsData, glData, maybePayloadData)
+            .asserting(_ shouldBe List(UpdateCommand.Event(StatusChangeEvent.RedoProjectTransformation(tsData.slug))))
 
-      _ <- updatesCalculator
-             .calculateUpdateCommands(tsData, glData, maybePayloadData)
-             .asserting(_ shouldBe List(UpdateCommand.Event(StatusChangeEvent.RedoProjectTransformation(tsData.slug))))
-
-      _ <- dataInProjectGraph(project).asserting(_.value shouldBe tsData)
-      _ <- dataInProjectsGraph(project).asserting(_.value shouldBe tsData)
-    } yield Succeeded
+        _ <- dataInProjectGraph(project).asserting(_.value shouldBe tsData)
+        _ <- dataInProjectsGraph(project).asserting(_.value shouldBe tsData)
+      } yield Succeeded
   }
 
-  it should "create upsert queries when there's a new dateModified" in {
-
+  it should "create upsert queries when there's a new dateModified" in projectsDSConfig.use { implicit pcc =>
     val project = anyProjectEntities.generateOne.to[entities.Project]
 
     val tsData           = tsDataFrom(project)
@@ -137,8 +135,7 @@ class UpdateCommandsCalculatorSpec
     } yield Succeeded
   }
 
-  it should "create upsert queries when there's a new description" in {
-
+  it should "create upsert queries when there's a new description" in projectsDSConfig.use { implicit pcc =>
     val project = anyProjectEntities.generateOne.to[entities.Project]
 
     val tsData           = tsDataFrom(project)
@@ -162,8 +159,7 @@ class UpdateCommandsCalculatorSpec
     } yield Succeeded
   }
 
-  it should "create delete queries when description is removed" in {
-
+  it should "create delete queries when description is removed" in projectsDSConfig.use { implicit pcc =>
     val project = anyProjectEntities
       .map(replaceProjectDesc(projectDescriptions.generateSome))
       .generateOne
@@ -189,8 +185,7 @@ class UpdateCommandsCalculatorSpec
     } yield Succeeded
   }
 
-  it should "create upsert queries when there are new keywords" in {
-
+  it should "create upsert queries when there are new keywords" in projectsDSConfig.use { implicit pcc =>
     val project = anyProjectEntities
       .map(replaceProjectKeywords(projectKeywords.generateSet(min = 1)))
       .generateOne
@@ -221,8 +216,7 @@ class UpdateCommandsCalculatorSpec
     } yield Succeeded
   }
 
-  it should "create queries that deletes keywords on removal" in {
-
+  it should "create queries that deletes keywords on removal" in projectsDSConfig.use { implicit pcc =>
     val project = anyProjectEntities
       .map(replaceProjectKeywords(projectKeywords.generateSet(min = 1)))
       .generateOne
@@ -253,8 +247,7 @@ class UpdateCommandsCalculatorSpec
     } yield Succeeded
   }
 
-  it should "create upsert queries when there are new images" in {
-
+  it should "create upsert queries when there are new images" in projectsDSConfig.use { implicit pcc =>
     val project = anyProjectEntities.generateOne.to[entities.Project]
 
     val tsData           = tsDataFrom(project)
@@ -282,8 +275,7 @@ class UpdateCommandsCalculatorSpec
     } yield Succeeded
   }
 
-  it should "create queries that deletes images on removal" in {
-
+  it should "create queries that deletes images on removal" in projectsDSConfig.use { implicit pcc =>
     val project = anyProjectEntities
       .map(replaceImages(imageUris.generateList(min = 1)))
       .generateOne
@@ -314,8 +306,7 @@ class UpdateCommandsCalculatorSpec
     } yield Succeeded
   }
 
-  it should "create queries that inserts keywords when there were none" in {
-
+  it should "create queries that inserts keywords when there were none" in projectsDSConfig.use { implicit pcc =>
     val project = anyProjectEntities.map(replaceProjectKeywords(Set.empty)).generateOne.to[entities.Project]
 
     val tsData           = tsDataFrom(project)
@@ -343,8 +334,7 @@ class UpdateCommandsCalculatorSpec
     } yield Succeeded
   }
 
-  it should "create no upsert queries if there are no new values" in {
-
+  it should "create no upsert queries if there are no new values" in projectsDSConfig.use { implicit pcc =>
     val project = anyProjectEntities.generateOne.to[entities.Project]
 
     val tsData           = tsDataFrom(project)
@@ -363,18 +353,19 @@ class UpdateCommandsCalculatorSpec
     } yield Succeeded
   }
 
-  private implicit val logger: TestLogger[IO] = TestLogger[IO]()
+  implicit override val ioLogger: Logger[IO] = TestLogger[IO]()
   private lazy val newValuesCalculator = mock[NewValuesCalculator]
   private lazy val updatesCalculator   = new UpdateCommandsCalculatorImpl[IO](newValuesCalculator)
 
-  private def execute(queries: List[UpdateCommand]) =
+  private def execute(queries: List[UpdateCommand])(implicit pcc: ProjectsConnectionConfig) =
     queries
       .collect { case q: UpdateCommand.Sparql => q.value }
-      .traverse_(runUpdate(on = projectsDataset, _))
+      .traverse_(runUpdate)
 
-  private def dataInProjectGraph(project: entities.Project): IO[Option[DataExtract.TS]] =
+  private def dataInProjectGraph(project: entities.Project)(implicit
+      pcc: ProjectsConnectionConfig
+  ): IO[Option[DataExtract.TS]] =
     runSelect(
-      on = projectsDataset,
       SparqlQuery.ofUnsafe(
         "UpdateCommandsCalculator Project fetch",
         Prefixes of (renku -> "renku", schema -> "schema"),
@@ -403,9 +394,10 @@ class UpdateCommandsCalculatorSpec
       )
     ).map(toDataExtract).flatMap(toOptionOrFail)
 
-  private def dataInProjectsGraph(project: entities.Project): IO[Option[DataExtract.TS]] =
+  private def dataInProjectsGraph(project: entities.Project)(implicit
+      pcc: ProjectsConnectionConfig
+  ): IO[Option[DataExtract.TS]] =
     runSelect(
-      on = projectsDataset,
       SparqlQuery.ofUnsafe(
         "UpdateCommandsCalculator Projects fetch",
         Prefixes of (renku -> "renku", schema -> "schema"),
@@ -458,6 +450,4 @@ class UpdateCommandsCalculatorSpec
     case h :: Nil => h.some.pure[IO]
     case _        => new Exception("Found more than one row").raiseError[IO, Nothing]
   }
-
-  implicit override val ioLogger: Logger[IO] = TestLogger[IO]()
 }

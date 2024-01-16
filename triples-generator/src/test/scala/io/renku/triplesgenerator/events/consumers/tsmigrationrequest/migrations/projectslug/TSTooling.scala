@@ -1,5 +1,5 @@
 /*
- * Copyright 2023 Swiss Data Science Center (SDSC)
+ * Copyright 2024 Swiss Data Science Center (SDSC)
  * A partnership between École Polytechnique Fédérale de Lausanne (EPFL) and
  * Eidgenössische Technische Hochschule Zürich (ETHZ).
  *
@@ -27,20 +27,26 @@ import io.renku.graph.model.{GraphClass, RenkuUrl, projects}
 import io.renku.jsonld.syntax._
 import io.renku.triplesstore.SparqlQuery.Prefixes
 import io.renku.triplesstore.client.syntax._
-import io.renku.triplesstore.{InMemoryJenaForSpec, ProjectsDataset, SparqlQuery}
+import io.renku.triplesstore.{GraphJenaSpec, ProjectsConnectionConfig, SparqlQuery}
+import org.typelevel.log4cats.Logger
 
 trait TSTooling {
-  self: InMemoryJenaForSpec with ProjectsDataset =>
+  self: GraphJenaSpec =>
 
-  protected def deleteRenkuSlugProps(projects: List[Project])(implicit ru: RenkuUrl): IO[Unit] =
+  protected def deleteRenkuSlugProps(
+      projects: List[Project]
+  )(implicit ru: RenkuUrl, pcc: ProjectsConnectionConfig, L: Logger[IO]): IO[Unit] =
     projects.traverse_(p => deleteRenkuSlugProp(p.resourceId))
 
-  protected def deleteRenkuSlugProp(id: projects.ResourceId): IO[Unit] =
+  protected def deleteRenkuSlugProp(
+      id: projects.ResourceId
+  )(implicit pcc: ProjectsConnectionConfig, L: Logger[IO]): IO[Unit] =
     deleteProjectRenkuSlug(id) >> deleteProjectsRenkuSlug(id)
 
-  protected def deleteProjectRenkuSlug(id: projects.ResourceId): IO[Unit] =
+  protected def deleteProjectRenkuSlug(
+      id: projects.ResourceId
+  )(implicit pcc: ProjectsConnectionConfig, L: Logger[IO]): IO[Unit] =
     runUpdate(
-      on = projectsDataset,
       SparqlQuery.ofUnsafe(
         "test renku:slug delete from Project",
         Prefixes of renku -> "renku",
@@ -55,9 +61,10 @@ trait TSTooling {
       )
     )
 
-  protected def deleteProjectsRenkuSlug(id: projects.ResourceId): IO[Unit] =
+  protected def deleteProjectsRenkuSlug(
+      id: projects.ResourceId
+  )(implicit pcc: ProjectsConnectionConfig, L: Logger[IO]): IO[Unit] =
     runUpdate(
-      on = projectsDataset,
       SparqlQuery.ofUnsafe(
         "test renku:slug delete from Projects",
         Prefixes of renku -> "renku",

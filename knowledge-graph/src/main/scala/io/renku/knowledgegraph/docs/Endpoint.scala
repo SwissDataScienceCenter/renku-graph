@@ -1,5 +1,5 @@
 /*
- * Copyright 2023 Swiss Data Science Center (SDSC)
+ * Copyright 2024 Swiss Data Science Center (SDSC)
  * A partnership between École Polytechnique Fédérale de Lausanne (EPFL) and
  * Eidgenössische Technische Hochschule Zürich (ETHZ).
  *
@@ -37,7 +37,6 @@ object Endpoint {
   def apply[F[_]: Async]: F[Endpoint[F]] = for {
     serviceVersion <- ServiceVersion.readFromConfig[F]()
     endpointsDocs <- List(
-                       datasets.EndpointDocs[F],
                        datasets.details.EndpointDocs[F],
                        entities.EndpointDocs[F],
                        ontology.EndpointDocs[F],

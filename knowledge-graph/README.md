@@ -8,7 +8,6 @@ The following routes may be slightly different when accessed via the main Renku 
 
 | Method | Path                                                                     | Description                                                                          |
 |--------|--------------------------------------------------------------------------|--------------------------------------------------------------------------------------|
-| GET    | ```/knowledge-graph/datasets```                                          | Returns datasets filtered by the given predicates.                                   |
 | GET    | ```/knowledge-graph/datasets/:id```                                      | Returns details of the dataset with the given `id`                                   |
 | GET    | ```/knowledge-graph/entities```                                          | Returns entities filtered by the given predicates`                                   |
 | GET    | ```/knowledge-graph/entities/current-user/recently-viewed```             | Returns entities recently viewed by the user introducing himself with the token.     |
@@ -26,128 +25,6 @@ The following routes may be slightly different when accessed via the main Renku 
 | GET    | ```/metrics```                                                           | Serves Prometheus metrics                                                            |
 | GET    | ```/ping```                                                              | To check if service is healthy                                                       |
 | GET    | ```/version```                                                           | Returns info about service version; same as `GET /knowledge-graph/version`           |
-
-#### GET /knowledge-graph/datasets
-
-Finds datasets which `name`, `description`, `keywords`, or creator `name` matches the given `phrase` or returns all the
-datasets if no `query` parameter is given.
-
-**NOTES:**
-
-* the `query` query parameter has to be url-encoded and it cannot be blank.
-* the `sort` query parameter is optional and defaults to `name:asc`. Allowed property names are: `name`,
-  `datePublished`, `date` and `projectsCount`.
-* the `page` query parameter is optional and defaults to `1`.
-* the `per_page` query parameter is optional and defaults to `20`.
-
-**Response**
-
-| Status                       | Description                                                                                    |
-|------------------------------|------------------------------------------------------------------------------------------------|
-| OK (200)                     | If there are datasets for the project or `[]` if nothing is found                              |
-| BAD_REQUEST (400)            | If the `query` parameter is blank or `sort` is invalid or `page` or `per_page` is not positive |
-| UNAUTHORIZED (401)           | If given auth header cannot be authenticated                                                   |
-| INTERNAL SERVER ERROR (500)  | Otherwise                                                                                      |
-
-Response headers:
-
-| Header        | Description                                                                           |
-|---------------|---------------------------------------------------------------------------------------|
-| `Total`       | The total number of items                                                             |
-| `Total-Pages` | The total number of pages                                                             |
-| `Per-Page`    | The number of items per page                                                          |
-| `Page`        | The index of the current page (starting at 1)                                         |
-| `Next-Page`   | The index of the next page (optional)                                                 |
-| `Prev-Page`   | The index of the previous page (optional)                                             |
-| `Link`        | The set of `prev`/`next`/`first`/`last` link headers (`prev` and `next` are optional) |
-
-Link response header example:
-
-Assuming the total is `30` and the
-URL `https://renku/knowledge-graph/datasets?query=phrase&sort=name:asc&page=2&per_page=10`
-
-```
-Link: <https://renku/knowledge-graph/datasets?query=phrase&sort=name:asc&page=1&per_page=10>; rel="prev"
-Link: <https://renku/knowledge-graph/datasets?query=phrase&sort=name:asc&page=3&per_page=10>; rel="next"
-Link: <https://renku/knowledge-graph/datasets?query=phrase&sort=name:asc&page=1&per_page=10>; rel="first"
-Link: <https://renku/knowledge-graph/datasets?query=phrase&sort=name:asc&page=3&per_page=10>; rel="last"
-```
-
-Response body example:
-
-```json
-[
-   {  
-      "identifier": "9f94add6-6d68-4cf4-91d9-4ba9e6b7dc4c",
-      "name": "mniouUnmal",
-      "slug": "mniouUnmal",      
-      "description": "vbnqyyjmbiBQpubavGpxlconuqj",  // optional property
-      "published": {
-        "datePublished": "2012-10-14", // optional property
-        "creator": [
-          {
-            "name": "e wmtnxmcguz"
-          },
-          {
-            "name": "iilmadw vcxabmh",
-            "email": "ticUnrW@cBmrdomoa"             // optional property
-          }
-        ]
-      },
-      "date": "2012-10-14T03:02:25.639Z",            // either datePublished or dateCreated
-      "projectsCount": 2,
-      "keywords": ["grüezi", "안녕", "잘 지내?"],
-      "images": [
-        {
-          "location": "image.png",
-          "_links":[  
-             {  
-                "rel":  "view",
-                "href": "https://renkulab.io/gitlab/project_slug/raw/master/data/mniouUnmal/image.png"
-             }
-          ]
-        }
-      ],
-      "_links":[  
-         {  
-            "rel":"details",
-            "href":"http://t:5511/datasets/9f94add6-6d68-4cf4-91d9-4ba9e6b7dc4c"
-         }
-      ]
-   },
-   {  
-      "identifier": "a1b1cb86-c664-4250-a1e3-578a8a22dcbb",
-      "name": "a",
-      "published": {
-        "creator": [
-          {
-            "name": "e wmtnxmcguz"
-          }
-        ]
-      },
-      "date": "2012-11-15T10:00:00.000Z",            // either datePublished or dateCreated
-      "projectsCount": 1,
-      "keywords": [],
-      "images": [
-        {
-          "location": "https://blah.com/image.png",
-          "_links":[  
-             {  
-                "rel":  "view",
-                "href": "https://blah.com/image.png"
-             }
-          ]
-        }
-      ],
-      "_links":[  
-         {  
-            "rel":  "details",
-            "href": "http://t:5511/datasets/a1b1cb86-c664-4250-a1e3-578a8a22dcbb"
-         }
-      ]
-   }
-]
-```
 
 #### GET /knowledge-graph/datasets/:id
 
@@ -678,6 +555,15 @@ https://github.com/SwissDataScienceCenter/renku-project-template
 Content-Disposition: form-data; name="templateId"
 
 python-minimal
+------WebKitFormBoundary7MA4YWxkTrZu0gW
+Content-Disposition: form-data; name="templateRef"
+
+0.6.0
+------WebKitFormBoundary7MA4YWxkTrZu0gW
+Content-Disposition: form-data; name="templateParameters"
+Content-Type: application/json
+
+[{"key":"archive_url","value":"http://host/path"}]
 ------WebKitFormBoundary7MA4YWxkTrZu0gW
 Content-Disposition: form-data; name="image"; filename="image.png"
 Content-Type: image/png

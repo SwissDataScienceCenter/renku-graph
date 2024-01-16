@@ -1,5 +1,5 @@
 /*
- * Copyright 2023 Swiss Data Science Center (SDSC)
+ * Copyright 2024 Swiss Data Science Center (SDSC)
  * A partnership between École Polytechnique Fédérale de Lausanne (EPFL) and
  * Eidgenössische Technische Hochschule Zürich (ETHZ).
  *
@@ -18,40 +18,42 @@
 
 package io.renku.eventlog.events.consumers.projectsync
 
-import cats.MonadThrow
 import cats.effect.Async
 import cats.syntax.all._
 import eu.timepit.refined.auto._
 import io.circe.Decoder
 import io.renku.graph.model.projects
-import io.renku.graph.tokenrepository.AccessTokenFinder
-import io.renku.http.client.GitLabClient
 import io.renku.http.client.RestClientError.UnauthorizedException
+import io.renku.http.client.{AccessToken, GitLabClient}
+import io.renku.http.tinytypes.TinyTypeURIEncoder._
+import io.renku.tokenrepository.api.TokenRepositoryClient
 import org.http4s.Status.{Forbidden, InternalServerError, NotFound, Ok, Unauthorized}
 import org.http4s.{EntityDecoder, Request, Response, Status}
+import org.typelevel.log4cats.Logger
 
 private trait GitLabProjectFetcher[F[_]] {
   def fetchGitLabProject(projectId: projects.GitLabId): F[Either[UnauthorizedException, Option[projects.Slug]]]
 }
 
 private object GitLabProjectFetcher {
-  def apply[F[_]: Async: GitLabClient: AccessTokenFinder]: F[GitLabProjectFetcher[F]] =
-    MonadThrow[F].catchNonFatal(new GitLabProjectFetcherImpl[F]).widen
+  def apply[F[_]: Async: GitLabClient: Logger]: F[GitLabProjectFetcher[F]] =
+    TokenRepositoryClient[F].map(new GitLabProjectFetcherImpl[F](_))
 }
 
-private class GitLabProjectFetcherImpl[F[_]: Async: GitLabClient: AccessTokenFinder] extends GitLabProjectFetcher[F] {
+private class GitLabProjectFetcherImpl[F[_]: Async: GitLabClient](trClient: TokenRepositoryClient[F])
+    extends GitLabProjectFetcher[F] {
 
-  private val tokenFinder: AccessTokenFinder[F] = AccessTokenFinder[F]
   import org.http4s.implicits._
-  import tokenFinder._
+  import trClient.findAccessToken
 
   override def fetchGitLabProject(
       projectId: projects.GitLabId
   ): F[Either[UnauthorizedException, Option[projects.Slug]]] =
-    findAccessToken(projectId) >>= { implicit accessToken =>
-      GitLabClient[F].get[Either[UnauthorizedException, Option[projects.Slug]]](uri"projects" / projectId.show,
-                                                                                "single-project"
-      )(mapping)
+    findAccessToken(projectId) >>= {
+      case None =>
+        Option.empty[projects.Slug].asRight[UnauthorizedException].pure[F]
+      case implicit0(at: Option[AccessToken]) =>
+        GitLabClient[F].get(uri"projects" / projectId, "single-project")(mapping)
     }
 
   private lazy val mapping

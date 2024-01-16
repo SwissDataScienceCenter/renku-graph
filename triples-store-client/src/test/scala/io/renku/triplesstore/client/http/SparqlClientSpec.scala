@@ -1,5 +1,5 @@
 /*
- * Copyright 2023 Swiss Data Science Center (SDSC)
+ * Copyright 2024 Swiss Data Science Center (SDSC)
  * A partnership between École Polytechnique Fédérale de Lausanne (EPFL) and
  * Eidgenössische Technische Hochschule Zürich (ETHZ).
  *
@@ -20,20 +20,19 @@ package io.renku.triplesstore.client.http
 
 import cats.effect._
 import cats.effect.testing.scalatest.AsyncIOSpec
+import io.renku.jsonld._
 import io.renku.jsonld.syntax._
-import io.renku.jsonld.{EntityId, EntityTypes, JsonLD, JsonLDEncoder, Schema}
+import io.renku.triplesstore.client.syntax._
+import io.renku.triplesstore.client.util.JenaSpec
 import org.scalatest.flatspec.AsyncFlatSpec
 import org.scalatest.matchers.should
 import org.typelevel.log4cats.Logger
 import org.typelevel.log4cats.slf4j.Slf4jLogger
-import io.renku.triplesstore.client.syntax._
-import io.renku.triplesstore.client.util.JenaContainerSupport
 
 import java.time.Instant
 
-class SparqlClientSpec extends AsyncFlatSpec with AsyncIOSpec with JenaContainerSupport with should.Matchers {
+class SparqlClientSpec extends AsyncFlatSpec with AsyncIOSpec with JenaSpec with should.Matchers {
   implicit val logger: Logger[IO] = Slf4jLogger.getLogger[IO]
-  val dataset = "projects"
 
   val testQuery = sparql"""PREFIX schema: <http://schema.org/>
                           |SELECT * WHERE {
@@ -43,7 +42,7 @@ class SparqlClientSpec extends AsyncFlatSpec with AsyncIOSpec with JenaContainer
                           |} LIMIT 100""".stripMargin
 
   it should "run sparql queries" in {
-    withDataset(dataset).use { c =>
+    testDSResource.use { c =>
       for {
         _ <- c.update(
                sparql"""PREFIX schema: <http://schema.org/>
@@ -74,7 +73,7 @@ class SparqlClientSpec extends AsyncFlatSpec with AsyncIOSpec with JenaContainer
 
   it should "upload jsonld" in {
     val data = Data("http://localhost/project/123", Instant.now())
-    withDataset(dataset).use { c =>
+    testDSResource.use { c =>
       for {
         _ <- c.upload(data.asJsonLD)
         r <- c.queryDecode[Data](SparqlQuery.raw("""PREFIX schema: <http://schema.org/>

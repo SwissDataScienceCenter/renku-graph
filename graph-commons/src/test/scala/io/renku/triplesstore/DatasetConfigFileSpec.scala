@@ -1,5 +1,5 @@
 /*
- * Copyright 2023 Swiss Data Science Center (SDSC)
+ * Copyright 2024 Swiss Data Science Center (SDSC)
  * A partnership between École Polytechnique Fédérale de Lausanne (EPFL) and
  * Eidgenössische Technische Hochschule Zürich (ETHZ).
  *
@@ -18,15 +18,13 @@
 
 package io.renku.triplesstore
 
-import cats.syntax.all._
-import io.renku.generators.Generators.Implicits._
-import io.renku.generators.Generators.nonEmptyStrings
+import org.scalatest.EitherValues
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
 
 import java.nio.file.{Files, Paths}
 
-class DatasetConfigFileSpec extends AnyWordSpec with should.Matchers {
+class DatasetConfigFileSpec extends AnyWordSpec with should.Matchers with EitherValues {
 
   "fromConfigMap" should {
 
@@ -34,24 +32,17 @@ class DatasetConfigFileSpec extends AnyWordSpec with should.Matchers {
       val ttlFile = Files.createTempFile("ds", "ttl")
       Files.writeString(ttlFile, ttlFileContent)
 
-      object TestConfigFile
-          extends DatasetConfigFileFactory[TestConfigFile](nonEmptyStrings().generateAs(DatasetName),
-                                                           new TestConfigFile(_),
-                                                           ttlFile.toString
-          )
+      object TestConfigFile extends DatasetConfigFileFactory[TestConfigFile](new TestConfigFile(_, _), ttlFile.toString)
 
-      TestConfigFile.fromTtlFile() shouldBe TestConfigFile(ttlFileContent).asRight
+      TestConfigFile.fromTtlFile().value.value       shouldBe ttlFileContent
+      TestConfigFile.fromTtlFile().value.datasetName shouldBe DatasetName("name")
     }
 
     "return a Left for an empty file" in {
       val ttlFile = Files.createTempFile("ds", "ttl")
       Files.writeString(ttlFile, "")
 
-      object TestConfigFile
-          extends DatasetConfigFileFactory[TestConfigFile](nonEmptyStrings().generateAs(DatasetName),
-                                                           new TestConfigFile(_),
-                                                           ttlFile.toString
-          )
+      object TestConfigFile extends DatasetConfigFileFactory[TestConfigFile](new TestConfigFile(_, _), ttlFile.toString)
 
       val Left(failure) = TestConfigFile.fromTtlFile()
 
@@ -61,10 +52,7 @@ class DatasetConfigFileSpec extends AnyWordSpec with should.Matchers {
     "return a Left if TTL file cannot be found" in {
       val nonExistingTtl = Paths.get("non-existing.yaml")
       object TestConfigFile
-          extends DatasetConfigFileFactory[TestConfigFile](nonEmptyStrings().generateAs(DatasetName),
-                                                           new TestConfigFile(_),
-                                                           nonExistingTtl.toString
-          )
+          extends DatasetConfigFileFactory[TestConfigFile](new TestConfigFile(_, _), nonExistingTtl.toString)
 
       val Left(failure) = TestConfigFile.fromTtlFile()
 
@@ -90,4 +78,5 @@ class DatasetConfigFileSpec extends AnyWordSpec with should.Matchers {
        |.""".stripMargin
 }
 
-private case class TestConfigFile private[triplesstore] (value: String) extends DatasetConfigFile
+private case class TestConfigFile private[triplesstore] (datasetName: DatasetName, value: String)
+    extends DatasetConfigFile

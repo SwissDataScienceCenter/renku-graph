@@ -1,5 +1,5 @@
 /*
- * Copyright 2023 Swiss Data Science Center (SDSC)
+ * Copyright 2024 Swiss Data Science Center (SDSC)
  * A partnership between École Polytechnique Fédérale de Lausanne (EPFL) and
  * Eidgenössische Technische Hochschule Zürich (ETHZ).
  *
@@ -33,11 +33,11 @@ import io.renku.graph.http.server.security.Authorizer.AuthContext
 import io.renku.graph.model
 import io.renku.graph.model.GraphModelGenerators._
 import io.renku.graph.model.RenkuUrl
+import io.renku.http.RenkuEntityCodec
 import io.renku.http.client.UrlEncoder.urlEncode
-import io.renku.http.rest.SortBy.Direction
+import io.renku.http.rest.Sorting
 import io.renku.http.rest.paging.PagingRequest
-import io.renku.http.rest.paging.model.{Page, PerPage}
-import io.renku.http.rest.{SortBy, Sorting}
+import io.renku.http.rest.paging.model.PerPage
 import io.renku.http.server.EndpointTester._
 import io.renku.http.server.security.EndpointSecurityException
 import io.renku.http.server.security.EndpointSecurityException.AuthorizationFailure
@@ -54,7 +54,6 @@ import org.http4s._
 import org.http4s.headers.`Content-Type`
 import org.http4s.implicits._
 import org.http4s.server.AuthMiddleware
-import org.scalacheck.Gen
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
@@ -69,139 +68,8 @@ class MicroserviceRoutesSpec
     with MockFactory
     with ScalaCheckPropertyChecks
     with should.Matchers
+    with RenkuEntityCodec
     with IOSpec {
-
-  "GET /knowledge-graph/datasets?query=<phrase>" should {
-
-    import datasets.Endpoint.Query._
-    import datasets.Endpoint.Sort
-    import datasets.Endpoint.Sort._
-    import datasets._
-
-    s"return $Ok when a valid 'query' and no 'sort', `page` and `per_page` parameters given" in new TestCase {
-
-      val maybeAuthUser = MaybeAuthUser.apply(authUsers.generateOption)
-      val phrase        = nonEmptyStrings().generateOne
-      (datasetsSearchEndpoint
-        .searchForDatasets(_: Option[Phrase], _: Sorting[Sort.type], _: PagingRequest, _: Option[AuthUser]))
-        .expects(Phrase(phrase).some,
-                 Sorting(Sort.By(NameProperty, Direction.Asc)),
-                 PagingRequest(Page.first, PerPage.default),
-                 maybeAuthUser.option
-        )
-        .returning(IO.pure(Response[IO](Ok)))
-
-      routes(maybeAuthUser)
-        .call(Request[IO](GET, uri"/knowledge-graph/datasets".withQueryParam(query.parameterName, phrase)))
-        .status shouldBe Ok
-    }
-
-    s"return $Ok when no ${query.parameterName} parameter given" in new TestCase {
-
-      val maybeAuthUser = MaybeAuthUser.apply(authUsers.generateOption)
-
-      (datasetsSearchEndpoint
-        .searchForDatasets(_: Option[Phrase], _: Sorting[Sort.type], _: PagingRequest, _: Option[AuthUser]))
-        .expects(Option.empty[Phrase],
-                 Sorting(Sort.By(NameProperty, Direction.Asc)),
-                 PagingRequest(Page.first, PerPage.default),
-                 maybeAuthUser.option
-        )
-        .returning(IO.pure(Response[IO](Ok)))
-
-      routes(maybeAuthUser).call(Request[IO](GET, uri"/knowledge-graph/datasets")).status shouldBe Ok
-    }
-
-    s"return $Unauthorized when user authentication failed" in new TestCase {
-      routes(givenAuthFailing())
-        .call(Request[IO](GET, uri"/knowledge-graph/datasets"))
-        .status shouldBe Unauthorized
-    }
-
-    Sort.properties foreach { sortProperty =>
-      val sortBy = Sort.By(sortProperty, Gen.oneOf(SortBy.Direction.Asc, SortBy.Direction.Desc).generateOne)
-
-      s"return $Ok when '${query.parameterName}' and 'sort=${sortBy.property}:${sortBy.direction}' parameters given" in new TestCase {
-        val maybeAuthUser = MaybeAuthUser.apply(authUsers.generateOption)
-
-        val phrase = phrases.generateOne
-        val request = Request[IO](
-          GET,
-          uri"/knowledge-graph/datasets"
-            .withQueryParam("query", phrase.value)
-            .withQueryParam("sort", s"${sortBy.property}:${sortBy.direction}")
-        )
-        (datasetsSearchEndpoint
-          .searchForDatasets(_: Option[Phrase], _: Sorting[Sort.type], _: PagingRequest, _: Option[AuthUser]))
-          .expects(phrase.some, Sorting(sortBy), PagingRequest.default, maybeAuthUser.option)
-          .returning(IO.pure(Response[IO](Ok)))
-
-        val response = routes(maybeAuthUser).call(request)
-
-        response.status shouldBe Ok
-
-        routesMetrics.clearRegistry()
-      }
-    }
-
-    s"return $Ok when query, ${PagingRequest.Decoders.page.parameterName} and ${PagingRequest.Decoders.perPage.parameterName} parameters given" in new TestCase {
-      forAll(phrases, pages, perPages) { (phrase, page, perPage) =>
-        val maybeAuthUser = MaybeAuthUser.apply(authUsers.generateOption)
-
-        val request = Request[IO](
-          GET,
-          uri"/knowledge-graph/datasets"
-            .withQueryParam("query", phrase.value)
-            .withQueryParam("page", page.value)
-            .withQueryParam("per_page", perPage.value)
-        )
-        (datasetsSearchEndpoint
-          .searchForDatasets(_: Option[Phrase], _: Sorting[Sort.type], _: PagingRequest, _: Option[AuthUser]))
-          .expects(phrase.some,
-                   Sorting(Sort.By(NameProperty, Direction.Asc)),
-                   PagingRequest(page, perPage),
-                   maybeAuthUser.option
-          )
-          .returning(IO.pure(Response[IO](Ok)))
-
-        routes(maybeAuthUser).call(request).status shouldBe Ok
-
-        routesMetrics.clearRegistry()
-      }
-    }
-
-    s"return $BadRequest for invalid " +
-      s"${query.parameterName} parameter, " +
-      s"${Sort.sort.parameterName} parameter, " +
-      s"${PagingRequest.Decoders.page.parameterName} parameter and " +
-      s"${PagingRequest.Decoders.perPage.parameterName} parameter" in new TestCase {
-
-        val sortProperty     = "invalid"
-        val requestedPage    = nonPositiveInts().generateOne
-        val requestedPerPage = nonPositiveInts().generateOne
-
-        val response = routes().call {
-          Request(
-            GET,
-            uri"/knowledge-graph/datasets"
-              .withQueryParam("query", blankStrings().generateOne)
-              .withQueryParam("sort", s"$sortProperty:${Direction.Asc}")
-              .withQueryParam("page", requestedPage.toString)
-              .withQueryParam("per_page", requestedPerPage.toString)
-          )
-        }
-
-        response.status shouldBe BadRequest
-        response.body[Message] shouldBe Message.Error.unsafeApply(
-          List(
-            s"'${query.parameterName}' parameter with invalid value",
-            Sort.sort.errorMessage(sortProperty),
-            PagingRequest.Decoders.page.errorMessage(requestedPage.value.toString),
-            PagingRequest.Decoders.perPage.errorMessage(requestedPerPage.value.toString)
-          ).mkString("; ")
-        )
-      }
-  }
 
   "GET /knowledge-graph/datasets/:id" should {
 
@@ -216,7 +84,7 @@ class MicroserviceRoutesSpec
 
         val maybeAuthUser = MaybeAuthUser.apply(authUsers.generateOption)
 
-        val authContext = AuthContext(maybeAuthUser.option, requestedDS, projectSlugs.generateSet())
+        val authContext = AuthContext(maybeAuthUser.option, requestedDS)
         givenDSAuthorizer(
           requestedDS,
           maybeAuthUser.option,
@@ -541,7 +409,7 @@ class MicroserviceRoutesSpec
 
       (projectSlugAuthorizer.authorize _)
         .expects(projectSlug, authUser.option)
-        .returning(rightT[IO, EndpointSecurityException](AuthContext(authUser.option, projectSlug, Set(projectSlug))))
+        .returning(rightT[IO, EndpointSecurityException](AuthContext(authUser.option, projectSlug)))
 
       (projectDeleteEndpoint
         .`DELETE /projects/:slug`(_: model.projects.Slug, _: AuthUser))
@@ -589,7 +457,7 @@ class MicroserviceRoutesSpec
       (projectSlugAuthorizer.authorize _)
         .expects(projectSlug, maybeAuthUser.option)
         .returning(
-          rightT[IO, EndpointSecurityException](AuthContext(maybeAuthUser.option, projectSlug, Set(projectSlug)))
+          rightT[IO, EndpointSecurityException](AuthContext(maybeAuthUser.option, projectSlug))
         )
 
       val request = Request[IO](GET, Uri.unsafeFromString(s"knowledge-graph/projects/$projectSlug"))
@@ -655,7 +523,7 @@ class MicroserviceRoutesSpec
           (projectSlugAuthorizer.authorize _)
             .expects(projectSlug, authUser.option)
             .returning(
-              rightT[IO, EndpointSecurityException](AuthContext(authUser.option, projectSlug, Set(projectSlug)))
+              rightT[IO, EndpointSecurityException](AuthContext(authUser.option, projectSlug))
             )
 
           (projectUpdateEndpoint
@@ -753,7 +621,7 @@ class MicroserviceRoutesSpec
           .expects(criteria.projectSlug, maybeAuthUser.option)
           .returning(
             rightT[IO, EndpointSecurityException](
-              AuthContext(maybeAuthUser.option, criteria.projectSlug, Set(criteria.projectSlug))
+              AuthContext(maybeAuthUser.option, criteria.projectSlug)
             )
           )
 
@@ -830,7 +698,7 @@ class MicroserviceRoutesSpec
 
         (projectSlugAuthorizer.authorize _)
           .expects(projectSlug, None)
-          .returning(rightT[IO, EndpointSecurityException](AuthContext.forUnknownUser(projectSlug, Set(projectSlug))))
+          .returning(rightT[IO, EndpointSecurityException](AuthContext.forUnknownUser(projectSlug)))
 
         val responseBody = jsons.generateOne
         (projectDatasetTagsEndpoint
@@ -865,7 +733,7 @@ class MicroserviceRoutesSpec
       (projectSlugAuthorizer.authorize _)
         .expects(projectSlug, maybeAuthUser.option)
         .returning(
-          rightT[IO, EndpointSecurityException](AuthContext(maybeAuthUser.option, projectSlug, Set(projectSlug)))
+          rightT[IO, EndpointSecurityException](AuthContext(maybeAuthUser.option, projectSlug))
         )
 
       val responseBody = jsons.generateOne
@@ -898,7 +766,7 @@ class MicroserviceRoutesSpec
       (projectSlugAuthorizer.authorize _)
         .expects(projectSlug, maybeAuthUser.option)
         .returning(
-          rightT[IO, EndpointSecurityException](AuthContext(maybeAuthUser.option, projectSlug, Set(projectSlug)))
+          rightT[IO, EndpointSecurityException](AuthContext(maybeAuthUser.option, projectSlug))
         )
 
       (lineageEndpoint.`GET /lineage` _)
@@ -921,7 +789,7 @@ class MicroserviceRoutesSpec
       (projectSlugAuthorizer.authorize _)
         .expects(projectSlug, maybeAuthUser.option)
         .returning(
-          rightT[IO, EndpointSecurityException](AuthContext(maybeAuthUser.option, projectSlug, Set(projectSlug)))
+          rightT[IO, EndpointSecurityException](AuthContext(maybeAuthUser.option, projectSlug))
         )
 
       (lineageEndpoint.`GET /lineage` _)
@@ -945,7 +813,7 @@ class MicroserviceRoutesSpec
       (projectSlugAuthorizer.authorize _)
         .expects(projectSlug, maybeAuthUser.option)
         .returning(
-          rightT[IO, EndpointSecurityException](AuthContext(maybeAuthUser.option, projectSlug, Set(projectSlug)))
+          rightT[IO, EndpointSecurityException](AuthContext(maybeAuthUser.option, projectSlug))
         )
 
       (lineageEndpoint.`GET /lineage` _)
@@ -1088,7 +956,6 @@ class MicroserviceRoutesSpec
   private trait TestCase {
 
     private implicit val ru: RenkuUrl = renkuUrls.generateOne
-    val datasetsSearchEndpoint          = mock[datasets.Endpoint[IO]]
     val datasetDetailsEndpoint          = mock[datasets.details.Endpoint[IO]]
     val entitiesEndpoint                = mock[entities.Endpoint[IO]]
     val recentEntitiesEndpoint          = mock[entities.currentuser.recentlyviewed.Endpoint[IO]]
@@ -1116,7 +983,6 @@ class MicroserviceRoutesSpec
 
     def routes(middleware: AuthMiddleware[IO, MaybeAuthUser]): Resource[IO, Kleisli[IO, Request[IO], Response[IO]]] =
       new MicroserviceRoutes[IO](
-        datasetsSearchEndpoint,
         datasetDetailsEndpoint,
         entitiesEndpoint,
         ontologyEndpoint,

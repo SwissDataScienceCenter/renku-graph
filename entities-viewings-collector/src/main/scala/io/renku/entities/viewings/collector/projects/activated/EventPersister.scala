@@ -1,5 +1,5 @@
 /*
- * Copyright 2023 Swiss Data Science Center (SDSC)
+ * Copyright 2024 Swiss Data Science Center (SDSC)
  * A partnership between École Polytechnique Fédérale de Lausanne (EPFL) and
  * Eidgenössische Technische Hochschule Zürich (ETHZ).
  *
@@ -32,7 +32,8 @@ private trait EventPersister[F[_]] {
 
 private object EventPersister {
   def apply[F[_]: Async: Logger: SparqlQueryTimeRecorder]: F[EventPersister[F]] =
-    ProjectsConnectionConfig[F]()
+    ProjectsConnectionConfig
+      .fromConfig[F]()
       .map(TSClient[F](_))
       .map(tsClient => new EventPersisterImpl[F](tsClient, EventDeduplicator(tsClient, categoryName)))
 

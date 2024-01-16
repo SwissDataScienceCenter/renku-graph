@@ -1,5 +1,5 @@
 /*
- * Copyright 2023 Swiss Data Science Center (SDSC)
+ * Copyright 2024 Swiss Data Science Center (SDSC)
  * A partnership between École Polytechnique Fédérale de Lausanne (EPFL) and
  * Eidgenössische Technische Hochschule Zürich (ETHZ).
  *
@@ -19,41 +19,41 @@
 package io.renku.knowledgegraph.metrics
 
 import cats.effect.IO
+import cats.effect.testing.scalatest.AsyncIOSpec
 import cats.implicits.toShow
 import io.renku.generators.Generators.Implicits._
 import io.renku.graph.model.testentities._
 import io.renku.interpreters.TestLogger
 import io.renku.jsonld.Property
 import io.renku.logging.TestSparqlQueryTimeRecorder
-import io.renku.testtools.IOSpec
-import io.renku.triplesstore.{InMemoryJenaForSpec, ProjectsDataset, SparqlQueryTimeRecorder}
+import io.renku.triplesstore.{GraphJenaSpec, ProjectsConnectionConfig, SparqlQueryTimeRecorder}
 import org.scalatest.matchers.should
-import org.scalatest.wordspec.AnyWordSpec
+import org.scalatest.wordspec.AsyncWordSpec
 import org.scalatestplus.scalacheck.ScalaCheckPropertyChecks
 
 class StatsFinderSpec
-    extends AnyWordSpec
-    with InMemoryJenaForSpec
-    with ProjectsDataset
+    extends AsyncWordSpec
+    with AsyncIOSpec
+    with GraphJenaSpec
     with ScalaCheckPropertyChecks
-    with should.Matchers
-    with IOSpec {
+    with should.Matchers {
 
   "entitiesCount" should {
 
-    "return zero if there are no entity in the DB" in new TestCase {
-      stats.entitiesCount().unsafeRunSync() shouldBe Map(
-        EntityLabel((schema / "Dataset").show)              -> Count(0L),
-        EntityLabel((schema / "Project").show)              -> Count(0L),
-        EntityLabel((prov / "Activity").show)               -> Count(0L),
-        EntityLabel((prov / "Plan").show)                   -> Count(0L),
-        EntityLabel((schema / "Person").show)               -> Count(0L),
-        EntityLabel((schema / "Person with GitLabId").show) -> Count(0L)
-      )
+    "return zero if there are no entity in the DB" in projectsDSConfig.use { implicit pcc =>
+      stats.entitiesCount().asserting {
+        _ shouldBe Map(
+          EntityLabel((schema / "Dataset").show)              -> Count(0L),
+          EntityLabel((schema / "Project").show)              -> Count(0L),
+          EntityLabel((prov / "Activity").show)               -> Count(0L),
+          EntityLabel((prov / "Plan").show)                   -> Count(0L),
+          EntityLabel((schema / "Person").show)               -> Count(0L),
+          EntityLabel((schema / "Person with GitLabId").show) -> Count(0L)
+        )
+      }
     }
 
-    "return info about number of objects by types" in new TestCase {
-
+    "return info about number of objects by types" in projectsDSConfig.use { implicit pcc =>
       val projectsWithDatasets =
         anyRenkuProjectEntities.addDataset(datasetEntities(provenanceNonModified)).generateNonEmptyList().toList
       val projectsWithActivities = anyRenkuProjectEntities
@@ -71,16 +71,15 @@ class StatsFinderSpec
         .update(schema / "Person", persons.size)
         .update(schema / "Person with GitLabId", persons.count(_.maybeGitLabId.isDefined))
 
-      upload(to = projectsDataset, projectsWithDatasets.map(_._2) ::: projectsWithActivities: _*)
-
-      stats.entitiesCount().unsafeRunSync() shouldBe entitiesWithActivities
+      uploadToProjects(projectsWithDatasets.map(_._2) ::: projectsWithActivities: _*) >>
+        stats.entitiesCount().asserting(_ shouldBe entitiesWithActivities)
     }
   }
 
-  private trait TestCase {
-    implicit val logger:               TestLogger[IO]              = TestLogger[IO]()
-    private implicit val timeRecorder: SparqlQueryTimeRecorder[IO] = TestSparqlQueryTimeRecorder[IO].unsafeRunSync()
-    val stats = new StatsFinderImpl[IO](projectsDSConnectionInfo)
+  private implicit lazy val logger: TestLogger[IO] = TestLogger[IO]()
+  private def stats(implicit pcc: ProjectsConnectionConfig) = {
+    implicit val tr: SparqlQueryTimeRecorder[IO] = TestSparqlQueryTimeRecorder.createUnsafe
+    new StatsFinderImpl[IO](pcc)
   }
 
   private implicit class MapOps(entitiesByType: Map[EntityLabel, Count]) {

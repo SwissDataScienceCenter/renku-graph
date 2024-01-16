@@ -1,5 +1,5 @@
 /*
- * Copyright 2023 Swiss Data Science Center (SDSC)
+ * Copyright 2024 Swiss Data Science Center (SDSC)
  * A partnership between École Polytechnique Fédérale de Lausanne (EPFL) and
  * Eidgenössische Technische Hochschule Zürich (ETHZ).
  *
@@ -19,6 +19,7 @@
 package io.renku.triplesgenerator.tsprovisioning.transformation.namedgraphs.activities
 
 import cats.effect.IO
+import cats.effect.testing.scalatest.AsyncIOSpec
 import cats.syntax.functor._
 import io.renku.generators.Generators.Implicits._
 import io.renku.generators.Generators.httpUrls
@@ -30,23 +31,18 @@ import io.renku.interpreters.TestLogger
 import io.renku.jsonld.syntax._
 import io.renku.jsonld.{JsonLDEncoder, NamedGraph}
 import io.renku.logging.TestSparqlQueryTimeRecorder
-import io.renku.testtools.IOSpec
 import io.renku.triplesstore._
 import io.renku.triplesstore.client.model.Quad
 import monocle.Lens
+import org.scalatest.Succeeded
 import org.scalatest.matchers.should
-import org.scalatest.wordspec.AnyWordSpec
+import org.scalatest.wordspec.AsyncWordSpec
 
-class KGInfoFinderSpec
-    extends AnyWordSpec
-    with IOSpec
-    with should.Matchers
-    with InMemoryJenaForSpec
-    with ProjectsDataset {
+class KGInfoFinderSpec extends AsyncWordSpec with AsyncIOSpec with GraphJenaSpec with should.Matchers {
 
   "findActivityAuthors" should {
 
-    "return activity author's resourceIds" in new TestCase {
+    "return activity author's resourceIds" in projectsDSConfig.use { implicit pcc =>
       val project = anyRenkuProjectEntities
         .withActivities(activityEntities(stepPlanEntities()))
         .generateOne
@@ -54,39 +50,39 @@ class KGInfoFinderSpec
 
       val activity = project.activities.headOption.getOrElse(fail("Activity expected"))
 
-      upload(to = projectsDataset, project)
+      for {
+        _ <- uploadToProjects(project)
 
-      val person = personEntities.generateOne.to[entities.Person]
-      upload(
-        to = projectsDataset, {
-          implicit val enc: JsonLDEncoder[entities.Person] =
-            EntityFunctions[entities.Person].encoder(GraphClass.Persons)
-          NamedGraph.fromJsonLDsUnsafe(GraphClass.Persons.id, person.asJsonLD)
-        }
-      )
-      insert(
-        to = projectsDataset,
-        Quad(GraphClass.Project.id(project.resourceId),
-             activity.resourceId.asEntityId,
-             prov / "wasAssociatedWith",
-             person.resourceId.asEntityId
-        )
-      )
+        person = personEntities.generateOne.to[entities.Person]
+        _ <- uploadToProjects {
+               implicit val enc: JsonLDEncoder[entities.Person] =
+                 EntityFunctions[entities.Person].encoder(GraphClass.Persons)
+               NamedGraph.fromJsonLDsUnsafe(GraphClass.Persons.id, person.asJsonLD)
+             }
+        _ <- insert(
+               Quad(GraphClass.Project.id(project.resourceId),
+                    activity.resourceId.asEntityId,
+                    prov / "wasAssociatedWith",
+                    person.resourceId.asEntityId
+               )
+             )
 
-      kgInfoFinder.findActivityAuthors(project.resourceId, activity.resourceId).unsafeRunSync() shouldBe
-        Set(activity.author.resourceId, person.resourceId)
+        _ <- kgInfoFinder
+               .findActivityAuthors(project.resourceId, activity.resourceId)
+               .asserting(_ shouldBe Set(activity.author.resourceId, person.resourceId))
+      } yield Succeeded
     }
 
-    "return no author if there's no Activity with the given id" in new TestCase {
+    "return no author if there's no Activity with the given id" in projectsDSConfig.use { implicit pcc =>
       kgInfoFinder
         .findActivityAuthors(projectResourceIds.generateOne, activities.ResourceId(httpUrls().generateOne))
-        .unsafeRunSync() shouldBe Set.empty
+        .asserting(_ shouldBe Set.empty)
     }
   }
 
   "findAssociationPersonAgents" should {
 
-    "return activity association person agent resourceIds" in new TestCase {
+    "return activity association person agent resourceIds" in projectsDSConfig.use { implicit pcc =>
       val project = anyRenkuProjectEntities
         .withActivities(activityEntities(stepPlanEntities()).map(toAssociationPersonAgent))
         .generateOne
@@ -94,30 +90,33 @@ class KGInfoFinderSpec
 
       val activity = project.activities.headOption.getOrElse(fail("Activity expected"))
 
-      upload(to = projectsDataset, project)
+      for {
+        _ <- uploadToProjects(project)
 
-      val person = personEntities.generateOne.to[entities.Person]
-      val updatedAgentActivity = ActivityLens.activityAssociationAgent.modify(
-        _.requireRight("Association.WithPersonAgent expected").as(person)
-      )(activity)
+        person = personEntities.generateOne.to[entities.Person]
+        updatedAgentActivity = ActivityLens.activityAssociationAgent.modify(
+                                 _.requireRight("Association.WithPersonAgent expected").as(person)
+                               )(activity)
 
-      val updatedProject = projectLens.modify(_ => List(updatedAgentActivity))(project)
-      upload(to = projectsDataset, updatedProject)
+        updatedProject = projectLens.modify(_ => List(updatedAgentActivity))(project)
+        _ <- uploadToProjects(updatedProject)
 
-      val originalAgent =
-        ActivityLens.activityAssociationAgent.get(activity).toOption.getOrElse(fail("expected Person agent"))
+        originalAgent =
+          ActivityLens.activityAssociationAgent.get(activity).toOption.getOrElse(fail("expected Person agent"))
 
-      kgInfoFinder.findAssociationPersonAgents(project.resourceId, activity.resourceId).unsafeRunSync() shouldBe
-        Set(originalAgent.resourceId, person.resourceId)
+        _ <- kgInfoFinder
+               .findAssociationPersonAgents(project.resourceId, activity.resourceId)
+               .asserting(_ shouldBe Set(originalAgent.resourceId, person.resourceId))
+      } yield Succeeded
     }
 
-    "return no agent if there's no Activity with the given id" in new TestCase {
+    "return no agent if there's no Activity with the given id" in projectsDSConfig.use { implicit pcc =>
       kgInfoFinder
         .findAssociationPersonAgents(projectResourceIds.generateOne, activities.ResourceId(httpUrls().generateOne))
-        .unsafeRunSync() shouldBe Set.empty
+        .asserting(_ shouldBe Set.empty)
     }
 
-    "return no agent if there's association with SoftwareAgent agent" in new TestCase {
+    "return no agent if there's association with SoftwareAgent agent" in projectsDSConfig.use { implicit pcc =>
       val project = anyRenkuProjectEntities
         .withActivities(activityEntities(stepPlanEntities()))
         .generateOne
@@ -125,18 +124,17 @@ class KGInfoFinderSpec
 
       val activity = project.activities.headOption.getOrElse(fail("Activity expected"))
 
-      upload(to = projectsDataset, project)
-
-      kgInfoFinder
-        .findAssociationPersonAgents(project.resourceId, activity.resourceId)
-        .unsafeRunSync() shouldBe Set.empty
+      uploadToProjects(project) >>
+        kgInfoFinder
+          .findAssociationPersonAgents(project.resourceId, activity.resourceId)
+          .asserting(_ shouldBe Set.empty)
     }
   }
 
-  private trait TestCase {
-    private implicit val logger:       TestLogger[IO]              = TestLogger[IO]()
-    private implicit val timeRecorder: SparqlQueryTimeRecorder[IO] = TestSparqlQueryTimeRecorder[IO].unsafeRunSync()
-    val kgInfoFinder = new KGInfoFinderImpl[IO](projectsDSConnectionInfo)
+  private implicit lazy val logger: TestLogger[IO] = TestLogger[IO]()
+  private def kgInfoFinder(implicit pcc: ProjectsConnectionConfig) = {
+    implicit val tr: SparqlQueryTimeRecorder[IO] = TestSparqlQueryTimeRecorder[IO].unsafeRunSync()
+    new KGInfoFinderImpl[IO](pcc)
   }
 
   private lazy val projectLens = Lens[entities.RenkuProject, List[entities.Activity]](_.activities) { a =>

@@ -1,5 +1,5 @@
 /*
- * Copyright 2023 Swiss Data Science Center (SDSC)
+ * Copyright 2024 Swiss Data Science Center (SDSC)
  * A partnership between École Polytechnique Fédérale de Lausanne (EPFL) and
  * Eidgenössische Technische Hochschule Zürich (ETHZ).
  *
@@ -25,7 +25,7 @@ import eu.timepit.refined.auto._
 import io.renku.data.Message
 import io.renku.generators.Generators.Implicits._
 import io.renku.generators.Generators._
-import io.renku.http.server.EndpointTester._
+import io.renku.http.RenkuEntityCodec
 import io.renku.interpreters.TestLogger
 import io.renku.interpreters.TestLogger.Level.Error
 import io.renku.testtools.IOSpec
@@ -38,14 +38,19 @@ import org.scalamock.scalatest.MockFactory
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
 
-class SubscriptionsEndpointSpec extends AnyWordSpec with IOSpec with MockFactory with should.Matchers {
+class SubscriptionsEndpointSpec
+    extends AnyWordSpec
+    with IOSpec
+    with MockFactory
+    with should.Matchers
+    with RenkuEntityCodec {
 
   "addSubscription" should {
 
     s"return $Accepted when the payload is acceptable" +
       "and subscriber URL was added to the pool" in new TestCase {
         val payload = jsons.generateOne
-        val request = Request(Method.POST, uri"subscriptions")
+        val request = Request[IO](Method.POST, uri"subscriptions")
           .withEntity(payload)
 
         (subscriptionCategoryRegistry.register _)
@@ -75,7 +80,7 @@ class SubscriptionsEndpointSpec extends AnyWordSpec with IOSpec with MockFactory
 
     s"return $BadRequest when no category accept the subscription" in new TestCase {
       val payload = jsons.generateOne
-      val request = Request(Method.POST, uri"subscriptions")
+      val request = Request[IO](Method.POST, uri"subscriptions")
         .withEntity(payload)
       val errorMessage = nonEmptyStrings().generateOne
 
@@ -97,7 +102,7 @@ class SubscriptionsEndpointSpec extends AnyWordSpec with IOSpec with MockFactory
       val exception = exceptions.generateOne
 
       val payload = jsons.generateOne
-      val request = Request(Method.POST, uri"subscriptions")
+      val request = Request[IO](Method.POST, uri"subscriptions")
         .withEntity(payload)
 
       (subscriptionCategoryRegistry.register _)

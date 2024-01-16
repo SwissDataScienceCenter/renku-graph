@@ -1,5 +1,5 @@
 /*
- * Copyright 2023 Swiss Data Science Center (SDSC)
+ * Copyright 2024 Swiss Data Science Center (SDSC)
  * A partnership between École Polytechnique Fédérale de Lausanne (EPFL) and
  * Eidgenössische Technische Hochschule Zürich (ETHZ).
  *
@@ -19,44 +19,36 @@
 package io.renku.eventlog.init
 
 import cats.effect.IO
-import io.renku.interpreters.TestLogger
+import cats.effect.testing.scalatest.AsyncIOSpec
+import io.renku.db.DBConfigProvider.DBConfig
+import io.renku.eventlog.EventLogDB
 import io.renku.interpreters.TestLogger.Level.Info
-import io.renku.testtools.IOSpec
+import org.scalatest.Succeeded
+import org.scalatest.flatspec.AsyncFlatSpec
 import org.scalatest.matchers.should
-import org.scalatest.wordspec.AnyWordSpec
 
-class PayloadTypeChangerSpec extends AnyWordSpec with IOSpec with DbInitSpec with should.Matchers {
+class PayloadTypeChangerSpec extends AsyncFlatSpec with AsyncIOSpec with DbInitSpec with should.Matchers {
 
-  protected[init] override lazy val migrationsToRun: List[DbMigrator[IO]] = allMigrations.takeWhile {
-    case _: PayloadTypeChangerImpl[IO] => false
-    case _ => true
+  protected[init] override val runMigrationsUpTo: Class[_ <: DbMigrator[IO]] = classOf[PayloadTypeChanger[IO]]
+
+  it should "do nothing if the payload is already a bytea" in testDBResource.use { implicit cfg =>
+    for {
+      _ <- tableExists("event_payload").asserting(_ shouldBe true)
+      _ <- verifyExists("event_payload", "payload", "text").asserting(_ shouldBe true)
+
+      _ <- tableRefactor.run.assertNoException
+
+      _ <- verifyExists("event_payload", "payload", "bytea").asserting(_ shouldBe true)
+      _ <- verifyColumnExists("event_payload", "schema_version").asserting(_ shouldBe false)
+
+      _ <- tableRefactor.run.assertNoException
+
+      _ <- verifyExists("event_payload", "payload", "bytea").asserting(_ shouldBe true)
+      _ <- verifyColumnExists("event_payload", "schema_version").asserting(_ shouldBe false)
+
+      _ <- logger.loggedOnlyF(Info("event_payload.payload already in bytea type"))
+    } yield Succeeded
   }
 
-  "run" should {
-
-    "do nothing if the payload is already a bytea" in new TestCase {
-
-      tableExists("event_payload") shouldBe true
-
-      verify("event_payload", "payload", "text")
-      verify("event_payload", "schema_version", "text")
-
-      tableRefactor.run.unsafeRunSync() shouldBe ()
-
-      verify("event_payload", "payload", "bytea")
-      verifyColumnExists("event_payload", "schema_version") shouldBe false
-
-      tableRefactor.run.unsafeRunSync() shouldBe ()
-
-      verify("event_payload", "payload", "bytea")
-      verifyColumnExists("event_payload", "schema_version") shouldBe false
-
-      logger.loggedOnly(Info("event_payload.payload already in bytea type"))
-    }
-  }
-
-  private trait TestCase {
-    implicit val logger: TestLogger[IO] = TestLogger[IO]()
-    val tableRefactor = new PayloadTypeChangerImpl[IO]
-  }
+  private def tableRefactor(implicit cfg: DBConfig[EventLogDB]) = new PayloadTypeChangerImpl[IO]
 }

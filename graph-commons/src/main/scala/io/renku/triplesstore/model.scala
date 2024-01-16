@@ -1,5 +1,5 @@
 /*
- * Copyright 2023 Swiss Data Science Center (SDSC)
+ * Copyright 2024 Swiss Data Science Center (SDSC)
  * A partnership between École Polytechnique Fédérale de Lausanne (EPFL) and
  * Eidgenössische Technische Hochschule Zürich (ETHZ).
  *
@@ -18,10 +18,16 @@
 
 package io.renku.triplesstore
 
+import RdfMediaTypes.`text/turtle`
 import cats.Show
+import cats.syntax.all._
 import io.renku.config.ConfigLoader.stringTinyTypeReader
 import io.renku.tinytypes.constraints.NonBlank
 import io.renku.tinytypes.{StringTinyType, TinyTypeFactory}
+import io.renku.triplesstore.client.http.DatasetDefinition
+import org.http4s.EntityEncoder._
+import org.http4s.Request
+import org.http4s.headers.`Content-Type`
 import pureconfig.ConfigReader
 
 import java.io.FileNotFoundException
@@ -32,19 +38,37 @@ object DatasetName extends TinyTypeFactory[DatasetName](new DatasetName(_)) with
   implicit val configReader: ConfigReader[DatasetName] = stringTinyTypeReader(DatasetName)
 }
 
-trait DatasetConfigFile extends StringTinyType
+trait DatasetConfigFile extends StringTinyType with DatasetDefinition {
+
+  val datasetName: DatasetName
+  override lazy val name: String = datasetName.value
+
+  override def putToRequest[F[_]]: Request[F] => Request[F] =
+    _.withEntity(value.show)
+      .withContentType(`Content-Type`(`text/turtle`))
+}
+
 object DatasetConfigFile {
   implicit lazy val show: Show[DatasetConfigFile] = Show.show(_.toString)
 }
-abstract class DatasetConfigFileFactory[TT <: DatasetConfigFile](val datasetName: DatasetName,
-                                                                 instantiate:     String => TT,
-                                                                 ttlFileName:     String
-) extends TinyTypeFactory[TT](instantiate) {
+abstract class DatasetConfigFileFactory[TT <: DatasetConfigFile](instantiate: (DatasetName, String) => TT,
+                                                                 ttlFileName: String
+) {
   import cats.syntax.all._
 
   def fromTtlFile(): Either[Exception, TT] = instance
 
-  private lazy val instance: Either[Exception, TT] = readFromFile() >>= from
+  private lazy val instance: Either[Exception, TT] =
+    readFromFile()
+      .flatMap(v => extractDSName(v).tupleRight(v))
+      .map { case (name, body) => instantiate(name, body) }
+
+  private lazy val dsNameExtractor = """(?s).*fuseki:name\W+"([\w-]+)".*""".r
+
+  private lazy val extractDSName: String => Either[Exception, DatasetName] = {
+    case dsNameExtractor(name) => DatasetName(name).asRight
+    case v                     => new Exception(s"No 'fuseki:name' property found in:\n$v").asLeft
+  }
 
   private def readFromFile(): Either[Exception, String] =
     readTtlLines

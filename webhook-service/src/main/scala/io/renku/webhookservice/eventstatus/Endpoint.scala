@@ -1,5 +1,5 @@
 /*
- * Copyright 2023 Swiss Data Science Center (SDSC)
+ * Copyright 2024 Swiss Data Science Center (SDSC)
  * A partnership between École Polytechnique Fédérale de Lausanne (EPFL) and
  * Eidgenössische Technische Hochschule Zürich (ETHZ).
  *
@@ -28,6 +28,7 @@ import io.renku.data.Message
 import io.renku.eventlog.api.events.CommitSyncRequest
 import io.renku.graph.model.projects
 import io.renku.graph.model.projects.GitLabId
+import io.renku.http.RenkuEntityCodec
 import io.renku.http.client.GitLabClient
 import io.renku.http.server.security.model.AuthUser
 import io.renku.logging.ExecutionTimeRecorder
@@ -39,7 +40,6 @@ import io.renku.webhookservice.hookvalidation.HookValidator.HookValidationResult
 import io.renku.webhookservice.model.ProjectHookUrl
 import io.renku.{eventlog, triplesgenerator}
 import org.http4s.Response
-import org.http4s.circe._
 import org.http4s.dsl.Http4sDsl
 import org.typelevel.log4cats.Logger
 
@@ -54,6 +54,7 @@ private class EndpointImpl[F[_]: Async: NonEmptyParallel: Logger: ExecutionTimeR
     elClient:          eventlog.api.events.Client[F],
     tgClient:          triplesgenerator.api.events.Client[F]
 ) extends Http4sDsl[F]
+    with RenkuEntityCodec
     with Endpoint[F] {
 
   import HookValidationResult._

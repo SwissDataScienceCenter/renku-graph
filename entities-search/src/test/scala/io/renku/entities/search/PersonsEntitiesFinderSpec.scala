@@ -1,5 +1,5 @@
 /*
- * Copyright 2023 Swiss Data Science Center (SDSC)
+ * Copyright 2024 Swiss Data Science Center (SDSC)
  * A partnership between École Polytechnique Fédérale de Lausanne (EPFL) and
  * Eidgenössische Technische Hochschule Zürich (ETHZ).
  *
@@ -21,28 +21,27 @@ package io.renku.entities.search
 import Criteria.Filters._
 import Criteria._
 import EntityConverters._
+import cats.effect.testing.scalatest.AsyncIOSpec
 import cats.syntax.all._
 import io.renku.generators.Generators.Implicits._
 import io.renku.generators.Generators._
 import io.renku.graph.model._
 import io.renku.graph.model.testentities._
-import io.renku.testtools.IOSpec
-import io.renku.triplesstore.{InMemoryJenaForSpec, ProjectsDataset}
+import io.renku.triplesstore.GraphJenaSpec
 import org.scalacheck.Gen.alphaLowerChar
 import org.scalatest.matchers.should
-import org.scalatest.wordspec.AnyWordSpec
+import org.scalatest.wordspec.AsyncWordSpec
 
 class PersonsEntitiesFinderSpec
-    extends AnyWordSpec
-    with should.Matchers
-    with FinderSpecOps
-    with InMemoryJenaForSpec
-    with ProjectsDataset
-    with IOSpec {
+    extends AsyncWordSpec
+    with AsyncIOSpec
+    with FinderSpec
+    with GraphJenaSpec
+    with should.Matchers {
 
   "findEntities - persons" should {
 
-    "return a single person if there are multiple with the same name" in new TestCase {
+    "return a single person if there are multiple with the same name" in projectsDSConfig.use { implicit pcc =>
       // person merging is a temporary solution until we start to return persons ids
 
       val query = nonBlankStrings(minLength = 6, charsGenerator = alphaLowerChar).generateOne
@@ -54,16 +53,16 @@ class PersonsEntitiesFinderSpec
         .map(_.copy(name = sentenceContaining(query).generateAs(persons.Name)))
         .generateOne
 
-      upload(to = projectsDataset, person1SameName, person2SameName, person3, personEntities.generateOne)
-
-      finder
-        .findEntities(Criteria(Filters(maybeQuery = Query(query.value).some)))
-        .unsafeRunSync()
-        .resultsWithSkippedMatchingScore
-        .sortBy(_.name)(nameOrdering) should {
-        be(List(person1SameName, person3).map(_.to[model.Entity.Person]).sortBy(_.name)(nameOrdering)) or
-          be(List(person2SameName, person3).map(_.to[model.Entity.Person]).sortBy(_.name)(nameOrdering))
-      }
+      uploadToProjects(person1SameName, person2SameName, person3, personEntities.generateOne) >>
+        entitiesFinder
+          .findEntities(Criteria(Filters(maybeQuery = Query(query.value).some)))
+          .asserting {
+            _.resultsWithSkippedMatchingScore
+              .sortBy(_.name)(nameOrdering) should {
+              be(List(person1SameName, person3).map(_.to[model.Entity.Person]).sortBy(_.name)(nameOrdering)) or
+                be(List(person2SameName, person3).map(_.to[model.Entity.Person]).sortBy(_.name)(nameOrdering))
+            }
+          }
     }
   }
 }

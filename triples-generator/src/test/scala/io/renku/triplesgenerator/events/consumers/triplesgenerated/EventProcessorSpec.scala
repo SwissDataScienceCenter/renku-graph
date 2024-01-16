@@ -1,5 +1,5 @@
 /*
- * Copyright 2023 Swiss Data Science Center (SDSC)
+ * Copyright 2024 Swiss Data Science Center (SDSC)
  * A partnership between École Polytechnique Fédérale de Lausanne (EPFL) and
  * Eidgenössische Technische Hochschule Zürich (ETHZ).
  *
@@ -32,22 +32,21 @@ import io.renku.graph.model.events._
 import io.renku.graph.model.projects.Slug
 import io.renku.graph.model.testentities._
 import io.renku.graph.model.{entities, projects}
-import io.renku.graph.tokenrepository.AccessTokenFinder
 import io.renku.http.client.AccessToken
 import io.renku.interpreters.TestLogger
 import io.renku.interpreters.TestLogger.Level.{Error, Info}
 import io.renku.interpreters.TestLogger.Matcher.NotRefEqual
 import io.renku.logging.TestExecutionTimeRecorder
 import io.renku.testtools.IOSpec
+import io.renku.tokenrepository.api.TokenRepositoryClient
+import io.renku.triplesgenerator.errors.ErrorGenerators.{logWorthyRecoverableErrors, nonRecoverableMalformedRepoErrors, silentRecoverableErrors}
 import io.renku.triplesgenerator.errors.ProcessingRecoverableError
 import io.renku.triplesgenerator.errors.ProcessingRecoverableError.{LogWorthyRecoverableError, SilentRecoverableError}
 import io.renku.triplesgenerator.events.consumers.EventStatusUpdater
 import io.renku.triplesgenerator.events.consumers.EventStatusUpdater.{ExecutionDelay, RollbackStatus}
-import io.renku.triplesgenerator.errors.ErrorGenerators.{logWorthyRecoverableErrors, nonRecoverableMalformedRepoErrors, silentRecoverableErrors}
 import io.renku.triplesgenerator.tsprovisioning.TSProvisioner
 import io.renku.triplesgenerator.tsprovisioning.triplesuploading.TriplesUploadResult
 import io.renku.triplesgenerator.tsprovisioning.triplesuploading.TriplesUploadResult._
-import org.scalacheck.Gen
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.Assertion
 import org.scalatest.matchers.should
@@ -57,14 +56,24 @@ import java.time.Duration
 
 class EventProcessorSpec extends AnyWordSpec with IOSpec with MockFactory with should.Matchers {
 
-  import AccessTokenFinder.Implicits._
-
   "process" should {
+
+    "mark the event as RecoverableFailure if no access token found" in new TestCase {
+
+      givenFetchingAccessToken(forProjectSlug = event.project.slug)
+        .returning(None.pure[IO])
+
+      expectEventMarkedAsRecoverableFailure(event, SilentRecoverableError("No access token"))
+
+      eventProcessor.process(event).unsafeRunSync() shouldBe ()
+
+      logSummary(event, isSuccessful = false)
+    }
 
     "succeed if events are successfully turned into triples" in new TestCase {
 
       givenFetchingAccessToken(forProjectSlug = event.project.slug)
-        .returning(maybeAccessToken.pure[IO])
+        .returning(accessToken.some.pure[IO])
 
       val project = anyRenkuProjectEntities.generateOne.to[entities.Project]
       givenEntityBuilding(event, returning = EitherT.rightT(project))
@@ -83,7 +92,7 @@ class EventProcessorSpec extends AnyWordSpec with IOSpec with MockFactory with s
       s"if entity building fails with $LogWorthyRecoverableError" in new TestCase {
 
         givenFetchingAccessToken(forProjectSlug = event.project.slug)
-          .returning(maybeAccessToken.pure[IO])
+          .returning(accessToken.some.pure[IO])
 
         val processingError = logWorthyRecoverableErrors.generateOne
         givenEntityBuilding(event, returning = leftT(processingError))
@@ -100,7 +109,7 @@ class EventProcessorSpec extends AnyWordSpec with IOSpec with MockFactory with s
       s"if entity building fails with $SilentRecoverableError" in new TestCase {
 
         givenFetchingAccessToken(forProjectSlug = event.project.slug)
-          .returning(maybeAccessToken.pure[IO])
+          .returning(accessToken.some.pure[IO])
 
         val processingError = silentRecoverableErrors.generateOne
         givenEntityBuilding(event, returning = leftT(processingError))
@@ -116,7 +125,7 @@ class EventProcessorSpec extends AnyWordSpec with IOSpec with MockFactory with s
       "if entity building fails with a non-ProcessingNonRecoverableError.MalformedRepository" in new TestCase {
 
         givenFetchingAccessToken(forProjectSlug = event.project.slug)
-          .returning(maybeAccessToken.pure[IO])
+          .returning(accessToken.some.pure[IO])
 
         val exception = exceptions.generateOne
         givenEntityBuilding(event,
@@ -135,7 +144,7 @@ class EventProcessorSpec extends AnyWordSpec with IOSpec with MockFactory with s
       "if entity building fails with ProcessingNonRecoverableError.MalformedRepository" in new TestCase {
 
         givenFetchingAccessToken(forProjectSlug = event.project.slug)
-          .returning(maybeAccessToken.pure[IO])
+          .returning(accessToken.some.pure[IO])
 
         val exception = nonRecoverableMalformedRepoErrors.generateOne
         givenEntityBuilding(event,
@@ -154,7 +163,7 @@ class EventProcessorSpec extends AnyWordSpec with IOSpec with MockFactory with s
       "if transforming triples fails with a LogWorthyRecoverableError" in new TestCase {
 
         givenFetchingAccessToken(forProjectSlug = event.project.slug)
-          .returning(maybeAccessToken.pure[IO])
+          .returning(accessToken.some.pure[IO])
 
         val project = anyProjectEntities.generateOne.to[entities.Project]
         givenEntityBuilding(event, returning = EitherT.rightT(project))
@@ -175,7 +184,7 @@ class EventProcessorSpec extends AnyWordSpec with IOSpec with MockFactory with s
       "if transforming triples fails with a SilentRecoverableError" in new TestCase {
 
         givenFetchingAccessToken(forProjectSlug = event.project.slug)
-          .returning(maybeAccessToken.pure[IO])
+          .returning(accessToken.some.pure[IO])
 
         val project = anyProjectEntities.generateOne.to[entities.Project]
         givenEntityBuilding(event, returning = EitherT.rightT(project))
@@ -195,7 +204,7 @@ class EventProcessorSpec extends AnyWordSpec with IOSpec with MockFactory with s
       "but doesn't log any errors" in new TestCase {
 
         givenFetchingAccessToken(forProjectSlug = event.project.slug)
-          .returning(maybeAccessToken.pure[IO])
+          .returning(accessToken.some.pure[IO])
 
         val project = anyRenkuProjectEntities.generateOne.to[entities.Project]
         givenEntityBuilding(event, returning = EitherT.rightT(project))
@@ -215,7 +224,7 @@ class EventProcessorSpec extends AnyWordSpec with IOSpec with MockFactory with s
     "mark event with TransformationNonRecoverableFailure if transforming triples fails" in new TestCase {
 
       givenFetchingAccessToken(forProjectSlug = event.project.slug)
-        .returning(maybeAccessToken.pure[IO])
+        .returning(accessToken.some.pure[IO])
 
       val project = anyRenkuProjectEntities.generateOne.to[entities.Project]
       givenEntityBuilding(event, returning = EitherT.rightT(project))
@@ -235,7 +244,7 @@ class EventProcessorSpec extends AnyWordSpec with IOSpec with MockFactory with s
       "if uploading triples fails with RecoverableFailure" in new TestCase {
 
         givenFetchingAccessToken(forProjectSlug = event.project.slug)
-          .returning(maybeAccessToken.pure[IO])
+          .returning(accessToken.some.pure[IO])
 
         val project = anyProjectEntities.generateOne.to[entities.Project]
         givenEntityBuilding(event, returning = EitherT.rightT(project))
@@ -256,7 +265,7 @@ class EventProcessorSpec extends AnyWordSpec with IOSpec with MockFactory with s
       "if uploading triples to the store fails with either NonRecoverableFailure" in new TestCase {
 
         givenFetchingAccessToken(forProjectSlug = event.project.slug)
-          .returning(maybeAccessToken.pure[IO])
+          .returning(accessToken.some.pure[IO])
 
         val project = anyProjectEntities.generateOne.to[entities.Project]
         givenEntityBuilding(event, returning = EitherT.rightT(project))
@@ -275,7 +284,7 @@ class EventProcessorSpec extends AnyWordSpec with IOSpec with MockFactory with s
     "succeed and log an error if marking event as TriplesStore fails" in new TestCase {
 
       givenFetchingAccessToken(forProjectSlug = event.project.slug)
-        .returning(maybeAccessToken.pure[IO])
+        .returning(accessToken.some.pure[IO])
 
       val project = anyProjectEntities.generateOne.to[entities.Project]
       givenEntityBuilding(event, returning = EitherT.rightT(project))
@@ -321,21 +330,21 @@ class EventProcessorSpec extends AnyWordSpec with IOSpec with MockFactory with s
 
     val event = triplesGeneratedEvents.generateOne
 
-    implicit val maybeAccessToken: Option[AccessToken] = Gen.option(accessTokens).generateOne
+    implicit val accessToken: AccessToken = accessTokens.generateOne
 
-    implicit val logger:            TestLogger[IO]        = TestLogger[IO]()
-    implicit val accessTokenFinder: AccessTokenFinder[IO] = mock[AccessTokenFinder[IO]]
-    val tsProvisioner         = mock[TSProvisioner[IO]]
+    implicit val logger:  TestLogger[IO]            = TestLogger[IO]()
+    private val trClient: TokenRepositoryClient[IO] = mock[TokenRepositoryClient[IO]]
+    private val tsProvisioner = mock[TSProvisioner[IO]]
     val eventStatusUpdater    = mock[EventStatusUpdater[IO]]
-    val entityBuilder         = mock[EntityBuilder[IO]]
+    private val entityBuilder = mock[EntityBuilder[IO]]
     val executionTimeRecorder = TestExecutionTimeRecorder[IO](maybeHistogram = None)
     val eventProcessor =
-      new EventProcessorImpl[IO](tsProvisioner, eventStatusUpdater, entityBuilder, executionTimeRecorder)
+      new EventProcessorImpl[IO](trClient, tsProvisioner, eventStatusUpdater, entityBuilder, executionTimeRecorder)
 
     def givenFetchingAccessToken(forProjectSlug: Slug) =
-      (accessTokenFinder
-        .findAccessToken(_: Slug)(_: Slug => String))
-        .expects(forProjectSlug, projectSlugToPath)
+      (trClient
+        .findAccessToken(_: Slug))
+        .expects(forProjectSlug)
 
     def givenSuccessfulTSProvisioning(project: Project) =
       givenTSProvisioning(project, returning = DeliverySuccess.pure[IO])
@@ -347,8 +356,8 @@ class EventProcessorSpec extends AnyWordSpec with IOSpec with MockFactory with s
 
     def givenEntityBuilding(event: TriplesGeneratedEvent, returning: EitherT[IO, ProcessingRecoverableError, Project]) =
       (entityBuilder
-        .buildEntity(_: TriplesGeneratedEvent)(_: Option[AccessToken]))
-        .expects(event, maybeAccessToken)
+        .buildEntity(_: TriplesGeneratedEvent)(_: AccessToken))
+        .expects(event, accessToken)
         .returning(returning)
 
     def expectEventMarkedAsRecoverableFailure(event: TriplesGeneratedEvent, exception: ProcessingRecoverableError) = {

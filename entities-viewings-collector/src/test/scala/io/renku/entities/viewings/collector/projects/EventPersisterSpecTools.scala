@@ -1,5 +1,5 @@
 /*
- * Copyright 2023 Swiss Data Science Center (SDSC)
+ * Copyright 2024 Swiss Data Science Center (SDSC)
  * A partnership between École Polytechnique Fédérale de Lausanne (EPFL) and
  * Eidgenössische Technische Hochschule Zürich (ETHZ).
  *
@@ -18,25 +18,26 @@
 
 package io.renku.entities.viewings.collector.projects
 
+import cats.effect.IO
+import cats.effect.testing.scalatest.AsyncIOSpec
 import eu.timepit.refined.auto._
 import io.renku.entities.viewings.collector.ProjectViewedTimeOntology.dataViewedProperty
 import io.renku.graph.model.Schemas.renku
 import io.renku.graph.model.{GraphClass, entities, projects}
 import io.renku.jsonld.syntax._
-import io.renku.testtools.IOSpec
 import io.renku.triplesstore.SparqlQuery.Prefixes
 import io.renku.triplesstore._
 import io.renku.triplesstore.client.model.Quad
 import io.renku.triplesstore.client.syntax._
+import org.typelevel.log4cats.Logger
 
 import java.time.Instant
 
 trait EventPersisterSpecTools {
-  self: InMemoryJenaForSpec with ProjectsDataset with IOSpec =>
+  self: TestProjectsDataset with AsyncIOSpec =>
 
-  protected def findAllViewings =
+  protected def findAllViewings(implicit pcc: ProjectsConnectionConfig, L: Logger[IO]) =
     runSelect(
-      on = projectsDataset,
       SparqlQuery.of(
         "test find project viewing",
         Prefixes of renku -> "renku",
@@ -46,13 +47,13 @@ trait EventPersisterSpecTools {
                  |}
                  |""".stripMargin
       )
-    ).unsafeRunSync()
-      .map(row => projects.ResourceId(row("id")) -> projects.DateViewed(Instant.parse(row("date"))))
-      .toSet
+    ).map(_.map(row => projects.ResourceId(row("id")) -> projects.DateViewed(Instant.parse(row("date")))).toSet)
 
-  protected def insertOtherDate(project: entities.Project, dateViewed: projects.DateViewed) =
+  protected def insertOtherDate(project: entities.Project, dateViewed: projects.DateViewed)(implicit
+      pcc: ProjectsConnectionConfig,
+      L:   Logger[IO]
+  ): IO[Unit] =
     insert(
-      to = projectsDataset,
       Quad(GraphClass.ProjectViewedTimes.id, project.resourceId.asEntityId, dataViewedProperty.id, dateViewed.asObject)
     )
 }

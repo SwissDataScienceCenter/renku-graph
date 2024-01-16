@@ -1,5 +1,5 @@
 /*
- * Copyright 2023 Swiss Data Science Center (SDSC)
+ * Copyright 2024 Swiss Data Science Center (SDSC)
  * A partnership between École Polytechnique Fédérale de Lausanne (EPFL) and
  * Eidgenössische Technische Hochschule Zürich (ETHZ).
  *
@@ -18,132 +18,158 @@
 
 package io.renku.eventlog.events.producers
 
-import cats.data.Kleisli
 import cats.effect.IO
-import io.renku.eventlog.InMemoryEventLogDbSpec
-import io.renku.eventlog.metrics.QueriesExecutionTimes
+import cats.effect.testing.scalatest.AsyncIOSpec
+import io.renku.db.DBConfigProvider.DBConfig
+import io.renku.eventlog.metrics.{QueriesExecutionTimes, TestQueriesExecutionTimes}
+import io.renku.eventlog.{EventLogDB, EventLogPostgresSpec}
 import io.renku.events.Generators._
 import io.renku.events.Subscription
 import io.renku.events.Subscription._
 import io.renku.generators.CommonGraphGenerators.microserviceBaseUrls
 import io.renku.generators.Generators.Implicits._
-import io.renku.metrics.TestMetricsRegistry
 import io.renku.microservices.MicroserviceBaseUrl
-import io.renku.testtools.IOSpec
-import org.scalamock.scalatest.MockFactory
-import org.scalatest.OptionValues
+import org.scalamock.scalatest.AsyncMockFactory
 import org.scalatest.matchers.should
-import org.scalatest.wordspec.AnyWordSpec
+import org.scalatest.wordspec.AsyncWordSpec
+import org.scalatest.{OptionValues, Succeeded}
 import skunk._
 import skunk.implicits._
 
 class DefaultSubscriberTrackerSpec
-    extends AnyWordSpec
-    with IOSpec
-    with InMemoryEventLogDbSpec
-    with MockFactory
+    extends AsyncWordSpec
+    with AsyncIOSpec
+    with EventLogPostgresSpec
+    with AsyncMockFactory
     with OptionValues
     with should.Matchers {
 
+  private val subscriber = subscribers.generateOne
+  private val sourceUrl  = microserviceBaseUrls.generateOne
+
   "add" should {
 
-    "insert a new row in the subscriber table if the subscriber does not exists" in new TestCase {
+    "insert a new row in the subscriber table if the subscriber does not exists" in testDBResource.use { implicit cfg =>
+      for {
+        _ <- findSubscriber(subscriber.url, sourceUrl).asserting(_ shouldBe None)
 
-      findSubscriber(subscriber.url, sourceUrl) shouldBe None
+        _ <- (tracker add subscriber).asserting(_ shouldBe true)
 
-      (tracker add subscriber).unsafeRunSync() shouldBe true
-
-      findSubscriber(subscriber.url, sourceUrl).value shouldBe (subscriber.id, subscriber.url, sourceUrl)
+        _ <- findSubscriber(subscriber.url, sourceUrl).asserting(
+               _.value shouldBe (subscriber.id, subscriber.url, sourceUrl)
+             )
+      } yield Succeeded
     }
 
-    "replace existing row for the subscription info with the same subscriber url but different subscriber id" in new TestCase {
+    "replace existing row for the subscription info with the same subscriber url but different subscriber id" in testDBResource
+      .use { implicit cfg =>
+        for {
+          _ <- findSubscriber(subscriber.url, sourceUrl).asserting(_ shouldBe None)
 
-      findSubscriber(subscriber.url, sourceUrl) shouldBe None
+          _ <- (tracker add subscriber).asserting(_ shouldBe true)
 
-      (tracker add subscriber).unsafeRunSync() shouldBe true
+          _ <- findSubscriber(subscriber.url, sourceUrl).asserting(
+                 _.value shouldBe (subscriber.id, subscriber.url, sourceUrl)
+               )
 
-      findSubscriber(subscriber.url, sourceUrl).value shouldBe (subscriber.id, subscriber.url, sourceUrl)
+          newSubscriberId = subscriberIds.generateOne
+          _ <- (tracker add subscriber.fold(_.copy(id = newSubscriberId), _.copy(id = newSubscriberId)))
+                 .asserting(_ shouldBe true)
 
-      val newSubscriberId = subscriberIds.generateOne
-      (tracker add subscriber.fold(_.copy(id = newSubscriberId), _.copy(id = newSubscriberId)))
-        .unsafeRunSync() shouldBe true
-
-      findSubscriber(subscriber.url, sourceUrl).value shouldBe (newSubscriberId, subscriber.url, sourceUrl)
-    }
-
-    "insert a new row in the subscriber table " +
-      "if the subscriber exists but the source_url is different" in new TestCase {
-
-        val otherSource  = microserviceBaseUrls.generateOne
-        val otherTracker = new DefaultSubscriberTrackerImpl[IO](otherSource)
-        (otherTracker add subscriber).unsafeRunSync() shouldBe true
-
-        findSubscriber(subscriber.url, otherSource).value shouldBe (subscriber.id, subscriber.url, otherSource)
-
-        findSubscriber(subscriber.url, sourceUrl) shouldBe None
-
-        (tracker add subscriber).unsafeRunSync() shouldBe true
-
-        findSubscriber(subscriber.url, otherSource).value shouldBe (subscriber.id, subscriber.url, otherSource)
-        findSubscriber(subscriber.url, sourceUrl).value   shouldBe (subscriber.id, subscriber.url, sourceUrl)
+          _ <- findSubscriber(subscriber.url, sourceUrl).asserting(
+                 _.value shouldBe (newSubscriberId, subscriber.url, sourceUrl)
+               )
+        } yield Succeeded
       }
 
-    "do nothing if the subscriber info is already present in the table" in new TestCase {
+    "insert a new row in the subscriber table " +
+      "if the subscriber exists but the source_url is different" in testDBResource.use { implicit cfg =>
+        val otherSource  = microserviceBaseUrls.generateOne
+        val otherTracker = new DefaultSubscriberTrackerImpl[IO](otherSource)
 
-      findSubscriber(subscriber.url, sourceUrl) shouldBe None
+        for {
+          _ <- (otherTracker add subscriber).asserting(_ shouldBe true)
 
-      (tracker add subscriber).unsafeRunSync()        shouldBe true
-      findSubscriber(subscriber.url, sourceUrl).value shouldBe (subscriber.id, subscriber.url, sourceUrl)
+          _ <- findSubscriber(subscriber.url, otherSource).asserting(
+                 _.value shouldBe (subscriber.id, subscriber.url, otherSource)
+               )
+          _ <- findSubscriber(subscriber.url, sourceUrl).asserting(_ shouldBe None)
 
-      (tracker add subscriber).unsafeRunSync()        shouldBe true
-      findSubscriber(subscriber.url, sourceUrl).value shouldBe (subscriber.id, subscriber.url, sourceUrl)
+          _ <- (tracker add subscriber).asserting(_ shouldBe true)
+
+          _ <- findSubscriber(subscriber.url, otherSource).asserting(
+                 _.value shouldBe (subscriber.id, subscriber.url, otherSource)
+               )
+          _ <- findSubscriber(subscriber.url, sourceUrl).asserting(
+                 _.value shouldBe (subscriber.id, subscriber.url, sourceUrl)
+               )
+        } yield Succeeded
+      }
+
+    "do nothing if the subscriber info is already present in the table" in testDBResource.use { implicit cfg =>
+      for {
+        _ <- findSubscriber(subscriber.url, sourceUrl).asserting(_ shouldBe None)
+
+        _ <- (tracker add subscriber).asserting(_ shouldBe true)
+        _ <- findSubscriber(subscriber.url, sourceUrl).asserting(
+               _.value shouldBe (subscriber.id, subscriber.url, sourceUrl)
+             )
+
+        _ <- (tracker add subscriber).asserting(_ shouldBe true)
+        _ <- findSubscriber(subscriber.url, sourceUrl).asserting(
+               _.value shouldBe (subscriber.id, subscriber.url, sourceUrl)
+             )
+      } yield Succeeded
     }
   }
 
   "remove" should {
 
-    "remove a subscriber if the subscriber and the current source url exists" in new TestCase {
+    "remove a subscriber if the subscriber and the current source url exists" in testDBResource.use { implicit cfg =>
+      for {
+        _ <- storeSubscriptionInfo(subscriber, sourceUrl)
 
-      storeSubscriptionInfo(subscriber, sourceUrl)
+        _ <- findSubscriber(subscriber.url, sourceUrl).asserting(
+               _.value shouldBe (subscriber.id, subscriber.url, sourceUrl)
+             )
 
-      findSubscriber(subscriber.url, sourceUrl).value shouldBe (subscriber.id, subscriber.url, sourceUrl)
-
-      (tracker remove subscriber.url).unsafeRunSync() shouldBe true
-      findSubscriber(subscriber.url, sourceUrl)       shouldBe None
+        _ <- (tracker remove subscriber.url).asserting(_ shouldBe true)
+        _ <- findSubscriber(subscriber.url, sourceUrl).asserting(_ shouldBe None)
+      } yield Succeeded
     }
 
-    "do nothing if the subscriber does not exists" in new TestCase {
-      (tracker remove subscriber.url).unsafeRunSync() shouldBe true
-      findSubscriber(subscriber.url, sourceUrl)       shouldBe None
+    "do nothing if the subscriber does not exists" in testDBResource.use { implicit cfg =>
+      (tracker remove subscriber.url).asserting(_ shouldBe true) >>
+        findSubscriber(subscriber.url, sourceUrl).asserting(_ shouldBe None)
     }
 
-    "do nothing if the subscriber exists but the source_url is different than the current source url" in new TestCase {
+    "do nothing if the subscriber exists but the source_url is different than the current source url" in testDBResource
+      .use { implicit cfg =>
+        val otherSource = microserviceBaseUrls.generateOne
+        for {
+          _ <- storeSubscriptionInfo(subscriber, otherSource)
+          _ <- findSubscriber(subscriber.url, otherSource).asserting(
+                 _.value shouldBe (subscriber.id, subscriber.url, otherSource)
+               )
 
-      val otherSource = microserviceBaseUrls.generateOne
-      storeSubscriptionInfo(subscriber, otherSource)
-      findSubscriber(subscriber.url, otherSource).value shouldBe (subscriber.id, subscriber.url, otherSource)
+          _ <- (tracker remove subscriber.url).asserting(_ shouldBe true)
+          _ <- findSubscriber(subscriber.url, otherSource).asserting(
+                 _.value shouldBe (subscriber.id, subscriber.url, otherSource)
+               )
 
-      (tracker remove subscriber.url).unsafeRunSync()   shouldBe true
-      findSubscriber(subscriber.url, otherSource).value shouldBe (subscriber.id, subscriber.url, otherSource)
-
-      findSubscriber(subscriber.url, sourceUrl) shouldBe None
-    }
+          _ <- findSubscriber(subscriber.url, sourceUrl).asserting(_ shouldBe None)
+        } yield Succeeded
+      }
   }
 
-  private trait TestCase {
+  private implicit lazy val qet: QueriesExecutionTimes[IO] = TestQueriesExecutionTimes[IO]
+  private def tracker(implicit cfg: DBConfig[EventLogDB]) =
+    new DefaultSubscriberTrackerImpl[IO](sourceUrl)
 
-    val subscriber = subscribers.generateOne
-
-    private implicit val metricsRegistry: TestMetricsRegistry[IO]   = TestMetricsRegistry[IO]
-    implicit val queriesExecTimes:        QueriesExecutionTimes[IO] = QueriesExecutionTimes[IO]().unsafeRunSync()
-    val sourceUrl = microserviceBaseUrls.generateOne
-    val tracker   = new DefaultSubscriberTrackerImpl[IO](sourceUrl)
-  }
-
-  private def findSubscriber(subscriberUrl: SubscriberUrl,
-                             sourceUrl:     MicroserviceBaseUrl
-  ): Option[(SubscriberId, SubscriberUrl, MicroserviceBaseUrl)] = execute {
-    Kleisli { session =>
+  private def findSubscriber(subscriberUrl: SubscriberUrl, sourceUrl: MicroserviceBaseUrl)(implicit
+      cfg: DBConfig[EventLogDB]
+  ): IO[Option[(SubscriberId, SubscriberUrl, MicroserviceBaseUrl)]] =
+    moduleSessionResource.session.use { session =>
       val query: Query[SubscriberUrl *: MicroserviceBaseUrl *: EmptyTuple,
                        (SubscriberId, SubscriberUrl, MicroserviceBaseUrl)
       ] = sql"""SELECT delivery_id, delivery_url, source_url
@@ -153,21 +179,21 @@ class DefaultSubscriberTrackerSpec
         .map { case subscriberId ~ subscriberUrl ~ microserviceBaseUrl =>
           (subscriberId, subscriberUrl, microserviceBaseUrl)
         }
+
       session.prepare(query).flatMap(_.option(subscriberUrl *: sourceUrl *: EmptyTuple))
     }
-  }
 
-  private def storeSubscriptionInfo(subscriber: Subscription.Subscriber, sourceUrl: MicroserviceBaseUrl): Unit =
-    execute[Unit] {
-      Kleisli { session =>
-        val query: Command[SubscriberId *: SubscriberUrl *: MicroserviceBaseUrl *: EmptyTuple] =
-          sql"""INSERT INTO subscriber (delivery_id, delivery_url, source_url)
-                VALUES ($subscriberIdEncoder, $subscriberUrlEncoder, $microserviceBaseUrlEncoder)
+  private def storeSubscriptionInfo(subscriber: Subscription.Subscriber, sourceUrl: MicroserviceBaseUrl)(implicit
+      cfg: DBConfig[EventLogDB]
+  ): IO[Unit] =
+    moduleSessionResource.session.use { session =>
+      val query: Command[SubscriberId *: SubscriberUrl *: MicroserviceBaseUrl *: EmptyTuple] =
+        sql"""INSERT INTO subscriber (delivery_id, delivery_url, source_url)
+              VALUES ($subscriberIdEncoder, $subscriberUrlEncoder, $microserviceBaseUrlEncoder)
           """.command
-        session
-          .prepare(query)
-          .flatMap(_.execute(subscriber.id *: subscriber.url *: sourceUrl *: EmptyTuple))
-          .void
-      }
+      session
+        .prepare(query)
+        .flatMap(_.execute(subscriber.id *: subscriber.url *: sourceUrl *: EmptyTuple))
+        .void
     }
 }

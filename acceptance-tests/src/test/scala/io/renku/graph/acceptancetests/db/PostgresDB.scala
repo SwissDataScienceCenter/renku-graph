@@ -1,5 +1,5 @@
 /*
- * Copyright 2023 Swiss Data Science Center (SDSC)
+ * Copyright 2024 Swiss Data Science Center (SDSC)
  * A partnership between École Polytechnique Fédérale de Lausanne (EPFL) and
  * Eidgenössische Technische Hochschule Zürich (ETHZ).
  *
@@ -19,82 +19,27 @@
 package io.renku.graph.acceptancetests.db
 
 import cats.effect._
-import com.dimafeng.testcontainers.FixedHostPortGenericContainer
+import cats.syntax.all._
 import eu.timepit.refined.auto._
 import io.renku.db.DBConfigProvider.DBConfig
-import io.renku.db.{PostgresContainer, SessionResource}
-import skunk.codec.all._
-import skunk.implicits._
-import skunk._
+import io.renku.db.{PostgresServer, SessionResource}
 import natchez.Trace.Implicits.noop
-import org.typelevel.log4cats.Logger
-import scala.concurrent.duration._
+import skunk._
+import skunk.codec.all.bool
+import skunk.implicits._
 
 object PostgresDB {
-  private[this] val starting: Ref[IO, Boolean] = Ref.unsafe[IO, Boolean](false)
 
-  private val dbConfig = DBConfig[Any](
-    host = "localhost",
-    port = 5432,
-    name = "postgres",
-    user = "at",
-    pass = "at",
-    connectionPool = 8
-  )
+  private lazy val server   = PostgresServer
+  private lazy val dbConfig = server.dbConfig
 
-  private val postgresContainer = {
-    val cfg = dbConfig
-    FixedHostPortGenericContainer(
-      imageName = PostgresContainer.image,
-      env = Map(
-        "POSTGRES_USER"     -> cfg.user.value,
-        "POSTGRES_PASSWORD" -> cfg.pass.value
-      ),
-      exposedPorts = Seq(cfg.port.value),
-      exposedHostPort = cfg.port.value,
-      exposedContainerPort = cfg.port.value,
-      command = Seq(s"-p ${cfg.port.value}")
-    )
-  }
-
-  def startPostgres(implicit L: Logger[IO]) =
-    starting.getAndUpdate(_ => true).flatMap {
-      case false =>
-        IO.unlessA(postgresContainer.container.isRunning)(
-          IO(postgresContainer.start()) *> waitForPostgres *> L.info(
-            "PostgreSQL database started"
-          )
-        )
-
-      case true =>
-        waitForPostgres
-    }
-
-  private def waitForPostgres =
-    fs2.Stream
-      .awakeDelay[IO](0.5.seconds)
-      .evalMap { _ =>
-        Session
-          .single[IO](
-            host = dbConfig.host,
-            port = dbConfig.port,
-            user = dbConfig.user.value,
-            password = Some(dbConfig.pass.value),
-            database = dbConfig.name.value
-          )
-          .use(_.unique(sql"SELECT 1".query(int4)))
-          .attempt
-      }
-      .map(_.fold(_ => 1, _ => 0))
-      .take(100)
-      .find(_ == 0)
-      .compile
-      .drain
+  def start(): IO[Unit] =
+    IO(server.start())
 
   def sessionPool(dbCfg: DBConfig[_]): Resource[IO, Resource[IO, Session[IO]]] =
     Session
       .pooled[IO](
-        host = postgresContainer.host,
+        host = dbCfg.host.value,
         port = dbConfig.port.value,
         database = dbCfg.name.value,
         user = dbCfg.user.value,
@@ -117,15 +62,21 @@ object PostgresDB {
     // note: it would be simpler to use the default user that is created with the container, but that requires
     // to first refactor how the configuration is loaded. Currently services load it from the file every time and so
     // this creates the users as expected from the given config
+    val roleExists: Query[Void, Boolean] =
+      sql"SELECT EXISTS (SELECT 1 FROM pg_catalog.pg_roles WHERE rolname = '#${cfg.user.value}')".query(bool)
     val createRole: Command[Void] =
       sql"create role #${cfg.user.value} with password '#${cfg.pass.value}' superuser login".command
     val createDatabase: Command[Void] = sql"create database  #${cfg.name.value}".command
     val grants:         Command[Void] = sql"grant all on database #${cfg.name.value} to #${cfg.user.value}".command
 
     session.use { s =>
-      s.execute(createRole) *>
-        s.execute(createDatabase) *>
-        s.execute(grants)
+      s.unique(roleExists) >>= {
+        case true => ().pure[IO]
+        case false =>
+          s.execute(createRole) *>
+            s.execute(createDatabase) *>
+            s.execute(grants)
+      }
     }.void
   }
 }

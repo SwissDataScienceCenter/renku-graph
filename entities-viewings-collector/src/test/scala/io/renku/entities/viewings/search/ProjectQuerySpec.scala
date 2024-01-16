@@ -1,5 +1,5 @@
 /*
- * Copyright 2023 Swiss Data Science Center (SDSC)
+ * Copyright 2024 Swiss Data Science Center (SDSC)
  * A partnership between École Polytechnique Fédérale de Lausanne (EPFL) and
  * Eidgenössische Technische Hochschule Zürich (ETHZ).
  *
@@ -22,76 +22,84 @@ import io.renku.entities.search.model.{MatchingScore, Entity => SearchEntity}
 import io.renku.entities.viewings.search.RecentEntitiesFinder.Criteria
 import io.renku.generators.Generators.Implicits._
 import io.renku.http.server.security.model.AuthUser
+import io.renku.triplesstore.GraphJenaSpec
+import org.scalatest.Succeeded
 
 import java.time.Instant
 
-class ProjectQuerySpec extends SearchTestBase {
+class ProjectQuerySpec extends SearchSpec with GraphJenaSpec {
 
-  it should "return one project entry if viewed multiple times" in {
+  it should "return one project entry if viewed multiple times" in projectsDSConfig.use { implicit pcc =>
     val project = renkuProjectEntities(visibilityPublic)
       .withActivities(activityEntities(stepPlanEntities()))
       .generateOne
 
     val person = personGen.generateOne
-    upload(projectsDataset, person)
+    for {
+      _ <- uploadToProjects(person)
 
-    val userId = person.maybeGitLabId.get
+      userId = person.maybeGitLabId.get
 
-    provisionTestProjects(project).unsafeRunSync()
-    storeProjectViewed(userId, Instant.now().minusSeconds(60), project.slug)
-    storeProjectViewed(userId, Instant.now().minusSeconds(30), project.slug)
-    storeProjectViewed(userId, Instant.now(), project.slug)
+      _ <- provisionTestProjects(project)
+      _ <- storeProjectViewed(userId, Instant.now().minusSeconds(60), project.slug)
+      _ <- storeProjectViewed(userId, Instant.now().minusSeconds(30), project.slug)
+      _ <- storeProjectViewed(userId, Instant.now(), project.slug)
 
-    val query = ProjectQuery.makeQuery(Criteria(Set.empty, AuthUser(userId, token), 5))
+      query = ProjectQuery.makeQuery(Criteria(Set.empty, AuthUser(userId, token), 5))
 
-    val decoded = tsClient.queryExpecting[List[SearchEntity.Project]](query)(projectDecoder).unsafeRunSync()
-    decoded.head shouldMatchTo
-      SearchEntity.Project(
-        matchingScore = MatchingScore(1f),
-        slug = project.slug,
-        name = project.name,
-        visibility = project.visibility,
-        date = project.dateCreated,
-        dateModified = project.dateModified,
-        maybeCreator = project.maybeCreator.map(_.name),
-        keywords = project.keywords.toList.sorted,
-        maybeDescription = project.maybeDescription,
-        images = project.images
-      )
+      _ <- tsClient.queryExpecting[List[SearchEntity.Project]](query)(projectDecoder).asserting {
+             _.head shouldMatchTo
+               SearchEntity.Project(
+                 matchingScore = MatchingScore(1f),
+                 slug = project.slug,
+                 name = project.name,
+                 visibility = project.visibility,
+                 date = project.dateCreated,
+                 dateModified = project.dateModified,
+                 maybeCreator = project.maybeCreator.map(_.name),
+                 keywords = project.keywords.toList.sorted,
+                 maybeDescription = project.maybeDescription,
+                 images = project.images
+               )
+           }
+    } yield Succeeded
   }
 
-  it should "find and decode projects" in {
+  it should "find and decode projects" in projectsDSConfig.use { implicit pcc =>
     val project = renkuProjectEntities(visibilityPublic)
       .withActivities(activityEntities(stepPlanEntities()))
       .generateOne
 
     val person = personGen.generateOne
-    upload(projectsDataset, person)
+    for {
+      _ <- uploadToProjects(person)
 
-    val userId = person.maybeGitLabId.get
+      userId = person.maybeGitLabId.get
 
-    provisionTestProjects(project).unsafeRunSync()
-    storeProjectViewed(userId, Instant.now(), project.slug)
+      _ <- provisionTestProjects(project)
+      _ <- storeProjectViewed(userId, Instant.now(), project.slug)
 
-    val query = ProjectQuery.makeQuery(Criteria(Set.empty, AuthUser(userId, token), 5))
+      query = ProjectQuery.makeQuery(Criteria(Set.empty, AuthUser(userId, token), 5))
 
-    val decoded = tsClient.queryExpecting[List[SearchEntity.Project]](query)(projectDecoder).unsafeRunSync()
-    decoded.head shouldMatchTo
-      SearchEntity.Project(
-        matchingScore = MatchingScore(1f),
-        slug = project.slug,
-        name = project.name,
-        visibility = project.visibility,
-        date = project.dateCreated,
-        dateModified = project.dateModified,
-        maybeCreator = project.maybeCreator.map(_.name),
-        keywords = project.keywords.toList.sorted,
-        maybeDescription = project.maybeDescription,
-        images = project.images
-      )
+      _ <- tsClient.queryExpecting[List[SearchEntity.Project]](query)(projectDecoder).asserting {
+             _.head shouldMatchTo
+               SearchEntity.Project(
+                 matchingScore = MatchingScore(1f),
+                 slug = project.slug,
+                 name = project.name,
+                 visibility = project.visibility,
+                 date = project.dateCreated,
+                 dateModified = project.dateModified,
+                 maybeCreator = project.maybeCreator.map(_.name),
+                 keywords = project.keywords.toList.sorted,
+                 maybeDescription = project.maybeDescription,
+                 images = project.images
+               )
+           }
+    } yield Succeeded
   }
 
-  it should "only return projects for the given user" in {
+  it should "only return projects for the given user" in projectsDSConfig.use { implicit pcc =>
     val project1 = renkuProjectEntities(visibilityPublic)
       .withActivities(activityEntities(stepPlanEntities()))
       .generateOne
@@ -101,27 +109,30 @@ class ProjectQuerySpec extends SearchTestBase {
 
     val person1 = personGen.generateOne
     val person2 = personGen.generateOne
-    upload(projectsDataset, person1, person2)
-    provisionTestProjects(project1, project2).unsafeRunSync()
+    for {
+      _ <- uploadToProjects(person1, person2)
+      _ <- provisionTestProjects(project1, project2)
 
-    storeProjectViewed(person1.maybeGitLabId.get, Instant.now(), project1.slug)
-    storeProjectViewed(person2.maybeGitLabId.get, Instant.now(), project2.slug)
+      _ <- storeProjectViewed(person1.maybeGitLabId.get, Instant.now(), project1.slug)
+      _ <- storeProjectViewed(person2.maybeGitLabId.get, Instant.now(), project2.slug)
 
-    val query = ProjectQuery.makeQuery(Criteria(Set.empty, AuthUser(person1.maybeGitLabId.get, token), 5))
+      query = ProjectQuery.makeQuery(Criteria(Set.empty, AuthUser(person1.maybeGitLabId.get, token), 5))
 
-    val decoded = tsClient.queryExpecting[List[SearchEntity.Project]](query)(projectDecoder).unsafeRunSync()
-    decoded.head shouldMatchTo
-      SearchEntity.Project(
-        matchingScore = MatchingScore(1f),
-        slug = project1.slug,
-        name = project1.name,
-        visibility = project1.visibility,
-        date = project1.dateCreated,
-        dateModified = project1.dateModified,
-        maybeCreator = project1.maybeCreator.map(_.name),
-        keywords = project1.keywords.toList.sorted,
-        maybeDescription = project1.maybeDescription,
-        images = project1.images
-      )
+      _ <- tsClient.queryExpecting[List[SearchEntity.Project]](query)(projectDecoder).asserting {
+             _.head shouldMatchTo
+               SearchEntity.Project(
+                 matchingScore = MatchingScore(1f),
+                 slug = project1.slug,
+                 name = project1.name,
+                 visibility = project1.visibility,
+                 date = project1.dateCreated,
+                 dateModified = project1.dateModified,
+                 maybeCreator = project1.maybeCreator.map(_.name),
+                 keywords = project1.keywords.toList.sorted,
+                 maybeDescription = project1.maybeDescription,
+                 images = project1.images
+               )
+           }
+    } yield Succeeded
   }
 }

@@ -1,5 +1,5 @@
 /*
- * Copyright 2023 Swiss Data Science Center (SDSC)
+ * Copyright 2024 Swiss Data Science Center (SDSC)
  * A partnership between École Polytechnique Fédérale de Lausanne (EPFL) and
  * Eidgenössische Technische Hochschule Zürich (ETHZ).
  *
@@ -20,6 +20,7 @@ package io.renku.eventlog.events.consumers.cleanuprequest
 
 import cats.effect.IO
 import cats.syntax.all._
+import io.renku.eventlog.api.events.CleanUpRequest
 import io.renku.generators.Generators.Implicits._
 import io.renku.graph.model.GraphModelGenerators._
 import io.renku.graph.model.projects
@@ -40,7 +41,7 @@ class EventProcessorSpec extends AnyWordSpec with IOSpec with should.Matchers wi
 
       (eventsQueue.offer _).expects(projectId, projectSlug).returning(().pure[IO])
 
-      processor.process(CleanUpRequestEvent(projectId, projectSlug)).unsafeRunSync() shouldBe ()
+      processor.process(CleanUpRequest(projectId, projectSlug)).unsafeRunSync() shouldBe ()
     }
 
     "offer project id and slug to the queue if a Partial event is given " +
@@ -52,7 +53,7 @@ class EventProcessorSpec extends AnyWordSpec with IOSpec with should.Matchers wi
 
         (eventsQueue.offer _).expects(projectId, projectSlug).returning(().pure[IO])
 
-        processor.process(CleanUpRequestEvent(projectSlug)).unsafeRunSync() shouldBe ()
+        processor.process(CleanUpRequest(projectSlug)).unsafeRunSync() shouldBe ()
       }
 
     "log a warning for a Partial event when projectId cannot be found in the project table" in new TestCase {
@@ -60,7 +61,7 @@ class EventProcessorSpec extends AnyWordSpec with IOSpec with should.Matchers wi
 
       (projectIdFinder.findProjectId _).expects(projectSlug).returning(Option.empty[projects.GitLabId].pure[IO])
 
-      processor.process(CleanUpRequestEvent(projectSlug)).unsafeRunSync() shouldBe ()
+      processor.process(CleanUpRequest(projectSlug)).unsafeRunSync() shouldBe ()
     }
   }
 

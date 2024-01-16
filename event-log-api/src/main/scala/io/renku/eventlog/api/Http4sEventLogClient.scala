@@ -1,5 +1,5 @@
 /*
- * Copyright 2023 Swiss Data Science Center (SDSC)
+ * Copyright 2024 Swiss Data Science Center (SDSC)
  * A partnership between École Polytechnique Fédérale de Lausanne (EPFL) and
  * Eidgenössische Technische Hochschule Zürich (ETHZ).
  *
@@ -22,14 +22,15 @@ import EventLogClient.{EventPayload, Result, SearchCriteria}
 import Http4sEventLogClient.Implicits._
 import cats.effect._
 import cats.syntax.all._
+import io.circe.Decoder
 import io.renku.control.Throttler
 import io.renku.graph.model.eventlogapi.ServiceStatus
 import io.renku.graph.model.events.{EventId, EventInfo}
 import io.renku.graph.model.projects.{Slug => ProjectSlug}
+import io.renku.http.RenkuEntityCodec
 import io.renku.http.client.RestClient
 import io.renku.tinytypes.TinyType
 import org.http4s.Uri.Path.SegmentEncoder
-import org.http4s.circe.CirceEntityCodec._
 import org.http4s.client.dsl.Http4sClientDsl
 import org.http4s.dsl.Http4sDsl
 import org.http4s.{QueryParamEncoder, Uri}
@@ -44,7 +45,8 @@ private[eventlog] final class Http4sEventLogClient[F[_]: Async: Logger](baseUri:
     extends RestClient[F, Nothing](Throttler.noThrottling)
     with EventLogClient[F]
     with Http4sDsl[F]
-    with Http4sClientDsl[F] {
+    with Http4sClientDsl[F]
+    with RenkuEntityCodec {
 
   def getEvents(criteria: EventLogClient.SearchCriteria): F[Result[List[EventInfo]]] = {
     val request = GET(
@@ -60,7 +62,7 @@ private[eventlog] final class Http4sEventLogClient[F[_]: Async: Logger](baseUri:
     )
 
     send(request) {
-      case (Ok, _, resp) => resp.as[List[EventInfo]].map(Result.success)
+      case (Ok, _, resp) => resp.asJson(Decoder.decodeList[EventInfo]).map(Result.success)
       case (ServiceUnavailable, _, _) =>
         Logger[F]
           .info("The event-log service is currently not available")
@@ -96,7 +98,7 @@ private[eventlog] final class Http4sEventLogClient[F[_]: Async: Logger](baseUri:
   override def getStatus: F[Result[ServiceStatus]] =
     send(GET(baseUri / "status")) {
       case (Ok, _, resp) =>
-        resp.as[ServiceStatus].map(Result.success)
+        resp.asJson(ServiceStatus.jsonDecoder).map(Result.success)
       case (ServiceUnavailable, _, _) =>
         Logger[F]
           .info("The event-log service is currently not available")

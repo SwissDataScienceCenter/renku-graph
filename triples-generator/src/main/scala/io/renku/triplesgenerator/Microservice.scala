@@ -1,5 +1,5 @@
 /*
- * Copyright 2023 Swiss Data Science Center (SDSC)
+ * Copyright 2024 Swiss Data Science Center (SDSC)
  * A partnership between École Polytechnique Fédérale de Lausanne (EPFL) and
  * Eidgenössische Technische Hochschule Zürich (ETHZ).
  *
@@ -31,18 +31,18 @@ import io.renku.events.consumers.EventConsumersRegistry
 import io.renku.events.{CategoryName, consumers}
 import io.renku.graph.config.RenkuUrlLoader
 import io.renku.graph.model.{RenkuUrl, datasets, projects}
-import io.renku.graph.tokenrepository.AccessTokenFinder
 import io.renku.http.client.GitLabClient
 import io.renku.http.server.HttpServer
 import io.renku.logging.ApplicationLogger
-import io.renku.metrics.MetricsRegistry
-import io.renku.microservices.{IOMicroservice, ResourceUse, ServiceReadinessChecker}
+import io.renku.metrics.{MetricsRegistry, MetricsRegistryLoader}
+import io.renku.microservices.{IOMicroservice, ServiceReadinessChecker}
 import io.renku.triplesgenerator.config.certificates.GitCertificateInstaller
 import io.renku.triplesgenerator.events.consumers._
 import io.renku.triplesgenerator.events.consumers.tsmigrationrequest.migrations.reprovisioning.ReProvisioningStatus
 import io.renku.triplesgenerator.init.{CliVersionCompatibilityChecker, CliVersionCompatibilityVerifier}
 import io.renku.triplesgenerator.metrics.MetricsService
 import io.renku.triplesstore.{ProjectSparqlClient, ProjectsConnectionConfig, SparqlQueryTimeRecorder}
+import io.renku.utils.common.ResourceUse
 import natchez.Trace.Implicits.noop
 import org.http4s.server.Server
 import org.typelevel.log4cats.Logger
@@ -68,10 +68,10 @@ object Microservice extends IOMicroservice {
       dbSessionPool <- Resource
                          .eval(new TgDbConfigProvider[IO].map(SessionPoolResource[IO, TgDB]))
                          .flatMap(identity)
-      implicit0(mr: MetricsRegistry[IO])           <- Resource.eval(MetricsRegistry[IO]())
+      implicit0(mr: MetricsRegistry[IO])           <- Resource.eval(MetricsRegistryLoader[IO]())
       implicit0(sqtr: SparqlQueryTimeRecorder[IO]) <- Resource.eval(SparqlQueryTimeRecorder.create[IO]())
 
-      projectConnConfig <- Resource.eval(ProjectsConnectionConfig[IO](config))
+      projectConnConfig <- Resource.eval(ProjectsConnectionConfig.fromConfig[IO](config))
       projectsSparql    <- ProjectSparqlClient[IO](projectConnConfig)
     } yield (config, dbSessionPool, projectsSparql, mr, sqtr)
 
@@ -87,7 +87,6 @@ object Microservice extends IOMicroservice {
   )(implicit mr: MetricsRegistry[IO], sqtr: SparqlQueryTimeRecorder[IO]): IO[ExitCode] = for {
 
     implicit0(gc: GitLabClient[IO])         <- GitLabClient[IO]()
-    implicit0(acf: AccessTokenFinder[IO])   <- AccessTokenFinder[IO]()
     implicit0(rp: ReProvisioningStatus[IO]) <- ReProvisioningStatus[IO]()
     implicit0(rurl: RenkuUrl)               <- RenkuUrlLoader[IO](config)
 
@@ -99,7 +98,7 @@ object Microservice extends IOMicroservice {
     tsWriteLock   = TgDB.createLock[IO, projects.Slug](sessionResource, 0.5.seconds)
     categoryLock  = TgDB.createLock[IO, CategoryName](sessionResource, 0.5.seconds)
     topSameAsLock = TgDB.createLock[IO, datasets.TopmostSameAs](sessionResource, 0.5.seconds)
-    projectConnConfig              <- ProjectsConnectionConfig[IO](config)
+    projectConnConfig              <- ProjectsConnectionConfig.fromConfig[IO](config)
     certificateLoader              <- CertificateLoader[IO]
     gitCertificateInstaller        <- GitCertificateInstaller[IO]
     sentryInitializer              <- SentryInitializer[IO]

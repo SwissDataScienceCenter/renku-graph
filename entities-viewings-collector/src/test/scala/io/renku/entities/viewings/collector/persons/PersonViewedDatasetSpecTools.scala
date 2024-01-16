@@ -1,5 +1,5 @@
 /*
- * Copyright 2023 Swiss Data Science Center (SDSC)
+ * Copyright 2024 Swiss Data Science Center (SDSC)
  * A partnership between École Polytechnique Fédérale de Lausanne (EPFL) and
  * Eidgenössische Technische Hochschule Zürich (ETHZ).
  *
@@ -18,24 +18,25 @@
 
 package io.renku.entities.viewings.collector.persons
 
+import cats.effect.IO
+import cats.effect.testing.scalatest.AsyncIOSpec
 import eu.timepit.refined.auto._
 import io.renku.entities.viewings.collector
 import io.renku.graph.model.Schemas.renku
 import io.renku.graph.model.{GraphClass, datasets, entities, persons}
 import io.renku.jsonld.syntax._
-import io.renku.testtools.IOSpec
 import io.renku.triplesstore.SparqlQuery.Prefixes
 import io.renku.triplesstore._
 import io.renku.triplesstore.client.syntax._
+import org.typelevel.log4cats.Logger
 
 import java.time.Instant
 
 trait PersonViewedDatasetSpecTools {
-  self: InMemoryJenaForSpec with ProjectsDataset with IOSpec =>
+  self: TestProjectsDataset with AsyncIOSpec =>
 
-  protected def findAllViewings =
+  protected def findAllViewings(implicit pcc: ProjectsConnectionConfig, L: Logger[IO]) =
     runSelect(
-      on = projectsDataset,
       SparqlQuery.of(
         "test find user dataset viewings",
         Prefixes of renku -> "renku",
@@ -47,14 +48,14 @@ trait PersonViewedDatasetSpecTools {
                  |}
                  |""".stripMargin
       )
-    ).unsafeRunSync()
-      .map(row =>
+    ).map(
+      _.map(row =>
         ViewingRecord(persons.ResourceId(row("id")),
                       datasets.ResourceId(row("datasetId")),
                       datasets.DateViewed(Instant.parse(row("date")))
         )
-      )
-      .toSet
+      ).toSet
+    )
 
   protected case class ViewingRecord(userId:    persons.ResourceId,
                                      datasetId: datasets.ResourceId,
@@ -64,23 +65,24 @@ trait PersonViewedDatasetSpecTools {
   protected def toCollectorDataset(ds: entities.Dataset[entities.Dataset.Provenance]) =
     collector.persons.Dataset(ds.resourceId, ds.identification.identifier)
 
-  protected def insertOtherDate(datasetId: datasets.ResourceId, dateViewed: datasets.DateViewed) =
-    runUpdate(
-      on = projectsDataset,
-      SparqlQuery.of(
-        "test add another user dataset dateViewed",
-        Prefixes of renku -> "renku",
-        sparql"""|INSERT {
-                 |  GRAPH ${GraphClass.PersonViewings.id} {
-                 |    ?viewingId renku:dateViewed ${dateViewed.asObject}
-                 |  }
-                 |}
-                 |WHERE {
-                 |  GRAPH ${GraphClass.PersonViewings.id} {
-                 |    ?viewingId renku:dataset ${datasetId.asEntityId}
-                 |  }
-                 |}
-                 |""".stripMargin
-      )
-    ).unsafeRunSync()
+  protected def insertOtherDate(datasetId: datasets.ResourceId, dateViewed: datasets.DateViewed)(implicit
+      pcc: ProjectsConnectionConfig,
+      L:   Logger[IO]
+  ): IO[Unit] = runUpdate(
+    SparqlQuery.of(
+      "test add another user dataset dateViewed",
+      Prefixes of renku -> "renku",
+      sparql"""|INSERT {
+               |  GRAPH ${GraphClass.PersonViewings.id} {
+               |    ?viewingId renku:dateViewed ${dateViewed.asObject}
+               |  }
+               |}
+               |WHERE {
+               |  GRAPH ${GraphClass.PersonViewings.id} {
+               |    ?viewingId renku:dataset ${datasetId.asEntityId}
+               |  }
+               |}
+               |""".stripMargin
+    )
+  )
 }

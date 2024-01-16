@@ -1,5 +1,5 @@
 /*
- * Copyright 2023 Swiss Data Science Center (SDSC)
+ * Copyright 2024 Swiss Data Science Center (SDSC)
  * A partnership between École Polytechnique Fédérale de Lausanne (EPFL) and
  * Eidgenössische Technische Hochschule Zürich (ETHZ).
  *
@@ -21,27 +21,28 @@ package io.renku.core.client
 import Generators.newProjectsGen
 import io.circe.literal._
 import io.circe.syntax._
-import io.renku.generators.Generators.Implicits._
 import org.scalatest.EitherValues
 import org.scalatest.flatspec.AnyFlatSpec
 import org.scalatest.matchers.should
+import org.scalatestplus.scalacheck.ScalaCheckPropertyChecks
 
-class NewProjectSpec extends AnyFlatSpec with should.Matchers with EitherValues {
+class NewProjectSpec extends AnyFlatSpec with should.Matchers with EitherValues with ScalaCheckPropertyChecks {
 
   it should "encode to JSON" in {
-
-    val newProject = newProjectsGen.generateOne
-
-    newProject.asJson shouldBe
-      json"""{
-        "url":                 ${newProject.template.repositoryUrl},
-        "identifier":          ${newProject.template.identifier},
-        "project_repository":  ${newProject.projectRepository},
-        "project_namespace":   ${newProject.namespace},
-        "project_name":        ${newProject.name},
-        "project_keywords":    ${newProject.keywords},
-        "project_description": ${newProject.maybeDescription},
-        "initial_branch":      ${newProject.branch}
-      }""".dropNullValues
+    forAll(newProjectsGen) { newProject =>
+      newProject.asJson shouldBe
+        json"""{
+          "url":                 ${newProject.template.repositoryUrl},
+          "identifier":          ${newProject.template.identifier},
+          "ref":                 ${newProject.template.maybeRef},
+          "parameters":          ${newProject.template.maybeParameters.map(_.value)},
+          "project_repository":  ${newProject.projectRepository},
+          "project_namespace":   ${newProject.namespace},
+          "project_name":        ${newProject.name},
+          "project_keywords":    ${newProject.keywords},
+          "project_description": ${newProject.maybeDescription},
+          "initial_branch":      ${newProject.branch}
+        }""".dropNullValues
+    }
   }
 }

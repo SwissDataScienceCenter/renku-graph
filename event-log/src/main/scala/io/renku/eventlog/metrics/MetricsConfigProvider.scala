@@ -1,5 +1,5 @@
 /*
- * Copyright 2023 Swiss Data Science Center (SDSC)
+ * Copyright 2024 Swiss Data Science Center (SDSC)
  * A partnership between École Polytechnique Fédérale de Lausanne (EPFL) and
  * Eidgenössische Technische Hochschule Zürich (ETHZ).
  *
@@ -20,7 +20,7 @@ package io.renku.eventlog.metrics
 
 import cats.MonadThrow
 import com.typesafe.config.{Config, ConfigFactory}
-import io.renku.config.MetricsConfigProvider
+import io.renku.metrics.MetricsConfigProvider
 
 import scala.concurrent.duration.FiniteDuration
 

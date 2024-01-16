@@ -1,5 +1,5 @@
 /*
- * Copyright 2023 Swiss Data Science Center (SDSC)
+ * Copyright 2024 Swiss Data Science Center (SDSC)
  * A partnership between École Polytechnique Fédérale de Lausanne (EPFL) and
  * Eidgenössische Technische Hochschule Zürich (ETHZ).
  *
@@ -117,7 +117,7 @@ private[migrations] object ProjectsDateViewedCreator {
 
   def apply[F[_]: Async: Logger: MetricsRegistry: SparqlQueryTimeRecorder]: F[Migration[F]] =
     for {
-      tsClient          <- ProjectsConnectionConfig[F]().map(TSClient[F](_))
+      tsClient          <- ProjectsConnectionConfig.fromConfig[F]().map(TSClient[F](_))
       elClient          <- EventLogClient[F]
       tgClient          <- triplesgenerator.api.events.Client[F]
       executionRegister <- MigrationExecutionRegister[F]

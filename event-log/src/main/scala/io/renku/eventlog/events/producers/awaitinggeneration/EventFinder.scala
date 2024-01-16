@@ -1,5 +1,5 @@
 /*
- * Copyright 2023 Swiss Data Science Center (SDSC)
+ * Copyright 2024 Swiss Data Science Center (SDSC)
  * A partnership between École Polytechnique Fédérale de Lausanne (EPFL) and
  * Eidgenössische Technische Hochschule Zürich (ETHZ).
  *
@@ -34,6 +34,7 @@ import io.renku.eventlog.events.producers.DefaultSubscribers.DefaultSubscribers
 import io.renku.eventlog.events.producers.ProjectPrioritisation.{Priority, ProjectInfo}
 import io.renku.eventlog.events.producers.{EventFinder, ProjectPrioritisation}
 import io.renku.eventlog.metrics.{EventStatusGauges, QueriesExecutionTimes}
+import io.renku.events.consumers.Project
 import io.renku.graph.model.events.EventStatus._
 import io.renku.graph.model.events.{CompoundEventId, EventDate, EventId, EventStatus, ExecutionDate}
 import io.renku.graph.model.projects
@@ -116,7 +117,7 @@ private class EventFinderImpl[F[_]: Async: Parallel: SessionResource: QueriesExe
           .query(projectIdDecoder ~ projectSlugDecoder ~ eventDateDecoder ~ int8)
           .map {
             case (id: projects.GitLabId) ~ (slug: projects.Slug) ~ (eventDate: EventDate) ~ (currentOccupancy: Long) =>
-              ProjectInfo(id, slug, eventDate, Refined.unsafeApply(currentOccupancy.toInt))
+              ProjectInfo(Project(id, slug), eventDate, Refined.unsafeApply(currentOccupancy.toInt))
           }
       )
       .arguments(ExecutionDate(now()) *: ExecutionDate(now()) *: projectsFetchingLimit.value *: EmptyTuple)

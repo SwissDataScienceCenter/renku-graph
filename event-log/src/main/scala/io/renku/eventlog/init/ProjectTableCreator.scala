@@ -1,5 +1,5 @@
 /*
- * Copyright 2023 Swiss Data Science Center (SDSC)
+ * Copyright 2024 Swiss Data Science Center (SDSC)
  * A partnership between École Polytechnique Fédérale de Lausanne (EPFL) and
  * Eidgenössische Technische Hochschule Zürich (ETHZ).
  *
@@ -47,9 +47,9 @@ private class ProjectTableCreatorImpl[F[_]: MonadCancelThrow: Logger: SessionRes
 
   private def createTable(): Kleisli[F, Session[F], Unit] = for {
     _ <- execute(createTableSql)
-    _ <- execute(sql"CREATE INDEX IF NOT EXISTS idx_project_id        ON project(project_id)".command)
-    _ <- execute(sql"CREATE INDEX IF NOT EXISTS idx_project_path      ON project(project_path)".command)
-    _ <- execute(sql"CREATE INDEX IF NOT EXISTS idx_latest_event_date ON project(latest_event_date)".command)
+    _ <- execute(sql"CREATE INDEX IF NOT EXISTS idx_project_project_id        ON project(project_id)".command)
+    _ <- execute(sql"CREATE INDEX IF NOT EXISTS idx_project_project_path      ON project(project_path)".command)
+    _ <- execute(sql"CREATE INDEX IF NOT EXISTS idx_project_latest_event_date ON project(latest_event_date)".command)
     _ <- Kleisli.liftF(Logger[F] info "'project' table created")
     _ <- execute(fillInTableSql)
     _ <- Kleisli.liftF(Logger[F] info "'project' table filled in")

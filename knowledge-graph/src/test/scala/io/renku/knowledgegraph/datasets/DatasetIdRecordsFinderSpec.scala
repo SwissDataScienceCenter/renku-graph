@@ -1,5 +1,5 @@
 /*
- * Copyright 2023 Swiss Data Science Center (SDSC)
+ * Copyright 2024 Swiss Data Science Center (SDSC)
  * A partnership between École Polytechnique Fédérale de Lausanne (EPFL) and
  * Eidgenössische Technische Hochschule Zürich (ETHZ).
  *
@@ -21,12 +21,14 @@ package io.renku.knowledgegraph.datasets
 import cats.effect.IO
 import io.renku.generators.Generators.Implicits._
 import io.renku.graph.model.testentities.generators.EntitiesGenerators
-import io.renku.triplesstore.ProjectSparqlClient
+import io.renku.triplesstore.{ProjectSparqlClient, ProjectsConnectionConfig}
 
 class DatasetIdRecordsFinderSpec extends SecurityRecordFinderSupport {
-  lazy val finder = ProjectSparqlClient[IO](projectsDSConnectionInfo).map(DatasetIdRecordsFinder.apply[IO])
 
-  it should "find security records for a simple project with one dataset" in {
+  private def finder(implicit pcc: ProjectsConnectionConfig) =
+    ProjectSparqlClient[IO](pcc).map(DatasetIdRecordsFinder.apply[IO])
+
+  it should "find security records for a simple project with one dataset" in projectsDSConfig.use { implicit pcc =>
     val project = projectWithDatasetAndMembers.generateOne
 
     val dsId = project.datasets.head.identification.identifier
@@ -38,7 +40,7 @@ class DatasetIdRecordsFinderSpec extends SecurityRecordFinderSupport {
     } yield ()
   }
 
-  it should "find security records without members if there are none" in {
+  it should "find security records without members if there are none" in projectsDSConfig.use { implicit pcc =>
     val project = projectWithDatasetAndNoMembers.generateOne
     val dsId    = project.datasets.head.identification.identifier
     for {
@@ -48,7 +50,7 @@ class DatasetIdRecordsFinderSpec extends SecurityRecordFinderSupport {
     } yield ()
   }
 
-  it should "find security records for a forked project" in {
+  it should "find security records for a forked project" in projectsDSConfig.use { implicit pcc =>
     val (dataset, (parentProject, project)) = projectAndFork.generateOne
 
     val dsId = dataset.identification.identifier
@@ -60,7 +62,7 @@ class DatasetIdRecordsFinderSpec extends SecurityRecordFinderSupport {
     } yield ()
   }
 
-  it should "find security records for the project that has the dataset" in {
+  it should "find security records for the project that has the dataset" in projectsDSConfig.use { implicit pcc =>
     val createProjects = projectWithDatasetAndMembers.asStream.toIO
       .evalTap(provisionTestProject(_))
       .take(3)
@@ -75,7 +77,7 @@ class DatasetIdRecordsFinderSpec extends SecurityRecordFinderSupport {
     } yield ()
   }
 
-  it should "find nothing if there is no project using the dataset" in {
+  it should "find nothing if there is no project using the dataset" in projectsDSConfig.use { implicit pcc =>
     val project = projectWithDatasetAndMembers.generateOne
     val dsId = EntitiesGenerators.datasetIdentifiers
       .suchThat(_ != project.datasets.head.identification.identifier)

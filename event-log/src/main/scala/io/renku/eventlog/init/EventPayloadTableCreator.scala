@@ -1,5 +1,5 @@
 /*
- * Copyright 2023 Swiss Data Science Center (SDSC)
+ * Copyright 2024 Swiss Data Science Center (SDSC)
  * A partnership between École Polytechnique Fédérale de Lausanne (EPFL) and
  * Eidgenössische Technische Hochschule Zürich (ETHZ).
  *
@@ -61,8 +61,8 @@ private class EventPayloadTableCreatorImpl[F[_]: MonadCancelThrow: Logger: Sessi
 
   private def createTable(): Kleisli[F, Session[F], Unit] = for {
     _ <- execute(createTableSql)
-    _ <- execute(sql"CREATE INDEX IF NOT EXISTS idx_event_id ON event_payload(event_id)".command)
-    _ <- execute(sql"CREATE INDEX IF NOT EXISTS idx_project_id ON event_payload(project_id)".command)
+    _ <- execute(sql"CREATE INDEX IF NOT EXISTS idx_event_payload_event_id ON event_payload(event_id)".command)
+    _ <- execute(sql"CREATE INDEX IF NOT EXISTS idx_event_payload_project_id ON event_payload(project_id)".command)
     _ <- Kleisli.liftF(Logger[F] info "'event_payload' table created")
     _ <- execute(foreignKeySql)
   } yield ()

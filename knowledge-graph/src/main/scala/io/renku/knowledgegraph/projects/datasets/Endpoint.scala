@@ -1,5 +1,5 @@
 /*
- * Copyright 2023 Swiss Data Science Center (SDSC)
+ * Copyright 2024 Swiss Data Science Center (SDSC)
  * A partnership between École Polytechnique Fédérale de Lausanne (EPFL) and
  * Eidgenössische Technische Hochschule Zürich (ETHZ).
  *
@@ -28,11 +28,12 @@ import io.renku.config.renku
 import io.renku.data.Message
 import io.renku.graph.config.{GitLabUrlLoader, RenkuUrlLoader}
 import io.renku.graph.model.{GitLabUrl, RenkuUrl, projects}
+import io.renku.http.RenkuEntityCodec
 import io.renku.http.rest.Links._
 import io.renku.http.rest.SortBy.Direction
 import io.renku.http.rest.Sorting
 import io.renku.http.rest.paging.{PagingHeaders, PagingRequest, PagingResponse}
-import io.renku.logging.ExecutionTimeRecorder
+import io.renku.logging.{ExecutionTimeRecorder, ExecutionTimeRecorderLoader}
 import io.renku.triplesstore.{ProjectsConnectionConfig, SparqlQueryTimeRecorder}
 import org.http4s.dsl.Http4sDsl
 import org.http4s.{Header, Request, Response}
@@ -49,10 +50,10 @@ class EndpointImpl[F[_]: MonadCancelThrow: Logger](
     executionTimeRecorder: ExecutionTimeRecorder[F]
 )(implicit renkuUrl: RenkuUrl, renkuApiUrl: renku.ApiUrl, gitLabUrl: GitLabUrl)
     extends Http4sDsl[F]
+    with RenkuEntityCodec
     with Endpoint[F] {
 
   import executionTimeRecorder._
-  import org.http4s.circe._
 
   def `GET /projects/:slug/datasets`(request: Request[F], criteria: Criteria): F[Response[F]] =
     measureAndLogTime(finishedSuccessfully(criteria.projectSlug)) {
@@ -113,8 +114,8 @@ object Endpoint {
     implicit0(renkuUrl: RenkuUrl)        <- RenkuUrlLoader()
     implicit0(gitLabUrl: GitLabUrl)      <- GitLabUrlLoader[F]()
     implicit0(renkuApiUrl: renku.ApiUrl) <- renku.ApiUrl[F]()
-    renkuConnectionConfig                <- ProjectsConnectionConfig[F]()
-    executionTimeRecorder                <- ExecutionTimeRecorder[F]()
+    renkuConnectionConfig                <- ProjectsConnectionConfig.fromConfig[F]()
+    executionTimeRecorder                <- ExecutionTimeRecorderLoader[F]()
   } yield new EndpointImpl[F](ProjectDatasetsFinder(renkuConnectionConfig), executionTimeRecorder)
 
   def href(renkuApiUrl: renku.ApiUrl, projectSlug: projects.Slug): Href =

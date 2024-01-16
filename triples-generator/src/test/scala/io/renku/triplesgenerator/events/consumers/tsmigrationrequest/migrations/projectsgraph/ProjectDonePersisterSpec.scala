@@ -1,5 +1,5 @@
 /*
- * Copyright 2023 Swiss Data Science Center (SDSC)
+ * Copyright 2024 Swiss Data Science Center (SDSC)
  * A partnership between École Polytechnique Fédérale de Lausanne (EPFL) and
  * Eidgenössische Technische Hochschule Zürich (ETHZ).
  *
@@ -19,51 +19,47 @@
 package io.renku.triplesgenerator.events.consumers.tsmigrationrequest.migrations.projectsgraph
 
 import cats.effect.IO
+import cats.effect.testing.scalatest.AsyncIOSpec
 import io.renku.generators.Generators.Implicits._
 import io.renku.graph.model.GraphModelGenerators.renkuUrls
 import io.renku.graph.model.RenkuTinyTypeGenerators.projectSlugs
 import io.renku.graph.model.RenkuUrl
 import io.renku.interpreters.TestLogger
-import io.renku.logging.TestSparqlQueryTimeRecorder
-import io.renku.testtools.IOSpec
 import io.renku.triplesstore._
-import org.scalatest.OptionValues
 import org.scalatest.matchers.should
-import org.scalatest.wordspec.AnyWordSpec
+import org.scalatest.wordspec.AsyncWordSpec
+import org.scalatest.{OptionValues, Succeeded}
 
 import scala.util.Random
 
 class ProjectDonePersisterSpec
-    extends AnyWordSpec
+    extends AsyncWordSpec
+    with AsyncIOSpec
+    with GraphJenaSpec
     with should.Matchers
-    with IOSpec
-    with InMemoryJenaForSpec
-    with MigrationsDataset
     with OptionValues {
 
   "noteDone" should {
 
-    "remove the (ProvisionProjectsGraph, renku:toBeMigrated, slug) triple" in new TestCase {
-
+    "remove the (ProvisionProjectsGraph, renku:toBeMigrated, slug) triple" in migrationsDSConfig.use { implicit mcc =>
       val slugs       = projectSlugs.generateList(min = 2)
       val insertQuery = BacklogCreator.asToBeMigratedInserts.apply(slugs).value
+      val finder      = progressFinder
 
-      runUpdate(on = migrationsDataset, insertQuery).unsafeRunSync()
+      for {
+        _ <- runUpdate(insertQuery)
 
-      progressFinder.findProgressInfo.unsafeRunSync() shouldBe s"${slugs.size} left from ${slugs.size}"
+        _ <- finder.findProgressInfo.asserting(_ shouldBe s"${slugs.size} left from ${slugs.size}")
 
-      donePersister.noteDone(Random.shuffle(slugs).head).unsafeRunSync()
+        _ <- donePersister.noteDone(Random.shuffle(slugs).head)
 
-      progressFinder.findProgressInfo.unsafeRunSync() shouldBe s"${slugs.size - 1} left from ${slugs.size}"
+        _ <- finder.findProgressInfo.asserting(_ shouldBe s"${slugs.size - 1} left from ${slugs.size}")
+      } yield Succeeded
     }
   }
 
-  private trait TestCase {
-    implicit val renkuUrl:       RenkuUrl                    = renkuUrls.generateOne
-    private implicit val logger: TestLogger[IO]              = TestLogger[IO]()
-    private implicit val tr:     SparqlQueryTimeRecorder[IO] = TestSparqlQueryTimeRecorder[IO].unsafeRunSync()
-    private val tsClient = TSClient[IO](migrationsDSConnectionInfo)
-    val progressFinder   = new ProgressFinderImpl[IO](tsClient)
-    val donePersister    = new ProjectDonePersisterImpl[IO](tsClient)
-  }
+  implicit val renkuUrl:            RenkuUrl       = renkuUrls.generateOne
+  private implicit lazy val logger: TestLogger[IO] = TestLogger[IO]()
+  private def progressFinder(implicit mcc: MigrationsConnectionConfig) = new ProgressFinderImpl[IO](tsClient)
+  private def donePersister(implicit mcc:  MigrationsConnectionConfig) = new ProjectDonePersisterImpl[IO](tsClient)
 }

@@ -1,5 +1,5 @@
 /*
- * Copyright 2023 Swiss Data Science Center (SDSC)
+ * Copyright 2024 Swiss Data Science Center (SDSC)
  * A partnership between École Polytechnique Fédérale de Lausanne (EPFL) and
  * Eidgenössische Technische Hochschule Zürich (ETHZ).
  *
@@ -19,11 +19,11 @@
 package io.renku.graph.model
 
 import io.circe.literal._
-import io.renku.generators.Generators._
 import io.renku.generators.Generators.Implicits._
+import io.renku.generators.Generators._
 import io.renku.graph.model.GraphModelGenerators._
-import io.renku.graph.model.events._
 import io.renku.graph.model.events.EventStatus._
+import io.renku.graph.model.events._
 import org.scalacheck.{Arbitrary, Gen}
 
 import java.time.Duration
@@ -70,6 +70,9 @@ object EventsGenerators {
     projectId <- projectIds
   } yield CompoundEventId(eventId, projectId)
 
+  def compoundEventIds(projectId: projects.GitLabId): Gen[CompoundEventId] =
+    eventIds.map(CompoundEventId(_, projectId))
+
   implicit lazy val eventProcessingTimes: Gen[EventProcessingTime] =
     javaDurations(min = Duration ofMinutes 10).map(EventProcessingTime.apply)
 
@@ -79,5 +82,4 @@ object EventsGenerators {
     .toGeneratorOfList(min = 1)
     .map(_.toArray)
     .generateAs(ZippedEventPayload.apply)
-
 }

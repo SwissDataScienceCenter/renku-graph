@@ -1,5 +1,5 @@
 /*
- * Copyright 2023 Swiss Data Science Center (SDSC)
+ * Copyright 2024 Swiss Data Science Center (SDSC)
  * A partnership between École Polytechnique Fédérale de Lausanne (EPFL) and
  * Eidgenössische Technische Hochschule Zürich (ETHZ).
  *
@@ -19,55 +19,48 @@
 package io.renku.eventlog.init
 
 import cats.effect.IO
-import io.renku.interpreters.TestLogger
+import cats.effect.testing.scalatest.AsyncIOSpec
+import io.renku.db.DBConfigProvider.DBConfig
+import io.renku.eventlog.EventLogDB
 import io.renku.interpreters.TestLogger.Level.Info
-import io.renku.testtools.IOSpec
+import org.scalatest.Succeeded
+import org.scalatest.flatspec.AsyncFlatSpec
 import org.scalatest.matchers.should
-import org.scalatest.wordspec.AnyWordSpec
 
-class TSMigrationTableCreatorSpec extends AnyWordSpec with IOSpec with DbInitSpec with should.Matchers {
+class TSMigrationTableCreatorSpec extends AsyncFlatSpec with AsyncIOSpec with DbInitSpec with should.Matchers {
 
-  protected[init] override lazy val migrationsToRun: List[DbMigrator[IO]] = allMigrations.takeWhile {
-    case _: TSMigrationTableCreatorImpl[IO] => false
-    case _ => true
+  protected[init] override val runMigrationsUpTo: Class[_ <: DbMigrator[IO]] = classOf[TSMigrationTableCreator[IO]]
+
+  it should "do nothing if the 'ts_migration' table already exists" in testDBResource.use { implicit cfg =>
+    for {
+      _ <- tableExists("ts_migration").asserting(_ shouldBe false)
+
+      _ <- tableCreator.run.assertNoException
+
+      _ <- tableExists("ts_migration").asserting(_ shouldBe true)
+
+      _ <- logger.loggedOnlyF(Info("'ts_migration' table created"))
+
+      _ <- logger.resetF()
+
+      _ <- tableCreator.run.assertNoException
+
+      _ <- logger.loggedOnlyF(Info("'ts_migration' table exists"))
+    } yield Succeeded
   }
 
-  "run" should {
+  it should "create relevant indices and constraints" in testDBResource.use { implicit cfg =>
+    for {
+      _ <- tableCreator.run.assertNoException
 
-    "do nothing if the 'ts_migration' table already exists" in new TestCase {
+      _ <- tableExists("ts_migration").asserting(_ shouldBe true)
 
-      tableExists("ts_migration") shouldBe false
-
-      tableCreator.run.unsafeRunSync() shouldBe ()
-
-      tableExists("ts_migration") shouldBe true
-
-      logger.loggedOnly(Info("'ts_migration' table created"))
-
-      logger.reset()
-
-      tableCreator.run.unsafeRunSync() shouldBe ()
-
-      logger.loggedOnly(Info("'ts_migration' table exists"))
-    }
-
-    "create relevant indices and constraints" in new TestCase {
-
-      tableCreator.run.unsafeRunSync() shouldBe ()
-
-      tableExists("ts_migration") shouldBe true
-
-      verifyIndexExists("ts_migration", "idx_subscriber_version")
-      verifyIndexExists("ts_migration", "idx_subscriber_url")
-      verifyIndexExists("ts_migration", "idx_status")
-      verifyIndexExists("ts_migration", "idx_change_date")
-
-      verifyConstraintExists("ts_migration", "version_url_unique")
-    }
+      _ <- verifyIndexExists("ts_migration", "idx_ts_migration_subscriber_version").asserting(_ shouldBe true)
+      _ <- verifyIndexExists("ts_migration", "idx_ts_migration_subscriber_url").asserting(_ shouldBe true)
+      _ <- verifyIndexExists("ts_migration", "idx_ts_migration_status").asserting(_ shouldBe true)
+      _ <- verifyIndexExists("ts_migration", "idx_ts_migration_change_date").asserting(_ shouldBe true)
+    } yield Succeeded
   }
 
-  private trait TestCase {
-    implicit val logger: TestLogger[IO] = TestLogger[IO]()
-    val tableCreator = new TSMigrationTableCreatorImpl[IO]
-  }
+  private def tableCreator(implicit cfg: DBConfig[EventLogDB]) = new TSMigrationTableCreatorImpl[IO]
 }

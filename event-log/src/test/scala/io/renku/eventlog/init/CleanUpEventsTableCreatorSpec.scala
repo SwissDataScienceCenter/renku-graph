@@ -1,5 +1,5 @@
 /*
- * Copyright 2023 Swiss Data Science Center (SDSC)
+ * Copyright 2024 Swiss Data Science Center (SDSC)
  * A partnership between École Polytechnique Fédérale de Lausanne (EPFL) and
  * Eidgenössische Technische Hochschule Zürich (ETHZ).
  *
@@ -19,44 +19,42 @@
 package io.renku.eventlog.init
 
 import cats.effect.IO
-import io.renku.interpreters.TestLogger
+import cats.effect.testing.scalatest.AsyncIOSpec
+import io.renku.db.DBConfigProvider.DBConfig
+import io.renku.eventlog.EventLogDB
 import io.renku.interpreters.TestLogger.Level.Info
-import io.renku.testtools.IOSpec
+import org.scalatest.Succeeded
+import org.scalatest.flatspec.AsyncFlatSpec
 import org.scalatest.matchers.should
-import org.scalatest.wordspec.AnyWordSpec
 
-class CleanUpEventsTableCreatorSpec extends AnyWordSpec with IOSpec with DbInitSpec with should.Matchers {
+class CleanUpEventsTableCreatorSpec extends AsyncFlatSpec with AsyncIOSpec with DbInitSpec with should.Matchers {
 
-  protected[init] override lazy val migrationsToRun: List[DbMigrator[IO]] = allMigrations.takeWhile {
-    case _: CleanUpEventsTableCreatorImpl[IO] => false
-    case _ => true
+  protected[init] override val runMigrationsUpTo: Class[_ <: DbMigrator[IO]] = classOf[CleanUpEventsTableCreator[IO]]
+
+  it should "create the 'clean_up_events_queue' table if does not exist" in testDBResource.use { implicit cfg =>
+    for {
+      _ <- tableCreator.run.assertNoException
+
+      _ <- logger.loggedOnlyF(Info("'clean_up_events_queue' table created"))
+
+      _ <- tableCreator.run.assertNoException
+
+      _ <- logger.loggedOnlyF(
+             Info("'clean_up_events_queue' table created"),
+             Info("'clean_up_events_queue' table exists")
+           )
+    } yield Succeeded
   }
 
-  "run" should {
+  it should "create indices for the date column" in testDBResource.use { implicit cfg =>
+    for {
+      _ <- tableCreator.run.assertNoException
 
-    "create the 'clean_up_events_queue' table if does not exist" in new TestCase {
-
-      tableCreator.run.unsafeRunSync() shouldBe ()
-
-      logger.loggedOnly(Info("'clean_up_events_queue' table created"))
-
-      tableCreator.run.unsafeRunSync() shouldBe ()
-
-      logger.loggedOnly(Info("'clean_up_events_queue' table created"), Info("'clean_up_events_queue' table exists"))
-    }
-
-    "create indices for the date column" in new TestCase {
-
-      tableCreator.run.unsafeRunSync() shouldBe ()
-
-      verifyIndexExists("clean_up_events_queue", "idx_date")
-      verifyIndexExists("clean_up_events_queue", "idx_project_path")
-      verifyConstraintExists("clean_up_events_queue", "project_path_unique")
-    }
+      _ <- verifyIndexExists("clean_up_events_queue", "idx_date")
+      _ <- verifyIndexExists("clean_up_events_queue", "idx_project_path")
+      _ <- verifyConstraintExists("clean_up_events_queue", "project_path_unique")
+    } yield Succeeded
   }
 
-  private trait TestCase {
-    implicit val logger: TestLogger[IO] = TestLogger[IO]()
-    val tableCreator = new CleanUpEventsTableCreatorImpl[IO]
-  }
+  private def tableCreator(implicit cfg: DBConfig[EventLogDB]) = new CleanUpEventsTableCreatorImpl[IO]
 }

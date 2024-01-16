@@ -1,5 +1,5 @@
 /*
- * Copyright 2023 Swiss Data Science Center (SDSC)
+ * Copyright 2024 Swiss Data Science Center (SDSC)
  * A partnership between École Polytechnique Fédérale de Lausanne (EPFL) and
  * Eidgenössische Technische Hochschule Zürich (ETHZ).
  *
@@ -20,61 +20,49 @@ package io.renku.triplesgenerator.events.consumers.tsmigrationrequest
 package migrations.v10migration
 
 import cats.effect.IO
+import cats.effect.testing.scalatest.AsyncIOSpec
 import io.renku.generators.Generators.Implicits._
 import io.renku.graph.model.testentities._
 import io.renku.graph.model.versions.SchemaVersion
 import io.renku.interpreters.TestLogger
-import io.renku.logging.TestSparqlQueryTimeRecorder
-import io.renku.testtools.IOSpec
 import io.renku.triplesstore._
-import org.scalamock.scalatest.MockFactory
+import org.scalamock.scalatest.AsyncMockFactory
 import org.scalatest.matchers.should
-import org.scalatest.wordspec.AnyWordSpec
+import org.scalatest.wordspec.AsyncWordSpec
 
 class MigrationNeedCheckerSpec
-    extends AnyWordSpec
+    extends AsyncWordSpec
+    with AsyncIOSpec
+    with GraphJenaSpec
     with should.Matchers
-    with IOSpec
-    with InMemoryJenaForSpec
-    with ProjectsDataset
-    with MockFactory {
+    with AsyncMockFactory {
 
   private val v9  = SchemaVersion("9")
   private val v10 = SchemaVersion("10")
 
   "checkMigrationNeeded" should {
 
-    "return Yes if there are projects in schema v9" in new TestCase {
-
+    "return Yes if there are projects in schema v9" in projectsDSConfig.use { implicit pcc =>
       val v9Project  = anyRenkuProjectEntities.map(setSchema(v9)).generateOne
       val v10Project = anyRenkuProjectEntities.map(setSchema(v10)).generateOne
 
-      upload(to = projectsDataset, v9Project, v10Project)
-
-      checker.checkMigrationNeeded.unsafeRunSync() shouldBe a[ConditionedMigration.MigrationRequired.Yes]
+      uploadToProjects(v9Project, v10Project) >>
+        checker.checkMigrationNeeded.asserting(_ shouldBe a[ConditionedMigration.MigrationRequired.Yes])
     }
 
-    "return No if there are only projects in schema different than v9" in new TestCase {
-
-      upload(to = projectsDataset, anyRenkuProjectEntities.map(setSchema(v10)).generateOne)
-
-      checker.checkMigrationNeeded.unsafeRunSync() shouldBe a[ConditionedMigration.MigrationRequired.No]
+    "return No if there are only projects in schema different than v9" in projectsDSConfig.use { implicit pcc =>
+      uploadToProjects(anyRenkuProjectEntities.map(setSchema(v10)).generateOne) >>
+        checker.checkMigrationNeeded.asserting(_ shouldBe a[ConditionedMigration.MigrationRequired.No])
     }
 
-    "return No if there are projects without schema" in new TestCase {
-
-      upload(to = projectsDataset, anyNonRenkuProjectEntities.generateOne)
-
-      checker.checkMigrationNeeded.unsafeRunSync() shouldBe a[ConditionedMigration.MigrationRequired.No]
+    "return No if there are projects without schema" in projectsDSConfig.use { implicit pcc =>
+      uploadToProjects(anyNonRenkuProjectEntities.generateOne) >>
+        checker.checkMigrationNeeded.asserting(_ shouldBe a[ConditionedMigration.MigrationRequired.No])
     }
   }
 
-  private trait TestCase {
-
-    private implicit val logger:       TestLogger[IO]              = TestLogger[IO]()
-    private implicit val timeRecorder: SparqlQueryTimeRecorder[IO] = TestSparqlQueryTimeRecorder[IO].unsafeRunSync()
-    val checker = new MigrationNeedCheckerImpl[IO](TSClient[IO](projectsDSConnectionInfo))
-  }
+  private implicit lazy val logger: TestLogger[IO] = TestLogger[IO]()
+  private def checker(implicit pcc: ProjectsConnectionConfig) = new MigrationNeedCheckerImpl[IO](tsClient)
 
   private def setSchema(version: SchemaVersion): Project => Project =
     _.fold(_.copy(version = version), _.copy(version = version), identity, identity)

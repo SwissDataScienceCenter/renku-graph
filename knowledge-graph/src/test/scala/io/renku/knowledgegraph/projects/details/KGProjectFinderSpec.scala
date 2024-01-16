@@ -1,5 +1,5 @@
 /*
- * Copyright 2023 Swiss Data Science Center (SDSC)
+ * Copyright 2024 Swiss Data Science Center (SDSC)
  * A partnership between École Polytechnique Fédérale de Lausanne (EPFL) and
  * Eidgenössische Technische Hochschule Zürich (ETHZ).
  *
@@ -20,78 +20,83 @@ package io.renku.knowledgegraph.projects.details
 
 import Converters._
 import cats.effect.IO
+import cats.effect.testing.scalatest.AsyncIOSpec
 import cats.syntax.all._
-import io.renku.entities.searchgraphs.SearchInfoDatasets
+import io.renku.entities.searchgraphs.TestSearchInfoDatasets
 import io.renku.generators.CommonGraphGenerators.authUsers
 import io.renku.generators.Generators.Implicits._
+import io.renku.generators.Generators.countingGen
 import io.renku.graph.model.projects.Visibility
 import io.renku.graph.model.testentities.Project
 import io.renku.graph.model.testentities.generators.EntitiesGenerators
 import io.renku.interpreters.TestLogger
 import io.renku.logging.TestSparqlQueryTimeRecorder
-import io.renku.testtools.IOSpec
-import io.renku.triplesstore.{InMemoryJenaForSpec, ProjectsDataset, SparqlQueryTimeRecorder}
+import io.renku.triplesstore.{GraphJenaSpec, ProjectsConnectionConfig, SparqlQueryTimeRecorder}
 import org.scalacheck.Gen
 import org.scalatest.matchers.should
-import org.scalatest.wordspec.AnyWordSpec
+import org.scalatest.wordspec.AsyncWordSpec
 import org.scalatestplus.scalacheck.ScalaCheckPropertyChecks
 import org.typelevel.log4cats.Logger
 
 class KGProjectFinderSpec
-    extends AnyWordSpec
-    with should.Matchers
+    extends AsyncWordSpec
+    with AsyncIOSpec
+    with GraphJenaSpec
+    with TestSearchInfoDatasets
     with EntitiesGenerators
-    with InMemoryJenaForSpec
-    with ProjectsDataset
-    with SearchInfoDatasets
     with ScalaCheckPropertyChecks
-    with IOSpec {
+    with should.Matchers {
 
   implicit override val ioLogger: Logger[IO] = TestLogger[IO]()
 
   "findProject" should {
 
-    "return details of the project with the given slug when there's no parent" in new TestCase {
-      forAll(Gen.oneOf(renkuProjectEntities(anyVisibility), nonRenkuProjectEntities(anyVisibility))) { project =>
-        provisionTestProjects(anyProjectEntities.generateOne, project).unsafeRunSync()
+    forAll(Gen.oneOf(renkuProjectEntities(anyVisibility), nonRenkuProjectEntities(anyVisibility)), countingGen) {
+      case (project, attempt) =>
+        s"return details of the project with the given slug when there's no parent - #$attempt" in projectsDSConfig
+          .use { implicit pcc =>
+            provisionTestProjects(anyProjectEntities.generateOne, project) >>
+              finder
+                .findProject(project.slug, authUsers.generateOption)
+                .asserting(_ shouldBe project.to(kgProjectConverter).some)
+          }
+    }
 
-        kgProjectFinder.findProject(project.slug, authUsers.generateOption).unsafeRunSync() shouldBe
-          project.to(kgProjectConverter).some
+    forAll(
+      Gen.oneOf(renkuProjectWithParentEntities(visibilityPublic), nonRenkuProjectWithParentEntities(visibilityPublic)),
+      countingGen
+    ) { (project, attempt) =>
+      s"return details of the project with the given slug if it has a parent project - public projects - #$attempt" in projectsDSConfig
+        .use { implicit pcc =>
+          provisionTestProjects(project, project.parent) >>
+            finder
+              .findProject(project.slug, authUsers.generateOption)
+              .asserting(_ shouldBe project.to(kgProjectConverter).some)
+        }
+    }
+
+    "return details of the project with the given slug if it has a parent project - non-public projects" in projectsDSConfig
+      .use { implicit pcc =>
+        val user         = authUsers.generateOne
+        val userAsMember = projectMemberEntities(Gen.const(user.id.some)).generateOne
+
+        val project = Gen
+          .oneOf(
+            renkuProjectWithParentEntities(visibilityNonPublic).modify(replaceMembers(Set(userAsMember))),
+            nonRenkuProjectWithParentEntities(visibilityNonPublic).modify(replaceMembers(Set(userAsMember)))
+          )
+          .generateOne
+
+        val parent = replaceMembers(Set(userAsMember))(project.parent)
+
+        provisionTestProjects(project, parent) >>
+          finder
+            .findProject(project.slug, user.some)
+            .asserting(_ shouldBe project.to(kgProjectConverter).some)
       }
-    }
-
-    "return details of the project with the given slug if it has a parent project - public projects" in new TestCase {
-      forAll(
-        Gen.oneOf(renkuProjectWithParentEntities(visibilityPublic), nonRenkuProjectWithParentEntities(visibilityPublic))
-      ) { project =>
-        provisionTestProjects(project, project.parent).unsafeRunSync()
-
-        kgProjectFinder.findProject(project.slug, authUsers.generateOption).unsafeRunSync() shouldBe
-          project.to(kgProjectConverter).some
-      }
-    }
-
-    "return details of the project with the given slug if it has a parent project - non-public projects" in new TestCase {
-      val user         = authUsers.generateOne
-      val userAsMember = projectMemberEntities(Gen.const(user.id.some)).generateOne
-
-      val project = Gen
-        .oneOf(
-          renkuProjectWithParentEntities(visibilityNonPublic).modify(replaceMembers(Set(userAsMember))),
-          nonRenkuProjectWithParentEntities(visibilityNonPublic).modify(replaceMembers(Set(userAsMember)))
-        )
-        .generateOne
-
-      val parent = replaceMembers(Set(userAsMember))(project.parent)
-
-      provisionTestProjects(project, parent).unsafeRunSync()
-
-      kgProjectFinder.findProject(project.slug, user.some).unsafeRunSync() shouldBe
-        project.to(kgProjectConverter).some
-    }
 
     "return details of the project with the given slug without info about the parent " +
-      "if the user has no rights to access the parent project" in new TestCase {
+      "if the user has no rights to access the parent project" in projectsDSConfig.use { implicit pcc =>
         val user = authUsers.generateOne
         val project = Gen
           .oneOf(
@@ -104,21 +109,17 @@ class KGProjectFinderSpec
 
         val parent = (replaceVisibility[Project](to = Visibility.Private) andThen removeMembers())(project.parent)
 
-        provisionTestProjects(project, parent).unsafeRunSync()
-
-        kgProjectFinder.findProject(project.slug, Some(user)).unsafeRunSync() shouldBe Some {
-          project.to(kgProjectConverter).copy(maybeParent = None)
-        }
+        provisionTestProjects(project, parent) >>
+          finder
+            .findProject(project.slug, Some(user))
+            .asserting(_ shouldBe Some(project.to(kgProjectConverter).copy(maybeParent = None)))
       }
 
-    "return None if there's no project with the given slug" in new TestCase {
-      kgProjectFinder.findProject(projectSlugs.generateOne, authUsers.generateOption).unsafeRunSync() shouldBe None
+    "return None if there's no project with the given slug" in projectsDSConfig.use { implicit pcc =>
+      finder.findProject(projectSlugs.generateOne, authUsers.generateOption).asserting(_ shouldBe None)
     }
   }
 
-  private trait TestCase {
-    private implicit val logger:       TestLogger[IO]              = TestLogger[IO]()
-    private implicit val timeRecorder: SparqlQueryTimeRecorder[IO] = TestSparqlQueryTimeRecorder[IO].unsafeRunSync()
-    val kgProjectFinder = new KGProjectFinderImpl[IO](projectsDSConnectionInfo)
-  }
+  private implicit val timeRecorder: SparqlQueryTimeRecorder[IO] = TestSparqlQueryTimeRecorder[IO].unsafeRunSync()
+  private def finder(implicit pcc: ProjectsConnectionConfig) = new KGProjectFinderImpl[IO](pcc)
 }

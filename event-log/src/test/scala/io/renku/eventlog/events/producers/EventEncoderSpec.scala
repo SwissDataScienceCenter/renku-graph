@@ -1,5 +1,5 @@
 /*
- * Copyright 2023 Swiss Data Science Center (SDSC)
+ * Copyright 2024 Swiss Data Science Center (SDSC)
  * A partnership between École Polytechnique Fédérale de Lausanne (EPFL) and
  * Eidgenössische Technische Hochschule Zürich (ETHZ).
  *
@@ -23,14 +23,14 @@ import cats.syntax.all._
 import io.circe.Json
 import io.renku.generators.Generators.Implicits._
 import io.renku.generators.Generators._
-import io.renku.http.server.EndpointTester.jsonEntityDecoder
+import io.renku.http.RenkuEntityCodec
 import io.renku.testtools.IOSpec
 import org.http4s.MediaType
 import org.http4s.headers.`Content-Type`
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
 
-class EventEncoderSpec extends AnyWordSpec with IOSpec with should.Matchers {
+class EventEncoderSpec extends AnyWordSpec with IOSpec with should.Matchers with RenkuEntityCodec {
 
   "encodeParts" should {
     "encode only event part for events without payload" in {

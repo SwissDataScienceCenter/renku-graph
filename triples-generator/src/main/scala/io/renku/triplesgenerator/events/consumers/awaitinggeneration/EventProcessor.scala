@@ -1,5 +1,5 @@
 /*
- * Copyright 2023 Swiss Data Science Center (SDSC)
+ * Copyright 2024 Swiss Data Science Center (SDSC)
  * A partnership between École Polytechnique Fédérale de Lausanne (EPFL) and
  * Eidgenössische Technische Hochschule Zürich (ETHZ).
  *
@@ -23,18 +23,18 @@ import cats.data.EitherT
 import cats.effect.Async
 import cats.syntax.all._
 import eu.timepit.refined.auto._
-import io.renku.graph.model.events.{CompoundEventId, EventProcessingTime, EventStatus}
 import io.renku.graph.model.events.EventStatus.{GenerationNonRecoverableFailure, GenerationRecoverableFailure}
-import io.renku.graph.tokenrepository.AccessTokenFinder
+import io.renku.graph.model.events.{CompoundEventId, EventProcessingTime, EventStatus}
 import io.renku.http.client.AccessToken
 import io.renku.jsonld.JsonLD
-import io.renku.logging.ExecutionTimeRecorder
+import io.renku.logging.{ExecutionTimeRecorder, ExecutionTimeRecorderLoader}
 import io.renku.logging.ExecutionTimeRecorder.ElapsedTime
 import io.renku.metrics.{Histogram, MetricsRegistry}
+import io.renku.tokenrepository.api.TokenRepositoryClient
+import io.renku.triplesgenerator.errors.ProcessingRecoverableError._
 import io.renku.triplesgenerator.errors.{ProcessingNonRecoverableError, ProcessingRecoverableError}
 import io.renku.triplesgenerator.events.consumers.EventStatusUpdater
 import io.renku.triplesgenerator.events.consumers.EventStatusUpdater._
-import io.renku.triplesgenerator.errors.ProcessingRecoverableError._
 import io.renku.triplesgenerator.events.consumers.awaitinggeneration.triplesgeneration.TriplesGenerator
 import org.typelevel.log4cats.Logger
 
@@ -45,40 +45,42 @@ private trait EventProcessor[F[_]] {
   def process(event: CommitEvent): F[Unit]
 }
 
-private class EventProcessorImpl[F[_]: MonadThrow: AccessTokenFinder: Logger](
+private class EventProcessorImpl[F[_]: MonadThrow: Logger](
+    trClient:                TokenRepositoryClient[F],
     triplesGenerator:        TriplesGenerator[F],
     statusUpdater:           EventStatusUpdater[F],
     allEventsTimeRecorder:   ExecutionTimeRecorder[F],
     singleEventTimeRecorder: ExecutionTimeRecorder[F]
 ) extends EventProcessor[F] {
 
-  private val accessTokenFinder: AccessTokenFinder[F] = AccessTokenFinder[F]
   import TriplesGenerationResult._
-  import accessTokenFinder._
+  import trClient.findAccessToken
   import triplesGenerator._
 
-  def process(event: CommitEvent): F[Unit] = allEventsTimeRecorder.measureExecutionTime {
-    for {
-      _                                   <- Logger[F].info(s"${logMessageCommon(event)} accepted")
-      implicit0(mat: Option[AccessToken]) <- findAccessToken(event.project.slug) recoverWith rollbackEvent(event)
-      uploadingResult                     <- generateAndUpdateStatus(event)
-    } yield uploadingResult
-  } flatMap logSummary recoverWith logError(event)
+  def process(event: CommitEvent): F[Unit] =
+    Logger[F].info(s"${logMessageCommon(event)} accepted") >>
+      allEventsTimeRecorder.measureExecutionTime {
+        findAccessToken(event.project.slug)
+          .recoverWith(rollbackEvent(event))
+          .flatMap {
+            case None => RecoverableError(event, SilentRecoverableError("No access token")).widen.pure[F]
+            case Some(implicit0(at: AccessToken)) => generateAndUpdateStatus(event)
+          }
+          .flatTap(updateEventLog)
+      } flatMap logSummary recoverWith logError(event)
 
   private def logError(event: CommitEvent): PartialFunction[Throwable, F[Unit]] = { case NonFatal(exception) =>
     Logger[F].error(exception)(s"${logMessageCommon(event)} processing failure")
   }
 
-  private def generateAndUpdateStatus(
-      commit: CommitEvent
-  )(implicit maybeAccessToken: Option[AccessToken]): F[TriplesGenerationResult] = EitherT {
-    singleEventTimeRecorder
-      .measureExecutionTime(generateTriples(commit).value)
-      .map(toTriplesGenerated(commit))
-  }.leftSemiflatMap(toRecoverableError(commit))
-    .merge
-    .recoverWith(toNonRecoverableFailure(commit))
-    .flatTap(updateEventLog)
+  private def generateAndUpdateStatus(commit: CommitEvent)(implicit at: AccessToken): F[TriplesGenerationResult] =
+    EitherT {
+      singleEventTimeRecorder
+        .measureExecutionTime(generateTriples(commit).value)
+        .map(toTriplesGenerated(commit))
+    }.leftSemiflatMap(toRecoverableError(commit))
+      .merge
+      .recoverWith(toNonRecoverableFailure(commit))
 
   private def toTriplesGenerated(commit: CommitEvent): (
       (ElapsedTime, Either[ProcessingRecoverableError, JsonLD])
@@ -165,6 +167,7 @@ private class EventProcessorImpl[F[_]: MonadThrow: AccessTokenFinder: Logger](
 
   private sealed trait TriplesGenerationResult extends Product with Serializable {
     val commit: CommitEvent
+    lazy val widen: TriplesGenerationResult = this
   }
   private sealed trait GenerationError extends TriplesGenerationResult {
     val cause: Throwable
@@ -187,7 +190,8 @@ private class EventProcessorImpl[F[_]: MonadThrow: AccessTokenFinder: Logger](
 
 private object EventProcessor {
 
-  def apply[F[_]: Async: Logger: AccessTokenFinder: MetricsRegistry]: F[EventProcessor[F]] = for {
+  def apply[F[_]: Async: Logger: MetricsRegistry]: F[EventProcessor[F]] = for {
+    trClient           <- TokenRepositoryClient[F]
     triplesGenerator   <- TriplesGenerator()
     eventStatusUpdater <- EventStatusUpdater(categoryName)
     histogram <- Histogram[F](
@@ -196,12 +200,12 @@ private object EventProcessor {
                    buckets = Seq(.1, .5, 1, 5, 10, 50, 100, 500, 1000, 5000, 10000, 50000, 100000, 500000, 1000000,
                                  5000000, 10000000, 50000000, 100000000, 500000000)
                  )
-    allEventsTimeRecorder   <- ExecutionTimeRecorder[F](maybeHistogram = Some(histogram))
-    singleEventTimeRecorder <- ExecutionTimeRecorder[F](maybeHistogram = None)
-  } yield new EventProcessorImpl(
-    triplesGenerator,
-    eventStatusUpdater,
-    allEventsTimeRecorder,
-    singleEventTimeRecorder
+    allEventsTimeRecorder   <- ExecutionTimeRecorderLoader[F](maybeHistogram = Some(histogram))
+    singleEventTimeRecorder <- ExecutionTimeRecorderLoader[F](maybeHistogram = None)
+  } yield new EventProcessorImpl(trClient,
+                                 triplesGenerator,
+                                 eventStatusUpdater,
+                                 allEventsTimeRecorder,
+                                 singleEventTimeRecorder
   )
 }

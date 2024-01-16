@@ -1,5 +1,5 @@
 /*
- * Copyright 2023 Swiss Data Science Center (SDSC)
+ * Copyright 2024 Swiss Data Science Center (SDSC)
  * A partnership between École Polytechnique Fédérale de Lausanne (EPFL) and
  * Eidgenössische Technische Hochschule Zürich (ETHZ).
  *
@@ -35,6 +35,7 @@ lazy val root = project
     publishTo := Some(Resolver.file("Unused transient repository", file("target/unusedrepo")))
   )
   .aggregate(
+    utils,
     generators,
     triplesStoreClient,
     tinyTypes,
@@ -43,9 +44,10 @@ lazy val root = project
     renkuModel,
     graphCommons,
     eventsQueue,
+    tokenRepositoryApi,
+    tokenRepository,
     eventLogApi,
     eventLog,
-    tokenRepository,
     webhookService,
     commitEventService,
     triplesGeneratorApi,
@@ -57,24 +59,198 @@ lazy val root = project
     knowledgeGraph
   )
 
+lazy val commonUtils = project
+  .in(file("utils/common"))
+  .settings(commonSettings)
+  .enablePlugins(AutomateHeaderPlugin)
+  .settings(
+    name := "common-utils",
+    libraryDependencies ++=
+      Dependencies.fs2Core ++
+        Dependencies.catsEffect ++
+        Dependencies.refined ++
+        Dependencies.log4Cats ++
+        Dependencies.monocle ++
+        Dependencies.ip4s,
+    libraryDependencies ++=
+      Dependencies.scalamock.map(_ % Test)
+  )
+  .dependsOn(tinyTypes % "compile->compile;test->test")
+
+lazy val sentryUtils = project
+  .in(file("utils/sentry"))
+  .settings(commonSettings)
+  .enablePlugins(AutomateHeaderPlugin)
+  .settings(
+    name := "sentry-utils",
+    libraryDependencies ++=
+      Dependencies.sentryLogback
+  )
+  .dependsOn(configUtils % "compile->compile;test->test")
+
+lazy val jsonldUtils = project
+  .in(file("utils/jsonld"))
+  .settings(commonSettings)
+  .enablePlugins(AutomateHeaderPlugin)
+  .settings(
+    name := "jsonld-utils",
+    libraryDependencies ++=
+      Dependencies.jsonld4s
+  )
+  .dependsOn(
+    tinyTypes % "compile->compile;test->test",
+    commonUtils % "compile->compile;test->test"
+  )
+
+lazy val metricUtils = project
+  .in(file("utils/metrics"))
+  .settings(commonSettings)
+  .enablePlugins(AutomateHeaderPlugin)
+  .settings(
+    name := "metrics-utils",
+    libraryDependencies ++=
+      Dependencies.prometheus
+  )
+  .dependsOn(commonUtils % "compile->compile;test->test")
+
+lazy val http4sClientUtils = project
+  .in(file("utils/http4s-client"))
+  .settings(commonSettings)
+  .enablePlugins(AutomateHeaderPlugin)
+  .settings(
+    name := "http4s-client-utils",
+    libraryDependencies ++=
+      Dependencies.http4sClient ++
+        Dependencies.http4sCirce ++
+        Dependencies.http4sDsl,
+    libraryDependencies ++=
+      (Dependencies.wiremock ++ Dependencies.scalamock).map(_ % Test)
+  )
+  .dependsOn(
+    commonUtils % "compile->compile;test->test",
+    metricUtils % "compile->compile;test->test"
+  )
+
+lazy val http4sServerUtils = project
+  .in(file("utils/http4s-server"))
+  .settings(commonSettings)
+  .enablePlugins(AutomateHeaderPlugin)
+  .settings(
+    name := "http4s-server-utils",
+    libraryDependencies ++=
+      Dependencies.http4sClient ++
+        Dependencies.http4sServer ++
+        Dependencies.http4sCirce ++
+        Dependencies.http4sDsl ++
+        Dependencies.http4sPrometheus
+  )
+  .dependsOn(
+    commonUtils       % "compile->compile;test->test",
+    metricUtils       % "compile->compile;test->test",
+    http4sClientUtils % "compile->compile;test->test"
+  )
+
+lazy val gitlabUtils = project
+  .in(file("utils/gitlab"))
+  .settings(commonSettings)
+  .enablePlugins(AutomateHeaderPlugin)
+  .settings(
+    name := "gitlab-utils"
+  )
+  .dependsOn(
+    commonUtils       % "compile->compile;test->test",
+    metricUtils       % "compile->compile;test->test",
+    http4sClientUtils % "compile->compile;test->test"
+  )
+
+lazy val configUtils = project
+  .in(file("utils/config"))
+  .settings(commonSettings)
+  .enablePlugins(AutomateHeaderPlugin)
+  .settings(
+    name := "config-utils",
+    libraryDependencies ++=
+      Dependencies.pureconfig ++
+        Dependencies.refinedPureconfig ++
+        Dependencies.log4Cats
+  )
+  .dependsOn(
+    tinyTypes   % "compile->compile;test->test",
+    commonUtils % "compile->compile;test->test",
+    metricUtils % "compile->compile;test->test"
+  )
+
+lazy val utils = project
+  .in(file("utils"))
+  .aggregate(
+    commonUtils,
+    configUtils,
+    sentryUtils,
+    http4sClientUtils,
+    http4sServerUtils,
+    jsonldUtils,
+    metricUtils,
+    gitlabUtils
+  )
+
 lazy val generators = project
   .in(file("generators"))
   .withId("generators")
   .settings(commonSettings)
+  .settings(
+    name := "generators",
+    libraryDependencies ++=
+      (Dependencies.refined ++
+        Dependencies.circeCore ++
+        Dependencies.jsonld4s ++
+        Dependencies.catsCore ++
+        Dependencies.fs2Core ++
+        Dependencies.scalacheck).map(_ % Test) ++
+        Dependencies.ip4s
+  )
   .enablePlugins(AutomateHeaderPlugin)
 
 lazy val triplesStoreClient = project
   .in(file("triples-store-client"))
   .withId("triples-store-client")
   .settings(commonSettings)
-  .dependsOn(generators % "test->test")
+  .settings(
+    name := "triples-store-client",
+    Test / testOptions += Tests.Setup(JenaServer.start),
+    Test / testOptions += Tests.Cleanup(JenaServer.stop),
+    libraryDependencies ++=
+      Dependencies.jsonld4s ++
+        Dependencies.luceneQueryParser ++
+        Dependencies.luceneAnalyzer ++
+        Dependencies.fs2Core ++
+        Dependencies.rdf4jQueryParserSparql ++
+        Dependencies.http4sClient ++
+        Dependencies.http4sCirce
+  )
+  .dependsOn(
+    generators % "test->test",
+    tinyTypes  % "compile->compile; test->test",
+    http4sClientUtils % "compile->compile;test->test"
+  )
   .enablePlugins(AutomateHeaderPlugin)
 
 lazy val tinyTypes = project
   .in(file("tiny-types"))
   .withId("tiny-types")
   .settings(commonSettings)
-  .dependsOn(triplesStoreClient % "compile->compile; test->test")
+  .settings(
+    name := "tiny-types",
+    libraryDependencies ++=
+      Dependencies.refined ++
+        Dependencies.circeCore ++
+        Dependencies.circeLiteral ++
+        Dependencies.circeGeneric ++
+        Dependencies.circeOptics ++
+        Dependencies.circeParser ++
+        Dependencies.catsCore ++
+        Dependencies.catsFree
+  )
+  .dependsOn(generators % "test->test")
   .enablePlugins(AutomateHeaderPlugin)
 
 lazy val renkuModelTinyTypes = project
@@ -82,13 +258,21 @@ lazy val renkuModelTinyTypes = project
   .withId("renku-model-tiny-types")
   .enablePlugins(AutomateHeaderPlugin)
   .settings(commonSettings)
-  .dependsOn(tinyTypes % "compile->compile; test->test")
+  .settings(
+    name := "renku-model-tiny-types",
+    libraryDependencies ++= Dependencies.jsonld4s ++ Dependencies.diffx.map(_ % Test)
+  )
+  .dependsOn(tinyTypes % "compile->compile; test->test", triplesStoreClient, jsonldUtils)
 
 lazy val renkuCliModel = project
   .in(file("renku-cli-model"))
   .withId("renku-cli-model")
   .enablePlugins(AutomateHeaderPlugin)
   .settings(commonSettings)
+  .settings(
+    name := "renku-cli-model",
+    libraryDependencies ++= Dependencies.diffx.map(_ % Test)
+  )
   .dependsOn(
     tinyTypes           % "compile->compile; test->test",
     renkuModelTinyTypes % "compile->compile; test->test"
@@ -98,6 +282,11 @@ lazy val renkuModel = project
   .in(file("renku-model"))
   .withId("renku-model")
   .settings(commonSettings)
+  .settings(
+    name := "renku-model",
+    libraryDependencies ++=
+      Dependencies.diffx.map(_ % Test)
+  )
   .dependsOn(
     tinyTypes           % "compile->compile; test->test",
     renkuModelTinyTypes % "compile->compile; test->test",
@@ -109,16 +298,59 @@ lazy val graphCommons = project
   .in(file("graph-commons"))
   .withId("graph-commons")
   .settings(commonSettings)
+  .settings(
+    name := "graph-commons",
+    Test / testOptions += Tests.Setup { cl =>
+      PostgresServer.start(cl)
+      JenaServer.start(cl)
+    },
+    Test / testOptions += Tests.Cleanup { cl =>
+      PostgresServer.stop(cl)
+      JenaServer.stop(cl)
+    },
+    libraryDependencies ++=
+      Dependencies.pureconfig ++
+        Dependencies.refinedPureconfig ++
+        Dependencies.sentryLogback ++
+        Dependencies.luceneQueryParser ++
+        Dependencies.http4sClient ++
+        Dependencies.http4sServer ++
+        Dependencies.http4sCirce ++
+        Dependencies.http4sDsl ++
+        Dependencies.http4sPrometheus ++
+        Dependencies.skunk ++
+        Dependencies.catsEffect ++
+        Dependencies.log4Cats,
+    // Test dependencies
+    libraryDependencies ++=
+      (Dependencies.wiremock ++
+        Dependencies.scalamock).map(_ % Test)
+  )
   .dependsOn(
     renkuModel  % "compile->compile; test->test",
     projectAuth % "compile->compile; test->test"
   )
   .enablePlugins(AutomateHeaderPlugin)
+  .dependsOn(
+    commonUtils       % "compile->compile; test->test",
+    configUtils       % "compile->compile; test->test",
+    sentryUtils       % "compile->compile; test->test",
+    http4sClientUtils % "compile->compile; test->test",
+    http4sServerUtils % "compile->compile; test->test",
+    jsonldUtils       % "compile->compile; test->test",
+    metricUtils       % "compile->compile; test->test",
+    gitlabUtils       % "compile->compile; test->test"
+  )
 
 lazy val eventsQueue = project
   .in(file("events-queue"))
   .withId("events-queue")
   .settings(commonSettings)
+  .settings(
+    name := "events-queue",
+    Test / testOptions += Tests.Setup(PostgresServer.start),
+    Test / testOptions += Tests.Cleanup(PostgresServer.stop)
+  )
   .dependsOn(
     graphCommons % "compile->compile; test->test"
   )
@@ -128,6 +360,12 @@ lazy val eventLogApi = project
   .in(file("event-log-api"))
   .withId("event-log-api")
   .settings(commonSettings)
+  .settings(
+    name := "event-log-api",
+    libraryDependencies ++=
+      Dependencies.circeGeneric ++
+        Dependencies.circeGenericExtras
+  )
   .dependsOn(graphCommons % "compile->compile; test->test")
   .enablePlugins(AutomateHeaderPlugin)
 
@@ -135,7 +373,14 @@ lazy val eventLog = project
   .in(file("event-log"))
   .withId("event-log")
   .settings(commonSettings)
+  .settings(
+    name := "event-log",
+    Test / testOptions += Tests.Setup(PostgresServer.start),
+    Test / testOptions += Tests.Cleanup(PostgresServer.stop),
+    libraryDependencies ++= Dependencies.logbackClassic ++ Dependencies.circeGenericExtras
+  )
   .dependsOn(
+    tokenRepositoryApi  % "compile->compile; test->test",
     eventLogApi         % "compile->compile; test->test",
     triplesGeneratorApi % "compile->compile; test->test"
   )
@@ -148,6 +393,9 @@ lazy val webhookServiceApi = project
   .in(file("webhook-service-api"))
   .withId("webhook-service-api")
   .settings(commonSettings)
+  .settings(
+    name := "webhook-service-api"
+  )
   .dependsOn(graphCommons % "compile->compile; test->test")
   .enablePlugins(AutomateHeaderPlugin)
 
@@ -155,7 +403,12 @@ lazy val webhookService = project
   .in(file("webhook-service"))
   .withId("webhook-service")
   .settings(commonSettings)
+  .settings(
+    name := "webhook-service",
+    libraryDependencies ++= Dependencies.logbackClassic
+  )
   .dependsOn(
+    tokenRepositoryApi  % "compile->compile; test->test",
     webhookServiceApi   % "compile->compile; test->test",
     eventLogApi         % "compile->compile; test->test",
     triplesGeneratorApi % "compile->compile; test->test"
@@ -169,7 +422,14 @@ lazy val commitEventService = project
   .in(file("commit-event-service"))
   .withId("commit-event-service")
   .settings(commonSettings)
-  .dependsOn(eventLogApi % "compile->compile; test->test")
+  .settings(
+    name := "commit-event-service",
+    libraryDependencies ++= Dependencies.logbackClassic
+  )
+  .dependsOn(
+    tokenRepositoryApi % "compile->compile; test->test",
+    eventLogApi        % "compile->compile; test->test"
+  )
   .enablePlugins(
     JavaAppPackaging,
     AutomateHeaderPlugin
@@ -179,12 +439,24 @@ lazy val entitiesSearch = project
   .in(file("entities-search"))
   .withId("entities-search")
   .settings(commonSettings)
+  .settings(
+    name := "entities-search",
+    Test / testOptions += Tests.Setup(JenaServer.start),
+    Test / testOptions += Tests.Cleanup(JenaServer.stop)
+  )
   .dependsOn(graphCommons % "compile->compile; test->test")
   .enablePlugins(AutomateHeaderPlugin)
 
 lazy val projectAuth = project
   .in(file("project-auth"))
+  .withId("project-auth")
   .settings(commonSettings)
+  .settings(
+    name := "project-auth",
+    Test / testOptions += Tests.Setup(JenaServer.start),
+    Test / testOptions += Tests.Cleanup(JenaServer.stop),
+    libraryDependencies ++= Dependencies.http4sClient
+  )
   .dependsOn(
     renkuModelTinyTypes % "compile->compile; test->test",
     triplesStoreClient  % "compile->compile; test->test"
@@ -195,13 +467,21 @@ lazy val triplesGeneratorApi = project
   .in(file("triples-generator-api"))
   .withId("triples-generator-api")
   .settings(commonSettings)
-  .dependsOn(eventLogApi % "compile->compile; test->test")
+  .settings(
+    name := "triples-generator-api"
+  )
+  .dependsOn(graphCommons % "compile->compile; test->test")
   .enablePlugins(AutomateHeaderPlugin)
 
 lazy val entitiesViewingsCollector = project
   .in(file("entities-viewings-collector"))
   .withId("entities-viewings-collector")
   .settings(commonSettings)
+  .settings(
+    name := "entities-viewings-collector",
+    Test / testOptions += Tests.Setup(JenaServer.start),
+    Test / testOptions += Tests.Cleanup(JenaServer.stop)
+  )
   .dependsOn(
     eventsQueue         % "compile->compile; test->test",
     triplesGeneratorApi % "compile->compile; test->test",
@@ -214,6 +494,12 @@ lazy val triplesGenerator = project
   .withId("triples-generator")
   .settings(commonSettings)
   .settings(
+    name := "triples-generator",
+    Test / testOptions += Tests.Setup(JenaServer.start),
+    Test / testOptions += Tests.Cleanup(JenaServer.stop),
+    libraryDependencies ++=
+      Dependencies.logbackClassic ++
+        Dependencies.ammoniteOps,
     reStart / envVars := Map(
       "JENA_RENKU_PASSWORD" -> "renku",
       "JENA_ADMIN_PASSWORD" -> "renku",
@@ -221,6 +507,8 @@ lazy val triplesGenerator = project
     )
   )
   .dependsOn(
+    tokenRepositoryApi  % "compile->compile; test->test",
+    eventLogApi         % "compile->compile; test->test",
     triplesGeneratorApi % "compile->compile; test->test",
     entitiesSearch,
     entitiesViewingsCollector % "compile->compile; test->test",
@@ -231,11 +519,30 @@ lazy val triplesGenerator = project
     AutomateHeaderPlugin
   )
 
+lazy val tokenRepositoryApi = project
+  .in(file("token-repository-api"))
+  .withId("token-repository-api")
+  .settings(commonSettings)
+  .settings(
+    name := "token-repository-api"
+  )
+  .dependsOn(graphCommons % "compile->compile; test->test")
+  .enablePlugins(AutomateHeaderPlugin)
+
 lazy val tokenRepository = project
   .in(file("token-repository"))
   .withId("token-repository")
   .settings(commonSettings)
-  .dependsOn(eventLogApi % "compile->compile; test->test")
+  .settings(
+    name := "token-repository",
+    Test / testOptions += Tests.Setup(PostgresServer.start),
+    Test / testOptions += Tests.Cleanup(PostgresServer.stop),
+    libraryDependencies ++= Dependencies.logbackClassic
+  )
+  .dependsOn(
+    tokenRepositoryApi % "compile->compile; test->test",
+    eventLogApi        % "compile->compile; test->test"
+  )
   .enablePlugins(
     JavaAppPackaging,
     AutomateHeaderPlugin
@@ -253,6 +560,14 @@ lazy val knowledgeGraph = project
   .withId("knowledge-graph")
   .settings(commonSettings)
   .settings(
+    name := "knowledge-graph",
+    Test / testOptions += Tests.Setup(JenaServer.start),
+    Test / testOptions += Tests.Cleanup(JenaServer.stop),
+    libraryDependencies ++=
+      Dependencies.logbackClassic ++
+        Dependencies.widoco ++
+        Dependencies.swaggerParser,
+    resolvers += "jitpack" at "https://jitpack.io",
     reStart / envVars := Map(
       "JENA_RENKU_PASSWORD"      -> "renku",
       "RENKU_URL"                -> "http://localhost:3000",
@@ -261,7 +576,8 @@ lazy val knowledgeGraph = project
     )
   )
   .dependsOn(
-    graphCommons        % "compile->compile; test->test",
+    tokenRepositoryApi  % "compile->compile; test->test",
+    eventLogApi         % "compile->compile; test->test",
     entitiesSearch      % "compile->compile; test->test",
     webhookServiceApi   % "compile->compile; test->test",
     triplesGeneratorApi % "compile->compile; test->test",
@@ -277,6 +593,18 @@ lazy val acceptanceTests = project
   .in(file("acceptance-tests"))
   .withId("acceptance-tests")
   .settings(commonSettings)
+  .settings(
+    name := "acceptance-tests",
+    Test / parallelExecution := false,
+    Test / testOptions += Tests.Setup { cl =>
+      PostgresServer.start(cl)
+      JenaServer.start(cl)
+    },
+    Test / testOptions += Tests.Cleanup { cl =>
+      PostgresServer.stop(cl)
+      JenaServer.stop(cl)
+    }
+  )
   .dependsOn(
     webhookService,
     commitEventService,
@@ -325,6 +653,12 @@ lazy val commonSettings = Seq(
   ),
   Compile / console / scalacOptions := (Compile / scalacOptions).value.filterNot(_ == "-Xfatal-warnings"),
   Test / console / scalacOptions := (Compile / console / scalacOptions).value,
+  libraryDependencies ++=  (Dependencies.scalacheck ++
+    Dependencies.scalatest ++
+    Dependencies.catsEffectScalaTest ++
+    Dependencies.catsEffectMunit ++
+    Dependencies.scalacheckEffectMunit ++
+    Dependencies.scalatestScalaCheck).map(_ % Test),
   // Format: on
   organizationName := "Swiss Data Science Center (SDSC)",
   startYear := Some(java.time.LocalDate.now().getYear),

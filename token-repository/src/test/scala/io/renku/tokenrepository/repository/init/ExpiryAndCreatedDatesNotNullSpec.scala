@@ -1,5 +1,5 @@
 /*
- * Copyright 2023 Swiss Data Science Center (SDSC)
+ * Copyright 2024 Swiss Data Science Center (SDSC)
  * A partnership between École Polytechnique Fédérale de Lausanne (EPFL) and
  * Eidgenössische Technische Hochschule Zürich (ETHZ).
  *
@@ -41,7 +41,6 @@ class ExpiryAndCreatedDatesNotNullSpec
       _ <- verifyColumnNullable("projects_tokens", "expiry_date").asserting(_ shouldBe true)
       _ <- verifyColumnNullable("projects_tokens", "created_at").asserting(_ shouldBe true)
 
-      _ <- logger.resetF()
       _ <- ExpiryAndCreatedDatesNotNull[IO].run.assertNoException
       _ <- verifyColumnNullable("projects_tokens", "expiry_date").asserting(_ shouldBe false)
       _ <- verifyColumnNullable("projects_tokens", "created_at").asserting(_ shouldBe false)

@@ -1,5 +1,5 @@
 /*
- * Copyright 2023 Swiss Data Science Center (SDSC)
+ * Copyright 2024 Swiss Data Science Center (SDSC)
  * A partnership between École Polytechnique Fédérale de Lausanne (EPFL) and
  * Eidgenössische Technische Hochschule Zürich (ETHZ).
  *
@@ -30,6 +30,6 @@ object TestSparqlQueryTimeRecorder {
     SparqlQueryTimeRecorder.create[F]()
   }
 
-  def createUnsafe(implicit logger: Logger[IO], IORuntime: IORuntime): SparqlQueryTimeRecorder[IO] =
+  def createUnsafe(implicit logger: Logger[IO], ioRuntime: IORuntime): SparqlQueryTimeRecorder[IO] =
     apply[IO].unsafeRunSync()
 }

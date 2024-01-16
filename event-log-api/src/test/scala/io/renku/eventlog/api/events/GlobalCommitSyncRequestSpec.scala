@@ -1,5 +1,5 @@
 /*
- * Copyright 2023 Swiss Data Science Center (SDSC)
+ * Copyright 2024 Swiss Data Science Center (SDSC)
  * A partnership between École Polytechnique Fédérale de Lausanne (EPFL) and
  * Eidgenössische Technische Hochschule Zürich (ETHZ).
  *
@@ -71,9 +71,9 @@ class GlobalCommitSyncRequestSpec
           "id":   ${projectIds.generateOne},
           "slug": ${projectSlugs.generateOne}
         }
-      }""".hcursor.as[CommitSyncRequest]
+      }""".hcursor.as[GlobalCommitSyncRequest]
 
-      result.left.value.getMessage() should include(s"Expected COMMIT_SYNC_REQUEST but got $otherCategory")
+      result.left.value.getMessage() should include(s"Expected GLOBAL_COMMIT_SYNC_REQUEST but got $otherCategory")
     }
   }
 }

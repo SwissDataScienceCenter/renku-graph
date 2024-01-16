@@ -1,5 +1,5 @@
 /*
- * Copyright 2023 Swiss Data Science Center (SDSC)
+ * Copyright 2024 Swiss Data Science Center (SDSC)
  * A partnership between École Polytechnique Fédérale de Lausanne (EPFL) and
  * Eidgenössische Technische Hochschule Zürich (ETHZ).
  *
@@ -45,7 +45,7 @@ private object ProjectDatasetsFinder {
   ): ProjectDatasetsFinder[F] = new ProjectDatasetsFinderImpl[F](TSClient[F](conCfg))
 }
 
-private class ProjectDatasetsFinderImpl[F[_]: Async: NonEmptyParallel: Logger: SparqlQueryTimeRecorder](
+private class ProjectDatasetsFinderImpl[F[_]: Async: NonEmptyParallel: Logger](
     tsClient: TSClient[F]
 )(implicit renkuUrl: RenkuUrl)
     extends ProjectDatasetsFinder[F]

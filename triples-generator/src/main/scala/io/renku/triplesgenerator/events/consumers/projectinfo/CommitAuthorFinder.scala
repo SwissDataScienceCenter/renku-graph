@@ -1,5 +1,5 @@
 /*
- * Copyright 2023 Swiss Data Science Center (SDSC)
+ * Copyright 2024 Swiss Data Science Center (SDSC)
  * A partnership between École Polytechnique Fédérale de Lausanne (EPFL) and
  * Eidgenössische Technische Hochschule Zürich (ETHZ).
  *
@@ -33,7 +33,7 @@ import org.typelevel.log4cats.Logger
 
 private trait CommitAuthorFinder[F[_]] {
   def findCommitAuthor(projectSlug: projects.Slug, commitId: CommitId)(implicit
-      maybeAccessToken: Option[AccessToken]
+      at: AccessToken
   ): EitherT[F, ProcessingRecoverableError, Option[(persons.Name, persons.Email)]]
 }
 
@@ -48,12 +48,12 @@ private class CommitAuthorFinderImpl[F[_]: Async: GitLabClient: Logger](
   import org.http4s.Status.{NotFound, Ok}
 
   override def findCommitAuthor(projectSlug: projects.Slug, commitId: CommitId)(implicit
-      maybeAccessToken: Option[AccessToken]
+      at: AccessToken
   ): EitherT[F, ProcessingRecoverableError, Option[(persons.Name, persons.Email)]] = EitherT {
     GitLabClient[F]
       .get(uri"projects" / projectSlug.value / "repository" / "commits" / commitId.show, "single-commit")(
         mapTo[(persons.Name, persons.Email)]
-      )
+      )(at.some)
       .map(_.asRight[ProcessingRecoverableError])
       .recoverWith(recoveryStrategy.maybeRecoverableError)
   }

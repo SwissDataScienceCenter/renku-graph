@@ -1,5 +1,5 @@
 /*
- * Copyright 2023 Swiss Data Science Center (SDSC)
+ * Copyright 2024 Swiss Data Science Center (SDSC)
  * A partnership between École Polytechnique Fédérale de Lausanne (EPFL) and
  * Eidgenössische Technische Hochschule Zürich (ETHZ).
  *
@@ -32,9 +32,7 @@ import io.renku.triplesgenerator.events.consumers.awaitinggeneration.triplesgene
 import org.typelevel.log4cats.Logger
 
 private[awaitinggeneration] trait TriplesGenerator[F[_]] {
-  def generateTriples(commit: CommitEvent)(implicit
-      maybeAccessToken: Option[AccessToken]
-  ): EitherT[F, ProcessingRecoverableError, JsonLD]
+  def generateTriples(commit: CommitEvent)(implicit at: AccessToken): EitherT[F, ProcessingRecoverableError, JsonLD]
 }
 
 private[awaitinggeneration] object TriplesGenerator {

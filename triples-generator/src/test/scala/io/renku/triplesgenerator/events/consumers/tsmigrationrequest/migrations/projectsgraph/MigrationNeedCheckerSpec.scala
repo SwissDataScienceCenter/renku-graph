@@ -1,5 +1,5 @@
 /*
- * Copyright 2023 Swiss Data Science Center (SDSC)
+ * Copyright 2024 Swiss Data Science Center (SDSC)
  * A partnership between École Polytechnique Fédérale de Lausanne (EPFL) and
  * Eidgenössische Technische Hochschule Zürich (ETHZ).
  *
@@ -20,56 +20,49 @@ package io.renku.triplesgenerator.events.consumers.tsmigrationrequest
 package migrations.projectsgraph
 
 import cats.effect.IO
-import io.renku.entities.searchgraphs.SearchInfoDatasets
+import cats.effect.testing.scalatest.AsyncIOSpec
+import io.renku.entities.searchgraphs.TestSearchInfoDatasets
 import io.renku.generators.Generators.Implicits._
 import io.renku.graph.model.testentities._
 import io.renku.interpreters.TestLogger
-import io.renku.logging.TestSparqlQueryTimeRecorder
-import io.renku.testtools.IOSpec
 import io.renku.triplesstore._
-import org.scalamock.scalatest.MockFactory
+import org.scalatest.Succeeded
 import org.scalatest.matchers.should
-import org.scalatest.wordspec.AnyWordSpec
+import org.scalatest.wordspec.AsyncWordSpec
 import org.typelevel.log4cats.Logger
 
 class MigrationNeedCheckerSpec
-    extends AnyWordSpec
-    with should.Matchers
-    with IOSpec
-    with InMemoryJenaForSpec
-    with ProjectsDataset
-    with SearchInfoDatasets
-    with MockFactory {
+    extends AsyncWordSpec
+    with AsyncIOSpec
+    with GraphJenaSpec
+    with TestSearchInfoDatasets
+    with should.Matchers {
 
   "checkMigrationNeeded" should {
 
-    "return Yes if there are projects without a counterpart in the Projects graph" in new TestCase {
+    "return Yes if there are projects without a counterpart in the Projects graph" in projectsDSConfig.use {
+      implicit pcc =>
+        val projectInTwoGraphs = anyProjectEntities.generateOne
+        val projectInOneGraph  = anyProjectEntities.generateOne
 
-      val projectInTwoGraphs = anyProjectEntities.generateOne
-      val projectInOneGraph  = anyProjectEntities.generateOne
+        for {
+          _ <- provisionTestProject(projectInTwoGraphs)
 
-      provisionTestProject(projectInTwoGraphs).unsafeRunSync()
+          _ <- uploadToProjects(projectInOneGraph)
 
-      upload(to = projectsDataset, projectInOneGraph)
-
-      checker.checkMigrationNeeded.unsafeRunSync() shouldBe a[ConditionedMigration.MigrationRequired.Yes]
+          _ <- checker.checkMigrationNeeded.asserting(_ shouldBe a[ConditionedMigration.MigrationRequired.Yes])
+        } yield Succeeded
     }
 
-    "return No if there are only projects in both graphs" in new TestCase {
-
+    "return No if there are only projects in both graphs" in projectsDSConfig.use { implicit pcc =>
       val project = anyProjectEntities.generateOne
 
-      provisionTestProject(project).unsafeRunSync()
-
-      checker.checkMigrationNeeded.unsafeRunSync() shouldBe a[ConditionedMigration.MigrationRequired.No]
+      provisionTestProject(project) >>
+        checker.checkMigrationNeeded.asserting(_ shouldBe a[ConditionedMigration.MigrationRequired.No])
     }
   }
 
-  private implicit val logger:    TestLogger[IO] = TestLogger[IO]()
-  implicit override val ioLogger: Logger[IO]     = logger
+  implicit override val ioLogger: Logger[IO] = TestLogger[IO]()
 
-  private trait TestCase {
-    private implicit val timeRecorder: SparqlQueryTimeRecorder[IO] = TestSparqlQueryTimeRecorder[IO].unsafeRunSync()
-    val checker = new MigrationNeedCheckerImpl[IO](TSClient[IO](projectsDSConnectionInfo))
-  }
+  private def checker(implicit pcc: ProjectsConnectionConfig) = new MigrationNeedCheckerImpl[IO](tsClient)
 }

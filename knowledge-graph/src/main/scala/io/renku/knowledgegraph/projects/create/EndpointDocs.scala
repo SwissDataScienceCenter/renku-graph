@@ -1,5 +1,5 @@
 /*
- * Copyright 2023 Swiss Data Science Center (SDSC)
+ * Copyright 2024 Swiss Data Science Center (SDSC)
  * A partnership between École Polytechnique Fédérale de Lausanne (EPFL) and
  * Eidgenössische Technische Hochschule Zürich (ETHZ).
  *
@@ -22,7 +22,6 @@ package projects.create
 import eu.timepit.refined.auto._
 import io.circe.literal._
 import io.renku.data.Message
-import io.renku.data.MessageCodecs._
 import io.renku.knowledgegraph.docs.model.Operation.POST
 import io.renku.knowledgegraph.docs.model._
 
@@ -82,6 +81,15 @@ object EndpointDocs extends docs.EndpointDocs {
                |Content-Disposition: form-data; name="templateId"
                |
                |python-minimal
+               |------WebKitFormBoundary7MA4YWxkTrZu0gW
+               |Content-Disposition: form-data; name="templateRef"
+               |
+               |0.6.0
+               |------WebKitFormBoundary7MA4YWxkTrZu0gW
+               |Content-Disposition: form-data; name="templateParameters"
+               |Content-Type: application/json
+               |
+               |[{"key":"archive_url","value":"http://host/path"}]
                |------WebKitFormBoundary7MA4YWxkTrZu0gW
                |Content-Disposition: form-data; name="image"; filename="image.png"
                |Content-Type: image/png

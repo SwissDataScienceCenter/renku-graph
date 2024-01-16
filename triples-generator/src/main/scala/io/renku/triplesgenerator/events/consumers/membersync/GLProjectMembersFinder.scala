@@ -1,5 +1,5 @@
 /*
- * Copyright 2023 Swiss Data Science Center (SDSC)
+ * Copyright 2024 Swiss Data Science Center (SDSC)
  * A partnership between École Polytechnique Fédérale de Lausanne (EPFL) and
  * Eidgenössische Technische Hochschule Zürich (ETHZ).
  *
@@ -38,12 +38,12 @@ import org.typelevel.ci._
 import org.typelevel.log4cats.Logger
 
 private trait GLProjectMembersFinder[F[_]] {
-  def findProjectMembers(slug: Slug)(implicit maybeAccessToken: Option[AccessToken]): F[Set[GitLabProjectMember]]
+  def findProjectMembers(slug: Slug)(implicit at: AccessToken): F[Set[GitLabProjectMember]]
 }
 
 private class GLProjectMembersFinderImpl[F[_]: Async: GitLabClient: Logger] extends GLProjectMembersFinder[F] {
 
-  override def findProjectMembers(slug: Slug)(implicit mat: Option[AccessToken]): F[Set[GitLabProjectMember]] =
+  override def findProjectMembers(slug: Slug)(implicit at: AccessToken): F[Set[GitLabProjectMember]] =
     fetch(uri"projects" / slug / "members" / "all")
 
   private val glApiName: String Refined NonEmpty = "project-members"
@@ -52,9 +52,9 @@ private class GLProjectMembersFinderImpl[F[_]: Async: GitLabClient: Logger] exte
       uri:        Uri,
       maybePage:  Option[Int] = None,
       allMembers: Set[GitLabProjectMember] = Set.empty
-  )(implicit maybeAccessToken: Option[AccessToken]): F[Set[GitLabProjectMember]] = for {
+  )(implicit at: AccessToken): F[Set[GitLabProjectMember]] = for {
     uri                     <- addPageToUrl(uri, maybePage).pure[F]
-    fetchedUsersAndNextPage <- GitLabClient[F].get(uri, glApiName)(mapResponse(uri))
+    fetchedUsersAndNextPage <- GitLabClient[F].get(uri, glApiName)(mapResponse)(at.some)
     allResults              <- addNextPage(uri, allMembers, fetchedUsersAndNextPage)
   } yield allResults
 
@@ -63,9 +63,8 @@ private class GLProjectMembersFinderImpl[F[_]: Async: GitLabClient: Logger] exte
     case None       => uri
   }
 
-  private def mapResponse(uri: Uri)(implicit
-      maybeAccessToken: Option[AccessToken]
-  ): PartialFunction[(Status, Request[F], Response[F]), F[(Set[GitLabProjectMember], Option[Int])]] = {
+  private lazy val mapResponse
+      : PartialFunction[(Status, Request[F], Response[F]), F[(Set[GitLabProjectMember], Option[Int])]] = {
     case (Ok, _, response) =>
       response
         .as[List[Option[GitLabProjectMember]]]
@@ -73,17 +72,14 @@ private class GLProjectMembersFinderImpl[F[_]: Async: GitLabClient: Logger] exte
     case (NotFound, _, _) =>
       (Set.empty[GitLabProjectMember] -> Option.empty[Int]).pure[F]
     case (Unauthorized | Forbidden, _, _) =>
-      maybeAccessToken match {
-        case Some(_) => fetch(uri)(maybeAccessToken = None).map(_ -> None)
-        case None    => (Set.empty[GitLabProjectMember] -> Option.empty[Int]).pure[F]
-      }
+      (Set.empty[GitLabProjectMember] -> Option.empty[Int]).pure[F]
   }
 
   private def addNextPage(
       uri:                          Uri,
       allUsers:                     Set[GitLabProjectMember],
       fetchedUsersAndMaybeNextPage: (Set[GitLabProjectMember], Option[Int])
-  )(implicit maybeAccessToken: Option[AccessToken]): F[Set[GitLabProjectMember]] =
+  )(implicit at: AccessToken): F[Set[GitLabProjectMember]] =
     fetchedUsersAndMaybeNextPage match {
       case (fetchedUsers, maybeNextPage @ Some(_)) => fetch(uri, maybeNextPage, allUsers ++ fetchedUsers)
       case (fetchedUsers, None)                    => (allUsers ++ fetchedUsers).pure[F]
@@ -96,7 +92,6 @@ private class GLProjectMembersFinderImpl[F[_]: Async: GitLabClient: Logger] exte
     (cur.downField("id").success, cur.downField("name").success)
       .mapN((_, _) => Decoder.forProduct3("id", "name", "access_level")(GitLabProjectMember.apply).map(_.some)(cur))
       .getOrElse(Option.empty[GitLabProjectMember].asRight[DecodingFailure])
-
 }
 
 private object GLProjectMembersFinder {

@@ -1,5 +1,5 @@
 /*
- * Copyright 2023 Swiss Data Science Center (SDSC)
+ * Copyright 2024 Swiss Data Science Center (SDSC)
  * A partnership between École Polytechnique Fédérale de Lausanne (EPFL) and
  * Eidgenössische Technische Hochschule Zürich (ETHZ).
  *
@@ -29,17 +29,25 @@ private sealed trait DBUpdateResults {
 
 private object DBUpdateResults {
 
+  lazy val empty: ForProjects = ForProjects.empty
+
   final case class ForProjects(statusCounts: Set[(projects.Slug, Map[EventStatus, Int])]) extends DBUpdateResults {
     def apply(project: projects.Slug): Map[EventStatus, Int] =
       statusCounts.find(_._1 == project).map(_._2).getOrElse(Map.empty)
   }
 
+  def apply(projectSlug: projects.Slug, statusCounts: (EventStatus, Int)*): ForProjects =
+    ForProjects(projectSlug, statusCounts.toMap[EventStatus, Int])
+
   object ForProjects {
 
-    lazy val empty: ForProjects = ForProjects(Set.empty)
+    lazy val empty: ForProjects = ForProjects(Set.empty[(projects.Slug, Map[EventStatus, Int])])
 
     def apply(projectSlug: projects.Slug, statusCount: Map[EventStatus, Int]): ForProjects =
       ForProjects(Set(projectSlug -> statusCount))
+
+    def apply(projectSlug: projects.Slug, statusCounts: (EventStatus, Int)*): ForProjects =
+      apply(projectSlug, statusCounts.toMap)
   }
 
   final case object ForAllProjects extends DBUpdateResults

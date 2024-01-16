@@ -1,5 +1,5 @@
 /*
- * Copyright 2023 Swiss Data Science Center (SDSC)
+ * Copyright 2024 Swiss Data Science Center (SDSC)
  * A partnership between École Polytechnique Fédérale de Lausanne (EPFL) and
  * Eidgenössische Technische Hochschule Zürich (ETHZ).
  *
@@ -41,7 +41,6 @@ class ProjectPathAdderSpec
       for {
         _ <- verifyColumnExists("projects_tokens", "project_path").asserting(_ shouldBe false)
 
-        _ <- logger.resetF()
         _ <- ProjectPathAdder[IO].run.assertNoException
         _ <- verifyColumnExists("projects_tokens", "project_path").asserting(_ shouldBe true)
         _ <- logger.loggedOnlyF(Info("'project_path' column added"))

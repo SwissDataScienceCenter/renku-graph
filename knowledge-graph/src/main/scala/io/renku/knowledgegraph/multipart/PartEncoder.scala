@@ -1,5 +1,5 @@
 /*
- * Copyright 2023 Swiss Data Science Center (SDSC)
+ * Copyright 2024 Swiss Data Science Center (SDSC)
  * A partnership between École Polytechnique Fédérale de Lausanne (EPFL) and
  * Eidgenössische Technische Hochschule Zürich (ETHZ).
  *
@@ -18,7 +18,11 @@
 
 package io.renku.knowledgegraph.multipart
 
+import io.circe.Json
 import io.renku.tinytypes.TinyType
+import org.http4s.Header.ToRaw._
+import org.http4s.MediaType
+import org.http4s.headers.`Content-Type`
 import org.http4s.multipart.Part
 
 trait PartEncoder[F[_], A] {
@@ -32,6 +36,11 @@ object PartEncoder {
 
   implicit def fromPartValueEncoder[F[_], A](implicit pvEnc: PartValueEncoder[A]): PartEncoder[F, A] =
     instance[F, A]((partName: String, a: A) => Part.formData[F](partName, pvEnc(a)))
+
+  implicit def fromPartJsonValueEncoder[F[_]]: PartEncoder[F, Json] =
+    instance[F, Json]((partName: String, a: Json) =>
+      Part.formData[F](partName, a.noSpaces, `Content-Type`(MediaType.application.json))
+    )
 }
 
 trait PartValueEncoder[A] {

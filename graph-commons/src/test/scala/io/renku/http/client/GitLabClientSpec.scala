@@ -1,5 +1,5 @@
 /*
- * Copyright 2023 Swiss Data Science Center (SDSC)
+ * Copyright 2024 Swiss Data Science Center (SDSC)
  * A partnership between École Polytechnique Fédérale de Lausanne (EPFL) and
  * Eidgenössische Technische Hochschule Zürich (ETHZ).
  *
@@ -60,7 +60,8 @@ class GitLabClientSpec
     with should.Matchers
     with TryValues
     with TableDrivenPropertyChecks
-    with MockFactory {
+    with MockFactory
+    with GitLabClientMappings {
 
   "get" should {
 

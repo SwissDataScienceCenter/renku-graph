@@ -1,5 +1,5 @@
 /*
- * Copyright 2023 Swiss Data Science Center (SDSC)
+ * Copyright 2024 Swiss Data Science Center (SDSC)
  * A partnership between École Polytechnique Fédérale de Lausanne (EPFL) and
  * Eidgenössische Technische Hochschule Zürich (ETHZ).
  *
@@ -25,10 +25,10 @@ import eu.timepit.refined.auto._
 import io.circe.Decoder
 import io.renku.core.client.Branch
 import io.renku.graph.model.projects
+import io.renku.http.RenkuEntityCodec
 import io.renku.http.client.{AccessToken, GitLabClient}
 import io.renku.http.tinytypes.TinyTypeURIEncoder._
 import org.http4s.Status.{NotFound, Ok}
-import org.http4s.circe.CirceEntityDecoder._
 import org.http4s.implicits._
 import org.http4s.{Request, Response, Status}
 
@@ -43,7 +43,9 @@ private object BranchProtectionCheck {
   case class BranchInfo(name: Branch, default: Boolean, canPush: Boolean)
 }
 
-private class BranchProtectionCheckImpl[F[_]: Async: GitLabClient] extends BranchProtectionCheck[F] {
+private class BranchProtectionCheckImpl[F[_]: Async: GitLabClient]
+    extends BranchProtectionCheck[F]
+    with RenkuEntityCodec {
 
   override def findDefaultBranchInfo(slug: projects.Slug, at: AccessToken): F[Option[DefaultBranch]] =
     GitLabClient[F]
@@ -54,7 +56,7 @@ private class BranchProtectionCheckImpl[F[_]: Async: GitLabClient] extends Branc
       })
 
   private lazy val mapResponse: PartialFunction[(Status, Request[F], Response[F]), F[List[BranchInfo]]] = {
-    case (Ok, _, resp)    => resp.as[List[BranchInfo]]
+    case (Ok, _, resp)    => resp.asJson(Decoder.decodeList[BranchInfo])
     case (NotFound, _, _) => List.empty[BranchInfo].pure[F]
   }
 

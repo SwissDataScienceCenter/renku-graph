@@ -1,5 +1,5 @@
 /*
- * Copyright 2023 Swiss Data Science Center (SDSC)
+ * Copyright 2024 Swiss Data Science Center (SDSC)
  * A partnership between École Polytechnique Fédérale de Lausanne (EPFL) and
  * Eidgenössische Technische Hochschule Zürich (ETHZ).
  *
@@ -45,14 +45,13 @@ object Authorizer {
       Authorizer.of(this)
   }
 
-  final case class AuthContext[Key](maybeAuthUser: Option[AuthUser], key: Key, allowedProjects: Set[projects.Slug]) {
-    def addAllowedProject(slug: projects.Slug): AuthContext[Key] = copy(allowedProjects = allowedProjects + slug)
-    def replaceKey[K](key:      K):             AuthContext[K]   = AuthContext(maybeAuthUser, key, allowedProjects)
+  final case class AuthContext[Key](maybeAuthUser: Option[AuthUser], key: Key) {
+    def replaceKey[K](key: K): AuthContext[K] = AuthContext(maybeAuthUser, key)
   }
 
   object AuthContext {
-    def forUnknownUser[Key](key: Key, allowedProjects: Set[projects.Slug]): AuthContext[Key] =
-      AuthContext(None, key, allowedProjects)
+    def forUnknownUser[Key](key: Key): AuthContext[Key] =
+      AuthContext(None, key)
   }
 
   def of[F[_]: MonadThrow, K](securityRecordFinder: SecurityRecordFinder[F, K]): Authorizer[F, K] =
@@ -70,25 +69,20 @@ private class AuthorizerImpl[F[_]: MonadThrow, Key](securityRecordsFinder: Secur
                          maybeAuthUser: Option[AuthUser]
   ): EitherT[F, EndpointSecurityException, AuthContext[Key]] = for {
     records     <- EitherT.right(securityRecordsFinder(key, maybeAuthUser))
-    authContext <- validate(AuthContext[Key](maybeAuthUser, key, Set.empty), records)
+    authContext <- validate(AuthContext[Key](maybeAuthUser, key), records)
   } yield authContext
 
   private def validate(authContext: AuthContext[Key],
                        records:     List[SecurityRecord]
   ): EitherT[F, EndpointSecurityException, AuthContext[Key]] = EitherT.fromEither[F] {
-    findAllowedProjects(authContext)(records) match {
-      case allowed if allowed.isEmpty => AuthorizationFailure.asLeft
-      case allowed                    => authContext.copy(allowedProjects = allowed).asRight
-    }
+    if (isAllowed(authContext, records)) authContext.asRight
+    else AuthorizationFailure.asLeft
   }
 
-  private def findAllowedProjects(authContext: AuthContext[Key]): List[SecurityRecord] => Set[projects.Slug] =
-    _.foldLeft(Set.empty[projects.Slug]) {
-      case (allowed, SecurityRecord(Public, slug, _))                                          => allowed + slug
-      case (allowed, SecurityRecord(Internal, slug, _)) if authContext.maybeAuthUser.isDefined => allowed + slug
-      case (allowed, SecurityRecord(Private, slug, members))
-          if (members intersect authContext.maybeAuthUser.map(_.id).toSet).nonEmpty =>
-        allowed + slug
-      case (allowed, _) => allowed
-    }
+  private def isAllowed(authContext: AuthContext[Key], records: List[SecurityRecord]): Boolean =
+    records.exists(r =>
+      r.visibility == Public ||
+        (r.visibility == Internal && authContext.maybeAuthUser.isDefined) ||
+        (r.visibility == Private && authContext.maybeAuthUser.map(_.id).exists(r.allowedPersons.contains))
+    )
 }

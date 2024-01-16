@@ -1,5 +1,5 @@
 /*
- * Copyright 2023 Swiss Data Science Center (SDSC)
+ * Copyright 2024 Swiss Data Science Center (SDSC)
  * A partnership between École Polytechnique Fédérale de Lausanne (EPFL) and
  * Eidgenössische Technische Hochschule Zürich (ETHZ).
  *
@@ -27,6 +27,7 @@ import io.renku.logging.TestSparqlQueryTimeRecorder
 import io.renku.projectauth.{Generators, ProjectAuthServiceSupport}
 import io.renku.testtools.CustomAsyncIOSpec
 import io.renku.triplesstore.SparqlQueryTimeRecorder
+import io.renku.triplesstore.client.util.JenaSpec
 import org.scalatest.flatspec.AsyncFlatSpec
 import org.scalatest.matchers.should
 import org.typelevel.log4cats.Logger
@@ -34,6 +35,7 @@ import org.typelevel.log4cats.Logger
 class ProjectAuthRecordsFinderSpec
     extends AsyncFlatSpec
     with CustomAsyncIOSpec
+    with JenaSpec
     with ProjectAuthServiceSupport
     with should.Matchers {
   implicit val logger:   Logger[IO]                  = TestLogger[IO]()

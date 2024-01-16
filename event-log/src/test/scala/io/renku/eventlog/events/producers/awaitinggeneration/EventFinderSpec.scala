@@ -1,5 +1,5 @@
 /*
- * Copyright 2023 Swiss Data Science Center (SDSC)
+ * Copyright 2024 Swiss Data Science Center (SDSC)
  * A partnership between École Polytechnique Fédérale de Lausanne (EPFL) and
  * Eidgenössische Technische Hochschule Zürich (ETHZ).
  *
@@ -20,366 +20,377 @@ package io.renku.eventlog.events.producers
 package awaitinggeneration
 
 import cats.effect.IO
+import cats.effect.testing.scalatest.AsyncIOSpec
+import cats.syntax.all._
 import eu.timepit.refined.auto._
-import io.renku.eventlog.InMemoryEventLogDbSpec
+import io.renku.db.DBConfigProvider.DBConfig
 import io.renku.eventlog.events.producers.ProjectPrioritisation.Priority.MaxPriority
 import io.renku.eventlog.events.producers.ProjectPrioritisation.{Priority, ProjectInfo}
 import io.renku.eventlog.metrics.TestEventStatusGauges._
-import io.renku.eventlog.metrics.{EventStatusGauges, QueriesExecutionTimes, TestEventStatusGauges}
+import io.renku.eventlog.metrics.{EventStatusGauges, QueriesExecutionTimes, TestEventStatusGauges, TestQueriesExecutionTimes}
+import io.renku.eventlog.{EventLogDB, EventLogPostgresSpec}
+import io.renku.events.consumers.ConsumersModelGenerators.consumerProjects
+import io.renku.events.consumers.Project
 import io.renku.generators.Generators.Implicits._
 import io.renku.generators.Generators._
 import io.renku.graph.model.EventContentGenerators._
 import io.renku.graph.model.EventsGenerators._
-import io.renku.graph.model.GraphModelGenerators._
 import io.renku.graph.model.events.EventStatus._
 import io.renku.graph.model.events._
-import io.renku.graph.model.projects.{GitLabId, Slug}
-import io.renku.metrics.TestMetricsRegistry
-import io.renku.testtools.IOSpec
 import org.scalacheck.Gen
-import org.scalamock.scalatest.MockFactory
-import org.scalatest.OptionValues
+import org.scalamock.scalatest.AsyncMockFactory
+import org.scalatest.flatspec.AsyncFlatSpec
 import org.scalatest.matchers.should
-import org.scalatest.wordspec.AnyWordSpec
+import org.scalatest.{OptionValues, Succeeded}
 
 import java.time.Instant
 import java.time.temporal.ChronoUnit.DAYS
 
 private class EventFinderSpec
-    extends AnyWordSpec
-    with IOSpec
-    with InMemoryEventLogDbSpec
-    with MockFactory
+    extends AsyncFlatSpec
+    with AsyncIOSpec
+    with EventLogPostgresSpec
+    with AsyncMockFactory
     with should.Matchers
     with OptionValues {
 
-  "popEvent" should {
+  it should s"find the most recent event in status $New or $GenerationRecoverableFailure " +
+    s"and mark it as $GeneratingTriples" in testDBResource.use { implicit cfg =>
+      val project = consumerProjects.generateOne
+      for {
+        notLatestEvent <- createEvent(
+                            status = Gen.oneOf(New, GenerationRecoverableFailure),
+                            eventDate = timestamps(max = now.minus(2, DAYS)).generateAs(EventDate),
+                            project = project
+                          )
+        event2 <- createEvent(
+                    status = Gen.oneOf(New, GenerationRecoverableFailure),
+                    eventDate = timestamps(min = notLatestEvent.date.value, max = now).generateAs(EventDate),
+                    project = project
+                  )
 
-    s"find the most recent event in status $New or $GenerationRecoverableFailure " +
-      s"and mark it as $GeneratingTriples" in new TestCase {
+        _ <- findEvents(GeneratingTriples).asserting(_ shouldBe List.empty)
 
-        val projectId   = projectIds.generateOne
-        val projectSlug = projectSlugs.generateOne
+        _ = givenPrioritisation(
+              takes = List(ProjectInfo(project, event2.date, currentOccupancy = 0)),
+              totalOccupancy = 0,
+              returns = List(ProjectIds(project) -> MaxPriority)
+            )
 
-        val (_, _, notLatestEventDate, _) = createEvent(
-          status = Gen.oneOf(New, GenerationRecoverableFailure).generateOne,
-          eventDate = timestamps(max = now.minus(2, DAYS)).generateAs(EventDate),
-          projectId = projectId,
-          projectSlug = projectSlug
-        )
+        _ <- finder.popEvent().map(_.value).asserting(_ shouldBe event2.toAwaitingEvent)
 
-        val (event2Id, event2Body, latestEventDate, _) = createEvent(
-          status = Gen.oneOf(New, GenerationRecoverableFailure).generateOne,
-          eventDate = timestamps(min = notLatestEventDate.value, max = now).generateAs(EventDate),
-          projectId = projectId,
-          projectSlug = projectSlug
-        )
+        _ <- gauges.awaitingGeneration.getValue(project.slug).asserting(_ shouldBe -1)
+        _ <- gauges.underGeneration.getValue(project.slug).asserting(_ shouldBe 1)
 
-        findEvents(EventStatus.GeneratingTriples) shouldBe List.empty
+        _ <- findEvents(GeneratingTriples).asserting {
+               _.map(_.select(Field.Id, Field.ExecutionDate)) shouldBe List(FoundEvent(event2.id, executionDate))
+             }
 
-        givenPrioritisation(
-          takes = List(ProjectInfo(projectId, projectSlug, latestEventDate, currentOccupancy = 0)),
-          totalOccupancy = 0,
-          returns = List(ProjectIds(projectId, projectSlug) -> MaxPriority)
-        )
+        _ = givenPrioritisation(takes = Nil, totalOccupancy = 1, returns = Nil)
 
-        finder.popEvent().unsafeRunSync().value shouldBe AwaitingGenerationEvent(event2Id, projectSlug, event2Body)
-
-        gauges.awaitingGeneration.getValue(projectSlug).unsafeRunSync() shouldBe -1
-        gauges.underGeneration.getValue(projectSlug).unsafeRunSync()    shouldBe 1
-
-        findEvents(EventStatus.GeneratingTriples).noBatchDate shouldBe List((event2Id, executionDate))
-
-        givenPrioritisation(takes = Nil, totalOccupancy = 1, returns = Nil)
-
-        finder.popEvent().unsafeRunSync() shouldBe None
-      }
-
-    s"find the most recent event in status $New or $GenerationRecoverableFailure " +
-      "if there are multiple latest events with the same date" in new TestCase {
-
-        val projectId       = projectIds.generateOne
-        val projectSlug     = projectSlugs.generateOne
-        val latestEventDate = eventDates.generateOne
-
-        val (event1Id, event1Body, _, _) = createEvent(
-          status = Gen.oneOf(New, GenerationRecoverableFailure).generateOne,
-          eventDate = latestEventDate,
-          projectId = projectId,
-          projectSlug = projectSlug
-        )
-
-        val (event2Id, event2Body, _, _) = createEvent(
-          status = Gen.oneOf(New, GenerationRecoverableFailure).generateOne,
-          eventDate = latestEventDate,
-          projectId = projectId,
-          projectSlug = projectSlug
-        )
-
-        findEvents(EventStatus.GeneratingTriples) shouldBe List.empty
-
-        // 1st event with the same event date
-        givenPrioritisation(
-          takes = List(ProjectInfo(projectId, projectSlug, latestEventDate, currentOccupancy = 0)),
-          totalOccupancy = 0,
-          returns = List(ProjectIds(projectId, projectSlug) -> MaxPriority)
-        )
-
-        finder.popEvent().unsafeRunSync().value should {
-          be(AwaitingGenerationEvent(event1Id, projectSlug, event1Body)) or
-            be(AwaitingGenerationEvent(event2Id, projectSlug, event2Body))
-        }
-
-        gauges.awaitingGeneration.getValue(projectSlug).unsafeRunSync() shouldBe -1
-        gauges.underGeneration.getValue(projectSlug).unsafeRunSync()    shouldBe 1
-
-        findEvents(EventStatus.GeneratingTriples).noBatchDate should {
-          be(List((event1Id, executionDate))) or be(List((event2Id, executionDate)))
-        }
-
-        // 2nd event with the same event date
-        givenPrioritisation(
-          takes = List(ProjectInfo(projectId, projectSlug, latestEventDate, currentOccupancy = 1)),
-          totalOccupancy = 1,
-          returns = List(ProjectIds(projectId, projectSlug) -> MaxPriority)
-        )
-
-        finder.popEvent().unsafeRunSync().value should {
-          be(AwaitingGenerationEvent(event1Id, projectSlug, event1Body)) or
-            be(AwaitingGenerationEvent(event2Id, projectSlug, event2Body))
-        }
-
-        gauges.awaitingGeneration.getValue(projectSlug).unsafeRunSync() shouldBe -2
-        gauges.underGeneration.getValue(projectSlug).unsafeRunSync()    shouldBe 2
-
-        findEvents(EventStatus.GeneratingTriples).noBatchDate should contain theSameElementsAs List(
-          event1Id -> executionDate,
-          event2Id -> executionDate
-        )
-
-        // no more events left
-        givenPrioritisation(takes = Nil, totalOccupancy = 2, returns = Nil)
-
-        finder.popEvent().unsafeRunSync() shouldBe None
-      }
-
-    Set(GenerationNonRecoverableFailure, TransformationNonRecoverableFailure, Skipped) foreach { latestEventStatus =>
-      s"find the most recent event in status $New or $GenerationRecoverableFailure " +
-        s"if the latest event is in status $latestEventStatus" in new TestCase {
-
-          val projectId   = projectIds.generateOne
-          val projectSlug = projectSlugs.generateOne
-
-          val (event1Id, event1Body, notLatestEventDate, _) = createEvent(
-            status = Gen.oneOf(New, GenerationRecoverableFailure).generateOne,
-            eventDate = timestamps(max = now.minus(2, DAYS)).generateAs(EventDate),
-            projectId = projectId,
-            projectSlug = projectSlug
-          )
-
-          val (_, _, latestEventDate, _) = createEvent(
-            status = latestEventStatus,
-            eventDate = timestamps(min = notLatestEventDate.value, max = now).generateAs(EventDate),
-            projectId = projectId,
-            projectSlug = projectSlug
-          )
-
-          findEvents(EventStatus.GeneratingTriples) shouldBe List.empty
-
-          givenPrioritisation(
-            takes = List(ProjectInfo(projectId, projectSlug, latestEventDate, currentOccupancy = 0)),
-            totalOccupancy = 0,
-            returns = List(ProjectIds(projectId, projectSlug) -> MaxPriority)
-          )
-
-          finder.popEvent().unsafeRunSync().value shouldBe AwaitingGenerationEvent(event1Id, projectSlug, event1Body)
-
-          gauges.awaitingGeneration.getValue(projectSlug).unsafeRunSync() shouldBe -1
-          gauges.underGeneration.getValue(projectSlug).unsafeRunSync()    shouldBe 1
-        }
+        _ <- finder.popEvent().asserting(_ shouldBe None)
+      } yield Succeeded
     }
 
-    List(GeneratingTriples,
-         TriplesGenerated,
-         TransformationRecoverableFailure,
-         TriplesStore,
-         AwaitingDeletion,
-         Deleting
-    ) foreach { latestEventStatus =>
-      s"find no event when there are older statuses in status $New or $GenerationRecoverableFailure " +
-        s"but the latest event is $latestEventStatus" in new TestCase {
+  it should s"find the most recent event in status $New or $GenerationRecoverableFailure " +
+    "if there are multiple latest events with the same date" in testDBResource.use { implicit cfg =>
+      val project         = consumerProjects.generateOne
+      val latestEventDate = eventDates.generateOne
+      for {
+        event1 <- createEvent(
+                    status = Gen.oneOf(New, GenerationRecoverableFailure),
+                    eventDate = latestEventDate,
+                    project = project
+                  )
+        event2 <- createEvent(
+                    status = Gen.oneOf(New, GenerationRecoverableFailure),
+                    eventDate = latestEventDate,
+                    project = project
+                  )
 
-          val projectId   = projectIds.generateOne
-          val projectSlug = projectSlugs.generateOne
+        _ <- findEvents(GeneratingTriples).asserting(_ shouldBe List.empty)
 
-          val (_, _, notLatestEventDate, _) = createEvent(
-            status = Gen.oneOf(New, GenerationRecoverableFailure).generateOne,
-            eventDate = timestamps(max = now.minus(2, DAYS)).generateAs(EventDate),
-            projectId = projectId,
-            projectSlug = projectSlug
+        // 1st event with the same event date
+        _ = givenPrioritisation(
+              takes = List(ProjectInfo(project, latestEventDate, currentOccupancy = 0)),
+              totalOccupancy = 0,
+              returns = List(ProjectIds(project) -> MaxPriority)
+            )
+
+        _ <- finder.popEvent().map(_.value).asserting {
+               _ should { be(event1.toAwaitingEvent) or be(event2.toAwaitingEvent) }
+             }
+
+        _ <- gauges.awaitingGeneration.getValue(project.slug).asserting(_ shouldBe -1)
+        _ <- gauges.underGeneration.getValue(project.slug).asserting(_ shouldBe 1)
+
+        _ <- findEvents(GeneratingTriples).asserting {
+               _.map(_.select(Field.Id, Field.ExecutionDate)) should {
+                 be(List(FoundEvent(event1.id, executionDate))) or be(List(FoundEvent(event2.id, executionDate)))
+               }
+             }
+
+        // 2nd event with the same event date
+        _ = givenPrioritisation(
+              takes = List(ProjectInfo(project, latestEventDate, currentOccupancy = 1)),
+              totalOccupancy = 1,
+              returns = List(ProjectIds(project) -> MaxPriority)
+            )
+
+        _ <- finder.popEvent().map(_.value).asserting {
+               _ should { be(event1.toAwaitingEvent) or be(event2.toAwaitingEvent) }
+             }
+
+        _ <- gauges.awaitingGeneration.getValue(project.slug).asserting(_ shouldBe -2)
+        _ <- gauges.underGeneration.getValue(project.slug).asserting(_ shouldBe 2)
+
+        _ <- findEvents(GeneratingTriples).asserting {
+               _.map(_.select(Field.Id, Field.ExecutionDate)) should contain theSameElementsAs
+                 List(FoundEvent(event1.id, executionDate), FoundEvent(event2.id, executionDate))
+             }
+
+        // no more events left
+        _ = givenPrioritisation(takes = Nil, totalOccupancy = 2, returns = Nil)
+
+        _ <- finder.popEvent().asserting(_ shouldBe None)
+      } yield Succeeded
+    }
+
+  it should s"find the most recent event in status $New or $GenerationRecoverableFailure " +
+    "if the latest event is status GenerationNonRecoverableFailure" in testDBResource.use { implicit cfg =>
+      `the most recent dated event should be found`(GenerationNonRecoverableFailure)
+    }
+  it should s"find the most recent event in status $New or $GenerationRecoverableFailure " +
+    "if the latest event is status TransformationNonRecoverableFailure" in testDBResource.use { implicit cfg =>
+      `the most recent dated event should be found`(TransformationNonRecoverableFailure)
+    }
+  it should s"find the most recent event in status $New or $GenerationRecoverableFailure " +
+    "if the latest event is status Skipped" in testDBResource.use { implicit cfg =>
+      `the most recent dated event should be found`(Skipped)
+    }
+
+  private def `the most recent dated event should be found`(latestEventStatus: EventStatus)(implicit
+      cfg: DBConfig[EventLogDB]
+  ) = {
+    val project = consumerProjects.generateOne
+    for {
+      event1 <- createEvent(
+                  status = Gen.oneOf(New, GenerationRecoverableFailure),
+                  eventDate = timestamps(max = now.minus(2, DAYS)).generateAs(EventDate),
+                  project = project
+                )
+      latestDateEvent <- createEvent(
+                           status = latestEventStatus,
+                           eventDate = timestamps(min = event1.date.value, max = now).generateAs(EventDate),
+                           project = project
+                         )
+
+      _ <- findEvents(GeneratingTriples).asserting(_ shouldBe List.empty)
+      _ = givenPrioritisation(
+            takes = List(ProjectInfo(project, latestDateEvent.date, currentOccupancy = 0)),
+            totalOccupancy = 0,
+            returns = List(ProjectIds(project) -> MaxPriority)
           )
 
-          createEvent(
-            status = latestEventStatus,
-            eventDate = timestamps(min = notLatestEventDate.value, max = now).generateAs(EventDate),
-            projectId = projectId,
-            projectSlug = projectSlug
-          )
+      _ <- finder.popEvent().map(_.value).asserting(_ shouldBe event1.toAwaitingEvent)
 
-          givenPrioritisation(takes = Nil,
+      _ <- gauges.awaitingGeneration.getValue(project.slug).asserting(_ shouldBe -1)
+      _ <- gauges.underGeneration.getValue(project.slug).asserting(_ shouldBe 1)
+    } yield Succeeded
+  }
+
+  it should s"find no event when there are older statuses in status $New or $GenerationRecoverableFailure " +
+    "but the latest event is GeneratingTriples" in testDBResource.use { implicit cfg =>
+      `not find an event in New status if the latest is in certain status`(GeneratingTriples)
+    }
+  it should s"find no event when there are older statuses in status $New or $GenerationRecoverableFailure " +
+    "but the latest event is TriplesGenerated" in testDBResource.use { implicit cfg =>
+      `not find an event in New status if the latest is in certain status`(TriplesGenerated)
+    }
+  it should s"find no event when there are older statuses in status $New or $GenerationRecoverableFailure " +
+    "but the latest event is TransformationRecoverableFailure" in testDBResource.use { implicit cfg =>
+      `not find an event in New status if the latest is in certain status`(TransformationRecoverableFailure)
+    }
+  it should s"find no event when there are older statuses in status $New or $GenerationRecoverableFailure " +
+    "but the latest event is TriplesStore" in testDBResource.use { implicit cfg =>
+      `not find an event in New status if the latest is in certain status`(TriplesStore)
+    }
+  it should s"find no event when there are older statuses in status $New or $GenerationRecoverableFailure " +
+    "but the latest event is AwaitingDeletion" in testDBResource.use { implicit cfg =>
+      `not find an event in New status if the latest is in certain status`(AwaitingDeletion)
+    }
+  it should s"find no event when there are older statuses in status $New or $GenerationRecoverableFailure " +
+    "but the latest event is Deleting" in testDBResource.use { implicit cfg =>
+      `not find an event in New status if the latest is in certain status`(Deleting)
+    }
+
+  private def `not find an event in New status if the latest is in certain status`(
+      latestEventStatus: EventStatus
+  )(implicit cfg: DBConfig[EventLogDB]) = {
+    val project = consumerProjects.generateOne
+    for {
+      notLatestDateEvent <- createEvent(
+                              status = Gen.oneOf(New, GenerationRecoverableFailure),
+                              eventDate = timestamps(max = now.minus(2, DAYS)).generateAs(EventDate),
+                              project = project
+                            )
+      _ <- createEvent(
+             status = latestEventStatus,
+             eventDate = timestamps(min = notLatestDateEvent.date.value, max = now).generateAs(EventDate),
+             project = project
+           )
+
+      _ = givenPrioritisation(takes = Nil,
                               totalOccupancy = if (latestEventStatus == GeneratingTriples) 1 else 0,
                               returns = Nil
           )
 
-          finder.popEvent().unsafeRunSync() shouldBe None
-        }
-    }
-
-    "find no event when execution date is in the future " +
-      s"and status $New or $GenerationRecoverableFailure " in new TestCase {
-
-        val projectId   = projectIds.generateOne
-        val projectSlug = projectSlugs.generateOne
-
-        val (_, _, event1Date, _) = createEvent(
-          status = New,
-          eventDate = timestamps(max = Instant.now().minusSeconds(5)).generateAs(EventDate),
-          projectId = projectId,
-          projectSlug = projectSlug
-        )
-
-        val (_, _, event2Date, _) = createEvent(
-          status = GenerationRecoverableFailure,
-          eventDate = EventDate(event1Date.value plusSeconds 1),
-          executionDate = timestampsInTheFuture.generateAs(ExecutionDate),
-          projectId = projectId,
-          projectSlug = projectSlug
-        )
-
-        createEvent(
-          status = New,
-          eventDate = EventDate(event2Date.value plusSeconds 1),
-          executionDate = timestampsInTheFuture.generateAs(ExecutionDate),
-          projectId = projectId,
-          projectSlug = projectSlug
-        )
-
-        findEvents(EventStatus.GeneratingTriples) shouldBe List.empty
-
-        givenPrioritisation(takes = Nil, totalOccupancy = 0, returns = Nil)
-
-        finder.popEvent().unsafeRunSync() shouldBe None
-      }
-
-    "find the latest events from each project" in new TestCase {
-
-      val events = readyStatuses
-        .generateNonEmptyList(min = 2)
-        .map(createEvent(_))
-        .toList
-
-      findEvents(EventStatus.GeneratingTriples) shouldBe List.empty
-
-      events.sortBy(_._3).reverse.zipWithIndex foreach { case ((eventId, _, eventDate, projectSlug), index) =>
-        givenPrioritisation(
-          takes = List(ProjectInfo(eventId.projectId, projectSlug, eventDate, 0)),
-          totalOccupancy = index,
-          returns = List(ProjectIds(eventId.projectId, projectSlug) -> MaxPriority)
-        )
-      }
-
-      events foreach { _ =>
-        finder.popEvent().unsafeRunSync() shouldBe a[Some[_]]
-      }
-
-      events foreach { case (_, _, _, slug) =>
-        gauges.awaitingGeneration.getValue(slug).unsafeRunSync() shouldBe -1
-        gauges.underGeneration.getValue(slug).unsafeRunSync()    shouldBe 1
-      }
-
-      findEvents(status = GeneratingTriples).eventIdsOnly should contain theSameElementsAs events.map(_._1)
-    }
-
-    "return the latest events from each projects - case with projectsFetchingLimit > 1" in new TestCaseCommons {
-
-      val eventLogFind =
-        new EventFinderImpl[IO](currentTime, projectsFetchingLimit = 5, projectPrioritisation = projectPrioritisation)
-
-      val events = readyStatuses
-        .generateNonEmptyList(min = 3, max = 6)
-        .toList
-        .flatMap { status =>
-          (1 to positiveInts(max = 2).generateOne.value)
-            .map(_ => createEvent(status, projectId = projectIds.generateOne, projectSlug = projectSlugs.generateOne))
-        }
-
-      findEvents(EventStatus.GeneratingTriples) shouldBe List.empty
-
-      val eventsPerProject = events.groupBy(_._4).toList.sortBy(_._2.maxBy(_._3)._3).reverse
-
-      eventsPerProject.zipWithIndex foreach { case ((projectSlug, events), index) =>
-        val (eventIdOfTheNewestEvent, _, _, _) = events.sortBy(_._3).reverse.head
-        (projectPrioritisation.prioritise _)
-          .expects(*, index)
-          .returning(List(ProjectIds(eventIdOfTheNewestEvent.projectId, projectSlug) -> MaxPriority))
-      }
-
-      eventsPerProject foreach { _ =>
-        eventLogFind.popEvent().unsafeRunSync() shouldBe a[Some[_]]
-      }
-
-      eventsPerProject foreach { case (slug, events) =>
-        gauges.awaitingGeneration.getValue(slug).unsafeRunSync() shouldBe -events.size
-        gauges.underGeneration.getValue(slug).unsafeRunSync()    shouldBe events.size
-      }
-
-      findEvents(status = GeneratingTriples).eventIdsOnly should contain theSameElementsAs eventsPerProject.map {
-        case (_, list) => list.maxBy(_._3)._1
-      }
-
-      givenPrioritisation(takes = Nil, totalOccupancy = eventsPerProject.size, returns = Nil)
-
-      eventLogFind.popEvent().unsafeRunSync() shouldBe None
-    }
+      _ <- finder.popEvent().asserting(_ shouldBe None)
+    } yield Succeeded
   }
 
-  private trait TestCaseCommons {
-    val now           = Instant.now()
-    val executionDate = ExecutionDate(now)
-    val currentTime   = mockFunction[Instant]
-    currentTime.expects().returning(now).anyNumberOfTimes()
+  it should "find no event when execution date is in the future " +
+    s"and status $New or $GenerationRecoverableFailure " in testDBResource.use { implicit cfg =>
+      val project = consumerProjects.generateOne
+      for {
+        event1 <- createEvent(
+                    status = New,
+                    eventDate = timestamps(max = Instant.now().minusSeconds(5)).generateAs(EventDate),
+                    project = project
+                  )
+        event2 <- createEvent(
+                    status = GenerationRecoverableFailure,
+                    eventDate = EventDate(event1.date.value plusSeconds 1),
+                    executionDate = timestampsInTheFuture.generateAs(ExecutionDate),
+                    project = project
+                  )
+        _ <- createEvent(
+               status = New,
+               eventDate = EventDate(event2.date.value plusSeconds 1),
+               executionDate = timestampsInTheFuture.generateAs(ExecutionDate),
+               project = project
+             )
 
-    implicit val gauges:                  EventStatusGauges[IO]     = TestEventStatusGauges[IO]
-    private implicit val metricsRegistry: TestMetricsRegistry[IO]   = TestMetricsRegistry[IO]
-    implicit val queriesExecTimes:        QueriesExecutionTimes[IO] = QueriesExecutionTimes[IO]().unsafeRunSync()
-    val projectPrioritisation = mock[ProjectPrioritisation[IO]]
+        _ <- findEvents(GeneratingTriples).asserting(_ shouldBe List.empty)
 
-    def givenPrioritisation(takes: List[ProjectInfo], totalOccupancy: Long, returns: List[(ProjectIds, Priority)]) =
-      (projectPrioritisation.prioritise _)
-        .expects(takes, totalOccupancy)
-        .returning(returns)
+        _ = givenPrioritisation(takes = Nil, totalOccupancy = 0, returns = Nil)
+
+        _ <- finder.popEvent().asserting(_ shouldBe None)
+      } yield Succeeded
+    }
+
+  it should "find the latest events from each project" in testDBResource.use { implicit cfg =>
+    for {
+      events <- readyStatuses.generateNonEmptyList(min = 2).map(createEvent(_)).toList.sequence
+
+      _ <- findEvents(GeneratingTriples).asserting(_ shouldBe List.empty)
+
+      _ = events.sortBy(_.date).reverse.zipWithIndex foreach { case (event, index) =>
+            givenPrioritisation(
+              takes = List(ProjectInfo(event.project, event.date, 0)),
+              totalOccupancy = index,
+              returns = List(ProjectIds(event.project) -> MaxPriority)
+            )
+          }
+
+      _ <- events.traverse_ { _ =>
+             finder.popEvent().asserting(_ shouldBe a[Some[_]])
+           }
+
+      _ <- events.traverse_ { event =>
+             gauges.awaitingGeneration.getValue(event.project.slug).asserting(_ shouldBe -1) >>
+               gauges.underGeneration.getValue(event.project.slug).asserting(_ shouldBe 1)
+           }
+
+      _ <- findEvents(GeneratingTriples).asserting {
+             _.map(_.id) should contain theSameElementsAs events.map(_.id)
+           }
+    } yield Succeeded
   }
 
-  private trait TestCase extends TestCaseCommons {
-    val finder = new EventFinderImpl[IO](currentTime, projectsFetchingLimit = 1, projectPrioritisation)
+  it should "return the latest events from each projects - case with projectsFetchingLimit > 1" in testDBResource.use {
+    implicit cfg =>
+      val finder =
+        new EventFinderImpl[IO](() => now, projectsFetchingLimit = 5, projectPrioritisation = projectPrioritisation)
+
+      for {
+        events <- readyStatuses
+                    .generateNonEmptyList(min = 3, max = 6)
+                    .toList
+                    .flatMap { status =>
+                      (1 to positiveInts(max = 2).generateOne.value)
+                        .map(_ => createEvent(status, project = consumerProjects.generateOne))
+                    }
+                    .sequence
+
+        _ <- findEvents(GeneratingTriples).asserting(_ shouldBe List.empty)
+
+        eventsPerProject = events.groupBy(_.project).toList.sortBy(_._2.maxBy(_.date).date).reverse
+        _ = eventsPerProject.zipWithIndex foreach { case ((_, events), index) =>
+              val theNewestEvent = events.sortBy(_.date).reverse.head
+              (projectPrioritisation.prioritise _)
+                .expects(*, index)
+                .returning(List(ProjectIds(theNewestEvent.project) -> MaxPriority))
+            }
+
+        _ <- eventsPerProject.map(_ => finder.popEvent().asserting(_ shouldBe a[Some[_]])).sequence
+
+        _ <- eventsPerProject.map { case (project, events) =>
+               gauges.awaitingGeneration.getValue(project.slug).asserting(_ shouldBe -events.size) >>
+                 gauges.underGeneration.getValue(project.slug).asserting(_ shouldBe events.size)
+             }.sequence
+
+        _ <- findEvents(GeneratingTriples).asserting {
+               _.map(_.id) should contain theSameElementsAs
+                 eventsPerProject.map { case (_, list) => list.maxBy(_.date).id }
+             }
+
+        _ = givenPrioritisation(takes = Nil, totalOccupancy = eventsPerProject.size, returns = Nil)
+        _ <- finder.popEvent().asserting(_ shouldBe None)
+      } yield Succeeded
   }
+
+  private lazy val now           = Instant.now()
+  private lazy val executionDate = ExecutionDate(now)
+
+  private implicit lazy val gauges: EventStatusGauges[IO]     = TestEventStatusGauges[IO]
+  private implicit val qet:         QueriesExecutionTimes[IO] = TestQueriesExecutionTimes[IO]
+  private lazy val projectPrioritisation = mock[ProjectPrioritisation[IO]]
+
+  private def givenPrioritisation(takes:          List[ProjectInfo],
+                                  totalOccupancy: Long,
+                                  returns:        List[(ProjectIds, Priority)]
+  ) =
+    (projectPrioritisation.prioritise _)
+      .expects(takes, totalOccupancy)
+      .returning(returns)
+
+  private def finder(implicit cfg: DBConfig[EventLogDB]) =
+    new EventFinderImpl[IO](() => now, projectsFetchingLimit = 1, projectPrioritisation)
 
   private def executionDatesInThePast: Gen[ExecutionDate] = timestampsNotInTheFuture map ExecutionDate.apply
 
   private def readyStatuses = Gen.oneOf(New, GenerationRecoverableFailure)
 
-  private def createEvent(status:        EventStatus,
+  private case class CreatedEvent(id: CompoundEventId, body: EventBody, date: EventDate, project: Project) {
+    lazy val toAwaitingEvent = AwaitingGenerationEvent(id, project.slug, body)
+  }
+
+  private def createEvent(status:        Gen[EventStatus],
                           eventDate:     EventDate = eventDates.generateOne,
                           executionDate: ExecutionDate = executionDatesInThePast.generateOne,
                           batchDate:     BatchDate = batchDates.generateOne,
-                          projectId:     GitLabId = projectIds.generateOne,
-                          projectSlug:   Slug = projectSlugs.generateOne
-  ): (CompoundEventId, EventBody, EventDate, Slug) = {
-    val eventId   = compoundEventIds.generateOne.copy(projectId = projectId)
-    val eventBody = eventBodies.generateOne
-
-    storeEvent(eventId, status, executionDate, eventDate, eventBody, batchDate = batchDate, projectSlug = projectSlug)
-
-    (eventId, eventBody, eventDate, projectSlug)
+                          project:       Project = consumerProjects.generateOne
+  )(implicit cfg: DBConfig[EventLogDB]): IO[CreatedEvent] = {
+    val eventId = compoundEventIds(project.id).generateOne
+    val body    = eventBodies.generateOne
+    storeEvent(eventId,
+               status.generateOne,
+               executionDate,
+               eventDate,
+               body,
+               batchDate = batchDate,
+               projectSlug = project.slug
+    ).as(CreatedEvent(eventId, body, eventDate, project))
   }
 }

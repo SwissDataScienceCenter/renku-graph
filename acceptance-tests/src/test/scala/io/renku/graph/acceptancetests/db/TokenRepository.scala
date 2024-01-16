@@ -1,5 +1,5 @@
 /*
- * Copyright 2023 Swiss Data Science Center (SDSC)
+ * Copyright 2024 Swiss Data Science Center (SDSC)
  * A partnership between École Polytechnique Fédérale de Lausanne (EPFL) and
  * Eidgenössische Technische Hochschule Zürich (ETHZ).
  *
@@ -30,9 +30,8 @@ object TokenRepository {
   private lazy val dbConfig: DBConfigProvider.DBConfig[ProjectsTokensDB] =
     new ProjectsTokensDbConfigProvider[Try].get().fold(throw _, identity)
 
-  def startDB()(implicit logger: Logger[IO]): IO[Unit] = for {
-    _ <- PostgresDB.startPostgres
+  def initDB()(implicit logger: Logger[IO]): IO[Unit] = for {
     _ <- PostgresDB.initializeDatabase(dbConfig)
-    _ <- logger.info("projects_tokens DB started")
+    _ <- logger.info("projects_tokens DB initialised")
   } yield ()
 }

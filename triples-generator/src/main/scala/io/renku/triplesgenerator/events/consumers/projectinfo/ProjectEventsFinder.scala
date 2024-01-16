@@ -1,5 +1,5 @@
 /*
- * Copyright 2023 Swiss Data Science Center (SDSC)
+ * Copyright 2024 Swiss Data Science Center (SDSC)
  * A partnership between École Polytechnique Fédérale de Lausanne (EPFL) and
  * Eidgenössische Technische Hochschule Zürich (ETHZ).
  *
@@ -37,7 +37,7 @@ import org.typelevel.log4cats.Logger
 
 private trait ProjectEventsFinder[F[_]] {
   def find(project: Project, page: Int)(implicit
-      maybeAccessToken: Option[AccessToken]
+      at: AccessToken
   ): EitherT[F, ProcessingRecoverableError, (List[PushEvent], PagingInfo)]
 }
 
@@ -46,13 +46,13 @@ private class ProjectEventsFinderImpl[F[_]: Async: GitLabClient: Logger](
 ) extends ProjectEventsFinder[F] {
 
   override def find(project: Project, page: Int)(implicit
-      maybeAccessToken: Option[AccessToken]
+      at: AccessToken
   ): EitherT[F, ProcessingRecoverableError, (List[PushEvent], PagingInfo)] = EitherT {
     GitLabClient[F]
       .get(
         uri"projects" / project.id.show / "events" withQueryParams Map("action" -> "pushed", "page" -> page.toString),
         "project-events"
-      )(mapResponse)
+      )(mapResponse)(at.some)
       .map(_.asRight[ProcessingRecoverableError])
       .recoverWith(recoveryStrategy.maybeRecoverableError)
   }

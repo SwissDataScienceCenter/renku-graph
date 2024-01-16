@@ -1,5 +1,5 @@
 /*
- * Copyright 2023 Swiss Data Science Center (SDSC)
+ * Copyright 2024 Swiss Data Science Center (SDSC)
  * A partnership between École Polytechnique Fédérale de Lausanne (EPFL) and
  * Eidgenössische Technische Hochschule Zürich (ETHZ).
  *
@@ -32,6 +32,7 @@ import io.renku.generators.Generators.Implicits._
 import io.renku.generators.Generators.fixed
 import io.renku.graph.model.GraphModelGenerators.personGitLabIds
 import io.renku.graph.model.projects
+import io.renku.http.RenkuEntityCodec
 import io.renku.http.client.{AccessToken, GitLabClient}
 import io.renku.http.client.RestClient.ResponseMappingF
 import io.renku.http.rest.paging.model.{Page, Total}
@@ -51,6 +52,7 @@ class GLProjectFinderSpec
     with should.Matchers
     with IOSpec
     with MockFactory
+    with RenkuEntityCodec
     with GitLabClientTools[IO] {
 
   private type ResultsChunk = (List[model.Project.NotActivated], Option[Total])

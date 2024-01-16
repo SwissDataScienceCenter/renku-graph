@@ -1,5 +1,5 @@
 /*
- * Copyright 2023 Swiss Data Science Center (SDSC)
+ * Copyright 2024 Swiss Data Science Center (SDSC)
  * A partnership between École Polytechnique Fédérale de Lausanne (EPFL) and
  * Eidgenössische Technische Hochschule Zürich (ETHZ).
  *
@@ -28,19 +28,19 @@ import io.renku.generators.CommonGraphGenerators._
 import io.renku.generators.Generators.Implicits._
 import io.renku.generators.Generators.exceptions
 import io.renku.graph.model.GraphModelGenerators._
+import io.renku.http.RenkuEntityCodec
 import io.renku.interpreters.TestLogger
 import io.renku.testtools.IOSpec
 import model.Node.{Label, Location, Type}
 import model.{Edge, Lineage, Node}
 import org.http4s.MediaType.application
 import org.http4s.Status.{InternalServerError, NotFound, Ok}
-import org.http4s.circe.jsonDecoder
 import org.http4s.headers.`Content-Type`
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
 
-class EndpointSpec extends AnyWordSpec with should.Matchers with MockFactory with IOSpec {
+class EndpointSpec extends AnyWordSpec with should.Matchers with MockFactory with IOSpec with RenkuEntityCodec {
 
   "GET /lineage" should {
 

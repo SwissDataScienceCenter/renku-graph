@@ -1,5 +1,5 @@
 /*
- * Copyright 2023 Swiss Data Science Center (SDSC)
+ * Copyright 2024 Swiss Data Science Center (SDSC)
  * A partnership between École Polytechnique Fédérale de Lausanne (EPFL) and
  * Eidgenössische Technische Hochschule Zürich (ETHZ).
  *
@@ -38,8 +38,8 @@ private object TSDatasetRecreator {
   ): F[Migration[F]] =
     (MonadThrow[F].fromEither(dsConfigFactory.fromTtlFile()), TSAdminClient[F], MigrationExecutionRegister[F])
       .mapN((ttlFile, tsAdmin, execRegister) =>
-        new TSDatasetRecreatorImpl[F](Migration.Name(show"Recreate ${dsConfigFactory.datasetName} dataset $suffix"),
-                                      dsConfigFactory.datasetName,
+        new TSDatasetRecreatorImpl[F](Migration.Name(show"Recreate ${ttlFile.datasetName} dataset $suffix"),
+                                      ttlFile.datasetName,
                                       ttlFile,
                                       tsAdmin,
                                       execRegister

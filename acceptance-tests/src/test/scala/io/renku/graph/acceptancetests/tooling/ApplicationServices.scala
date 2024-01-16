@@ -1,5 +1,5 @@
 /*
- * Copyright 2023 Swiss Data Science Center (SDSC)
+ * Copyright 2024 Swiss Data Science Center (SDSC)
  * A partnership between École Polytechnique Fédérale de Lausanne (EPFL) and
  * Eidgenössische Technische Hochschule Zürich (ETHZ).
  *
@@ -20,10 +20,11 @@ package io.renku.graph.acceptancetests.tooling
 
 import cats.Monad
 import cats.effect._
+import cats.syntax.all._
 import cats.effect.std.Semaphore
 import io.renku._
 import io.renku.eventlog.MigrationStatus
-import io.renku.graph.acceptancetests.db.{EventLog, TokenRepository, TriplesGenerator, TriplesStore}
+import io.renku.graph.acceptancetests.db.{EventLog, PostgresDB, TokenRepository, TriplesGenerator, TriplesStore}
 import io.renku.graph.acceptancetests.stubs.RemoteTriplesGenerator
 import io.renku.graph.acceptancetests.stubs.gitlab.GitLabStubSupport
 import io.renku.graph.acceptancetests.tooling.KnowledgeGraphClient.KnowledgeGraphClient
@@ -54,15 +55,16 @@ trait ApplicationServices extends GitLabStubSupport with RemoteTriplesGenerator 
   override def beforeAll(): Unit = {
     super.beforeAll()
 
-    servicesRunner
-      .run(
-        tokenRepository,
-        eventLog,
-        webhookService,
-        commitEventService,
-        triplesGenerator,
-        knowledgeGraph
-      )
+    ((PostgresDB.start() -> TriplesStore.start()).parTupled.void >>
+      servicesRunner
+        .run(
+          tokenRepository,
+          eventLog,
+          webhookService,
+          commitEventService,
+          triplesGenerator,
+          knowledgeGraph
+        ))
       .unsafeRunSync()
   }
 
@@ -77,14 +79,14 @@ trait ApplicationServices extends GitLabStubSupport with RemoteTriplesGenerator 
     "token-repository",
     tokenrepository.Microservice,
     tokenRepositoryClient,
-    preServiceStart = List(TokenRepository.startDB()),
+    preServiceStart = List(TokenRepository.initDB()),
     serviceArgsList = List()
   )
   private lazy val eventLog = ServiceRun(
     "event-log",
     eventlog.Microservice,
     eventLogClient,
-    preServiceStart = List(EventLog.startDB()),
+    preServiceStart = List(EventLog.initDB()),
     postServiceStart = List(eventLogClient.waitForReadiness),
     serviceArgsList = List()
   )
@@ -92,7 +94,7 @@ trait ApplicationServices extends GitLabStubSupport with RemoteTriplesGenerator 
     "triples-generator",
     service = triplesgenerator.Microservice,
     serviceClient = triplesGeneratorClient,
-    preServiceStart = List(TriplesGenerator.startDB(), TriplesStore.start()),
+    preServiceStart = List(TriplesGenerator.initDB()),
     postServiceStart = List(waitForTSMigrations)
   )
 

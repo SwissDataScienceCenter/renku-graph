@@ -1,5 +1,5 @@
 /*
- * Copyright 2023 Swiss Data Science Center (SDSC)
+ * Copyright 2024 Swiss Data Science Center (SDSC)
  * A partnership between École Polytechnique Fédérale de Lausanne (EPFL) and
  * Eidgenössische Technische Hochschule Zürich (ETHZ).
  *
@@ -18,9 +18,11 @@
 
 package io.renku.eventlog.init
 
-import cats.data.Kleisli
 import cats.effect.IO
+import cats.effect.testing.scalatest.AsyncIOSpec
 import io.circe.literal._
+import io.renku.db.DBConfigProvider.DBConfig
+import io.renku.eventlog.EventLogDB
 import io.renku.eventlog.init.Generators._
 import io.renku.eventlog.init.model.Event
 import io.renku.generators.Generators.Implicits._
@@ -28,103 +30,78 @@ import io.renku.graph.model.EventContentGenerators._
 import io.renku.graph.model.EventsGenerators._
 import io.renku.graph.model.events._
 import io.renku.graph.model.projects
-import io.renku.interpreters.TestLogger
 import io.renku.interpreters.TestLogger.Level.Info
-import io.renku.testtools.IOSpec
+import org.scalatest.Succeeded
+import org.scalatest.flatspec.AsyncFlatSpec
 import org.scalatest.matchers.should
-import org.scalatest.wordspec.AnyWordSpec
 import skunk._
 import skunk.codec.all._
 import skunk.implicits._
 
 import java.time.{LocalDateTime, ZoneOffset}
 
-class BatchDateAdderSpec extends AnyWordSpec with IOSpec with DbInitSpec with should.Matchers {
+class BatchDateAdderSpec extends AsyncFlatSpec with AsyncIOSpec with DbInitSpec with should.Matchers {
 
-  private[this] implicit val logger: TestLogger[IO] = TestLogger[IO]()
+  protected[init] override val runMigrationsUpTo: Class[_ <: DbMigrator[IO]] = classOf[BatchDateAdder[IO]]
 
-  protected[init] override lazy val migrationsToRun: List[DbMigrator[IO]] = List(
-    EventLogTableCreator[IO],
-    ProjectPathAdder[IO]
-  )
-
-  "run" should {
-
-    "do nothing if the 'event' table already exists" in new TestCase {
-
-      createEventTable()
-
-      batchDateAdder.run.unsafeRunSync() shouldBe ()
-
-      logger.loggedOnly(Info("'batch_date' column adding skipped"))
-    }
-
-    "do nothing if the 'batch_date' column already exists" in new TestCase {
-
-      checkColumnExists shouldBe false
-
-      batchDateAdder.run.unsafeRunSync() shouldBe ()
-
-      checkColumnExists shouldBe true
-
-      logger.loggedOnly(Info("'batch_date' column added"))
-
-      logger.reset()
-
-      batchDateAdder.run.unsafeRunSync() shouldBe ()
-
-      logger.loggedOnly(Info("'batch_date' column exists"))
-    }
-
-    "add the 'batch_date' column if does not exist and migrate the data for it" in new TestCase {
-
-      checkColumnExists shouldBe false
-
-      val event1            = events.generateOne
-      val event1CreatedDate = createdDates.generateOne
-      storeEvent(event1, event1CreatedDate)
-      val event2            = events.generateOne
-      val event2CreatedDate = createdDates.generateOne
-      storeEvent(event2, event2CreatedDate)
-
-      batchDateAdder.run.unsafeRunSync() shouldBe ()
-
-      findBatchDates shouldBe Set(BatchDate(event1CreatedDate.value), BatchDate(event2CreatedDate.value))
-
-      verifyTrue(sql"DROP INDEX idx_batch_date;".command)
-
-      logger.loggedOnly(Info("'batch_date' column added"))
-    }
+  it should "do nothing if the 'event' table already exists" in testDBResource.use { implicit cfg =>
+    createEventTable >>
+      logger.resetF() >>
+      batchDateAdder.run.assertNoException >>
+      logger.loggedOnlyF(Info("'batch_date' column adding skipped"))
   }
 
-  private trait TestCase {
-    implicit val logger: TestLogger[IO] = TestLogger[IO]()
-    val batchDateAdder = new BatchDateAdderImpl[IO]
+  it should "do nothing if the 'batch_date' column already exists" in testDBResource.use { implicit cfg =>
+    for {
+      _ <- verifyColumnExists("event_log", "batch_date").asserting(_ shouldBe false)
+
+      _ <- batchDateAdder.run.assertNoException
+
+      _ <- verifyColumnExists("event_log", "batch_date").asserting(_ shouldBe true)
+
+      _ <- logger.loggedOnlyF(Info("'batch_date' column added"))
+
+      _ <- logger.resetF()
+
+      _ <- batchDateAdder.run.assertNoException
+
+      _ <- logger.loggedOnlyF(Info("'batch_date' column exists"))
+    } yield Succeeded
   }
 
-  private def checkColumnExists: Boolean =
-    sessionResource
-      .useK {
-        Kleisli { session =>
-          val query: Query[Void, BatchDate] = sql"select batch_date from event_log limit 1"
-            .query(timestamp)
-            .map { case time: LocalDateTime => BatchDate(time.toInstant(ZoneOffset.UTC)) }
-          session
-            .option(query)
-            .map(_ => true)
-            .recover { case _ => false }
-        }
-      }
-      .unsafeRunSync()
+  it should "add the 'batch_date' column if does not exist and migrate the data for it" in testDBResource.use {
+    implicit cfg =>
+      for {
+        _ <- verifyColumnExists("event_log", "batch_date").asserting(_ shouldBe false)
 
-  private def storeEvent(event: Event, createdDate: CreatedDate): Unit = execute[Unit] {
-    Kleisli { session =>
+        event1            = events.generateOne
+        event1CreatedDate = createdDates.generateOne
+        _ <- storeEvent(event1, event1CreatedDate)
+        event2            = events.generateOne
+        event2CreatedDate = createdDates.generateOne
+        _ <- storeEvent(event2, event2CreatedDate)
+
+        _ <- batchDateAdder.run.assertNoException
+
+        _ <- findBatchDates.asserting(
+               _ shouldBe Set(BatchDate(event1CreatedDate.value), BatchDate(event2CreatedDate.value))
+             )
+
+        _ <- verifyIndexExists("event_log", "idx_batch_date").asserting(_ shouldBe true)
+
+        _ <- logger.loggedOnlyF(Info("'batch_date' column added"))
+      } yield Succeeded
+  }
+
+  private def batchDateAdder(implicit cfg: DBConfig[EventLogDB]) = new BatchDateAdderImpl[IO]
+
+  private def storeEvent(event: Event, createdDate: CreatedDate)(implicit cfg: DBConfig[EventLogDB]): IO[Unit] =
+    moduleSessionResource.session.use { session =>
       val query: Command[
         EventId *: projects.GitLabId *: projects.Slug *: EventStatus *: CreatedDate *: ExecutionDate *: EventDate *: String *: EmptyTuple
-      ] =
-        sql"""insert into
-              event_log (event_id, project_id, project_path, status, created_date, execution_date, event_date, event_body) 
-              values (
+      ] = sql"""
+         INSERT INTO event_log (event_id, project_id, project_path, status, created_date, execution_date, event_date, event_body)
+         VALUES (
                 $eventIdEncoder, 
                 $projectIdEncoder, 
                 $projectSlugEncoder,
@@ -150,29 +127,24 @@ class BatchDateAdderSpec extends AnyWordSpec with IOSpec with DbInitSpec with sh
               EmptyTuple
           )
         )
-        .map(_ => ())
+        .void
     }
-  }
 
   private def toJsonBody(event: Event): String =
     json"""{
-    "project": {
-      "id":   ${event.project.id.value},
-      "slug": ${event.project.slug.value}
-     }
-  }""".noSpaces
+      "project": {
+        "id":   ${event.project.id},
+        "slug": ${event.project.slug}
+       }
+    }""".noSpaces
 
-  private def findBatchDates: Set[BatchDate] =
-    sessionResource
-      .useK {
-        Kleisli { session =>
-          val query: Query[Void, BatchDate] = sql"select batch_date from event_log"
-            .query(timestamp)
-            .map { case time: LocalDateTime => BatchDate(time.toInstant(ZoneOffset.UTC)) }
-
-          session.execute(query)
-        }
+  private def findBatchDates(implicit cfg: DBConfig[EventLogDB]): IO[Set[BatchDate]] =
+    moduleSessionResource.session
+      .use { session =>
+        val query: Query[Void, BatchDate] = sql"select batch_date from event_log"
+          .query(timestamp)
+          .map { case time: LocalDateTime => BatchDate(time.toInstant(ZoneOffset.UTC)) }
+        session.execute(query)
       }
-      .unsafeRunSync()
-      .toSet
+      .map(_.toSet)
 }

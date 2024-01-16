@@ -1,5 +1,5 @@
 /*
- * Copyright 2023 Swiss Data Science Center (SDSC)
+ * Copyright 2024 Swiss Data Science Center (SDSC)
  * A partnership between École Polytechnique Fédérale de Lausanne (EPFL) and
  * Eidgenössische Technische Hochschule Zürich (ETHZ).
  *
@@ -43,7 +43,7 @@ import java.time.{LocalDate, OffsetDateTime}
 trait TokenRepositoryPostgresSpec extends PostgresSpec[ProjectsTokensDB] with TokenRepositoryTypeSerializers {
   self: Suite with AsyncMockFactory =>
 
-  lazy val server: PostgresServer = TokenRepositoryPostgresServer
+  lazy val server: PostgresServer = PostgresServer
 
   lazy val migrations: SessionResource[IO, ProjectsTokensDB] => IO[Unit] = { sr =>
     implicit lazy val logger:           TestLogger[IO]                       = TestLogger[IO]()

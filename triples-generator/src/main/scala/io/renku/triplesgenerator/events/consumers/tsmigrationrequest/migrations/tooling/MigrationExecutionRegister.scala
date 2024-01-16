@@ -1,5 +1,5 @@
 /*
- * Copyright 2023 Swiss Data Science Center (SDSC)
+ * Copyright 2024 Swiss Data Science Center (SDSC)
  * A partnership between École Polytechnique Fédérale de Lausanne (EPFL) and
  * Eidgenössische Technische Hochschule Zürich (ETHZ).
  *
@@ -32,6 +32,7 @@ import io.renku.triplesgenerator.events.consumers.tsmigrationrequest.Migration
 import io.renku.triplesstore._
 import io.renku.triplesstore.SparqlQuery.Prefixes
 import org.typelevel.log4cats.Logger
+import io.renku.util.jsonld.TinyTypeJsonLDCodec._
 
 private[tsmigrationrequest] trait MigrationExecutionRegister[F[_]] {
   def registerExecution(migrationName: Migration.Name): F[Unit]
@@ -76,7 +77,7 @@ private[tsmigrationrequest] object MigrationExecutionRegister {
   def apply[F[_]: Async: Logger: SparqlQueryTimeRecorder]: F[MigrationExecutionRegister[F]] = for {
     implicit0(renkuUrl: RenkuUrl) <- RenkuUrlLoader[F]()
     serviceVersion                <- ServiceVersion.readFromConfig[F]()
-    storeConfig                   <- MigrationsConnectionConfig[F]()
+    storeConfig                   <- MigrationsConnectionConfig.fromConfig[F]()
   } yield new MigrationExecutionRegisterImpl[F](serviceVersion, storeConfig)
 
   private[migrations] final case class MigrationExecution(migrationName: Migration.Name, serviceVersion: ServiceVersion)

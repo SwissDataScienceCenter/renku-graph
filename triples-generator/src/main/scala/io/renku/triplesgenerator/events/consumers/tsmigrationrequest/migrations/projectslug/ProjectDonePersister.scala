@@ -1,5 +1,5 @@
 /*
- * Copyright 2023 Swiss Data Science Center (SDSC)
+ * Copyright 2024 Swiss Data Science Center (SDSC)
  * A partnership between École Polytechnique Fédérale de Lausanne (EPFL) and
  * Eidgenössische Technische Hochschule Zürich (ETHZ).
  *
@@ -33,7 +33,7 @@ private trait ProjectDonePersister[F[_]] {
 private object ProjectDonePersister {
   def apply[F[_]: Async: Logger: SparqlQueryTimeRecorder]: F[ProjectDonePersister[F]] = for {
     implicit0(ru: RenkuUrl) <- RenkuUrlLoader[F]()
-    tsClient                <- MigrationsConnectionConfig[F]().map(TSClient[F](_))
+    tsClient                <- MigrationsConnectionConfig.fromConfig[F]().map(TSClient[F](_))
   } yield new ProjectDonePersisterImpl[F](tsClient)
 }
 

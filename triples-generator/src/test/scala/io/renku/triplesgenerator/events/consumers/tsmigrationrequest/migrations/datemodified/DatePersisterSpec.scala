@@ -1,5 +1,5 @@
 /*
- * Copyright 2023 Swiss Data Science Center (SDSC)
+ * Copyright 2024 Swiss Data Science Center (SDSC)
  * A partnership between École Polytechnique Fédérale de Lausanne (EPFL) and
  * Eidgenössische Technische Hochschule Zürich (ETHZ).
  *
@@ -20,15 +20,14 @@ package io.renku.triplesgenerator.events.consumers.tsmigrationrequest.migrations
 package datemodified
 
 import cats.effect.IO
+import cats.effect.testing.scalatest.AsyncIOSpec
 import eu.timepit.refined.auto._
-import io.renku.entities.searchgraphs.SearchInfoDatasets
+import io.renku.entities.searchgraphs.TestSearchInfoDatasets
 import io.renku.generators.Generators.Implicits._
 import io.renku.graph.model.testentities._
 import io.renku.graph.model.{GraphClass, entities, projects}
 import io.renku.interpreters.TestLogger
 import io.renku.jsonld.syntax._
-import io.renku.logging.TestSparqlQueryTimeRecorder
-import io.renku.testtools.CustomAsyncIOSpec
 import io.renku.triplesgenerator.events.consumers.tsmigrationrequest.ConditionedMigration
 import io.renku.triplesstore.SparqlQuery.Prefixes
 import io.renku.triplesstore._
@@ -42,16 +41,14 @@ import java.time.Instant
 
 class DatePersisterSpec
     extends AsyncFlatSpec
-    with CustomAsyncIOSpec
+    with AsyncIOSpec
+    with GraphJenaSpec
+    with TestSearchInfoDatasets
     with should.Matchers
     with OptionValues
-    with InMemoryJenaForSpec
-    with ProjectsDataset
-    with SearchInfoDatasets
     with TSTooling {
 
-  it should "persist given dateCreated as dateModified" in {
-
+  it should "persist given dateCreated as dateModified" in projectsDSConfig.use { implicit pcc =>
     val project      = anyProjectEntities.generateOne.to[entities.Project]
     val expectedDate = projects.DateModified(project.dateCreated.value)
 
@@ -67,8 +64,7 @@ class DatePersisterSpec
       migrationNeedChecker.checkMigrationNeeded.asserting(_ shouldBe a[ConditionedMigration.MigrationRequired.No])
   }
 
-  it should "leave the old dateModified if exists" in {
-
+  it should "leave the old dateModified if exists" in projectsDSConfig.use { implicit pcc =>
     val project = anyProjectEntities.generateOne.to[entities.Project]
 
     provisionProject(project).assertNoException >>
@@ -82,15 +78,14 @@ class DatePersisterSpec
       migrationNeedChecker.checkMigrationNeeded.asserting(_ shouldBe a[ConditionedMigration.MigrationRequired.No])
   }
 
-  implicit override lazy val ioLogger: Logger[IO]                  = TestLogger[IO]()
-  private implicit val timeRecorder:   SparqlQueryTimeRecorder[IO] = TestSparqlQueryTimeRecorder[IO].unsafeRunSync()
-  private lazy val tsClient             = TSClient[IO](projectsDSConnectionInfo)
-  private lazy val persister            = new DatePersisterImpl[IO](tsClient)
-  private lazy val migrationNeedChecker = new MigrationNeedCheckerImpl[IO](tsClient)
+  implicit override lazy val ioLogger: Logger[IO] = TestLogger[IO]()
+  private def persister(implicit pcc:            ProjectsConnectionConfig) = new DatePersisterImpl[IO](tsClient)
+  private def migrationNeedChecker(implicit pcc: ProjectsConnectionConfig) = new MigrationNeedCheckerImpl[IO](tsClient)
 
-  private def findProjectDateModified(id: projects.ResourceId): IO[Option[projects.DateModified]] =
+  private def findProjectDateModified(id: projects.ResourceId)(implicit
+      pcc: ProjectsConnectionConfig
+  ): IO[Option[projects.DateModified]] =
     runSelect(
-      on = projectsDataset,
       SparqlQuery.ofUnsafe(
         "test find dateModified",
         Prefixes of schema -> "schema",
@@ -104,9 +99,10 @@ class DatePersisterSpec
       )
     ).map(_.map(_.get("date").map(Instant.parse).map(projects.DateModified(_))).headOption.flatten)
 
-  private def findProjectsDateModified(id: projects.ResourceId): IO[Option[projects.DateModified]] =
+  private def findProjectsDateModified(id: projects.ResourceId)(implicit
+      pcc: ProjectsConnectionConfig
+  ): IO[Option[projects.DateModified]] =
     runSelect(
-      on = projectsDataset,
       SparqlQuery.ofUnsafe(
         "test find dateModified",
         Prefixes of schema -> "schema",

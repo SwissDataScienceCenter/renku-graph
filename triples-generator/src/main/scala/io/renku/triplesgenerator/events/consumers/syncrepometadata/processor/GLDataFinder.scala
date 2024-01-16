@@ -1,5 +1,5 @@
 /*
- * Copyright 2023 Swiss Data Science Center (SDSC)
+ * Copyright 2024 Swiss Data Science Center (SDSC)
  * A partnership between École Polytechnique Fédérale de Lausanne (EPFL) and
  * Eidgenössische Technische Hochschule Zürich (ETHZ).
  *
@@ -22,9 +22,9 @@ import cats.effect.Async
 import cats.syntax.all._
 import io.renku.graph.model.images.ImageUri
 import io.renku.graph.model.projects
-import io.renku.graph.tokenrepository.AccessTokenFinder
-import io.renku.graph.tokenrepository.AccessTokenFinder.Implicits._
 import io.renku.http.client.GitLabClient
+import io.renku.tokenrepository.api.TokenRepositoryClient
+import org.typelevel.log4cats.Logger
 
 import java.time.Instant
 
@@ -33,13 +33,13 @@ private trait GLDataFinder[F[_]] {
 }
 
 private object GLDataFinder {
-  def apply[F[_]: Async: GitLabClient: AccessTokenFinder]: GLDataFinder[F] = new GLDataFinderImpl[F]
+  def apply[F[_]: Async: GitLabClient: Logger]: F[GLDataFinder[F]] =
+    TokenRepositoryClient[F].map(new GLDataFinderImpl[F](_))
 }
 
-private class GLDataFinderImpl[F[_]: Async: GitLabClient: AccessTokenFinder] extends GLDataFinder[F] {
+private class GLDataFinderImpl[F[_]: Async: GitLabClient](trClient: TokenRepositoryClient[F]) extends GLDataFinder[F] {
 
-  private val accessTokenFinder: AccessTokenFinder[F] = AccessTokenFinder[F]
-  import accessTokenFinder.findAccessToken
+  import trClient.findAccessToken
   import cats.data.OptionT
   import eu.timepit.refined.auto._
   import io.circe.Decoder

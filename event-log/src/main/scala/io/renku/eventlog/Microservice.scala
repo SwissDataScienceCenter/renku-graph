@@ -1,5 +1,5 @@
 /*
- * Copyright 2023 Swiss Data Science Center (SDSC)
+ * Copyright 2024 Swiss Data Science Center (SDSC)
  * A partnership between École Polytechnique Fédérale de Lausanne (EPFL) and
  * Eidgenössische Technische Hochschule Zürich (ETHZ).
  *
@@ -33,12 +33,12 @@ import io.renku.eventlog.metrics._
 import io.renku.events.consumers
 import io.renku.events.consumers.EventConsumersRegistry
 import io.renku.graph.model.projects
-import io.renku.graph.tokenrepository.AccessTokenFinder
 import io.renku.http.client.GitLabClient
 import io.renku.http.server.HttpServer
 import io.renku.logging.ApplicationLogger
 import io.renku.metrics._
-import io.renku.microservices.{IOMicroservice, ResourceUse, ServiceReadinessChecker}
+import io.renku.microservices.{IOMicroservice, ServiceReadinessChecker}
+import io.renku.utils.common.ResourceUse
 import natchez.Trace.Implicits.noop
 import org.http4s.server.Server
 import org.typelevel.log4cats.Logger
@@ -60,9 +60,8 @@ object Microservice extends IOMicroservice {
   ) =
     sessionPoolResource.use { implicit sessionResource =>
       for {
-        implicit0(mr: MetricsRegistry[IO])                  <- MetricsRegistry[IO]()
+        implicit0(mr: MetricsRegistry[IO])                  <- MetricsRegistryLoader[IO]()
         implicit0(gc: GitLabClient[IO])                     <- GitLabClient[IO]()
-        implicit0(acf: AccessTokenFinder[IO])               <- AccessTokenFinder[IO]()
         implicit0(qet: QueriesExecutionTimes[IO])           <- QueriesExecutionTimes[IO]()
         certificateLoader                                   <- CertificateLoader[IO]
         sentryInitializer                                   <- SentryInitializer[IO]
@@ -73,7 +72,7 @@ object Microservice extends IOMicroservice {
         eventLogMetrics                                     <- EventLogMetrics(statsFinder)
         implicit0(eventStatusGauges: EventStatusGauges[IO]) <- EventStatusGauges[IO](statsFinder)
         metricsResetScheduler <-
-          GaugeResetScheduler[IO, projects.Slug](eventStatusGauges.asList, MetricsConfigProvider())
+          GaugeResetScheduler[IO, projects.Slug](eventStatusGauges.asList, MetricsConfigProvider[IO]().getInterval())
         creationSubscription            <- events.consumers.creation.SubscriptionFactory[IO]
         zombieEventsSubscription        <- events.consumers.zombieevents.SubscriptionFactory[IO]
         commitSyncRequestSubscription   <- events.consumers.commitsyncrequest.SubscriptionFactory[IO]

@@ -1,5 +1,5 @@
 /*
- * Copyright 2023 Swiss Data Science Center (SDSC)
+ * Copyright 2024 Swiss Data Science Center (SDSC)
  * A partnership between École Polytechnique Fédérale de Lausanne (EPFL) and
  * Eidgenössische Technische Hochschule Zürich (ETHZ).
  *
@@ -19,33 +19,36 @@
 package io.renku.eventlog.events.consumers.zombieevents
 
 import cats.effect.IO
-import cats.syntax.all._
-import io.renku.eventlog.metrics.QueriesExecutionTimes
-import io.renku.eventlog.{InMemoryEventLogDbSpec, TypeSerializers}
+import cats.effect.testing.scalatest.AsyncIOSpec
+import io.renku.db.DBConfigProvider.DBConfig
+import io.renku.eventlog.metrics.{QueriesExecutionTimes, TestQueriesExecutionTimes}
+import io.renku.eventlog.{EventLogDB, EventLogPostgresSpec}
 import io.renku.generators.Generators.Implicits._
 import io.renku.graph.model.EventContentGenerators._
 import io.renku.graph.model.EventsGenerators._
-import io.renku.graph.model.GraphModelGenerators._
 import io.renku.graph.model.events.EventStatus.{AwaitingDeletion, Deleting, GeneratingTriples, New, TransformingTriples, TriplesGenerated}
 import io.renku.graph.model.events._
-import io.renku.metrics.TestMetricsRegistry
-import io.renku.testtools.IOSpec
-import org.scalamock.scalatest.MockFactory
+import org.scalamock.scalatest.AsyncMockFactory
 import org.scalatest.matchers.should
 import org.scalatest.prop.TableDrivenPropertyChecks
-import org.scalatest.wordspec.AnyWordSpec
+import org.scalatest.wordspec.AsyncWordSpec
+import org.scalatest.{OptionValues, Succeeded}
 
 import java.time.Instant
 import java.time.temporal.ChronoUnit.MICROS
 
 class ZombieStatusCleanerSpec
-    extends AnyWordSpec
-    with IOSpec
-    with InMemoryEventLogDbSpec
+    extends AsyncWordSpec
+    with AsyncIOSpec
+    with EventLogPostgresSpec
+    with AsyncMockFactory
     with TableDrivenPropertyChecks
-    with MockFactory
-    with TypeSerializers
-    with should.Matchers {
+    with should.Matchers
+    with OptionValues {
+
+  private val now           = Instant.now().truncatedTo(MICROS)
+  private val executionDate = executionDates.generateOne
+  private val zombieMessage = EventMessage("Zombie Event")
 
   "cleanZombieStatus" should {
 
@@ -58,70 +61,77 @@ class ZombieStatusCleanerSpec
       )
     } { (currentStatus, afterUpdateStatus) =>
       s"update event status to $afterUpdateStatus " +
-        s"if event has status $currentStatus and so the event in the DB" in new TestCase {
+        s"if event has status $currentStatus and so the event in the DB" in testDBResource.use { implicit cfg =>
+          for {
+            event <- addZombieEvent(currentStatus)
 
-          addZombieEvent(currentStatus)
+            _ <- findEvent(event.eventId).map(_.value).asserting {
+                   _.select(Field.Status, Field.ExecutionDate, Field.Message) shouldBe
+                     FoundEvent(currentStatus, executionDate, Some(zombieMessage))
+                 }
 
-          findEvent(eventId) shouldBe (executionDate, currentStatus, Some(zombieMessage)).some
+            _ <- updater
+                   .cleanZombieStatus(ZombieEvent(event.eventId, event.project.slug, currentStatus))
+                   .asserting(_ shouldBe Updated)
 
-          updater.cleanZombieStatus(ZombieEvent(eventId, projectSlug, currentStatus)).unsafeRunSync() shouldBe Updated
-
-          findEvent(eventId) shouldBe (ExecutionDate(now), afterUpdateStatus, None).some
+            _ <- findEvent(event.eventId).map(_.value).asserting {
+                   _.select(Field.Status, Field.ExecutionDate, Field.Message) shouldBe
+                     FoundEvent(afterUpdateStatus, ExecutionDate(now), maybeMessage = None)
+                 }
+          } yield Succeeded
         }
 
       s"update event status to $afterUpdateStatus and remove the existing event delivery info " +
-        s"if event has status $currentStatus and so the event in the DB" in new TestCase {
+        s"if event has status $currentStatus and so the event in the DB" in testDBResource.use { implicit cfg =>
+          for {
+            event <- addZombieEvent(currentStatus)
+            _     <- upsertEventDeliveryInfo(event.eventId)
 
-          addZombieEvent(currentStatus)
-          upsertEventDeliveryInfo(eventId)
+            _ <- findEvent(event.eventId).map(_.value).asserting {
+                   _.select(Field.Status, Field.ExecutionDate, Field.Message) shouldBe
+                     FoundEvent(currentStatus, executionDate, Some(zombieMessage))
+                 }
+            _ <- findAllEventDeliveries.asserting(_.map(_.eventId) shouldBe List(event.eventId))
 
-          findEvent(eventId)               shouldBe (executionDate, currentStatus, Some(zombieMessage)).some
-          findAllEventDeliveries.map(_._1) shouldBe List(eventId)
+            _ <- updater
+                   .cleanZombieStatus(ZombieEvent(event.eventId, event.project.slug, currentStatus))
+                   .asserting(_ shouldBe Updated)
 
-          updater.cleanZombieStatus(ZombieEvent(eventId, projectSlug, currentStatus)).unsafeRunSync() shouldBe Updated
-
-          findEvent(eventId)               shouldBe (ExecutionDate(now), afterUpdateStatus, None).some
-          findAllEventDeliveries.map(_._1) shouldBe Nil
+            _ <- findEvent(event.eventId).map(_.value).asserting {
+                   _.select(Field.Status, Field.ExecutionDate, Field.Message) shouldBe
+                     FoundEvent(afterUpdateStatus, ExecutionDate(now), maybeMessage = None)
+                 }
+            _ <- findAllEventDeliveries.asserting(_ shouldBe Nil)
+          } yield Succeeded
         }
     }
 
-    "do nothing if the event does not exists" in new TestCase {
+    "do nothing if the event does not exists" in testDBResource.use { implicit cfg =>
+      for {
+        event <- addZombieEvent(GeneratingTriples)
+        _ <- findEvent(event.eventId).map(_.value).asserting {
+               _.select(Field.Status, Field.ExecutionDate, Field.Message) shouldBe
+                 FoundEvent(GeneratingTriples, executionDate, Some(zombieMessage))
+             }
 
-      val otherEventId = compoundEventIds.generateOne
+        otherEventId = compoundEventIds.generateOne
+        _ <- updater
+               .cleanZombieStatus(ZombieEvent(otherEventId, event.project.slug, GeneratingTriples))
+               .asserting(_ shouldBe NotUpdated)
 
-      addZombieEvent(GeneratingTriples)
-
-      findEvent(eventId) shouldBe (executionDate, GeneratingTriples, Some(zombieMessage)).some
-
-      updater
-        .cleanZombieStatus(ZombieEvent(otherEventId, projectSlug, GeneratingTriples))
-        .unsafeRunSync() shouldBe NotUpdated
-
-      findEvent(eventId) shouldBe (executionDate, GeneratingTriples, Some(zombieMessage)).some
+        _ <- findEvent(event.eventId).map(_.value).asserting {
+               _.select(Field.Status, Field.ExecutionDate, Field.Message) shouldBe
+                 FoundEvent(GeneratingTriples, executionDate, Some(zombieMessage))
+             }
+      } yield Succeeded
     }
   }
 
-  private trait TestCase {
-    val currentTime = mockFunction[Instant]
-    private implicit val metricsRegistry:  TestMetricsRegistry[IO]   = TestMetricsRegistry[IO]
-    private implicit val queriesExecTimes: QueriesExecutionTimes[IO] = QueriesExecutionTimes[IO]().unsafeRunSync()
-    val updater = new ZombieStatusCleanerImpl[IO](currentTime)
-
-    val eventId       = compoundEventIds.generateOne
-    val projectSlug   = projectSlugs.generateOne
-    val executionDate = executionDates.generateOne
-    val zombieMessage = EventMessage("Zombie Event")
-
-    val now = Instant.now().truncatedTo(MICROS)
-    currentTime.expects().returning(now)
-
-    def addZombieEvent(status: EventStatus): Unit = storeEvent(eventId,
-                                                               status,
-                                                               executionDate,
-                                                               eventDates.generateOne,
-                                                               eventBodies.generateOne,
-                                                               projectSlug = projectSlug,
-                                                               maybeMessage = Some(zombieMessage)
-    )
+  private def updater(implicit cfg: DBConfig[EventLogDB]) = {
+    implicit val qet: QueriesExecutionTimes[IO] = TestQueriesExecutionTimes[IO]
+    new ZombieStatusCleanerImpl[IO](() => now)
   }
+
+  private def addZombieEvent(status: EventStatus)(implicit cfg: DBConfig[EventLogDB]) =
+    storeGeneratedEvent(status, executionDate = executionDate, message = Some(zombieMessage))
 }

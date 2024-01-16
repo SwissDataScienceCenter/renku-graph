@@ -1,5 +1,5 @@
 /*
- * Copyright 2023 Swiss Data Science Center (SDSC)
+ * Copyright 2024 Swiss Data Science Center (SDSC)
  * A partnership between École Polytechnique Fédérale de Lausanne (EPFL) and
  * Eidgenössische Technische Hochschule Zürich (ETHZ).
  *
@@ -23,10 +23,10 @@ import eu.timepit.refined.api.Refined
 import eu.timepit.refined.auto._
 import eu.timepit.refined.numeric.NonNegative
 import io.renku.eventlog.events.producers.DefaultSubscribers.DefaultSubscribers
+import io.renku.events.consumers.ConsumersModelGenerators.consumerProjects
 import io.renku.generators.Generators.Implicits._
 import io.renku.generators.Generators._
 import io.renku.graph.model.EventContentGenerators._
-import io.renku.graph.model.GraphModelGenerators._
 import io.renku.graph.model.events.EventDate
 import org.scalacheck.Gen
 import org.scalamock.scalatest.MockFactory
@@ -51,12 +51,13 @@ private class ProjectPrioritisationSpec extends AnyWordSpec with should.Matchers
 
         `given totalCapacity`(10)
 
-        val projects = List(
+        val infos = List(
           projectInfos.generateOne,
           projectInfos.generateOne
         ).map(_.copy(currentOccupancy = 0, latestEventDate = EventDate(now)))
 
-        projectPrioritisation.prioritise(projects, totalOccupancy = 0).noPriority shouldBe projects.map(_.toIdsAndSlug)
+        projectPrioritisation.prioritise(infos, totalOccupancy = 0).noPriority shouldBe
+          infos.map(i => ProjectIds(i.project))
       }
 
     "do not discard projects events if " +
@@ -66,14 +67,14 @@ private class ProjectPrioritisationSpec extends AnyWordSpec with should.Matchers
 
         `given totalCapacity`(10)
 
-        val projects = List(
+        val infos = List(
           projectInfos.generateOne,
           projectInfos.generateOne
         ).map(_.copy(currentOccupancy = positiveInts(max = 3).generateOne, latestEventDate = EventDate(now)))
 
         projectPrioritisation
-          .prioritise(projects, totalOccupancy = projects.map(_.currentOccupancy.value).sum)
-          .noPriority shouldBe projects.map(_.toIdsAndSlug)
+          .prioritise(infos, totalOccupancy = infos.map(_.currentOccupancy.value).sum)
+          .noPriority shouldBe infos.map(i => ProjectIds(i.project))
       }
 
     "discard all project events with " +
@@ -83,15 +84,15 @@ private class ProjectPrioritisationSpec extends AnyWordSpec with should.Matchers
 
         `given totalCapacity`(10)
 
-        val projects = List(
+        val infos = List(
           projectInfos.generateOne.copy(currentOccupancy = 8),
           projectInfos.generateOne.copy(currentOccupancy = 1),
           projectInfos.generateOne.copy(currentOccupancy = 0)
         ).map(_.copy(latestEventDate = EventDate(now)))
 
         projectPrioritisation
-          .prioritise(projects, totalOccupancy = projects.map(_.currentOccupancy.value).sum)
-          .noPriority shouldBe List(projects.last.toIdsAndSlug)
+          .prioritise(infos, totalOccupancy = infos.map(_.currentOccupancy.value).sum)
+          .noPriority shouldBe List(ProjectIds(infos.last.project))
       }
 
     "discard all project events with " +
@@ -101,15 +102,15 @@ private class ProjectPrioritisationSpec extends AnyWordSpec with should.Matchers
 
         `given totalCapacity`(10)
 
-        val projects = List(
+        val infos = List(
           projectInfos.generateOne.copy(currentOccupancy = 1),
           projectInfos.generateOne.copy(currentOccupancy = 1),
           projectInfos.generateOne.copy(currentOccupancy = 0)
         ).map(_.copy(latestEventDate = EventDate(now)))
 
         projectPrioritisation
-          .prioritise(projects, totalOccupancy = 8)
-          .noPriority shouldBe List(projects.last.toIdsAndSlug)
+          .prioritise(infos, totalOccupancy = 8)
+          .noPriority shouldBe List(ProjectIds(infos.last.project))
       }
 
     "discard all project events with " +
@@ -126,11 +127,11 @@ private class ProjectPrioritisationSpec extends AnyWordSpec with should.Matchers
 
         val projectsAwaitingGeneration = projectInfos.generateFixedSizeList(4).map(_.copy(currentOccupancy = 0))
 
-        val projects = List(project0, project1, project2, project3) ++ projectsAwaitingGeneration
+        val infos = List(project0, project1, project2, project3) ++ projectsAwaitingGeneration
 
         projectPrioritisation
-          .prioritise(projects, totalOccupancy = projects.map(_.currentOccupancy.value).sum)
-          .noPriority shouldBe projectsAwaitingGeneration.map(_.toIdsAndSlug)
+          .prioritise(infos, totalOccupancy = infos.map(_.currentOccupancy.value).sum)
+          .noPriority shouldBe projectsAwaitingGeneration.map(i => ProjectIds(i.project))
       }
 
     "return an empty list if there are no projects" in new TestCase {
@@ -144,9 +145,8 @@ private class ProjectPrioritisationSpec extends AnyWordSpec with should.Matchers
 
       val project = projectInfos.generateOne
 
-      projectPrioritisation.prioritise(List(project), totalOccupancy = positiveLongs().generateOne) shouldBe List(
-        (project.toIdsAndSlug, MaxPriority)
-      )
+      projectPrioritisation.prioritise(List(project), totalOccupancy = positiveLongs().generateOne) shouldBe
+        List((ProjectIds(project.project), MaxPriority))
     }
 
     "put priority MaxPriority if projects' event dates are within and hour and currentOccupancy is 0" in new TestCase {
@@ -159,8 +159,8 @@ private class ProjectPrioritisationSpec extends AnyWordSpec with should.Matchers
       )
 
       projectPrioritisation.prioritise(List(project1, project2), totalOccupancy = 0) shouldBe List(
-        (project1.toIdsAndSlug, MaxPriority),
-        (project2.toIdsAndSlug, MaxPriority)
+        (ProjectIds(project1.project), MaxPriority),
+        (ProjectIds(project2.project), MaxPriority)
       )
     }
 
@@ -175,8 +175,8 @@ private class ProjectPrioritisationSpec extends AnyWordSpec with should.Matchers
         )
 
         projectPrioritisation.prioritise(List(project1, project2), totalOccupancy = 0) shouldBe List(
-          (project1.toIdsAndSlug, MaxPriority),
-          (project2.toIdsAndSlug, MinPriority)
+          (ProjectIds(project1.project), MaxPriority),
+          (ProjectIds(project2.project), MinPriority)
         )
       }
 
@@ -197,9 +197,9 @@ private class ProjectPrioritisationSpec extends AnyWordSpec with should.Matchers
         val (projectIdAndSlug1, priority1) :: (projectIdAndSlug2, priority2) :: (projectIdAndSlug3, priority3) :: Nil =
           projectPrioritisation.prioritise(List(project1, project2, project3), totalOccupancy = 0)
 
-        projectIdAndSlug1.id shouldBe project1.id
-        projectIdAndSlug2.id shouldBe project2.id
-        projectIdAndSlug3.id shouldBe project3.id
+        projectIdAndSlug1.id shouldBe project1.project.id
+        projectIdAndSlug2.id shouldBe project2.project.id
+        projectIdAndSlug3.id shouldBe project3.project.id
 
         priority1.value shouldBe BigDecimal(1.0)
         priority2.value   should (be < BigDecimal(1.0) and be > BigDecimal(0.1))
@@ -225,8 +225,11 @@ private class ProjectPrioritisationSpec extends AnyWordSpec with should.Matchers
         val (projectIdAndSlug, priority) :: Nil =
           projectPrioritisation.prioritise(projects, totalOccupancy = projects.map(_.currentOccupancy.value).sum)
 
-        List(projectIdAndSlug.id) should contain atLeastOneElementOf List(project1.id, project2.id, project3.id)
-        priority                shouldBe MinPriority
+        List(projectIdAndSlug.id) should contain atLeastOneElementOf List(project1.project.id,
+                                                                          project2.project.id,
+                                                                          project3.project.id
+        )
+        priority shouldBe MinPriority
       }
 
     "put MaxPriority to the project with current occupancy 0 while other has > 0" in new TestCase {
@@ -247,7 +250,7 @@ private class ProjectPrioritisationSpec extends AnyWordSpec with should.Matchers
       val (projectIdAndSlug, priority) :: Nil =
         projectPrioritisation.prioritise(projects, totalOccupancy = projects.map(_.currentOccupancy.value).sum)
 
-      projectIdAndSlug.id shouldBe project2.id
+      projectIdAndSlug.id shouldBe project2.project.id
       priority            shouldBe MaxPriority
     }
 
@@ -271,8 +274,8 @@ private class ProjectPrioritisationSpec extends AnyWordSpec with should.Matchers
         val (projectIdAndSlug2, priority2) :: (projectIdAndSlug3, priority3) :: Nil =
           projectPrioritisation.prioritise(projects, totalOccupancy = projects.map(_.currentOccupancy.value).sum)
 
-        projectIdAndSlug2.id shouldBe project2.id
-        projectIdAndSlug3.id shouldBe project3.id
+        projectIdAndSlug2.id shouldBe project2.project.id
+        projectIdAndSlug3.id shouldBe project3.project.id
 
         priority2.value should (be <= BigDecimal(1.0) and be >= BigDecimal(0.1))
         priority3.value should (be <= BigDecimal(1.0) and be >= BigDecimal(0.1))
@@ -298,8 +301,8 @@ private class ProjectPrioritisationSpec extends AnyWordSpec with should.Matchers
         val (projectIdAndSlug1, priority1) :: (projectIdAndSlug3, priority3) :: Nil =
           projectPrioritisation.prioritise(projects, totalOccupancy = projects.map(_.currentOccupancy.value).sum)
 
-        projectIdAndSlug1.id shouldBe project1.id
-        projectIdAndSlug3.id shouldBe project3.id
+        projectIdAndSlug1.id shouldBe project1.project.id
+        projectIdAndSlug3.id shouldBe project3.project.id
 
         priority1     shouldBe MaxPriority
         priority3.value should (be <= BigDecimal(1.0) and be >= BigDecimal(0.1))
@@ -325,19 +328,14 @@ private class ProjectPrioritisationSpec extends AnyWordSpec with should.Matchers
   }
 
   private implicit lazy val projectInfos: Gen[ProjectInfo] = for {
-    projectId        <- projectIds
-    projectSlug      <- projectSlugs
+    project          <- consumerProjects
     latestEvenDate   <- eventDates
     currentOccupancy <- nonNegativeInts(20)
-  } yield ProjectInfo(projectId, projectSlug, latestEvenDate, currentOccupancy)
+  } yield ProjectInfo(project, latestEvenDate, currentOccupancy)
 
   private implicit class EventDateOps(eventDate: EventDate) {
     def plus(duration: FiniteDuration): EventDate =
       EventDate(eventDate.value plusMillis duration.toMillis)
-  }
-
-  private implicit class ProjectInfoOps(projectInfo: ProjectInfo) {
-    lazy val toIdsAndSlug = ProjectIds(projectInfo.id, projectInfo.slug)
   }
 
   private implicit class ResultsOps(results: List[(ProjectIds, Priority)]) {
