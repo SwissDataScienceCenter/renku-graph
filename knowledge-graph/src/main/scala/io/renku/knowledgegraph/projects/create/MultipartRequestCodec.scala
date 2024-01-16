@@ -24,6 +24,7 @@ import cats.syntax.all._
 import io.circe.Json
 import io.renku.core.client.{Template, templates}
 import io.renku.graph.model.projects
+import io.renku.http.RenkuEntityCodec.jsonEntityDecoder
 import io.renku.knowledgegraph.multipart.syntax._
 import io.renku.knowledgegraph.projects.images.Image
 import io.renku.knowledgegraph.projects.images.MultipartImageCodecs._
