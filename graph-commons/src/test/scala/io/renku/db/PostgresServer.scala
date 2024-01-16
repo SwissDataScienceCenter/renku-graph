@@ -24,6 +24,7 @@ import io.renku.db.DBConfigProvider.DBConfig
 
 import java.util.concurrent.atomic.AtomicBoolean
 import scala.sys.process._
+import scala.util.Try
 
 object PostgresServer extends PostgresServer("graph", port = 5432)
 
@@ -61,7 +62,7 @@ class PostgresServer(module: String, port: Int) {
     else if (checkRunning) ()
     else {
       println(s"Starting PostgreSQL container for '$module' from '$image' image")
-      startCmd.!!
+      startContainer()
       var rc = 1
       while (rc != 0) {
         Thread.sleep(500)
@@ -76,6 +77,14 @@ class PostgresServer(module: String, port: Int) {
     val isRunning = out.exists(_ contains containerName)
     wasRunning.set(isRunning)
     isRunning
+  }
+
+  private def startContainer(): Unit = {
+    val retryOnContainerFailedToRun: Throwable => Unit = {
+      case ex if ex.getMessage contains "Nonzero exit value: 125" => Thread.sleep(500); start()
+      case ex                                                     => throw ex
+    }
+    Try(startCmd.!!).fold(retryOnContainerFailedToRun, _ => ())
   }
 
   def stop(): Unit =
