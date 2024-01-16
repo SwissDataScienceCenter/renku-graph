@@ -1,5 +1,5 @@
 /*
- * Copyright 2023 Swiss Data Science Center (SDSC)
+ * Copyright 2024 Swiss Data Science Center (SDSC)
  * A partnership between École Polytechnique Fédérale de Lausanne (EPFL) and
  * Eidgenössische Technische Hochschule Zürich (ETHZ).
  *
@@ -28,13 +28,13 @@ import io.renku.graph.model.projects.GitLabId
 import io.renku.http.client.{AccessToken, GitLabClient}
 import io.renku.http.server.security.model.AuthUser
 import io.renku.metrics.MetricsRegistry
+import io.renku.tokenrepository.api.TokenRepositoryClient
 import io.renku.webhookservice.crypto.HookTokenCrypto
 import io.renku.webhookservice.hookcreation.HookCreator.CreationResult
 import io.renku.webhookservice.hookcreation.ProjectHookCreator.ProjectHook
 import io.renku.webhookservice.hookvalidation.HookValidator
 import io.renku.webhookservice.hookvalidation.HookValidator.HookValidationResult
 import io.renku.webhookservice.model._
-import io.renku.webhookservice.tokenrepository.AccessTokenAssociator
 import io.renku.webhookservice.{ProjectInfoFinder, hookvalidation}
 import org.typelevel.log4cats.Logger
 
@@ -43,13 +43,13 @@ private trait HookCreator[F[_]] {
 }
 
 private class HookCreatorImpl[F[_]: Spawn: Logger](
-    projectHookUrl:       ProjectHookUrl,
-    projectHookValidator: HookValidator[F],
-    tokenAssociator:      AccessTokenAssociator[F],
-    projectInfoFinder:    ProjectInfoFinder[F],
-    hookTokenCrypto:      HookTokenCrypto[F],
-    projectHookCreator:   ProjectHookCreator[F],
-    elClient:             eventlog.api.events.Client[F]
+    projectHookUrl:        ProjectHookUrl,
+    projectHookValidator:  HookValidator[F],
+    tokenRepositoryClient: TokenRepositoryClient[F],
+    projectInfoFinder:     ProjectInfoFinder[F],
+    hookTokenCrypto:       HookTokenCrypto[F],
+    projectHookCreator:    ProjectHookCreator[F],
+    elClient:              eventlog.api.events.Client[F]
 ) extends HookCreator[F] {
 
   import HookCreator.CreationResult._
@@ -78,7 +78,7 @@ private class HookCreatorImpl[F[_]: Spawn: Logger](
                               accessToken: AccessToken
   ): HookValidationResult => F[CreationResult] = {
     case HookValidationResult.HookMissing =>
-      tokenAssociator.associate(projectId, accessToken) >>
+      tokenRepositoryClient.storeAccessToken(projectId, accessToken) >>
         encrypt(HookToken(projectId))
           .flatMap(t => create(ProjectHook(projectId, projectHookUrl, t), accessToken))
           .as(HookCreated.widen)
@@ -118,15 +118,15 @@ private object HookCreator {
   def apply[F[_]: Async: GitLabClient: Logger: MetricsRegistry](projectHookUrl:  ProjectHookUrl,
                                                                 hookTokenCrypto: HookTokenCrypto[F]
   ): F[HookCreator[F]] = for {
-    hookValidator     <- hookvalidation.HookValidator(projectHookUrl)
-    tokenAssociator   <- AccessTokenAssociator[F]
-    projectInfoFinder <- ProjectInfoFinder[F]
-    hookCreator       <- ProjectHookCreator[F]
-    elClient          <- eventlog.api.events.Client[F]
+    hookValidator         <- hookvalidation.HookValidator(projectHookUrl)
+    tokenRepositoryClient <- TokenRepositoryClient[F]
+    projectInfoFinder     <- ProjectInfoFinder[F]
+    hookCreator           <- ProjectHookCreator[F]
+    elClient              <- eventlog.api.events.Client[F]
   } yield new HookCreatorImpl[F](
     projectHookUrl,
     hookValidator,
-    tokenAssociator,
+    tokenRepositoryClient,
     projectInfoFinder,
     hookTokenCrypto,
     hookCreator,

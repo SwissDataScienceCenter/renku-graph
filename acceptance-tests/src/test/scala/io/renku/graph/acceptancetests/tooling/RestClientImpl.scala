@@ -1,5 +1,5 @@
 /*
- * Copyright 2023 Swiss Data Science Center (SDSC)
+ * Copyright 2024 Swiss Data Science Center (SDSC)
  * A partnership between École Polytechnique Fédérale de Lausanne (EPFL) and
  * Eidgenössische Technische Hochschule Zürich (ETHZ).
  *
@@ -19,10 +19,9 @@
 package io.renku.graph.acceptancetests.tooling
 
 import cats.effect.IO
-import cats.effect.unsafe.IORuntime
 import eu.timepit.refined.auto._
 import io.renku.control.Throttler
-import io.renku.http.client.{AccessToken, RestClient}
+import io.renku.http.client.{AccessToken, GitLabClient, RestClient}
 import org.http4s._
 import org.typelevel.log4cats.Logger
 
@@ -31,14 +30,14 @@ import scala.concurrent.duration._
 class RestClientImpl(implicit logger: Logger[IO])
     extends RestClient[IO, RestClientImpl](Throttler.noThrottling, retryInterval = 500 millis, maxRetries = 1) {
 
-  def GET(url: String)(implicit ioRuntime: IORuntime): IO[Response[IO]] = for {
+  def GET(url: String): IO[Response[IO]] = for {
     uri      <- validateUri(url)
     response <- send(request(Method.GET, uri))(mapResponse)
   } yield response
 
-  def GET(url: String, accessToken: AccessToken)(implicit ioRuntime: IORuntime): IO[Response[IO]] = for {
+  def GET(url: String, accessToken: AccessToken): IO[Response[IO]] = for {
     uri      <- validateUri(url)
-    response <- send(request(Method.GET, uri, accessToken))(mapResponse)
+    response <- send(GitLabClient.request[IO](Method.GET, uri, Some(accessToken)))(mapResponse)
   } yield response
 
   private lazy val mapResponse: PartialFunction[(Status, Request[IO], Response[IO]), IO[Response[IO]]] = {

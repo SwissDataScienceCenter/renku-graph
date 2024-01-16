@@ -1,5 +1,5 @@
 /*
- * Copyright 2023 Swiss Data Science Center (SDSC)
+ * Copyright 2024 Swiss Data Science Center (SDSC)
  * A partnership between École Polytechnique Fédérale de Lausanne (EPFL) and
  * Eidgenössische Technische Hochschule Zürich (ETHZ).
  *
@@ -22,7 +22,11 @@ import eu.timepit.refined.api.Refined
 import eu.timepit.refined.auto._
 import io.renku.db.DBConfigProvider.DBConfig
 
+import java.util.concurrent.atomic.AtomicBoolean
 import scala.sys.process._
+import scala.util.Try
+
+object PostgresServer extends PostgresServer("graph", port = 5432)
 
 class PostgresServer(module: String, port: Int) {
 
@@ -51,35 +55,49 @@ class PostgresServer(module: String, port: Int) {
   private val isRunningCmd = s"docker container ls --filter 'name=$containerName'"
   private val stopCmd      = s"docker stop -t5 $containerName"
   private val isReadyCmd   = s"docker exec $containerName pg_isready"
-  private var wasRunning: Boolean = false
+  private val wasRunning   = new AtomicBoolean(false)
 
-  def start(): Unit =
-    if (skipServer) println("Not starting postgres via docker")
+  def start(): Unit = synchronized {
+    if (skipServer) println("Not starting Postgres via docker")
     else if (checkRunning) ()
     else {
-      println(s"Starting PostgreSQL container for module '$module' from '$image' image")
-      startCmd.!!
+      println(s"Starting PostgreSQL container for '$module' from '$image' image")
+      startContainer()
       var rc = 1
       while (rc != 0) {
         Thread.sleep(500)
         rc = isReadyCmd.!
+        if (rc == 0) println(s"PostgreSQL container for '$module' started on port $port")
       }
     }
+  }
 
   private def checkRunning: Boolean = {
-    val out = isRunningCmd.lazyLines.toList
-    wasRunning = out.exists(_ contains containerName)
-    wasRunning
+    val out       = isRunningCmd.lazyLines.toList
+    val isRunning = out.exists(_ contains containerName)
+    wasRunning.set(isRunning)
+    isRunning
   }
 
-  def stop(): Any =
-    if (!skipServer && !wasRunning) {
-      println(s"Stopping PostgreSQL container for module '$module'")
+  private def startContainer(): Unit = {
+    val retryOnContainerFailedToRun: Throwable => Unit = {
+      case ex if ex.getMessage contains "Nonzero exit value: 125" => Thread.sleep(500); start()
+      case ex                                                     => throw ex
+    }
+    Try(startCmd.!!).fold(retryOnContainerFailedToRun, _ => ())
+  }
+
+  def stop(): Unit =
+    if (!skipServer && !wasRunning.get()) {
+      println(s"Stopping PostgreSQL container for '$module'")
       stopCmd.!!
+      ()
     }
 
-  def forceStop(): Any = {
-    println(s"Stopping PostgreSQL container for module '$module'")
-    stopCmd.!!
-  }
+  def forceStop(): Unit =
+    if (!skipServer) {
+      println(s"Stopping PostgreSQL container for '$module'")
+      stopCmd.!!
+      ()
+    }
 }

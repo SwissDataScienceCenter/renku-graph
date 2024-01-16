@@ -1,5 +1,5 @@
 /*
- * Copyright 2023 Swiss Data Science Center (SDSC)
+ * Copyright 2024 Swiss Data Science Center (SDSC)
  * A partnership between École Polytechnique Fédérale de Lausanne (EPFL) and
  * Eidgenössische Technische Hochschule Zürich (ETHZ).
  *
@@ -28,7 +28,7 @@ import io.circe.literal._
 import io.renku.events.{CategoryName, EventRequestContent}
 import io.renku.events.producers.EventSender
 import io.renku.graph.config.{EventLogUrl, RenkuUrlLoader}
-import io.renku.logging.ExecutionTimeRecorder
+import io.renku.logging.{ExecutionTimeRecorder, ExecutionTimeRecorderLoader}
 import io.renku.logging.ExecutionTimeRecorder.ElapsedTime
 import io.renku.metrics.MetricsRegistry
 import io.renku.microservices.MicroserviceUrlFinder
@@ -129,11 +129,11 @@ private[migrations] object ReProvisioning {
   ): F[Migration[F]] = RenkuUrlLoader[F]().flatMap { implicit renkuUrl =>
     for {
       retryDelay                 <- find[F, FiniteDuration]("re-provisioning-retry-delay", config)
-      migrationsConnectionConfig <- MigrationsConnectionConfig[F](config)
+      migrationsConnectionConfig <- MigrationsConnectionConfig.fromConfig[F](config)
       eventSender                <- EventSender[F](EventLogUrl)
       microserviceUrlFinder      <- MicroserviceUrlFinder[F](Microservice.ServicePort)
       compatibility              <- VersionCompatibilityConfig.fromConfigF[F](config)
-      executionTimeRecorder      <- ExecutionTimeRecorder[F]()
+      executionTimeRecorder      <- ExecutionTimeRecorderLoader[F]()
       triplesRemover             <- TriplesRemoverImpl(config)
       judge <-
         ReProvisionJudge[F](migrationsConnectionConfig, ReProvisioningStatus[F], microserviceUrlFinder, compatibility)

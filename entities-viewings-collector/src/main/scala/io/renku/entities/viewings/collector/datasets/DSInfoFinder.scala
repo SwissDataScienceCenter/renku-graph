@@ -1,5 +1,5 @@
 /*
- * Copyright 2023 Swiss Data Science Center (SDSC)
+ * Copyright 2024 Swiss Data Science Center (SDSC)
  * A partnership between École Polytechnique Fédérale de Lausanne (EPFL) and
  * Eidgenössische Technische Hochschule Zürich (ETHZ).
  *
@@ -37,7 +37,7 @@ private final case class DSInfo(projectSlug: projects.Slug, dataset: Dataset)
 private object DSInfoFinder {
 
   def apply[F[_]: Async: Logger: SparqlQueryTimeRecorder]: F[DSInfoFinder[F]] =
-    ProjectsConnectionConfig[F]().flatMap(apply(_))
+    ProjectsConnectionConfig.fromConfig[F]().flatMap(apply(_))
 
   def apply[F[_]: MonadThrow](tsClient: TSClient[F]): DSInfoFinder[F] =
     new DSInfoFinderImpl[F](tsClient)

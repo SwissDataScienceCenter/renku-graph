@@ -1,5 +1,5 @@
 /*
- * Copyright 2023 Swiss Data Science Center (SDSC)
+ * Copyright 2024 Swiss Data Science Center (SDSC)
  * A partnership between École Polytechnique Fédérale de Lausanne (EPFL) and
  * Eidgenössische Technische Hochschule Zürich (ETHZ).
  *
@@ -20,21 +20,19 @@ package io.renku.triplesgenerator.events.consumers.tsmigrationrequest.migrations
 package datemodified
 
 import cats.effect.IO
+import cats.effect.testing.scalatest.AsyncIOSpec
 import eu.timepit.refined.auto._
-import io.renku.entities.searchgraphs.SearchInfoDatasets
+import io.renku.entities.searchgraphs.TestSearchInfoDatasets
 import io.renku.generators.Generators.Implicits._
 import io.renku.graph.model._
-import io.renku.graph.model.entities.EntityFunctions
 import io.renku.graph.model.testentities._
 import io.renku.interpreters.TestLogger
 import io.renku.jsonld.syntax._
 import io.renku.logging.TestSparqlQueryTimeRecorder
-import io.renku.testtools.CustomAsyncIOSpec
 import io.renku.triplesstore.SparqlQuery.Prefixes
 import io.renku.triplesstore._
 import io.renku.triplesstore.client.syntax._
 import org.scalacheck.Gen
-import org.scalamock.scalatest.AsyncMockFactory
 import org.scalatest.flatspec.AsyncFlatSpec
 import org.scalatest.matchers.should
 import org.typelevel.log4cats.Logger
@@ -42,75 +40,71 @@ import tooling.RecordsFinder
 
 class BacklogCreatorSpec
     extends AsyncFlatSpec
-    with CustomAsyncIOSpec
+    with AsyncIOSpec
+    with GraphJenaSpec
+    with TestSearchInfoDatasets
     with should.Matchers
-    with InMemoryJenaForSpec
-    with ProjectsDataset
-    with MigrationsDataset
-    with SearchInfoDatasets
-    with AsyncMockFactory
     with TSTooling {
 
   private val pageSize = 50
 
   it should "find all projects that have no dateModified, either DiscoverableProject or Project entities " +
-    "and copy their slugs into the migrations DS" in {
+    "and copy their slugs into the migrations DS" in allDSConfigs.use {
+      case (implicit0(f: ProjectsConnectionConfig), implicit0(d: MigrationsConnectionConfig)) =>
+        val projects = anyProjectEntities
+          .generateList(min = pageSize + 1, max = Gen.choose(pageSize + 1, (2 * pageSize) - 1).generateOne)
 
-      val projects = anyProjectEntities
-        .generateList(min = pageSize + 1, max = Gen.choose(pageSize + 1, (2 * pageSize) - 1).generateOne)
-
-      fetchBacklogProjects.asserting(_ shouldBe Nil) >>
-        provision(projects).assertNoException >>
-        deleteModifiedDates(projects).assertNoException >>
-        backlogCreator.createBacklog().assertNoException >>
-        fetchBacklogProjects.asserting(_.toSet shouldBe projects.map(_.slug).toSet)
+        fetchBacklogProjects.asserting(_ shouldBe Nil) >>
+          provision(projects).assertNoException >>
+          deleteModifiedDates(projects).assertNoException >>
+          backlogCreator.createBacklog().assertNoException >>
+          fetchBacklogProjects.asserting(_.toSet shouldBe projects.map(_.slug).toSet)
     }
 
-  it should "skip projects that already have dateModified" in {
+  it should "skip projects that already have dateModified" in allDSConfigs.use {
+    case (implicit0(f: ProjectsConnectionConfig), implicit0(d: MigrationsConnectionConfig)) =>
+      val projectToSkip    = anyProjectEntities.generateOne
+      val projectNotToSkip = anyProjectEntities.generateOne
 
-    val projectToSkip    = anyProjectEntities.generateOne
-    val projectNotToSkip = anyProjectEntities.generateOne
-
-    provision(projectToSkip).assertNoException >>
-      provision(projectNotToSkip).assertNoException >>
-      fetchBacklogProjects.asserting(_ shouldBe Nil) >>
-      deleteModifiedDates(projectNotToSkip.resourceId).assertNoException >>
-      backlogCreator.createBacklog().assertNoException >>
-      fetchBacklogProjects.asserting(_.toSet shouldBe Set(projectNotToSkip.slug))
+      provision(projectToSkip).assertNoException >>
+        provision(projectNotToSkip).assertNoException >>
+        fetchBacklogProjects.asserting(_ shouldBe Nil) >>
+        deleteModifiedDates(projectNotToSkip.resourceId).assertNoException >>
+        backlogCreator.createBacklog().assertNoException >>
+        fetchBacklogProjects.asserting(_.toSet shouldBe Set(projectNotToSkip.slug))
   }
 
-  it should "find project that does not have dateModified only in the Project graph" in {
+  it should "find project that does not have dateModified only in the Project graph" in allDSConfigs.use {
+    case (implicit0(f: ProjectsConnectionConfig), implicit0(d: MigrationsConnectionConfig)) =>
+      val project = anyProjectEntities.generateOne
 
-    val project = anyProjectEntities.generateOne
-
-    provision(project).assertNoException >>
-      fetchBacklogProjects.asserting(_ shouldBe Nil) >>
-      deleteProjectDateModified(project.resourceId).assertNoException >>
-      backlogCreator.createBacklog().assertNoException >>
-      fetchBacklogProjects.asserting(_.toSet shouldBe Set(project.slug))
+      provision(project).assertNoException >>
+        fetchBacklogProjects.asserting(_ shouldBe Nil) >>
+        deleteProjectDateModified(project.resourceId).assertNoException >>
+        backlogCreator.createBacklog().assertNoException >>
+        fetchBacklogProjects.asserting(_.toSet shouldBe Set(project.slug))
   }
 
-  it should "find project that does not have dateModified only in the Projects graph" in {
+  it should "find project that does not have dateModified only in the Projects graph" in allDSConfigs.use {
+    case (implicit0(f: ProjectsConnectionConfig), implicit0(d: MigrationsConnectionConfig)) =>
+      val project = anyProjectEntities.generateOne
 
-    val project = anyProjectEntities.generateOne
-
-    provision(project).assertNoException >>
-      fetchBacklogProjects.asserting(_ shouldBe Nil) >>
-      deleteProjectsDateModified(project.resourceId).assertNoException >>
-      backlogCreator.createBacklog().assertNoException >>
-      fetchBacklogProjects.asserting(_.toSet shouldBe Set(project.slug))
+      provision(project).assertNoException >>
+        fetchBacklogProjects.asserting(_ shouldBe Nil) >>
+        deleteProjectsDateModified(project.resourceId).assertNoException >>
+        backlogCreator.createBacklog().assertNoException >>
+        fetchBacklogProjects.asserting(_.toSet shouldBe Set(project.slug))
   }
 
-  private implicit lazy val logger:    TestLogger[IO] = TestLogger[IO]()
-  implicit override lazy val ioLogger: Logger[IO]     = logger
+  implicit override lazy val ioLogger: Logger[IO] = TestLogger()
 
-  private implicit lazy val timeRecorder: SparqlQueryTimeRecorder[IO] = TestSparqlQueryTimeRecorder[IO].unsafeRunSync()
-  private lazy val backlogCreator =
-    new BacklogCreatorImpl[IO](RecordsFinder[IO](projectsDSConnectionInfo), TSClient[IO](migrationsDSConnectionInfo))
+  private def backlogCreator(implicit pcc: ProjectsConnectionConfig, mcc: MigrationsConnectionConfig) = {
+    implicit lazy val tr: SparqlQueryTimeRecorder[IO] = TestSparqlQueryTimeRecorder.createUnsafe
+    new BacklogCreatorImpl[IO](RecordsFinder[IO](pcc), TSClient[IO](mcc))
+  }
 
-  private def fetchBacklogProjects: IO[List[projects.Slug]] =
+  private def fetchBacklogProjects(implicit mcc: MigrationsConnectionConfig): IO[List[projects.Slug]] =
     runSelect(
-      on = migrationsDataset,
       SparqlQuery.ofUnsafe(
         "test Projects dateModified",
         Prefixes of renku -> "renku",
@@ -122,12 +116,9 @@ class BacklogCreatorSpec
       )
     ).map(_.flatMap(_.get("slug").map(projects.Slug)))
 
-  private def provision(project: Project): IO[Unit] =
+  private def provision(project: Project)(implicit pcc: ProjectsConnectionConfig): IO[Unit] =
     provision(List(project))
 
-  private def provision(projects: List[Project]): IO[Unit] =
-    provisionTestProjects(projects: _*)(implicitly[RenkuUrl],
-                                        implicitly[EntityFunctions[entities.Project]],
-                                        projectsDSGraphsProducer[entities.Project]
-    )
+  private def provision(projects: List[Project])(implicit pcc: ProjectsConnectionConfig): IO[Unit] =
+    provisionTestProjects(projects: _*)
 }

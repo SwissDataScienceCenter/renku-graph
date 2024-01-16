@@ -1,5 +1,5 @@
 /*
- * Copyright 2023 Swiss Data Science Center (SDSC)
+ * Copyright 2024 Swiss Data Science Center (SDSC)
  * A partnership between École Polytechnique Fédérale de Lausanne (EPFL) and
  * Eidgenössische Technische Hochschule Zürich (ETHZ).
  *
@@ -19,96 +19,92 @@
 package io.renku.eventlog.events.consumers.statuschange.redoprojecttransformation
 
 import cats.effect.IO
-import io.renku.eventlog.events.consumers.statuschange.DBUpdateResults
+import cats.effect.testing.scalatest.AsyncIOSpec
+import cats.syntax.all._
+import io.renku.db.DBConfigProvider.DBConfig
 import io.renku.eventlog.api.events.StatusChangeEvent.{ProjectSlug, RedoProjectTransformation}
+import io.renku.eventlog.events.consumers.statuschange.DBUpdateResults
 import io.renku.eventlog.events.producers
-import io.renku.eventlog.events.producers.SubscriptionDataProvisioning
-import io.renku.eventlog.metrics.QueriesExecutionTimes
-import io.renku.eventlog.{InMemoryEventLogDbSpec, TypeSerializers}
+import io.renku.eventlog.events.producers.SubscriptionProvisioning
+import io.renku.eventlog.metrics.{QueriesExecutionTimes, TestQueriesExecutionTimes}
+import io.renku.eventlog.{EventLogDB, EventLogPostgresSpec}
 import io.renku.events.consumers.ConsumersModelGenerators.consumerProjects
 import io.renku.events.consumers.Project
 import io.renku.generators.Generators.Implicits._
 import io.renku.generators.Generators._
-import io.renku.graph.model.EventContentGenerators.eventMessages
-import io.renku.graph.model.EventsGenerators._
 import io.renku.graph.model.events.EventStatus._
 import io.renku.graph.model.events._
-import io.renku.interpreters.TestLogger
-import io.renku.metrics.TestMetricsRegistry
-import io.renku.testtools.IOSpec
-import org.scalamock.scalatest.MockFactory
+import org.scalamock.scalatest.AsyncMockFactory
+import org.scalatest.Succeeded
 import org.scalatest.matchers.should
-import org.scalatest.wordspec.AnyWordSpec
+import org.scalatest.wordspec.AsyncWordSpec
 
 class DequeuedEventHandlerSpec
-    extends AnyWordSpec
-    with IOSpec
-    with InMemoryEventLogDbSpec
-    with SubscriptionDataProvisioning
-    with TypeSerializers
-    with should.Matchers
-    with MockFactory {
+    extends AsyncWordSpec
+    with AsyncIOSpec
+    with EventLogPostgresSpec
+    with AsyncMockFactory
+    with SubscriptionProvisioning
+    with should.Matchers {
 
   "updateDB" should {
 
     "update the latest TRIPLES_STORE event of the given project to TRIPLES_GENERATED " +
-      "when there are no events in TRIPLES_GENERATED already" in new TestCase {
-
+      "when there are no events in TRIPLES_GENERATED already" in testDBResource.use { implicit cfg =>
         val project = consumerProjects.generateOne
 
-        addEvent(TriplesStore, project)
-          .addLaterEvent(GenerationNonRecoverableFailure)
-          .addLaterEvent(TriplesStore)
-          .addLaterEvent(New)
+        for {
+          _ <- addEvent(TriplesStore, project)
+                 .addLaterEvent(GenerationNonRecoverableFailure)
+                 .addLaterEvent(TriplesStore)
+                 .addLaterEvent(New)
 
-        findEventStatuses(project) shouldBe List(TriplesStore, GenerationNonRecoverableFailure, TriplesStore, New)
+          _ <- findEventStatuses(project).asserting(
+                 _ shouldBe List(TriplesStore, GenerationNonRecoverableFailure, TriplesStore, New)
+               )
 
-        val event = RedoProjectTransformation(ProjectSlug(project.slug))
-        sessionResource
-          .useK(updater updateDB event)
-          .unsafeRunSync() shouldBe DBUpdateResults.ForProjects(project.slug,
-                                                                Map(TriplesStore -> -1, TriplesGenerated -> 1)
-        )
+          event = RedoProjectTransformation(ProjectSlug(project.slug))
+          _ <- moduleSessionResource.session
+                 .useKleisli(updater updateDB event)
+                 .asserting(_ shouldBe DBUpdateResults(project.slug, TriplesStore -> -1, TriplesGenerated -> 1))
 
-        findEventStatuses(project) shouldBe List(TriplesStore, GenerationNonRecoverableFailure, TriplesGenerated, New)
+          _ <- findEventStatuses(project)
+                 .asserting(_ shouldBe List(TriplesStore, GenerationNonRecoverableFailure, TriplesGenerated, New))
 
-        sessionResource
-          .useK(updater updateDB event)
-          .unsafeRunSync() shouldBe DBUpdateResults.ForProjects.empty
+          _ <- moduleSessionResource.session
+                 .useKleisli(updater updateDB event)
+                 .asserting(_ shouldBe DBUpdateResults.empty)
+        } yield Succeeded
       }
 
     "remove row from the subscription_category_sync_time for the given project and ADD_MIN_PROJECT_INFO " +
-      "if there are no events in TRIPLES_STORE for it" in new TestCase {
-
+      "if there are no events in TRIPLES_STORE for it" in testDBResource.use { implicit cfg =>
         val project = consumerProjects.generateOne
 
-        addEvent(Skipped, project)
-          .addLaterEvent(GenerationNonRecoverableFailure)
-          .addLaterEvent(New)
+        for {
+          _ <- addEvent(Skipped, project)
+                 .addLaterEvent(GenerationNonRecoverableFailure)
+                 .addLaterEvent(New)
 
-        findEventStatuses(project) shouldBe List(Skipped, GenerationNonRecoverableFailure, New)
+          _ <- findEventStatuses(project).asserting(_ shouldBe List(Skipped, GenerationNonRecoverableFailure, New))
 
-        upsertCategorySyncTime(project.id,
-                               producers.minprojectinfo.categoryName,
-                               timestampsNotInTheFuture.generateAs(LastSyncedDate)
-        )
-        findSyncTime(project.id, producers.minprojectinfo.categoryName).isEmpty shouldBe false
+          _ <- upsertCategorySyncTime(project.id, producers.minprojectinfo.categoryName)
+          _ <- findSyncTime(project.id, producers.minprojectinfo.categoryName).asserting(_ shouldBe a[Some[_]])
 
-        sessionResource
-          .useK(updater updateDB RedoProjectTransformation(ProjectSlug(project.slug)))
-          .unsafeRunSync() shouldBe DBUpdateResults.ForProjects.empty
+          _ <- moduleSessionResource.session
+                 .useKleisli(updater updateDB RedoProjectTransformation(ProjectSlug(project.slug)))
+                 .asserting(_ shouldBe DBUpdateResults.empty)
 
-        findEventStatuses(project) shouldBe List(Skipped, GenerationNonRecoverableFailure, New)
+          _ <- findEventStatuses(project).asserting(_ shouldBe List(Skipped, GenerationNonRecoverableFailure, New))
 
-        findSyncTime(project.id, producers.minprojectinfo.categoryName) shouldBe None
+          _ <- findSyncTime(project.id, producers.minprojectinfo.categoryName).asserting(_ shouldBe None)
+        } yield Succeeded
       }
   }
 
-  private trait TestCase {
-    implicit val logger:                   TestLogger[IO]            = TestLogger[IO]()
-    private implicit val metricsRegistry:  TestMetricsRegistry[IO]   = TestMetricsRegistry[IO]
-    private implicit val queriesExecTimes: QueriesExecutionTimes[IO] = QueriesExecutionTimes[IO]().unsafeRunSync()
-    val updater = new DequeuedEventHandlerImpl[IO]
+  private lazy val updater = {
+    implicit val qet: QueriesExecutionTimes[IO] = TestQueriesExecutionTimes[IO]
+    new DequeuedEventHandlerImpl[IO]
   }
 
   private type EventCreationResult = (CompoundEventId, Project, EventDate)
@@ -116,35 +112,19 @@ class DequeuedEventHandlerSpec
   private def addEvent(status:    EventStatus,
                        project:   Project = consumerProjects.generateOne,
                        eventDate: EventDate = timestampsNotInTheFuture.generateAs(EventDate)
-  ): EventCreationResult = {
-    val eventId = compoundEventIds.generateOne.copy(projectId = project.id)
-    storeEvent(
-      eventId,
-      status,
-      timestamps.generateAs(ExecutionDate),
-      eventDate,
-      eventBodies.generateOne,
-      maybeMessage = status match {
-        case _: FailureStatus => eventMessages.generateSome
-        case _ => eventMessages.generateOption
-      },
-      maybeEventPayload = status match {
-        case TriplesStore | TriplesGenerated => zippedEventPayloads.generateSome
-        case AwaitingDeletion                => zippedEventPayloads.generateOption
-        case _                               => zippedEventPayloads.generateNone
-      },
-      projectSlug = project.slug
-    )
-    (eventId, project, eventDate)
+  )(implicit cfg: DBConfig[EventLogDB]): IO[EventCreationResult] =
+    storeGeneratedEvent(status, eventDate, project).map(ge => (ge.eventId, project, eventDate))
+
+  private implicit class EventCreationResultOps(result: IO[EventCreationResult]) {
+
+    def addLaterEvent(status: EventStatus)(implicit cfg: DBConfig[EventLogDB]): IO[EventCreationResult] =
+      result >>= { case (_, project, lastEventDate) =>
+        addEvent(status, project, timestampsNotInTheFuture(butYoungerThan = lastEventDate.value).generateAs(EventDate))
+      }
   }
 
-  private implicit class EventCreationResultOps(result: EventCreationResult) {
-    private val (_, project, lastEventDate) = result
-
-    def addLaterEvent(status: EventStatus): EventCreationResult =
-      addEvent(status, project, timestampsNotInTheFuture(butYoungerThan = lastEventDate.value).generateAs(EventDate))
-  }
-
-  private def findEventStatuses(project: Project) =
-    findAllProjectEvents(project.id).flatMap(findEvent).map(_._2)
+  private def findEventStatuses(project: Project)(implicit cfg: DBConfig[EventLogDB]) =
+    findAllProjectEvents(project.id)
+      .flatMap(_.map(findEvent).sequence)
+      .map(_.flatten.map(_.status))
 }

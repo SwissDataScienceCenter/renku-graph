@@ -1,5 +1,5 @@
 /*
- * Copyright 2023 Swiss Data Science Center (SDSC)
+ * Copyright 2024 Swiss Data Science Center (SDSC)
  * A partnership between École Polytechnique Fédérale de Lausanne (EPFL) and
  * Eidgenössische Technische Hochschule Zürich (ETHZ).
  *
@@ -28,10 +28,10 @@ import io.renku.generators.Generators._
 import io.renku.interpreters.TestLogger
 import io.renku.interpreters.TestLogger.Level.Info
 import io.renku.testtools.IOSpec
-import io.renku.triplesgenerator.events.consumers.tsmigrationrequest.migrations.tooling.RecoverableErrorsRecovery
 import io.renku.triplesgenerator.errors.ErrorGenerators.processingRecoverableErrors
+import io.renku.triplesgenerator.events.consumers.tsmigrationrequest.migrations.tooling.RecoverableErrorsRecovery
 import io.renku.triplesstore.TSAdminClient.CreationResult
-import io.renku.triplesstore.{DatasetConfigFile, DatasetName, TSAdminClient}
+import io.renku.triplesstore.{DatasetConfigFile, TSAdminClient}
 import org.scalacheck.Gen
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.matchers.should
@@ -42,10 +42,11 @@ class DatasetsCreatorSpec extends AnyWordSpec with IOSpec with should.Matchers w
   "createDatasets" should {
 
     "create all passed datasets" in new TestCase {
-      val results = datasets map { case (datasetName, datasetConfig) =>
+
+      val results = dsConfigFiles map { datasetConfig =>
         val result = creationResults.generateOne
         givenDSCreation(of = datasetConfig, returning = result.pure[IO])
-        datasetName -> result
+        datasetConfig.datasetName -> result
       }
 
       dsCreator.run().value.unsafeRunSync() shouldBe ().asRight
@@ -57,9 +58,8 @@ class DatasetsCreatorSpec extends AnyWordSpec with IOSpec with should.Matchers w
     }
 
     "return a Recoverable Error if in case of an exception the given strategy returns one" in new TestCase {
-      val datasetName            = nonEmptyStrings().generateAs(DatasetName)
-      val datasetConfig          = datasetConfigFiles.generateOne
-      override lazy val datasets = List(datasetName -> datasetConfig)
+      val datasetConfig               = datasetConfigFiles.generateOne
+      override lazy val dsConfigFiles = List(datasetConfig)
 
       val exception = exceptions.generateOne
       givenDSCreation(of = datasetConfig, returning = exception.raiseError[IO, CreationResult])
@@ -69,23 +69,19 @@ class DatasetsCreatorSpec extends AnyWordSpec with IOSpec with should.Matchers w
   }
 
   private trait TestCase {
-    lazy val datasets: List[(DatasetName, DatasetConfigFile)] = (
-      for {
-        name       <- nonEmptyStrings().toGeneratorOf(DatasetName)
-        configFile <- datasetConfigFiles
-      } yield name -> configFile
-    ).generateNonEmptyList().toList
+    lazy val dsConfigFiles: List[DatasetConfigFile] =
+      datasetConfigFiles.generateNonEmptyList().toList
 
     val recoverableError = processingRecoverableErrors.generateOne
-    val recoveryStrategy = new RecoverableErrorsRecovery {
+    private val recoveryStrategy = new RecoverableErrorsRecovery {
       override def maybeRecoverableError[F[_]: MonadThrow, OUT]: RecoveryStrategy[F, OUT] = { _ =>
         recoverableError.asLeft[OUT].pure[F]
       }
     }
 
     implicit val logger: TestLogger[IO] = TestLogger[IO]()
-    val tsAdminClient  = mock[TSAdminClient[IO]]
-    lazy val dsCreator = new DatasetsCreatorImpl[IO](datasets, tsAdminClient, recoveryStrategy)
+    private val tsAdminClient = mock[TSAdminClient[IO]]
+    lazy val dsCreator        = new DatasetsCreatorImpl[IO](dsConfigFiles, tsAdminClient, recoveryStrategy)
 
     def givenDSCreation(of: DatasetConfigFile, returning: IO[CreationResult]) =
       (tsAdminClient.createDataset _).expects(of).returning(returning)

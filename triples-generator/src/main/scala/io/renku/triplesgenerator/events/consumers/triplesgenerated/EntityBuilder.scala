@@ -1,5 +1,5 @@
 /*
- * Copyright 2023 Swiss Data Science Center (SDSC)
+ * Copyright 2024 Swiss Data Science Center (SDSC)
  * A partnership between École Polytechnique Fédérale de Lausanne (EPFL) and
  * Eidgenössische Technische Hochschule Zürich (ETHZ).
  *
@@ -34,7 +34,7 @@ import org.typelevel.log4cats.Logger
 
 private trait EntityBuilder[F[_]] {
   def buildEntity(event: TriplesGeneratedEvent)(implicit
-      maybeAccessToken: Option[AccessToken]
+      at: AccessToken
   ): EitherT[F, ProcessingRecoverableError, Project]
 }
 
@@ -48,22 +48,21 @@ private class EntityBuilderImpl[F[_]: MonadThrow](
 
   import applicative._
 
-  override def buildEntity(event: TriplesGeneratedEvent)(implicit
-      maybeAccessToken: Option[AccessToken]
-  ): EitherT[F, ProcessingRecoverableError, Project] = for {
+  override def buildEntity(
+      event: TriplesGeneratedEvent
+  )(implicit at: AccessToken): EitherT[F, ProcessingRecoverableError, Project] = for {
     projectInfo <- findValidProjectInfo(event)
     project     <- extractProject(projectInfo, event)
   } yield project
 
-  private def findValidProjectInfo(event: TriplesGeneratedEvent)(implicit
-      maybeAccessToken: Option[AccessToken]
-  ) = projectInfoFinder.findProjectInfo(event.project.slug) semiflatMap {
-    case Some(projectInfo) => projectInfo.pure[F]
-    case None =>
-      ProcessingNonRecoverableError
-        .MalformedRepository(show"${event.project} not found in GitLab")
-        .raiseError[F, GitLabProjectInfo]
-  }
+  private def findValidProjectInfo(event: TriplesGeneratedEvent)(implicit at: AccessToken) =
+    projectInfoFinder.findProjectInfo(event.project.slug) semiflatMap {
+      case Some(projectInfo) => projectInfo.pure[F]
+      case None =>
+        ProcessingNonRecoverableError
+          .MalformedRepository(show"${event.project} not found in GitLab")
+          .raiseError[F, GitLabProjectInfo]
+    }
 
   private def extractProject(projectInfo: GitLabProjectInfo, event: TriplesGeneratedEvent) =
     EitherT.right[ProcessingRecoverableError] {

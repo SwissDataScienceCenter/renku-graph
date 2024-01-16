@@ -1,5 +1,5 @@
 /*
- * Copyright 2023 Swiss Data Science Center (SDSC)
+ * Copyright 2024 Swiss Data Science Center (SDSC)
  * A partnership between École Polytechnique Fédérale de Lausanne (EPFL) and
  * Eidgenössische Technische Hochschule Zürich (ETHZ).
  *
@@ -26,9 +26,9 @@ import io.circe.syntax.EncoderOps
 import io.renku.data.Message
 import io.renku.generators.CommonGraphGenerators.authUsers
 import io.renku.generators.Generators.Implicits.GenOps
+import io.renku.http.RenkuEntityCodec
 import io.renku.http.client.AccessToken
 import io.renku.http.client.RestClientError.UnauthorizedException
-import io.renku.http.server.EndpointTester._
 import io.renku.interpreters.TestLogger
 import io.renku.interpreters.TestLogger.Level.Error
 import io.renku.testtools.IOSpec
@@ -42,7 +42,12 @@ import org.scalamock.scalatest.MockFactory
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
 
-class HookDeletionEndpointSpec extends AnyWordSpec with MockFactory with should.Matchers with IOSpec {
+class HookDeletionEndpointSpec
+    extends AnyWordSpec
+    with MockFactory
+    with should.Matchers
+    with IOSpec
+    with RenkuEntityCodec {
 
   "deleteHook" should {
 

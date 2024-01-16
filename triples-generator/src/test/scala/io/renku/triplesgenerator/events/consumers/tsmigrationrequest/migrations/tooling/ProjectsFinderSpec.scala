@@ -1,5 +1,5 @@
 /*
- * Copyright 2023 Swiss Data Science Center (SDSC)
+ * Copyright 2024 Swiss Data Science Center (SDSC)
  * A partnership between École Polytechnique Fédérale de Lausanne (EPFL) and
  * Eidgenössische Technische Hochschule Zürich (ETHZ).
  *
@@ -19,46 +19,39 @@
 package io.renku.triplesgenerator.events.consumers.tsmigrationrequest.migrations.tooling
 
 import cats.effect.IO
+import cats.effect.testing.scalatest.AsyncIOSpec
 import eu.timepit.refined.auto._
 import io.renku.generators.Generators.Implicits._
 import io.renku.graph.model.Schemas.{renku, schema}
 import io.renku.graph.model.testentities._
 import io.renku.interpreters.TestLogger
 import io.renku.logging.TestSparqlQueryTimeRecorder
-import io.renku.testtools.IOSpec
 import io.renku.triplesstore.SparqlQuery.Prefixes
 import io.renku.triplesstore._
 import org.scalatest.matchers.should
-import org.scalatest.wordspec.AnyWordSpec
+import org.scalatest.wordspec.AsyncWordSpec
 
-class ProjectsFinderSpec
-    extends AnyWordSpec
-    with IOSpec
-    with should.Matchers
-    with InMemoryJenaForSpec
-    with ProjectsDataset {
+class ProjectsFinderSpec extends AsyncWordSpec with AsyncIOSpec with GraphJenaSpec with should.Matchers {
 
   "findProjects" should {
 
-    "run the configured query and return the fetch the records" in new TestCase {
-
+    "run the configured query and return the fetch the records" in projectsDSConfig.use { implicit pcc =>
       val projects = anyProjectEntities.generateNonEmptyList().toList
 
-      projects foreach (upload(to = projectsDataset, _))
-
-      projectsFinder.findProjects.unsafeRunSync() should contain theSameElementsAs projects.map(_.slug)
+      uploadToProjects(projects: _*) >>
+        projectsFinder.findProjects.asserting(_ should contain theSameElementsAs projects.map(_.slug))
     }
   }
 
-  private trait TestCase {
-    private val query = SparqlQuery.of(
-      "find slug",
-      Prefixes of (schema -> "schema", renku -> "renku"),
-      """|SELECT DISTINCT ?slug
-         |WHERE { GRAPH ?g { ?id a schema:Project; renku:projectPath ?slug } }""".stripMargin
-    )
-    private implicit val logger:       TestLogger[IO]              = TestLogger[IO]()
-    private implicit val timeRecorder: SparqlQueryTimeRecorder[IO] = TestSparqlQueryTimeRecorder[IO].unsafeRunSync()
-    val projectsFinder = new ProjectsFinderImpl[IO](query, projectsDSConnectionInfo)
+  private lazy val query = SparqlQuery.of(
+    "find slug",
+    Prefixes of (schema -> "schema", renku -> "renku"),
+    """|SELECT DISTINCT ?slug
+       |WHERE { GRAPH ?g { ?id a schema:Project; renku:projectPath ?slug } }""".stripMargin
+  )
+  private implicit lazy val logger: TestLogger[IO] = TestLogger[IO]()
+  private def projectsFinder(implicit pcc: ProjectsConnectionConfig) = {
+    implicit val tr: SparqlQueryTimeRecorder[IO] = TestSparqlQueryTimeRecorder.createUnsafe
+    new ProjectsFinderImpl[IO](query, pcc)
   }
 }

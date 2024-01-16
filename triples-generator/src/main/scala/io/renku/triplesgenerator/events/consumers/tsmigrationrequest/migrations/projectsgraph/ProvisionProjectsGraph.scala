@@ -1,5 +1,5 @@
 /*
- * Copyright 2023 Swiss Data Science Center (SDSC)
+ * Copyright 2024 Swiss Data Science Center (SDSC)
  * A partnership between École Polytechnique Fédérale de Lausanne (EPFL) and
  * Eidgenössische Technische Hochschule Zürich (ETHZ).
  *
@@ -100,7 +100,7 @@ private[migrations] object ProvisionProjectsGraph {
     projectsFinder           <- ProjectsPageFinder[F]
     progressFinder           <- ProgressFinder[F]
     projectFetcher           <- ProjectFetcher[F]
-    projectsGraphProvisioner <- ProjectsConnectionConfig[F]().map(ProjectsGraphProvisioner[F](_))
+    projectsGraphProvisioner <- ProjectsConnectionConfig.fromConfig[F]().map(ProjectsGraphProvisioner[F](_))
     projectDonePersister     <- ProjectDonePersister[F]
     executionRegister        <- MigrationExecutionRegister[F]
   } yield new ProvisionProjectsGraph(checkMigrationNeeded,

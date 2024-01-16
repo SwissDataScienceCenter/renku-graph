@@ -1,5 +1,5 @@
 /*
- * Copyright 2023 Swiss Data Science Center (SDSC)
+ * Copyright 2024 Swiss Data Science Center (SDSC)
  * A partnership between École Polytechnique Fédérale de Lausanne (EPFL) and
  * Eidgenössische Technische Hochschule Zürich (ETHZ).
  *
@@ -39,7 +39,7 @@ private trait KGInfoFinder[F[_]] {
 
 private object KGInfoFinder {
   def apply[F[_]: Async: Logger: SparqlQueryTimeRecorder]: F[KGInfoFinder[F]] =
-    ProjectsConnectionConfig[F]().map(new KGInfoFinderImpl(_))
+    ProjectsConnectionConfig.fromConfig[F]().map(new KGInfoFinderImpl(_))
 }
 
 private class KGInfoFinderImpl[F[_]: Async: Logger: SparqlQueryTimeRecorder](

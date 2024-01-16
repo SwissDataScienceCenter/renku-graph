@@ -1,5 +1,5 @@
 /*
- * Copyright 2023 Swiss Data Science Center (SDSC)
+ * Copyright 2024 Swiss Data Science Center (SDSC)
  * A partnership between École Polytechnique Fédérale de Lausanne (EPFL) and
  * Eidgenössische Technische Hochschule Zürich (ETHZ).
  *
@@ -60,11 +60,12 @@ object StatusChangeEventsQueue {
   }
 
   def apply[F[_]: Async: Logger: SessionResource: QueriesExecutionTimes]: F[StatusChangeEventsQueue[F]] =
-    MonadThrow[F].catchNonFatal(new StatusChangeEventsQueueImpl[F])
+    MonadThrow[F].catchNonFatal(new StatusChangeEventsQueueImpl[F](queueCheckInterval = 1 second))
 }
 
-private class StatusChangeEventsQueueImpl[F[_]: Async: Logger: SessionResource: QueriesExecutionTimes]
-    extends DbClient[F](Some(QueriesExecutionTimes[F]))
+private class StatusChangeEventsQueueImpl[F[_]: Async: Logger: SessionResource: QueriesExecutionTimes](
+    queueCheckInterval: Duration
+) extends DbClient[F](Some(QueriesExecutionTimes[F]))
     with StatusChangeEventsQueue[F] {
 
   import eu.timepit.refined.auto._
@@ -109,7 +110,7 @@ private class StatusChangeEventsQueueImpl[F[_]: Async: Logger: SessionResource: 
 
   private def dequeueAll(): F[Unit] = Temporal[F].andWait(
     (handlers.get >>= (_.map(h => dequeueType(h)).sequence.void)) recoverWith loggingStatement,
-    time = 1 second
+    time = queueCheckInterval
   )
 
   private def dequeueType[E <: StatusChangeEvent](handler: HandlerDef[E]): F[Unit] =

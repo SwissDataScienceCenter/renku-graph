@@ -1,5 +1,5 @@
 /*
- * Copyright 2023 Swiss Data Science Center (SDSC)
+ * Copyright 2024 Swiss Data Science Center (SDSC)
  * A partnership between École Polytechnique Fédérale de Lausanne (EPFL) and
  * Eidgenössische Technische Hochschule Zürich (ETHZ).
  *
@@ -28,7 +28,7 @@ import io.renku.generators.Generators.Implicits._
 import io.renku.generators.Generators._
 import io.renku.graph.model.EventsGenerators.{compoundEventIds, eventBodies}
 import io.renku.graph.model.events.EventDetails
-import io.renku.http.server.EndpointTester._
+import io.renku.http.RenkuEntityCodec
 import io.renku.interpreters.TestLogger
 import io.renku.interpreters.TestLogger.Level.Error
 import io.renku.testtools.IOSpec
@@ -40,7 +40,12 @@ import org.scalamock.scalatest.MockFactory
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
 
-class EventDetailsEndpointSpec extends AnyWordSpec with IOSpec with MockFactory with should.Matchers {
+class EventDetailsEndpointSpec
+    extends AnyWordSpec
+    with IOSpec
+    with MockFactory
+    with should.Matchers
+    with RenkuEntityCodec {
 
   "getDetails" should {
 

@@ -1,5 +1,5 @@
 /*
- * Copyright 2023 Swiss Data Science Center (SDSC)
+ * Copyright 2024 Swiss Data Science Center (SDSC)
  * A partnership between École Polytechnique Fédérale de Lausanne (EPFL) and
  * Eidgenössische Technische Hochschule Zürich (ETHZ).
  *
@@ -42,7 +42,6 @@ class ProjectPathToSlugSpec
         _ <- verifyColumnExists("projects_tokens", "project_path").asserting(_ shouldBe true)
         _ <- verifyColumnExists("projects_tokens", "project_slug").asserting(_ shouldBe false)
 
-        _ <- logger.resetF()
         _ <- ProjectPathToSlug[IO].run.assertNoException
         _ <- verifyColumnExists("projects_tokens", "project_path").asserting(_ shouldBe false)
         _ <- verifyColumnExists("projects_tokens", "project_slug").asserting(_ shouldBe true)

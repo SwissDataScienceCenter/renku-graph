@@ -1,5 +1,5 @@
 /*
- * Copyright 2023 Swiss Data Science Center (SDSC)
+ * Copyright 2024 Swiss Data Science Center (SDSC)
  * A partnership between École Polytechnique Fédérale de Lausanne (EPFL) and
  * Eidgenössische Technische Hochschule Zürich (ETHZ).
  *
@@ -19,85 +19,59 @@
 package io.renku.eventlog.events.consumers.statuschange.toawaitingdeletion
 
 import cats.effect.IO
-import io.renku.eventlog.events.consumers.statuschange.DBUpdateResults
+import cats.effect.testing.scalatest.AsyncIOSpec
+import cats.syntax.all._
+import io.renku.db.DBConfigProvider.DBConfig
 import io.renku.eventlog.api.events.StatusChangeEvent.ToAwaitingDeletion
-import io.renku.eventlog.metrics.QueriesExecutionTimes
-import io.renku.eventlog.{InMemoryEventLogDbSpec, TypeSerializers}
-import io.renku.events.consumers.ConsumersModelGenerators
+import io.renku.eventlog.events.consumers.statuschange.DBUpdateResults
+import io.renku.eventlog.metrics.{QueriesExecutionTimes, TestQueriesExecutionTimes}
+import io.renku.eventlog.{EventLogDB, EventLogPostgresSpec}
+import io.renku.events.consumers.ConsumersModelGenerators.consumerProjects
+import io.renku.events.consumers.Project
 import io.renku.generators.Generators.Implicits._
 import io.renku.generators.Generators.timestampsNotInTheFuture
-import io.renku.graph.model.EventsGenerators.{eventBodies, eventIds, eventStatuses}
+import io.renku.graph.model.EventsGenerators.{eventIds, eventStatuses}
 import io.renku.graph.model.events.EventStatus._
 import io.renku.graph.model.events._
-import io.renku.metrics.TestMetricsRegistry
-import io.renku.testtools.IOSpec
-import org.scalamock.scalatest.MockFactory
+import org.scalamock.scalatest.AsyncMockFactory
+import org.scalatest.Succeeded
 import org.scalatest.matchers.should
-import org.scalatest.wordspec.AnyWordSpec
+import org.scalatest.wordspec.AsyncWordSpec
 
 import java.time.Instant
 
 class DbUpdaterSpec
-    extends AnyWordSpec
-    with IOSpec
-    with InMemoryEventLogDbSpec
-    with TypeSerializers
-    with should.Matchers
-    with MockFactory {
+    extends AsyncWordSpec
+    with AsyncIOSpec
+    with EventLogPostgresSpec
+    with AsyncMockFactory
+    with should.Matchers {
 
   "updateDB" should {
 
-    s"change status of the given event to $AwaitingDeletion" in new TestCase {
-
-      val eventOldStatus = eventStatuses.generateOne
-      val eventId        = addEvent(eventOldStatus)
-
-      sessionResource
-        .useK(dbUpdater updateDB ToAwaitingDeletion(eventId, project))
-        .unsafeRunSync() shouldBe DBUpdateResults.ForProjects(
-        project.slug,
-        Map(eventOldStatus -> -1, AwaitingDeletion -> 1)
-      )
-
-      findEvent(CompoundEventId(eventId, project.id)).map(_._2) shouldBe Some(AwaitingDeletion)
+    s"change status of the given event to $AwaitingDeletion" in testDBResource.use { implicit cfg =>
+      val project = consumerProjects.generateOne
+      for {
+        event <- addEvent(eventStatuses.generateOne, project)
+        _ <- moduleSessionResource.session
+               .useKleisli(dbUpdater updateDB ToAwaitingDeletion(event.eventId.id, project))
+               .asserting(_ shouldBe DBUpdateResults(project.slug, event.status -> -1, AwaitingDeletion -> 1))
+        _ <- findEvent(event.eventId).asserting(_.map(_.status) shouldBe AwaitingDeletion.some)
+      } yield Succeeded
     }
 
-    "do nothing if there's no event specified in the event" in new TestCase {
-      sessionResource
-        .useK(
-          dbUpdater updateDB ToAwaitingDeletion(
-            eventIds.generateOne,
-            ConsumersModelGenerators.consumerProjects.generateOne
-          )
-        )
-        .unsafeRunSync() shouldBe DBUpdateResults.ForProjects.empty
+    "do nothing if there's no event specified in the event" in testDBResource.use { implicit cfg =>
+      moduleSessionResource.session
+        .useKleisli {
+          dbUpdater updateDB ToAwaitingDeletion(eventIds.generateOne, consumerProjects.generateOne)
+        }
+        .asserting(_ shouldBe DBUpdateResults.empty)
     }
   }
 
-  private trait TestCase {
+  private implicit val qet: QueriesExecutionTimes[IO] = TestQueriesExecutionTimes[IO]
+  private lazy val dbUpdater = new DbUpdater[IO](() => Instant.now())
 
-    val project = ConsumersModelGenerators.consumerProjects.generateOne
-
-    val currentTime = mockFunction[Instant]
-    private implicit val metricsRegistry:  TestMetricsRegistry[IO]   = TestMetricsRegistry[IO]
-    private implicit val queriesExecTimes: QueriesExecutionTimes[IO] = QueriesExecutionTimes[IO]().unsafeRunSync()
-    val dbUpdater = new DbUpdater[IO](currentTime)
-
-    val now = Instant.now()
-    currentTime.expects().returning(now).anyNumberOfTimes()
-
-    def addEvent(status: EventStatus): EventId = {
-      val eventId = CompoundEventId(eventIds.generateOne, project.id)
-
-      storeEvent(
-        eventId,
-        status,
-        timestampsNotInTheFuture.generateAs(ExecutionDate),
-        timestampsNotInTheFuture.generateAs(EventDate),
-        eventBodies.generateOne,
-        projectSlug = project.slug
-      )
-      eventId.id
-    }
-  }
+  private def addEvent(status: EventStatus, project: Project)(implicit cfg: DBConfig[EventLogDB]): IO[GeneratedEvent] =
+    storeGeneratedEvent(status, timestampsNotInTheFuture.generateAs(EventDate), project)
 }

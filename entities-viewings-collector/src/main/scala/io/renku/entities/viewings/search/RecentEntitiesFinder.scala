@@ -1,5 +1,5 @@
 /*
- * Copyright 2023 Swiss Data Science Center (SDSC)
+ * Copyright 2024 Swiss Data Science Center (SDSC)
  * A partnership between École Polytechnique Fédérale de Lausanne (EPFL) and
  * Eidgenössische Technische Hochschule Zürich (ETHZ).
  *
@@ -24,7 +24,7 @@ import io.circe.Decoder
 import io.renku.entities.search.model.Entity
 import io.renku.http.rest.paging.PagingResponse
 import io.renku.http.server.security.model.AuthUser
-import io.renku.triplesstore.{ProjectsConnectionConfig, SparqlQueryTimeRecorder}
+import io.renku.triplesstore.{ProjectsConnectionConfig, SparqlQueryTimeRecorder, TSClient}
 import org.typelevel.log4cats.Logger
 
 trait RecentEntitiesFinder[F[_]] {
@@ -62,6 +62,5 @@ object RecentEntitiesFinder {
   def apply[F[_]: Async: NonEmptyParallel: Logger: SparqlQueryTimeRecorder](
       connConfig: ProjectsConnectionConfig
   ): F[RecentEntitiesFinder[F]] =
-    Async[F].pure(new RecentEntitiesFinderImpl[F](connConfig))
-
+    Async[F].pure(new RecentEntitiesFinderImpl[F](TSClient(connConfig)))
 }

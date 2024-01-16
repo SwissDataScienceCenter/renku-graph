@@ -1,5 +1,5 @@
 /*
- * Copyright 2023 Swiss Data Science Center (SDSC)
+ * Copyright 2024 Swiss Data Science Center (SDSC)
  * A partnership between École Polytechnique Fédérale de Lausanne (EPFL) and
  * Eidgenössische Technische Hochschule Zürich (ETHZ).
  *
@@ -18,76 +18,47 @@
 
 package io.renku.eventlog.init
 
-import cats.data.Kleisli
 import cats.effect.IO
-import io.renku.graph.model.projects
-import io.renku.interpreters.TestLogger
+import cats.effect.testing.scalatest.AsyncIOSpec
+import io.renku.db.DBConfigProvider.DBConfig
+import io.renku.eventlog.EventLogDB
 import io.renku.interpreters.TestLogger.Level.Info
-import io.renku.testtools.IOSpec
-import org.scalatest.concurrent.{Eventually, IntegrationPatience}
+import org.scalatest.Succeeded
+import org.scalatest.flatspec.AsyncFlatSpec
 import org.scalatest.matchers.should
-import org.scalatest.wordspec.AnyWordSpec
-import skunk._
-import skunk.implicits._
 
-class ProjectPathRemoverSpec
-    extends AnyWordSpec
-    with IOSpec
-    with DbInitSpec
-    with should.Matchers
-    with Eventually
-    with IntegrationPatience {
+class ProjectPathRemoverSpec extends AsyncFlatSpec with AsyncIOSpec with DbInitSpec with should.Matchers {
 
-  protected[init] override lazy val migrationsToRun: List[DbMigrator[IO]] = allMigrations.takeWhile {
-    case _: ProjectPathRemoverImpl[IO] => false
-    case _ => true
+  protected[init] override val runMigrationsUpTo: Class[_ <: DbMigrator[IO]] = classOf[ProjectPathRemover[IO]]
+
+  it should "do nothing if the 'event' table already exists" in testDBResource.use { implicit cfg =>
+    for {
+      _ <- createEventTable >> logger.resetF()
+
+      _ <- projectPathRemover.run.assertNoException
+
+      _ <- logger.loggedOnlyF(Info("'project_path' column dropping skipped"))
+    } yield Succeeded
   }
 
-  "run" should {
+  it should "remove the 'project_path' column if it exists on the 'event_log' table" in testDBResource.use {
+    implicit cfg =>
+      for {
+        _ <- verifyColumnExists("event_log", "project_path").asserting(_ shouldBe true)
 
-    "do nothing if the 'event' table already exists" in new TestCase {
+        _ <- projectPathRemover.run.assertNoException
 
-      createEventTable()
+        _ <- verifyColumnExists("event_log", "project_path").asserting(_ shouldBe false)
 
-      projectPathRemover.run.unsafeRunSync() shouldBe ((): Unit)
+        _ <- logger.loggedOnlyF(Info("'project_path' column removed"))
 
-      logger.loggedOnly(Info("'project_path' column dropping skipped"))
-    }
+        _ <- logger.resetF()
 
-    "remove the 'project_path' column if it exists on the 'event_log' table" in new TestCase {
+        _ <- projectPathRemover.run.assertNoException
 
-      checkColumnExists shouldBe true
-
-      projectPathRemover.run.unsafeRunSync() shouldBe ((): Unit)
-
-      checkColumnExists shouldBe false
-
-      logger.loggedOnly(Info("'project_path' column removed"))
-
-      logger.reset()
-
-      projectPathRemover.run.unsafeRunSync() shouldBe ((): Unit)
-
-      logger.loggedOnly(Info("'project_path' column already removed"))
-    }
+        _ <- logger.loggedOnlyF(Info("'project_path' column already removed"))
+      } yield Succeeded
   }
 
-  private trait TestCase {
-    implicit val logger: TestLogger[IO] = TestLogger[IO]()
-    val projectPathRemover = new ProjectPathRemoverImpl[IO]
-  }
-
-  private def checkColumnExists: Boolean = sessionResource
-    .useK {
-      Kleisli { session =>
-        val query: Query[Void, projects.Slug] =
-          sql"select project_path from event_log limit 1".query(projectSlugDecoder)
-        session
-          .option(query)
-          .map(_ => true)
-          .recover { case _ => false }
-      }
-    }
-    .unsafeRunSync()
-
+  private def projectPathRemover(implicit cfg: DBConfig[EventLogDB]) = new ProjectPathRemoverImpl[IO]
 }

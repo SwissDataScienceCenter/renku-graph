@@ -1,5 +1,5 @@
 /*
- * Copyright 2023 Swiss Data Science Center (SDSC)
+ * Copyright 2024 Swiss Data Science Center (SDSC)
  * A partnership between École Polytechnique Fédérale de Lausanne (EPFL) and
  * Eidgenössische Technische Hochschule Zürich (ETHZ).
  *
@@ -108,7 +108,7 @@ private class DatasetFinderImpl[F[_]: Spawn](
 private object DatasetFinder {
 
   def apply[F[_]: Async: Logger: SparqlQueryTimeRecorder]: F[DatasetFinder[F]] = for {
-    storeConfig      <- ProjectsConnectionConfig[F]()
+    storeConfig      <- ProjectsConnectionConfig.fromConfig[F]()
     baseDetailFinder <- BaseDetailsFinder[F](storeConfig)
     creatorsFinder   <- CreatorsFinder[F](storeConfig)
     partsFinder      <- PartsFinder[F](storeConfig)

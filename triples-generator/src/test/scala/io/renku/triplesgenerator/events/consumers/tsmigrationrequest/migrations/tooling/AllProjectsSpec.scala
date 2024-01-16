@@ -1,5 +1,5 @@
 /*
- * Copyright 2023 Swiss Data Science Center (SDSC)
+ * Copyright 2024 Swiss Data Science Center (SDSC)
  * A partnership between École Polytechnique Fédérale de Lausanne (EPFL) and
  * Eidgenössische Technische Hochschule Zürich (ETHZ).
  *
@@ -19,25 +19,20 @@
 package io.renku.triplesgenerator.events.consumers.tsmigrationrequest.migrations.tooling
 
 import cats.effect._
+import cats.effect.testing.scalatest.AsyncIOSpec
 import io.renku.generators.Generators.Implicits._
 import io.renku.graph.model.testentities.Project
 import io.renku.graph.model.testentities.generators.EntitiesGenerators
 import io.renku.graph.model.{GitLabApiUrl, RenkuUrl}
 import io.renku.interpreters.TestLogger
 import io.renku.logging.TestExecutionTimeRecorder
-import io.renku.testtools.IOSpec
 import io.renku.triplesgenerator.events.consumers.tsmigrationrequest.migrations.tooling.AllProjects.ProjectMetadata
-import io.renku.triplesstore.{InMemoryJenaForSpec, ProjectsDataset, SparqlQueryTimeRecorder}
+import io.renku.triplesstore.{GraphJenaSpec, ProjectsConnectionConfig, SparqlQueryTimeRecorder}
 import org.scalatest.matchers.should
-import org.scalatest.wordspec.AnyWordSpec
+import org.scalatest.wordspec.AsyncWordSpec
 import org.typelevel.log4cats.Logger
 
-class AllProjectsSpec
-    extends AnyWordSpec
-    with IOSpec
-    with InMemoryJenaForSpec
-    with ProjectsDataset
-    with should.Matchers {
+class AllProjectsSpec extends AsyncWordSpec with AsyncIOSpec with GraphJenaSpec with should.Matchers {
 
   implicit val renkuUrl:  RenkuUrl     = EntitiesGenerators.renkuUrl
   implicit val gitlabUrl: GitLabApiUrl = EntitiesGenerators.gitLabApiUrl
@@ -45,17 +40,17 @@ class AllProjectsSpec
   implicit lazy val timeRecorder: SparqlQueryTimeRecorder[IO] =
     new SparqlQueryTimeRecorder[IO](TestExecutionTimeRecorder[IO]())
 
-  def allProjects: AllProjects[IO] = AllProjects[IO](projectsDSConnectionInfo)
+  private def allProjects(implicit pcc: ProjectsConnectionConfig): AllProjects[IO] = AllProjects[IO](pcc)
 
   "find" should {
-    "find all projects" in {
+    "find all projects" in projectsDSConfig.use { implicit pcc =>
       val projectGen = EntitiesGenerators.anyProjectEntities
       val projects   = projectGen.generateFixedSizeList(32)
 
-      upload(to = projectsDataset, projects.map(a => a: Project): _*)
-      val result = allProjects.findAll(10).compile.toList.unsafeRunSync()
-
-      result shouldBe projects.map(p => ProjectMetadata(p.slug)).sortBy(_.slug.value)
+      for {
+        _       <- uploadToProjects(projects.map(a => a: Project): _*)
+        results <- allProjects.findAll(10).compile.toList
+      } yield results shouldBe projects.map(p => ProjectMetadata(p.slug)).sortBy(_.slug.value)
     }
   }
 }

@@ -1,5 +1,5 @@
 /*
- * Copyright 2023 Swiss Data Science Center (SDSC)
+ * Copyright 2024 Swiss Data Science Center (SDSC)
  * A partnership between École Polytechnique Fédérale de Lausanne (EPFL) and
  * Eidgenössische Technische Hochschule Zürich (ETHZ).
  *
@@ -157,7 +157,7 @@ class ProjectFinderSpec
   }
 
   private trait TestCase {
-    implicit val maybeAccessToken: Option[AccessToken] = accessTokens.generateOption
+    implicit val accessToken: AccessToken = accessTokens.generateOne
 
     private implicit val logger: TestLogger[IO]   = TestLogger[IO]()
     implicit val gitLabClient:   GitLabClient[IO] = mock[GitLabClient[IO]]
@@ -182,13 +182,13 @@ class ProjectFinderSpec
         .get(_: Uri, _: String Refined NonEmpty)(
           _: ResponseMappingF[IO, ResultType]
         )(_: Option[AccessToken]))
-        .expects(endpointStart / id, endpointName, *, maybeAccessToken)
+        .expects(endpointStart / id, endpointName, *, accessToken.some)
         .returning(returning)
     }
 
     val mapTo: ResponseMappingF[IO, Option[(GitLabProjectInfo, Option[persons.GitLabId])]] =
       captureMapping(gitLabClient)(
-        finder.findProject(projectSlugs.generateOne)(maybeAccessToken).value.unsafeRunSync(),
+        finder.findProject(projectSlugs.generateOne)(accessToken).value.unsafeRunSync(),
         Gen.const((gitLabProjectInfos.generateOne, Option.empty[persons.GitLabId]).some),
         underlyingMethod = Get
       )

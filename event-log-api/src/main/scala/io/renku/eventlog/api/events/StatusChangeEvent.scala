@@ -1,5 +1,5 @@
 /*
- * Copyright 2023 Swiss Data Science Center (SDSC)
+ * Copyright 2024 Swiss Data Science Center (SDSC)
  * A partnership between École Polytechnique Fédérale de Lausanne (EPFL) and
  * Eidgenössische Technische Hochschule Zürich (ETHZ).
  *
@@ -51,10 +51,13 @@ object StatusChangeEvent {
     implicit val show:        Show[ProjectSlug]    = Show.show(_.slug.show)
   }
 
+  type AllEventsToNew = AllEventsToNew.type
   case object AllEventsToNew extends StatusChangeEvent {
     implicit val show: Show[AllEventsToNew.type] = Show.show { event =>
       show"${event.subCategoryName}"
     }
+
+    implicit def dispatcher[F[_]]: Dispatcher[F, AllEventsToNew] = Dispatcher.instance(categoryName)
 
     implicit val jsonDecoder: Decoder[AllEventsToNew.type] = specificDecoder[AllEventsToNew.type]
     implicit val jsonEncoder: Encoder[AllEventsToNew.type] = specificEncoder[AllEventsToNew.type]
@@ -65,6 +68,8 @@ object StatusChangeEvent {
     implicit lazy val show: Show[ProjectEventsToNew] = Show.show { event =>
       show"${event.subCategoryName} ${event.project}"
     }
+
+    implicit def dispatcher[F[_]]: Dispatcher[F, ProjectEventsToNew] = Dispatcher.instance(categoryName)
 
     implicit val jsonDecoder: Decoder[ProjectEventsToNew] = specificDecoder[ProjectEventsToNew]
     implicit val jsonEncoder: Encoder[ProjectEventsToNew] = specificEncoder[ProjectEventsToNew]
@@ -80,12 +85,17 @@ object StatusChangeEvent {
       show"${event.subCategoryName} projectSlug = ${event.project.slug}, status = ${EventStatus.TriplesGenerated}"
     }
 
+    implicit def dispatcher[F[_]]: Dispatcher[F, RedoProjectTransformation] = Dispatcher.instance(categoryName)
+
     implicit val jsonDecoder: Decoder[RedoProjectTransformation] = specificDecoder[RedoProjectTransformation]
     implicit val jsonEncoder: Encoder[RedoProjectTransformation] = specificEncoder[RedoProjectTransformation]
   }
 
   final case class RollbackToAwaitingDeletion(project: Project) extends StatusChangeEvent
   object RollbackToAwaitingDeletion {
+
+    implicit def dispatcher[F[_]]: Dispatcher[F, RollbackToAwaitingDeletion] = Dispatcher.instance(categoryName)
+
     implicit val jsonDecoder: Decoder[RollbackToAwaitingDeletion] = specificDecoder[RollbackToAwaitingDeletion]
     implicit val jsonEncoder: Encoder[RollbackToAwaitingDeletion] = specificEncoder[RollbackToAwaitingDeletion]
 
@@ -98,6 +108,9 @@ object StatusChangeEvent {
     val eventId: CompoundEventId = CompoundEventId(id, project.id)
   }
   object RollbackToNew {
+
+    implicit def dispatcher[F[_]]: Dispatcher[F, RollbackToNew] = Dispatcher.instance(categoryName)
+
     implicit val jsonDecoder: Decoder[RollbackToNew] = specificDecoder[RollbackToNew]
     implicit val jsonEncoder: Encoder[RollbackToNew] = specificEncoder[RollbackToNew]
 
@@ -110,6 +123,9 @@ object StatusChangeEvent {
     val eventId: CompoundEventId = CompoundEventId(id, project.id)
   }
   object RollbackToTriplesGenerated {
+
+    implicit def dispatcher[F[_]]: Dispatcher[F, RollbackToTriplesGenerated] = Dispatcher.instance(categoryName)
+
     implicit val jsonDecoder: Decoder[RollbackToTriplesGenerated] = specificDecoder[RollbackToTriplesGenerated]
     implicit val jsonEncoder: Encoder[RollbackToTriplesGenerated] = specificEncoder[RollbackToTriplesGenerated]
 
@@ -122,6 +138,9 @@ object StatusChangeEvent {
     val eventId: CompoundEventId = CompoundEventId(id, project.id)
   }
   object ToAwaitingDeletion {
+
+    implicit def dispatcher[F[_]]: Dispatcher[F, ToAwaitingDeletion] = Dispatcher.instance(categoryName)
+
     implicit val jsonDecoder: Decoder[ToAwaitingDeletion] = specificDecoder[ToAwaitingDeletion]
     implicit val jsonEncoder: Encoder[ToAwaitingDeletion] = specificEncoder[ToAwaitingDeletion]
 
@@ -139,6 +158,9 @@ object StatusChangeEvent {
     val eventId: CompoundEventId = CompoundEventId(id, project.id)
   }
   object ToTriplesGenerated {
+
+    implicit def dispatcher[F[_]]: Dispatcher[F, ToTriplesGenerated] = Dispatcher.instance(categoryName)
+
     implicit val jsonDecoder: Decoder[ToTriplesGenerated] = specificDecoder[ToTriplesGenerated]
     implicit val jsonEncoder: Encoder[ToTriplesGenerated] = specificEncoder[ToTriplesGenerated]
 
@@ -155,6 +177,9 @@ object StatusChangeEvent {
     val eventId: CompoundEventId = CompoundEventId(id, project.id)
   }
   object ToTriplesStore {
+
+    implicit def dispatcher[F[_]]: Dispatcher[F, ToTriplesStore] = Dispatcher.instance(categoryName)
+
     implicit val jsonDecoder: Decoder[ToTriplesStore] = specificDecoder[ToTriplesStore]
     implicit val jsonEncoder: Encoder[ToTriplesStore] = specificEncoder[ToTriplesStore]
 
@@ -178,6 +203,9 @@ object StatusChangeEvent {
     }
   }
   object ToFailure {
+
+    implicit def dispatcher[F[_]]: Dispatcher[F, ToFailure] = Dispatcher.instance(categoryName)
+
     implicit val jsonDecoder: Decoder[ToFailure] = specificDecoder[ToFailure]
     implicit val jsonEncoder: Encoder[ToFailure] = specificEncoder[ToFailure]
 

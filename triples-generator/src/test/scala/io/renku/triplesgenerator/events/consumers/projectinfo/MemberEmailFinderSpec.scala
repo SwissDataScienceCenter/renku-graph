@@ -1,5 +1,5 @@
 /*
- * Copyright 2023 Swiss Data Science Center (SDSC)
+ * Copyright 2024 Swiss Data Science Center (SDSC)
  * A partnership between École Polytechnique Fédérale de Lausanne (EPFL) and
  * Eidgenössische Technische Hochschule Zürich (ETHZ).
  *
@@ -61,17 +61,17 @@ class MemberEmailFinderSpec
 
         val returningVal = EitherT.fromEither[IO]((events, PagingInfo(None, None)).asRight[ProcessingRecoverableError])
         (projectEventsFinder
-          .find(_: Project, _: Int)(_: Option[AccessToken]))
-          .expects(project, 1, maybeAccessToken)
+          .find(_: Project, _: Int)(_: AccessToken))
+          .expects(project, 1, accessToken)
           .returning(returningVal)
 
         val authorEmail = personEmails.generateOne
         (commitAuthorFinder
-          .findCommitAuthor(_: projects.Slug, _: CommitId)(_: Option[AccessToken]))
+          .findCommitAuthor(_: projects.Slug, _: CommitId)(_: AccessToken))
           .expects(
             project.slug,
             event.commitId,
-            maybeAccessToken
+            accessToken
           )
           .returning(EitherT.rightT[IO, ProcessingRecoverableError]((member.user.name -> authorEmail).some))
 
@@ -94,14 +94,14 @@ class MemberEmailFinderSpec
       val returningVal = EitherT.fromEither[IO]((events, PagingInfo(None, None)).asRight[ProcessingRecoverableError])
 
       (projectEventsFinder
-        .find(_: Project, _: Int)(_: Option[AccessToken]))
-        .expects(project, 1, maybeAccessToken)
+        .find(_: Project, _: Int)(_: AccessToken))
+        .expects(project, 1, accessToken)
         .returning(returningVal)
 
       val authorEmail = personEmails.generateOne
       (commitAuthorFinder
-        .findCommitAuthor(_: projects.Slug, _: CommitId)(_: Option[AccessToken]))
-        .expects(project.slug, commit, maybeAccessToken)
+        .findCommitAuthor(_: projects.Slug, _: CommitId)(_: AccessToken))
+        .expects(project.slug, commit, accessToken)
         .returning(EitherT.rightT[IO, ProcessingRecoverableError]((member.user.name -> authorEmail).some))
 
       finder.findMemberEmail(member, project).value.unsafeRunSync() shouldBe (member withEmail authorEmail).asRight
@@ -120,22 +120,22 @@ class MemberEmailFinderSpec
         EitherT.fromEither[IO]((eventsPage2, PagingInfo(None, None)).asRight[ProcessingRecoverableError])
 
       (projectEventsFinder
-        .find(_: Project, _: Int)(_: Option[AccessToken]))
-        .expects(project, 1, maybeAccessToken)
+        .find(_: Project, _: Int)(_: AccessToken))
+        .expects(project, 1, accessToken)
         .returning(returnedFirstTime)
 
       (projectEventsFinder
-        .find(_: Project, _: Int)(_: Option[AccessToken]))
-        .expects(project, 2, maybeAccessToken)
+        .find(_: Project, _: Int)(_: AccessToken))
+        .expects(project, 2, accessToken)
         .returning(returnedSecondTime)
 
       val authorEmail = personEmails.generateOne
       (commitAuthorFinder
-        .findCommitAuthor(_: projects.Slug, _: CommitId)(_: Option[AccessToken]))
+        .findCommitAuthor(_: projects.Slug, _: CommitId)(_: AccessToken))
         .expects(
           project.slug,
           event.commitId,
-          maybeAccessToken
+          accessToken
         )
         .returning(EitherT.rightT[IO, ProcessingRecoverableError]((member.user.name -> authorEmail).some))
 
@@ -158,8 +158,8 @@ class MemberEmailFinderSpec
           val firstPageEvents  = pushEvents.generateNonEmptyList(min = 20, max = 20).toList
           val firstPageResults = wrapResult(firstPageEvents, PagingInfo(2.some, maybeTotalPages))
           (projectEventsFinder
-            .find(_: Project, _: Int)(_: Option[AccessToken]))
-            .expects(project, firstPage, maybeAccessToken)
+            .find(_: Project, _: Int)(_: AccessToken))
+            .expects(project, firstPage, accessToken)
             .returning(firstPageResults)
         }
 
@@ -168,8 +168,8 @@ class MemberEmailFinderSpec
             val nextPageEvents  = pushEvents.generateNonEmptyList(min = 20, max = 20).toList
             val nextPageResults = wrapResult(nextPageEvents, PagingInfo((page + 1).some, maybeTotalPages))
             (projectEventsFinder
-              .find(_: Project, _: Int)(_: Option[AccessToken]))
-              .expects(project, page, maybeAccessToken)
+              .find(_: Project, _: Int)(_: AccessToken))
+              .expects(project, page, accessToken)
               .returning(nextPageResults)
           }
 
@@ -179,8 +179,8 @@ class MemberEmailFinderSpec
           val nextPageEvents  = event :: pushEvents.generateNonEmptyList(min = 20, max = 20).toList
           val nextPageResults = wrapResult(nextPageEvents, PagingInfo(None, maybeTotalPages))
           (projectEventsFinder
-            .find(_: Project, _: Int)(_: Option[AccessToken]))
-            .expects(project, totalPages, maybeAccessToken)
+            .find(_: Project, _: Int)(_: AccessToken))
+            .expects(project, totalPages, accessToken)
             .returning(nextPageResults)
         }
 
@@ -188,11 +188,11 @@ class MemberEmailFinderSpec
 
         def setExpectationForCommitAuthorFinder =
           (commitAuthorFinder
-            .findCommitAuthor(_: projects.Slug, _: CommitId)(_: Option[AccessToken]))
+            .findCommitAuthor(_: projects.Slug, _: CommitId)(_: AccessToken))
             .expects(
               project.slug,
               event.commitId,
-              maybeAccessToken
+              accessToken
             )
             .returning(EitherT.rightT[IO, ProcessingRecoverableError]((member.user.name -> authorEmail).some))
 
@@ -218,31 +218,31 @@ class MemberEmailFinderSpec
         val firstEvent = pushEvents.generateOne.forMember(member.user).forProject(project)
 
         (projectEventsFinder
-          .find(_: Project, _: Int)(_: Option[AccessToken]))
-          .expects(project, 1, maybeAccessToken)
+          .find(_: Project, _: Int)(_: AccessToken))
+          .expects(project, 1, accessToken)
           .returning(wrapResult(eventsPage1, PagingInfo(Some(2), Some(2))))
         (projectEventsFinder
-          .find(_: Project, _: Int)(_: Option[AccessToken]))
-          .expects(project, 2, maybeAccessToken)
+          .find(_: Project, _: Int)(_: AccessToken))
+          .expects(project, 2, accessToken)
           .returning(wrapResult(eventsPage2, PagingInfo(None, Some(2))))
 
         (commitAuthorFinder
-          .findCommitAuthor(_: projects.Slug, _: CommitId)(_: Option[AccessToken]))
+          .findCommitAuthor(_: projects.Slug, _: CommitId)(_: AccessToken))
           .expects(
             project.slug,
             eventPage1.commitId,
-            maybeAccessToken
+            accessToken
           )
           .returning(
             EitherT.rightT[IO, ProcessingRecoverableError]((personNames.generateOne -> personEmails.generateOne).some)
           )
         val authorEmail = personEmails.generateOne
         (commitAuthorFinder
-          .findCommitAuthor(_: projects.Slug, _: CommitId)(_: Option[AccessToken]))
+          .findCommitAuthor(_: projects.Slug, _: CommitId)(_: AccessToken))
           .expects(
             project.slug,
             eventPage2.commitId,
-            maybeAccessToken
+            accessToken
           )
           .returning(EitherT.rightT[IO, ProcessingRecoverableError]((member.user.name -> authorEmail).some))
 
@@ -260,30 +260,30 @@ class MemberEmailFinderSpec
       val eventsPage2 = Random.shuffle(eventPage2 :: pushEvents.generateNonEmptyList().toList)
 
       (projectEventsFinder
-        .find(_: Project, _: Int)(_: Option[AccessToken]))
-        .expects(project, 1, maybeAccessToken)
+        .find(_: Project, _: Int)(_: AccessToken))
+        .expects(project, 1, accessToken)
         .returning(wrapResult(eventsPage1, PagingInfo(Some(2), Some(2))))
       (projectEventsFinder
-        .find(_: Project, _: Int)(_: Option[AccessToken]))
-        .expects(project, 2, maybeAccessToken)
+        .find(_: Project, _: Int)(_: AccessToken))
+        .expects(project, 2, accessToken)
         .returning(wrapResult(eventsPage2, PagingInfo(None, Some(2))))
 
       (commitAuthorFinder
-        .findCommitAuthor(_: projects.Slug, _: CommitId)(_: Option[AccessToken]))
+        .findCommitAuthor(_: projects.Slug, _: CommitId)(_: AccessToken))
         .expects(
           project.slug,
           eventPage1.commitId,
-          maybeAccessToken
+          accessToken
         )
         .returning(
           EitherT.rightT[IO, ProcessingRecoverableError]((personNames.generateOne -> personEmails.generateOne).some)
         )
       (commitAuthorFinder
-        .findCommitAuthor(_: projects.Slug, _: CommitId)(_: Option[AccessToken]))
+        .findCommitAuthor(_: projects.Slug, _: CommitId)(_: AccessToken))
         .expects(
           project.slug,
           eventPage2.commitId,
-          maybeAccessToken
+          accessToken
         )
         .returning(
           EitherT.rightT[IO, ProcessingRecoverableError]((personNames.generateOne -> personEmails.generateOne).some)
@@ -295,12 +295,12 @@ class MemberEmailFinderSpec
     "return the given member back if no project events with the member as an author are found for the project" in new TestCase {
 
       (projectEventsFinder
-        .find(_: Project, _: Int)(_: Option[AccessToken]))
-        .expects(project, 1, maybeAccessToken)
+        .find(_: Project, _: Int)(_: AccessToken))
+        .expects(project, 1, accessToken)
         .returning(wrapResult(pushEvents.generateNonEmptyList().toList, PagingInfo(Some(2), Some(2))))
       (projectEventsFinder
-        .find(_: Project, _: Int)(_: Option[AccessToken]))
-        .expects(project, 2, maybeAccessToken)
+        .find(_: Project, _: Int)(_: AccessToken))
+        .expects(project, 2, accessToken)
         .returning(wrapResult(pushEvents.generateNonEmptyList().toList, PagingInfo(None, Some(2))))
 
       finder.findMemberEmail(member, project).value.unsafeRunSync() shouldBe member.asRight
@@ -308,8 +308,8 @@ class MemberEmailFinderSpec
 
     "return the given member back if no project events are found" in new TestCase {
       (projectEventsFinder
-        .find(_: Project, _: Int)(_: Option[AccessToken]))
-        .expects(project, 1, maybeAccessToken)
+        .find(_: Project, _: Int)(_: AccessToken))
+        .expects(project, 1, accessToken)
         .returning(wrapResult(Nil, PagingInfo(None, None)))
 
       finder.findMemberEmail(member, project).value.unsafeRunSync() shouldBe member.asRight
@@ -320,17 +320,17 @@ class MemberEmailFinderSpec
       val events = Random.shuffle(event :: pushEvents.generateNonEmptyList().toList)
 
       (projectEventsFinder
-        .find(_: Project, _: Int)(_: Option[AccessToken]))
-        .expects(project, 1, maybeAccessToken)
+        .find(_: Project, _: Int)(_: AccessToken))
+        .expects(project, 1, accessToken)
         .returning(wrapResult(events, PagingInfo(None, None)))
 
       val error = processingRecoverableErrors.generateOne
       (commitAuthorFinder
-        .findCommitAuthor(_: projects.Slug, _: CommitId)(_: Option[AccessToken]))
+        .findCommitAuthor(_: projects.Slug, _: CommitId)(_: AccessToken))
         .expects(
           project.slug,
           event.commitId,
-          maybeAccessToken
+          accessToken
         )
         .returning(EitherT.leftT[IO, Option[(persons.Name, persons.Email)]](error))
 
@@ -340,7 +340,7 @@ class MemberEmailFinderSpec
   }
 
   private trait TestCase {
-    implicit val maybeAccessToken: Option[AccessToken] = accessTokens.generateOption
+    implicit val accessToken: AccessToken = accessTokens.generateOne
     val project = Project(projectIds.generateOne, projectSlugs.generateOne)
     val member  = projectMembersNoEmail.generateOne
 

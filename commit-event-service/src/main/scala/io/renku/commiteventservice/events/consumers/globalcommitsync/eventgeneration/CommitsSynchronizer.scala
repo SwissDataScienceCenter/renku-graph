@@ -1,5 +1,5 @@
 /*
- * Copyright 2023 Swiss Data Science Center (SDSC)
+ * Copyright 2024 Swiss Data Science Center (SDSC)
  * A partnership between École Polytechnique Fédérale de Lausanne (EPFL) and
  * Eidgenössische Technische Hochschule Zürich (ETHZ).
  *
@@ -27,13 +27,13 @@ import io.renku.commiteventservice.events.consumers.globalcommitsync._
 import io.renku.commiteventservice.events.consumers.globalcommitsync.eventgeneration.gitlab.{GitLabCommitFetcher, GitLabCommitStatFetcher}
 import io.renku.events.consumers.Project
 import io.renku.graph.model.events.CommitId
-import io.renku.graph.tokenrepository.AccessTokenFinder
 import io.renku.http.client.{AccessToken, GitLabClient}
 import io.renku.http.rest.paging.PagingRequest
 import io.renku.http.rest.paging.model.{Page, PerPage}
 import io.renku.logging.ExecutionTimeRecorder
 import io.renku.logging.ExecutionTimeRecorder.ElapsedTime
 import io.renku.metrics.MetricsRegistry
+import io.renku.tokenrepository.api.TokenRepositoryClient
 import org.typelevel.log4cats.Logger
 
 import java.time.Instant
@@ -45,7 +45,8 @@ private[globalcommitsync] trait CommitsSynchronizer[F[_]] {
 
 private[globalcommitsync] class CommitsSynchronizerImpl[F[
     _
-]: Async: NonEmptyParallel: Logger: AccessTokenFinder: ExecutionTimeRecorder](
+]: Async: NonEmptyParallel: Logger: ExecutionTimeRecorder](
+    tokenRepositoryClient:     TokenRepositoryClient[F],
     gitLabCommitStatFetcher:   GitLabCommitStatFetcher[F],
     gitLabCommitFetcher:       GitLabCommitFetcher[F],
     elCommitFetcher:           ELCommitFetcher[F],
@@ -56,10 +57,9 @@ private[globalcommitsync] class CommitsSynchronizerImpl[F[
 
   private val commitsPerPage = PerPage(50)
 
-  private val accessTokenFinder: AccessTokenFinder[F] = AccessTokenFinder[F]
-  import accessTokenFinder._
   import commitEventDeleter._
   import elCommitFetcher._
+  import tokenRepositoryClient.findAccessToken
   private val executionTimeRecorder = ExecutionTimeRecorder[F]
   import executionTimeRecorder._
   import gitLabCommitFetcher._
@@ -200,19 +200,20 @@ private[globalcommitsync] class CommitsSynchronizerImpl[F[
 }
 
 private[globalcommitsync] object CommitsSynchronizer {
-  def apply[F[
-      _
-  ]: Async: NonEmptyParallel: GitLabClient: AccessTokenFinder: Logger: MetricsRegistry: ExecutionTimeRecorder]
-      : F[CommitsSynchronizer[F]] = for {
-    gitLabCommitStatFetcher   <- GitLabCommitStatFetcher[F]
-    gitLabCommitFetcher       <- GitLabCommitFetcher[F]
-    elCommitFetcher           <- ELCommitFetcher[F]
-    commitEventDeleter        <- CommitEventDeleter[F]
-    missingCommitEventCreator <- MissingCommitEventCreator[F]
-  } yield new CommitsSynchronizerImpl(gitLabCommitStatFetcher,
-                                      gitLabCommitFetcher,
-                                      elCommitFetcher,
-                                      commitEventDeleter,
-                                      missingCommitEventCreator
-  )
+  def apply[F[_]: Async: NonEmptyParallel: GitLabClient: Logger: MetricsRegistry: ExecutionTimeRecorder]
+      : F[CommitsSynchronizer[F]] =
+    for {
+      tokenRepositoryClient     <- TokenRepositoryClient[F]
+      gitLabCommitStatFetcher   <- GitLabCommitStatFetcher[F]
+      gitLabCommitFetcher       <- GitLabCommitFetcher[F]
+      elCommitFetcher           <- ELCommitFetcher[F]
+      commitEventDeleter        <- CommitEventDeleter[F]
+      missingCommitEventCreator <- MissingCommitEventCreator[F]
+    } yield new CommitsSynchronizerImpl(tokenRepositoryClient,
+                                        gitLabCommitStatFetcher,
+                                        gitLabCommitFetcher,
+                                        elCommitFetcher,
+                                        commitEventDeleter,
+                                        missingCommitEventCreator
+    )
 }

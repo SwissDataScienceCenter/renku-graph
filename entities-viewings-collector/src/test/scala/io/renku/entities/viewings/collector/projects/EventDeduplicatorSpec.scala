@@ -1,5 +1,5 @@
 /*
- * Copyright 2023 Swiss Data Science Center (SDSC)
+ * Copyright 2024 Swiss Data Science Center (SDSC)
  * A partnership between École Polytechnique Fédérale de Lausanne (EPFL) and
  * Eidgenössische Technische Hochschule Zürich (ETHZ).
  *
@@ -19,7 +19,9 @@
 package io.renku.entities.viewings.collector.projects
 
 import cats.effect.IO
+import cats.effect.testing.scalatest.AsyncIOSpec
 import cats.syntax.all._
+import io.renku.entities.searchgraphs.TestSearchInfoDatasets
 import io.renku.entities.viewings.collector.persons.PersonViewedProjectPersister
 import io.renku.entities.viewings.collector.projects.viewed.EventPersisterImpl
 import io.renku.events.Generators.categoryNames
@@ -28,98 +30,107 @@ import io.renku.generators.Generators.timestamps
 import io.renku.graph.model.testentities._
 import io.renku.graph.model.{entities, projects}
 import io.renku.interpreters.TestLogger
-import io.renku.logging.TestSparqlQueryTimeRecorder
-import io.renku.testtools.IOSpec
 import io.renku.triplesgenerator.api.events.Generators._
 import io.renku.triplesstore._
-import org.scalamock.scalatest.MockFactory
+import org.scalamock.scalatest.AsyncMockFactory
+import org.scalatest.Succeeded
 import org.scalatest.matchers.should
-import org.scalatest.wordspec.AnyWordSpec
+import org.scalatest.wordspec.AsyncWordSpec
 
 class EventDeduplicatorSpec
-    extends AnyWordSpec
-    with should.Matchers
+    extends AsyncWordSpec
+    with AsyncIOSpec
+    with GraphJenaSpec
+    with TestSearchInfoDatasets
     with EventPersisterSpecTools
-    with IOSpec
-    with InMemoryJenaForSpec
-    with ProjectsDataset
-    with MockFactory {
+    with should.Matchers
+    with AsyncMockFactory {
 
   "deduplicate" should {
 
-    "do nothing if there's only one date for the project" in new TestCase {
-
+    "do nothing if there's only one date for the project" in projectsDSConfig.use { implicit pcc =>
       val project = anyProjectEntities.generateOne.to[entities.Project]
-      upload(to = projectsDataset, project)
 
-      val event = projectViewedEvents.generateOne.copy(slug = project.slug)
+      for {
+        _ <- provisionProject(project)
 
-      persister.persist(event).unsafeRunSync() shouldBe ()
+        event = projectViewedEvents.generateOne.copy(slug = project.slug)
 
-      deduplicator.deduplicate(project.resourceId).unsafeRunSync() shouldBe ()
+        _ <- persister.persist(event).assertNoException
 
-      findAllViewings shouldBe Set(project.resourceId -> event.dateViewed)
+        _ <- deduplicator.deduplicate(project.resourceId).assertNoException
+
+        _ <- findAllViewings.asserting(_ shouldBe Set(project.resourceId -> event.dateViewed))
+      } yield Succeeded
     }
 
-    "leave only the latest date if there are many" in new TestCase {
-
+    "leave only the latest date if there are many" in projectsDSConfig.use { implicit pcc =>
       val project = anyProjectEntities.generateOne.to[entities.Project]
-      upload(to = projectsDataset, project)
+      for {
+        _ <- provisionProject(project)
 
-      val event = projectViewedEvents.generateOne.copy(slug = project.slug)
-      persister.persist(event).unsafeRunSync() shouldBe ()
+        event = projectViewedEvents.generateOne.copy(slug = project.slug)
+        _ <- persister.persist(event).assertNoException
 
-      val olderDateViewed1 = timestamps(max = event.dateViewed.value).generateAs(projects.DateViewed)
-      insertOtherDate(project, olderDateViewed1)
-      val olderDateViewed2 = timestamps(max = event.dateViewed.value).generateAs(projects.DateViewed)
-      insertOtherDate(project, olderDateViewed2)
+        olderDateViewed1 = timestamps(max = event.dateViewed.value).generateAs(projects.DateViewed)
+        _ <- insertOtherDate(project, olderDateViewed1)
+        olderDateViewed2 = timestamps(max = event.dateViewed.value).generateAs(projects.DateViewed)
+        _ <- insertOtherDate(project, olderDateViewed2)
 
-      findAllViewings shouldBe Set(
-        project.resourceId -> event.dateViewed,
-        project.resourceId -> olderDateViewed1,
-        project.resourceId -> olderDateViewed2
-      )
+        _ <- findAllViewings.asserting {
+               _ shouldBe Set(
+                 project.resourceId -> event.dateViewed,
+                 project.resourceId -> olderDateViewed1,
+                 project.resourceId -> olderDateViewed2
+               )
+             }
 
-      deduplicator.deduplicate(project.resourceId).unsafeRunSync() shouldBe ()
+        _ <- deduplicator.deduplicate(project.resourceId).assertNoException
 
-      findAllViewings shouldBe Set(project.resourceId -> event.dateViewed)
+        _ <- findAllViewings.asserting(_ shouldBe Set(project.resourceId -> event.dateViewed))
+      } yield Succeeded
     }
 
-    "do not remove dates for other projects" in new TestCase {
-
+    "do not remove dates for other projects" in projectsDSConfig.use { implicit pcc =>
       val project1 = anyProjectEntities.generateOne.to[entities.Project]
-      upload(to = projectsDataset, project1)
       val project2 = anyProjectEntities.generateOne.to[entities.Project]
-      upload(to = projectsDataset, project2)
+      for {
+        _ <- provisionProjects(project1, project2)
 
-      val event1 = projectViewedEvents.generateOne.copy(slug = project1.slug)
-      persister.persist(event1).unsafeRunSync() shouldBe ()
-      val event2 = projectViewedEvents.generateOne.copy(slug = project2.slug)
-      persister.persist(event2).unsafeRunSync() shouldBe ()
+        event1 = projectViewedEvents.generateOne.copy(slug = project1.slug)
+        _ <- persister.persist(event1).assertNoException
+        event2 = projectViewedEvents.generateOne.copy(slug = project2.slug)
+        _ <- persister.persist(event2).assertNoException
 
-      findAllViewings shouldBe Set(
-        project1.resourceId -> event1.dateViewed,
-        project2.resourceId -> event2.dateViewed
-      )
+        _ <- findAllViewings.asserting {
+               _ shouldBe Set(
+                 project1.resourceId -> event1.dateViewed,
+                 project2.resourceId -> event2.dateViewed
+               )
+             }
 
-      deduplicator.deduplicate(project1.resourceId).unsafeRunSync() shouldBe ()
+        _ <- deduplicator.deduplicate(project1.resourceId).assertNoException
 
-      findAllViewings shouldBe Set(
-        project1.resourceId -> event1.dateViewed,
-        project2.resourceId -> event2.dateViewed
-      )
+        _ <- findAllViewings.asserting {
+               _ shouldBe Set(
+                 project1.resourceId -> event1.dateViewed,
+                 project2.resourceId -> event2.dateViewed
+               )
+             }
+      } yield Succeeded
     }
   }
 
-  private trait TestCase {
+  implicit val ioLogger: TestLogger[IO] = TestLogger[IO]()
 
-    private implicit val logger: TestLogger[IO]              = TestLogger[IO]()
-    private implicit val sqtr:   SparqlQueryTimeRecorder[IO] = TestSparqlQueryTimeRecorder[IO].unsafeRunSync()
-    private val tsClient = TSClient[IO](projectsDSConnectionInfo)
-    val deduplicator     = new EventDeduplicatorImpl[IO](tsClient, categoryNames.generateOne)
+  private def deduplicator(implicit pcc: ProjectsConnectionConfig) =
+    new EventDeduplicatorImpl[IO](tsClient, categoryNames.generateOne)
 
-    private val personViewingPersister = mock[PersonViewedProjectPersister[IO]]
+  private def persister(implicit pcc: ProjectsConnectionConfig) = {
+
+    val personViewingPersister = mock[PersonViewedProjectPersister[IO]]
     (personViewingPersister.persist _).expects(*).returning(().pure[IO]).anyNumberOfTimes()
-    val persister = new EventPersisterImpl[IO](tsClient, deduplicator, personViewingPersister)
+
+    new EventPersisterImpl[IO](tsClient, deduplicator, personViewingPersister)
   }
 }

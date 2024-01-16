@@ -1,5 +1,5 @@
 /*
- * Copyright 2023 Swiss Data Science Center (SDSC)
+ * Copyright 2024 Swiss Data Science Center (SDSC)
  * A partnership between École Polytechnique Fédérale de Lausanne (EPFL) and
  * Eidgenössische Technische Hochschule Zürich (ETHZ).
  *
@@ -21,7 +21,6 @@ package io.renku.graph.http.server.security
 import io.renku.generators.Generators.Implicits._
 import io.renku.generators.Generators.nonEmptyStrings
 import io.renku.graph.http.server.security.Authorizer.AuthContext
-import io.renku.graph.model.GraphModelGenerators.projectSlugs
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
 
@@ -30,10 +29,8 @@ class AuthContextSpec extends AnyWordSpec with should.Matchers {
   "forUnknownUser" should {
 
     "return an AuthContext object without auth user" in {
-      val key             = nonEmptyStrings().generateOne
-      val allowedProjects = projectSlugs.generateSet()
-
-      AuthContext.forUnknownUser(key, allowedProjects) shouldBe AuthContext(None, key, allowedProjects)
+      val key = nonEmptyStrings().generateOne
+      AuthContext.forUnknownUser(key) shouldBe AuthContext(None, key)
     }
   }
 }

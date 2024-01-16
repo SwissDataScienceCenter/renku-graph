@@ -1,5 +1,5 @@
 /*
- * Copyright 2023 Swiss Data Science Center (SDSC)
+ * Copyright 2024 Swiss Data Science Center (SDSC)
  * A partnership between École Polytechnique Fédérale de Lausanne (EPFL) and
  * Eidgenössische Technische Hochschule Zürich (ETHZ).
  *
@@ -30,7 +30,7 @@ private trait ProjectExistenceChecker[F[_]] {
 
 private object ProjectExistenceChecker {
   def apply[F[_]: Async: Logger: SparqlQueryTimeRecorder]: F[ProjectExistenceChecker[F]] =
-    ProjectsConnectionConfig[F]().map(TSClient[F](_)).map(new ProjectExistenceCheckerImpl[F](_))
+    ProjectsConnectionConfig.fromConfig[F]().map(TSClient[F](_)).map(new ProjectExistenceCheckerImpl[F](_))
 }
 
 private class ProjectExistenceCheckerImpl[F[_]](tsClient: TSClient[F]) extends ProjectExistenceChecker[F] {

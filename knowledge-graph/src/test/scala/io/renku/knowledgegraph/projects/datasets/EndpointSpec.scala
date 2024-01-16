@@ -1,5 +1,5 @@
 /*
- * Copyright 2023 Swiss Data Science Center (SDSC)
+ * Copyright 2024 Swiss Data Science Center (SDSC)
  * A partnership between École Polytechnique Fédérale de Lausanne (EPFL) and
  * Eidgenössische Technische Hochschule Zürich (ETHZ).
  *
@@ -22,7 +22,7 @@ import Generators.projectDatasetGen
 import cats.effect.IO
 import cats.syntax.all._
 import io.circe.syntax._
-import io.circe.{Encoder, Json}
+import io.circe.{Decoder, Encoder, Json}
 import io.renku.config.renku
 import io.renku.config.renku.ResourceUrl
 import io.renku.data.Message
@@ -31,8 +31,8 @@ import io.renku.generators.Generators.Implicits._
 import io.renku.generators.Generators._
 import io.renku.graph.model.GraphModelGenerators._
 import io.renku.graph.model.{GitLabUrl, RenkuUrl}
+import io.renku.http.RenkuEntityCodec
 import io.renku.http.rest.paging.{PagingHeaders, PagingResponse}
-import io.renku.http.server.EndpointTester._
 import io.renku.interpreters.TestLogger
 import io.renku.interpreters.TestLogger.Level.{Error, Warn}
 import io.renku.logging.TestExecutionTimeRecorder
@@ -52,6 +52,7 @@ class EndpointSpec
     with AsyncMockFactory
     with ScalaCheckPropertyChecks
     with should.Matchers
+    with RenkuEntityCodec
     with BeforeAndAfterEach {
 
   it should "respond with OK and the found datasets" in {
@@ -63,7 +64,7 @@ class EndpointSpec
 
     endpoint.`GET /projects/:slug/datasets`(request, criteria) >>= { response =>
       for {
-        _ <- response.as[List[Json]].asserting(_ shouldBe pagingResponse.results.map(_.asJson))
+        _ <- response.asJson(Decoder.decodeList[Json]).asserting(_ shouldBe pagingResponse.results.map(_.asJson))
         _ = response.status        shouldBe Ok
         _ = response.contentType   shouldBe Some(`Content-Type`(MediaType.application.json))
         _ = response.headers.headers should contain allElementsOf PagingHeaders.from[ResourceUrl](pagingResponse)
@@ -84,7 +85,7 @@ class EndpointSpec
 
     endpoint.`GET /projects/:slug/datasets`(request, criteria) >>= { response =>
       for {
-        _ <- response.as[List[Json]].asserting(_ shouldBe List.empty)
+        _ <- response.asJson(Decoder.decodeList[Json]).asserting(_ shouldBe List.empty)
         _ = response.status shouldBe Ok
         _ =
           logger.loggedOnly(

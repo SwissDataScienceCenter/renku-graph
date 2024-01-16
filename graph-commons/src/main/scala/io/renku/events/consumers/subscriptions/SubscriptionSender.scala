@@ -1,5 +1,5 @@
 /*
- * Copyright 2023 Swiss Data Science Center (SDSC)
+ * Copyright 2024 Swiss Data Science Center (SDSC)
  * A partnership between École Polytechnique Fédérale de Lausanne (EPFL) and
  * Eidgenössische Technische Hochschule Zürich (ETHZ).
  *
@@ -24,6 +24,7 @@ import cats.syntax.all._
 import io.circe.Json
 import io.renku.control.Throttler
 import io.renku.graph.config.EventLogUrl
+import io.renku.http.RenkuEntityCodec
 import io.renku.http.client.RestClient
 import org.typelevel.log4cats.Logger
 
@@ -34,11 +35,11 @@ private trait SubscriptionSender[F[_]] {
 private class SubscriptionSenderImpl[F[_]: Async: Temporal: Logger](
     eventLogUrl: EventLogUrl
 ) extends RestClient[F, SubscriptionSender[F]](Throttler.noThrottling)
-    with SubscriptionSender[F] {
+    with SubscriptionSender[F]
+    with RenkuEntityCodec {
 
   import org.http4s.Method.POST
   import org.http4s.Status.Accepted
-  import org.http4s.circe._
   import org.http4s.{Request, Response, Status}
 
   override def postToEventLog(subscriptionPayload: Json): F[Unit] = for {

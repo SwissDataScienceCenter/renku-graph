@@ -1,5 +1,5 @@
 /*
- * Copyright 2023 Swiss Data Science Center (SDSC)
+ * Copyright 2024 Swiss Data Science Center (SDSC)
  * A partnership between École Polytechnique Fédérale de Lausanne (EPFL) and
  * Eidgenössische Technische Hochschule Zürich (ETHZ).
  *
@@ -19,58 +19,67 @@
 package io.renku.eventlog.events.consumers.statuschange
 
 import cats.effect.IO
-import io.renku.eventlog.InMemoryEventLogDbSpec
-import io.renku.eventlog.metrics.QueriesExecutionTimes
+import cats.effect.testing.scalatest.AsyncIOSpec
+import io.renku.eventlog.EventLogPostgresSpec
+import io.renku.eventlog.metrics.{QueriesExecutionTimes, TestQueriesExecutionTimes}
 import io.renku.events.Generators.{subscriberIds, subscriberUrls}
+import io.renku.events.consumers.ConsumersModelGenerators.consumerProjects
 import io.renku.generators.CommonGraphGenerators.microserviceBaseUrls
 import io.renku.generators.Generators.Implicits._
 import io.renku.graph.model.EventContentGenerators._
 import io.renku.graph.model.EventsGenerators._
-import io.renku.graph.model.GraphModelGenerators.{projectIds, projectSlugs}
-import io.renku.graph.model.events.CompoundEventId
-import io.renku.metrics.TestMetricsRegistry
-import io.renku.testtools.IOSpec
+import io.renku.graph.model.GraphModelGenerators.projectIds
+import org.scalamock.scalatest.AsyncMockFactory
+import org.scalatest.Succeeded
 import org.scalatest.matchers.should
-import org.scalatest.wordspec.AnyWordSpec
+import org.scalatest.wordspec.AsyncWordSpec
 
-class DeliveryInfoRemoverSpec extends AnyWordSpec with IOSpec with should.Matchers with InMemoryEventLogDbSpec {
+class DeliveryInfoRemoverSpec
+    extends AsyncWordSpec
+    with AsyncIOSpec
+    with EventLogPostgresSpec
+    with AsyncMockFactory
+    with should.Matchers {
+
+  private val projectId     = projectIds.generateOne
+  private val subscriberId  = subscriberIds.generateOne
+  private val subscriberUrl = subscriberUrls.generateOne
+  private val sourceUrl     = microserviceBaseUrls.generateOne
 
   "deleteDelivery" should {
 
-    "remove delivery info for the given eventId from the DB" in new TestCase {
-      val event =
-        storeGeneratedEvent(eventStatuses.generateOne, eventDates.generateOne, projectId, projectSlugs.generateOne)
-      val eventId = CompoundEventId(event._1, projectId)
-      upsertSubscriber(subscriberId, subscriberUrl, sourceUrl)
-      upsertEventDelivery(eventId, subscriberId)
+    "remove delivery info for the given eventId from the DB" in testDBResource.use { implicit cfg =>
+      for {
+        event <-
+          storeGeneratedEvent(eventStatuses.generateOne, eventDates.generateOne, consumerProjects.generateOne)
+        _ <- upsertSubscriber(subscriberId, subscriberUrl, sourceUrl)
+        _ <- upsertEventDelivery(event.eventId, subscriberId)
 
-      val otherEvent =
-        storeGeneratedEvent(eventStatuses.generateOne, eventDates.generateOne, projectId, projectSlugs.generateOne)
-      val otherEventId = CompoundEventId(otherEvent._1, projectId)
-      upsertEventDelivery(otherEventId, subscriberId)
+        otherEvent <-
+          storeGeneratedEvent(eventStatuses.generateOne, eventDates.generateOne, consumerProjects.generateOne)
+        _ <- upsertEventDelivery(otherEvent.eventId, subscriberId)
 
-      findAllEventDeliveries should contain theSameElementsAs List(eventId -> subscriberId,
-                                                                   otherEventId -> subscriberId
-      )
+        _ <- findAllEventDeliveries.asserting {
+               _ should contain theSameElementsAs List(FoundDelivery(event.eventId, subscriberId),
+                                                       FoundDelivery(otherEvent.eventId, subscriberId)
+               )
+             }
 
-      execute(deliveryRemover.deleteDelivery(eventId)) shouldBe ()
+        _ <- moduleSessionResource.session.useKleisli(deliveryRemover.deleteDelivery(event.eventId)).assertNoException
 
-      findAllEventDeliveries shouldBe List(otherEventId -> subscriberId)
+        _ <- findAllEventDeliveries.asserting(_ shouldBe List(FoundDelivery(otherEvent.eventId, subscriberId)))
+      } yield Succeeded
     }
 
-    "do nothing if there's no event with the given id in the DB" in new TestCase {
-      execute(deliveryRemover.deleteDelivery(compoundEventIds.generateOne)) shouldBe ()
+    "do nothing if there's no event with the given id in the DB" in testDBResource.use { implicit cfg =>
+      moduleSessionResource.session
+        .useKleisli(deliveryRemover.deleteDelivery(compoundEventIds.generateOne))
+        .assertNoException
     }
   }
 
-  private trait TestCase {
-    val projectId     = projectIds.generateOne
-    val subscriberId  = subscriberIds.generateOne
-    val subscriberUrl = subscriberUrls.generateOne
-    val sourceUrl     = microserviceBaseUrls.generateOne
-
-    private implicit val metricsRegistry:  TestMetricsRegistry[IO]   = TestMetricsRegistry[IO]
-    private implicit val queriesExecTimes: QueriesExecutionTimes[IO] = QueriesExecutionTimes[IO]().unsafeRunSync()
-    val deliveryRemover = new DeliveryInfoRemoverImpl[IO]
+  private def deliveryRemover = {
+    implicit val qet: QueriesExecutionTimes[IO] = TestQueriesExecutionTimes[IO]
+    new DeliveryInfoRemoverImpl[IO]
   }
 }

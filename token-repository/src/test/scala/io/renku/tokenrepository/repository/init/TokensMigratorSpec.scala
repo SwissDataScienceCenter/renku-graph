@@ -1,5 +1,5 @@
 /*
- * Copyright 2023 Swiss Data Science Center (SDSC)
+ * Copyright 2024 Swiss Data Science Center (SDSC)
  * A partnership between École Polytechnique Fédérale de Lausanne (EPFL) and
  * Eidgenössische Technische Hochschule Zürich (ETHZ).
  *
@@ -72,7 +72,6 @@ class TokensMigratorSpec
           (projectTokenEncrypted, creationInfo) =
             givenSuccessfulTokenReplacement(oldTokenProject, oldTokenEncrypted)
 
-          _ <- logger.resetF()
           _ <- migration.run.assertNoException
 
           _ <- findToken(validTokenProject.id).asserting(_ shouldBe validTokenEncrypted.value.some)
@@ -100,7 +99,6 @@ class TokensMigratorSpec
       (projectTokenEncrypted1, creationInfo1) =
         givenSuccessfulTokenReplacement(oldTokenProject1, oldTokenEncrypted1)
 
-      _ <- logger.resetF()
       _ <- migration.run.assertNoException
 
       _ <- findToken(validTokenProject.id).asserting(_ shouldBe validTokenEncrypted.value.some)
@@ -197,7 +195,6 @@ class TokensMigratorSpec
       projectTokenEncrypted = encryptedAccessTokens.generateOne
       _                     = givenEncryption(projectToken, returning = projectTokenEncrypted.pure[IO])
 
-      _ <- logger.resetF()
       _ <- migration.run.assertNoException
 
       _ <- findToken(oldTokenProject.id).asserting(_ shouldBe projectTokenEncrypted.value.some)
@@ -232,7 +229,6 @@ class TokensMigratorSpec
       projectTokenEncrypted = encryptedAccessTokens.generateOne
       _                     = givenEncryption(projectToken, returning = projectTokenEncrypted.pure[IO])
 
-      _ <- logger.resetF()
       _ <- migration.run.assertNoException
 
       _ <- findToken(oldTokenProject.id).asserting(_ shouldBe projectTokenEncrypted.value.some)

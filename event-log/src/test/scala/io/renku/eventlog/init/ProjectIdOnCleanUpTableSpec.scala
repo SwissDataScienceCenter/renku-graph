@@ -1,5 +1,5 @@
 /*
- * Copyright 2023 Swiss Data Science Center (SDSC)
+ * Copyright 2024 Swiss Data Science Center (SDSC)
  * A partnership between École Polytechnique Fédérale de Lausanne (EPFL) and
  * Eidgenössische Technische Hochschule Zürich (ETHZ).
  *
@@ -18,95 +18,89 @@
 
 package io.renku.eventlog.init
 
-import cats.data.Kleisli
 import cats.effect.IO
+import cats.effect.testing.scalatest.AsyncIOSpec
 import cats.syntax.all._
-import io.renku.eventlog.TypeSerializers
+import io.renku.db.DBConfigProvider.DBConfig
+import io.renku.eventlog.{EventLogDB, TypeSerializers}
+import io.renku.events.consumers.ConsumersModelGenerators.consumerProjects
+import io.renku.events.consumers.Project
 import io.renku.generators.Generators.Implicits._
-import io.renku.graph.model.GraphModelGenerators._
 import io.renku.graph.model.projects
-import io.renku.interpreters.TestLogger
 import io.renku.interpreters.TestLogger.Level.Info
-import io.renku.testtools.IOSpec
+import org.scalatest.Succeeded
+import org.scalatest.flatspec.AsyncFlatSpec
 import org.scalatest.matchers.should
-import org.scalatest.wordspec.AnyWordSpec
 import skunk._
 import skunk.implicits._
 
 class ProjectIdOnCleanUpTableSpec
-    extends AnyWordSpec
-    with IOSpec
+    extends AsyncFlatSpec
+    with AsyncIOSpec
     with DbInitSpec
     with should.Matchers
     with TypeSerializers {
 
-  protected[init] override lazy val migrationsToRun: List[DbMigrator[IO]] = allMigrations.takeWhile {
-    case _: ProjectIdOnCleanUpTableImpl[IO] => false
-    case _ => true
+  protected[init] override val runMigrationsUpTo: Class[_ <: DbMigrator[IO]] = classOf[ProjectIdOnCleanUpTable[IO]]
+
+  it should "add 'project_id' column to the 'clean_up_events_queue' if doesn't exist" in testDBResource.use {
+    implicit cfg =>
+      for {
+        _ <- verifyColumnExists("clean_up_events_queue", "project_id").asserting(_ shouldBe false)
+
+        _ <- migrator.run.assertNoException
+
+        _ <- verifyColumnExists("clean_up_events_queue", "project_id").asserting(_ shouldBe true)
+
+        _ <- logger.loggedOnlyF(Info("'clean_up_events_queue.project_id' column added"))
+
+        _ <- logger.resetF()
+
+        _ <- migrator.run.assertNoException
+
+        _ <- logger.loggedOnlyF(Info("'clean_up_events_queue.project_id' column exists"))
+      } yield Succeeded
   }
 
-  "run" should {
+  it should "fill in the new 'project_id' column with data from the 'project' table " +
+    "and remove rows without matching project" in testDBResource.use { implicit cfg =>
+      val project1 = consumerProjects.generateOne
+      for {
+        _ <- insertToQueue(project1.slug)
+        _ <- insertToProject(project1)
 
-    "add 'project_id' column to the 'clean_up_events_queue' if doesn't exist" in new TestCase {
+        project2 = consumerProjects.generateOne
+        _ <- insertToQueue(project2.slug)
 
-      verifyColumnExists("clean_up_events_queue", "project_id") shouldBe false
+        _ <- migrator.run.assertNoException
 
-      migrator.run.unsafeRunSync() shouldBe ()
-
-      verifyColumnExists("clean_up_events_queue", "project_id") shouldBe true
-
-      logger.loggedOnly(Info("'clean_up_events_queue.project_id' column added"))
-
-      logger.reset()
-
-      migrator.run.unsafeRunSync() shouldBe ()
-
-      logger.loggedOnly(Info("'clean_up_events_queue.project_id' column exists"))
+        _ <- findQueueRows.asserting(_ shouldBe List(project1))
+      } yield Succeeded
     }
 
-    "fill in the new 'project_id' column with data from the 'project' table " +
-      "and remove rows without matching project" in new TestCase {
+  private def migrator(implicit cfg: DBConfig[EventLogDB]) = new ProjectIdOnCleanUpTableImpl[IO]
 
-        val projectSlug1 = projectSlugs.generateOne
-        insertToQueue(projectSlug1)
-        val projectId1 = projectIds.generateOne
-        insertToProject(projectSlug1, projectId1)
-
-        val projectSlug2 = projectSlugs.generateOne
-        insertToQueue(projectSlug2)
-
-        migrator.run.unsafeRunSync() shouldBe ()
-
-        findQueueRows shouldBe List(projectSlug1 -> projectId1)
-      }
-  }
-
-  private trait TestCase {
-    implicit val logger: TestLogger[IO] = TestLogger[IO]()
-    val migrator = new ProjectIdOnCleanUpTableImpl[IO]
-  }
-
-  private def insertToQueue(slug: projects.Slug): Unit = executeCommand {
-    sql"""INSERT INTO clean_up_events_queue(date, project_path)
+  private def insertToQueue(slug: projects.Slug)(implicit cfg: DBConfig[EventLogDB]): IO[Unit] =
+    executeCommand {
+      sql"""INSERT INTO clean_up_events_queue(date, project_path)
           VALUES(now(), '#${slug.show}')
        """.command
-  }
+    }
 
-  private def insertToProject(slug: projects.Slug, id: projects.GitLabId): Unit = executeCommand {
-    sql"""INSERT INTO project(project_id, project_path, latest_event_date)
-          VALUES (#${id.show}, '#${slug.show}', now())
+  private def insertToProject(project: Project)(implicit cfg: DBConfig[EventLogDB]): IO[Unit] =
+    executeCommand {
+      sql"""INSERT INTO project(project_id, project_path, latest_event_date)
+          VALUES (#${project.id.value.toString}, '#${project.slug.value}', now())
        """.command
-  }
+    }
 
-  private def findQueueRows: List[(projects.Slug, projects.GitLabId)] =
-    execute[List[(projects.Slug, projects.GitLabId)]] {
-      Kleisli { session =>
-        val query: Query[Void, projects.Slug ~ projects.GitLabId] = sql"""
+  private def findQueueRows(implicit cfg: DBConfig[EventLogDB]): IO[List[Project]] =
+    moduleSessionResource.session.use { session =>
+      val query: Query[Void, Project] = sql"""
           SELECT project_path, project_id 
           FROM clean_up_events_queue"""
-          .query(projectSlugDecoder ~ projectIdDecoder)
-          .map { case (slug: projects.Slug, id: projects.GitLabId) => slug -> id }
-        session.execute(query)
-      }
+        .query(projectSlugDecoder ~ projectIdDecoder)
+        .map { case (slug: projects.Slug, id: projects.GitLabId) => Project(id, slug) }
+      session.execute(query)
     }
 }

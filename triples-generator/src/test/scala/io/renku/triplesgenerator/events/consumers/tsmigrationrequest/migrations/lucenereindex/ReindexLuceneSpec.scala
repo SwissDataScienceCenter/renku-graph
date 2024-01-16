@@ -1,5 +1,5 @@
 /*
- * Copyright 2023 Swiss Data Science Center (SDSC)
+ * Copyright 2024 Swiss Data Science Center (SDSC)
  * A partnership between École Polytechnique Fédérale de Lausanne (EPFL) and
  * Eidgenössische Technische Hochschule Zürich (ETHZ).
  *
@@ -67,11 +67,10 @@ class ReindexLuceneSpec
 
       givenEnvHasCapabilitiesToTakeNextEvent
 
-      allProjects map givenRedoTransformationEventSent
-
       allProjects foreach verifyProjectNotedDone
 
-      migration.migrate().value.asserting(_.value shouldBe ())
+      migration.migrate().value.asserting(_.value shouldBe ()) >>
+        elClient.waitForArrival(allProjects.map(StatusChangeEvent.RedoProjectTransformation(_))).assertNoException
     }
 
   it should "skip the backlog preparation task if the backlog is already built " +
@@ -90,11 +89,10 @@ class ReindexLuceneSpec
 
       givenEnvHasCapabilitiesToTakeNextEvent
 
-      allProjects map givenRedoTransformationEventSent
-
       allProjects foreach verifyProjectNotedDone
 
-      migration.migrate().value.asserting(_.value shouldBe ())
+      migration.migrate().value.asserting(_.value shouldBe ()) >>
+        elClient.waitForArrival(allProjects.map(StatusChangeEvent.RedoProjectTransformation(_))).assertNoException
     }
 
   it should "return a Recoverable Error if in case of an exception while finding projects " +
@@ -119,7 +117,7 @@ class ReindexLuceneSpec
   private val projectsFinder        = mock[ProjectsPageFinder[IO]]
   private val progressFinder        = mock[ProgressFinder[IO]]
   private val envReadinessChecker   = mock[EnvReadinessChecker[IO]]
-  private val elClient              = mock[eventlog.api.events.Client[IO]]
+  private lazy val elClient         = eventlog.api.events.TestClient.collectingMode[IO]
   private val projectDonePersister  = mock[ProjectDonePersister[IO]]
   private val executionRegister     = mock[MigrationExecutionRegister[IO]]
   private lazy val recoverableError = processingRecoverableErrors.generateOne
@@ -167,12 +165,6 @@ class ReindexLuceneSpec
       .expects()
       .returning(().pure[IO])
       .atLeastOnce()
-
-  private def givenRedoTransformationEventSent(slug: projects.Slug) =
-    (elClient
-      .send(_: StatusChangeEvent.RedoProjectTransformation))
-      .expects(StatusChangeEvent.RedoProjectTransformation(slug))
-      .returning(().pure[IO])
 
   private def verifyProjectNotedDone(slug: projects.Slug) =
     (projectDonePersister.noteDone _)

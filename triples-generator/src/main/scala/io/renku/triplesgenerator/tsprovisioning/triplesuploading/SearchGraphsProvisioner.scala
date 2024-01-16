@@ -1,5 +1,5 @@
 /*
- * Copyright 2023 Swiss Data Science Center (SDSC)
+ * Copyright 2024 Swiss Data Science Center (SDSC)
  * A partnership between École Polytechnique Fédérale de Lausanne (EPFL) and
  * Eidgenössische Technische Hochschule Zürich (ETHZ).
  *
@@ -44,7 +44,7 @@ private object SearchGraphsProvisioner {
   def default[F[_]: Async: Logger: SparqlQueryTimeRecorder](
       topSameAsLock: Lock[F, datasets.TopmostSameAs]
   ): F[SearchGraphsProvisioner[F]] =
-    ProjectsConnectionConfig[F]().map(apply(topSameAsLock, _))
+    ProjectsConnectionConfig.fromConfig[F]().map(apply(topSameAsLock, _))
 }
 
 private class SearchGraphsProvisionerImpl[F[_]: MonadThrow](

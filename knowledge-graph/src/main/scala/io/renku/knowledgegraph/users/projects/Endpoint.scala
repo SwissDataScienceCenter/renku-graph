@@ -1,5 +1,5 @@
 /*
- * Copyright 2023 Swiss Data Science Center (SDSC)
+ * Copyright 2024 Swiss Data Science Center (SDSC)
  * A partnership between École Polytechnique Fédérale de Lausanne (EPFL) and
  * Eidgenössische Technische Hochschule Zürich (ETHZ).
  *
@@ -18,17 +18,18 @@
 
 package io.renku.knowledgegraph.users.projects
 
-import Endpoint._
 import cats.Parallel
 import cats.effect.Async
 import cats.syntax.all._
-import finder._
 import io.renku.config.renku
 import io.renku.graph.config.RenkuUrlLoader
 import io.renku.graph.model.{RenkuUrl, persons}
+import io.renku.http.RenkuEntityCodec
 import io.renku.http.client.GitLabClient
 import io.renku.http.rest.paging.{PagingHeaders, PagingRequest, PagingResponse}
 import io.renku.http.server.security.model.AuthUser
+import io.renku.knowledgegraph.users.projects.Endpoint._
+import io.renku.knowledgegraph.users.projects.finder._
 import io.renku.tinytypes.{StringTinyType, TinyTypeFactory}
 import io.renku.triplesstore.SparqlQueryTimeRecorder
 import org.http4s.dsl.Http4sDsl
@@ -103,14 +104,13 @@ private class EndpointImpl[F[_]: Async: Logger](projectsFinder: ProjectsFinder[F
                                                 renkuUrl:    RenkuUrl,
                                                 renkuApiUrl: renku.ApiUrl
 ) extends Http4sDsl[F]
+    with RenkuEntityCodec
     with Endpoint[F] {
 
   import eu.timepit.refined.auto._
-  import io.circe.Json
   import io.circe.syntax._
   import io.renku.data.Message
-  import org.http4s.circe.jsonEncoderOf
-  import org.http4s.{EntityEncoder, Header, Request, Response, Status}
+  import org.http4s.{Header, Request, Response, Status}
 
   private implicit val rnkUrl:    RenkuUrl     = renkuUrl
   private implicit val rnkApiUrl: renku.ApiUrl = renkuApiUrl
@@ -124,8 +124,6 @@ private class EndpointImpl[F[_]: Async: Logger](projectsFinder: ProjectsFinder[F
       .withEntity(response.results.asJson)
       .putHeaders(PagingHeaders.from(response)(resourceUrl, renku.ResourceUrl).toSeq.map(Header.ToRaw.rawToRaw): _*)
   }
-
-  private implicit lazy val responseEntityEncoder: EntityEncoder[F, Json] = jsonEncoderOf[F, Json]
 
   private lazy val httpResult: PartialFunction[Throwable, F[Response[F]]] = { case NonFatal(exception) =>
     val message = Message.Error("Finding user's projects failed")

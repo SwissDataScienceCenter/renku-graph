@@ -1,5 +1,5 @@
 /*
- * Copyright 2023 Swiss Data Science Center (SDSC)
+ * Copyright 2024 Swiss Data Science Center (SDSC)
  * A partnership between École Polytechnique Fédérale de Lausanne (EPFL) and
  * Eidgenössische Technische Hochschule Zürich (ETHZ).
  *
@@ -28,10 +28,10 @@ import io.circe.{Decoder, DecodingFailure}
 import io.renku.control.Throttler
 import io.renku.graph.model.projects
 import io.renku.graph.model.versions.SchemaVersion
-import io.renku.http.client.{AccessToken, RestClient, UserAccessToken}
+import io.renku.http.RenkuEntityCodec
+import io.renku.http.client.{AccessToken, GitLabClient, RestClient, UserAccessToken}
 import io.renku.http.tinytypes.TinyTypeURIEncoder._
 import org.http4s.Header
-import org.http4s.circe._
 import org.http4s.client.dsl.Http4sClientDsl
 import org.http4s.dsl.Http4sDsl
 import org.typelevel.ci._
@@ -62,7 +62,8 @@ private class LowLevelApisImpl[F[_]: Async: Logger](coreLatestUri: RenkuCoreUri.
     extends RestClient[F, Nothing](Throttler.noThrottling)
     with LowLevelApis[F]
     with Http4sDsl[F]
-    with Http4sClientDsl[F] {
+    with Http4sClientDsl[F]
+    with RenkuEntityCodec {
 
   import clientTools._
 
@@ -85,7 +86,7 @@ private class LowLevelApisImpl[F[_]: Async: Logger](coreLatestUri: RenkuCoreUri.
       val uri = (coreUri.uri / "renku" / "cache.migrations_check")
         .withQueryParam("git_url", projectGitHttpUrl.value)
 
-      send(request(GET, uri, accessToken).putHeaders(userHeaders)) {
+      send(GitLabClient.request[F](GET, uri, accessToken.some).putHeaders(userHeaders)) {
         case (Ok, _, resp) =>
           toResult[ProjectMigrationCheck](resp)
         case reqInfo =>
@@ -110,7 +111,8 @@ private class LowLevelApisImpl[F[_]: Async: Logger](coreLatestUri: RenkuCoreUri.
   override def postProjectCreate(newProject: NewProject, accessToken: UserAccessToken): F[Result[Unit]] =
     toUserHeaders(newProject.userInfo) >>= { userHeaders =>
       send(
-        request(POST, coreLatestUri.uri / "renku" / "templates.create_project", accessToken)
+        GitLabClient
+          .request[F](POST, coreLatestUri.uri / "renku" / "templates.create_project", accessToken.some)
           .withEntity(newProject.asJson)
           .putHeaders(userHeaders)
       ) {
@@ -125,7 +127,8 @@ private class LowLevelApisImpl[F[_]: Async: Logger](coreLatestUri: RenkuCoreUri.
   ): F[Result[Branch]] =
     toUserHeaders(updates.userInfo) >>= { userHeaders =>
       send(
-        request(POST, uri.uri / "renku" / uri.apiVersion / "project.edit", accessToken)
+        GitLabClient
+          .request[F](POST, uri.uri / "renku" / uri.apiVersion / "project.edit", accessToken.some)
           .withEntity(updates.asJson)
           .putHeaders(userHeaders)
       ) {

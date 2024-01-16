@@ -1,5 +1,5 @@
 /*
- * Copyright 2023 Swiss Data Science Center (SDSC)
+ * Copyright 2024 Swiss Data Science Center (SDSC)
  * A partnership between École Polytechnique Fédérale de Lausanne (EPFL) and
  * Eidgenössische Technische Hochschule Zürich (ETHZ).
  *
@@ -40,7 +40,6 @@ class ProjectsTokensTableCreatorSpec
     for {
       _ <- tableExists("projects_tokens").asserting(_ shouldBe false)
 
-      _ <- logger.resetF()
       _ <- ProjectsTokensTableCreator[IO].run.assertNoException
       _ <- tableExists("projects_tokens").asserting(_ shouldBe true)
       _ <- logger.loggedOnlyF(Info("'projects_tokens' table created"))

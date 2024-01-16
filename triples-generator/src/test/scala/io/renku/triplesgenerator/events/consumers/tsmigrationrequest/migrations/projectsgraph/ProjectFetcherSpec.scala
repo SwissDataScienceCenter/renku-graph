@@ -1,5 +1,5 @@
 /*
- * Copyright 2023 Swiss Data Science Center (SDSC)
+ * Copyright 2024 Swiss Data Science Center (SDSC)
  * A partnership between École Polytechnique Fédérale de Lausanne (EPFL) and
  * Eidgenössische Technische Hochschule Zürich (ETHZ).
  *
@@ -19,55 +19,50 @@
 package io.renku.triplesgenerator.events.consumers.tsmigrationrequest.migrations.projectsgraph
 
 import cats.effect.IO
+import cats.effect.testing.scalatest.AsyncIOSpec
 import io.renku.generators.Generators.Implicits._
 import io.renku.graph.model._
 import io.renku.graph.model.testentities._
 import io.renku.interpreters.TestLogger
-import io.renku.logging.TestSparqlQueryTimeRecorder
-import io.renku.testtools.CustomAsyncIOSpec
-import io.renku.triplesstore.{InMemoryJenaForSpec, ProjectsDataset, SparqlQueryTimeRecorder, TSClient}
+import io.renku.triplesstore.{GraphJenaSpec, ProjectsConnectionConfig}
 import org.scalatest.OptionValues
 import org.scalatest.flatspec.AsyncFlatSpec
 import org.scalatest.matchers.should
 
 class ProjectFetcherSpec
     extends AsyncFlatSpec
-    with CustomAsyncIOSpec
+    with AsyncIOSpec
+    with GraphJenaSpec
     with should.Matchers
-    with InMemoryJenaForSpec
-    with ProjectsDataset
     with OptionValues {
 
-  it should "fetch info about the project" in {
-
+  it should "fetch info about the project" in projectsDSConfig.use { implicit pcc =>
     val project = anyProjectEntities.suchThat(_.images.size > 1).generateOne.to[entities.Project]
 
-    upload(to = projectsDataset, project)
-
-    fetcher
-      .fetchProject(project.slug)
-      .asserting(
-        _.value shouldBe entities.NonRenkuProject.WithoutParent(
-          project.resourceId,
-          project.slug,
-          project.name,
-          project.maybeDescription,
-          project.dateCreated,
-          project.dateModified,
-          project.maybeCreator.map(p => entities.Person.WithNameOnly(p.resourceId, p.name, None, None)),
-          project.visibility,
-          project.keywords,
-          members = Set.empty,
-          project.images
+    uploadToProjects(project) >>
+      fetcher
+        .fetchProject(project.slug)
+        .asserting(
+          _.value shouldBe entities.NonRenkuProject.WithoutParent(
+            project.resourceId,
+            project.slug,
+            project.name,
+            project.maybeDescription,
+            project.dateCreated,
+            project.dateModified,
+            project.maybeCreator.map(p => entities.Person.WithNameOnly(p.resourceId, p.name, None, None)),
+            project.visibility,
+            project.keywords,
+            members = Set.empty,
+            project.images
+          )
         )
-      )
   }
 
-  it should "return no project if one does not exists" in {
+  it should "return no project if one does not exists" in projectsDSConfig.use { implicit pcc =>
     fetcher.fetchProject(projectSlugs.generateOne).asserting(_ shouldBe None)
   }
 
-  private implicit val logger:       TestLogger[IO]              = TestLogger[IO]()
-  private implicit val timeRecorder: SparqlQueryTimeRecorder[IO] = TestSparqlQueryTimeRecorder[IO].unsafeRunSync()
-  private lazy val fetcher = new ProjectFetcherImpl[IO](TSClient[IO](projectsDSConnectionInfo))
+  private implicit lazy val logger: TestLogger[IO] = TestLogger[IO]()
+  private def fetcher(implicit pcc: ProjectsConnectionConfig) = new ProjectFetcherImpl[IO](tsClient)
 }

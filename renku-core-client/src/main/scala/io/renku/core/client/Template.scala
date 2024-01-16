@@ -1,5 +1,5 @@
 /*
- * Copyright 2023 Swiss Data Science Center (SDSC)
+ * Copyright 2024 Swiss Data Science Center (SDSC)
  * A partnership between École Polytechnique Fédérale de Lausanne (EPFL) and
  * Eidgenössische Technische Hochschule Zürich (ETHZ).
  *
@@ -18,10 +18,15 @@
 
 package io.renku.core.client
 
+import io.circe.Json
 import io.renku.tinytypes.constraints.{NonBlank, Url}
 import io.renku.tinytypes.{StringTinyType, TinyTypeFactory, UrlTinyType}
 
-final case class Template(repositoryUrl: templates.RepositoryUrl, identifier: templates.Identifier)
+final case class Template(repositoryUrl:   templates.RepositoryUrl,
+                          identifier:      templates.Identifier,
+                          maybeRef:        Option[templates.Ref],
+                          maybeParameters: Option[templates.Parameters]
+)
 
 object templates {
 
@@ -30,4 +35,9 @@ object templates {
 
   final class Identifier private (val value: String) extends AnyVal with StringTinyType
   implicit object Identifier extends TinyTypeFactory[Identifier](new Identifier(_)) with NonBlank[Identifier]
+
+  final class Ref private (val value: String) extends AnyVal with StringTinyType
+  implicit object Ref                         extends TinyTypeFactory[Ref](new Ref(_)) with NonBlank[Ref]
+
+  final case class Parameters(value: List[Json])
 }

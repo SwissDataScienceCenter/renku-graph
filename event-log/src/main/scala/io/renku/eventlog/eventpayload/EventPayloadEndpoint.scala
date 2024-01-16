@@ -1,5 +1,5 @@
 /*
- * Copyright 2023 Swiss Data Science Center (SDSC)
+ * Copyright 2024 Swiss Data Science Center (SDSC)
  * A partnership between École Polytechnique Fédérale de Lausanne (EPFL) and
  * Eidgenössische Technische Hochschule Zürich (ETHZ).
  *
@@ -25,6 +25,7 @@ import io.renku.eventlog.EventLogDB.SessionResource
 import io.renku.eventlog.metrics.QueriesExecutionTimes
 import io.renku.graph.model.events.EventId
 import io.renku.graph.model.projects.{Slug => ProjectSlug}
+import io.renku.http.RenkuEntityCodec
 import org.http4s._
 import org.http4s.dsl.Http4sDsl
 import org.http4s.headers.{`Content-Disposition`, `Content-Length`, `Content-Type`}
@@ -42,7 +43,7 @@ object EventPayloadEndpoint {
     apply[F](EventPayloadFinder[F])
 
   def apply[F[_]: Concurrent: Logger](payloadFinder: EventPayloadFinder[F]): EventPayloadEndpoint[F] =
-    new EventPayloadEndpoint[F] with Http4sDsl[F] {
+    new EventPayloadEndpoint[F] with Http4sDsl[F] with RenkuEntityCodec {
       def getEventPayload(eventId: EventId, projectSlug: ProjectSlug): F[Response[F]] =
         payloadFinder.findEventPayload(eventId, projectSlug).flatMap {
           case Some(data) =>

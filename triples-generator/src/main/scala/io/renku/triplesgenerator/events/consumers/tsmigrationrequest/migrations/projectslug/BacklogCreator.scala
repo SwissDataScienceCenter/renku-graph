@@ -1,5 +1,5 @@
 /*
- * Copyright 2023 Swiss Data Science Center (SDSC)
+ * Copyright 2024 Swiss Data Science Center (SDSC)
  * A partnership between École Polytechnique Fédérale de Lausanne (EPFL) and
  * Eidgenössische Technische Hochschule Zürich (ETHZ).
  *
@@ -41,8 +41,8 @@ private trait BacklogCreator[F[_]] {
 private object BacklogCreator {
   def apply[F[_]: Async: Logger: SparqlQueryTimeRecorder]: F[BacklogCreator[F]] = for {
     implicit0(ru: RenkuUrl) <- RenkuUrlLoader[F]()
-    recordsFinder           <- ProjectsConnectionConfig[F]().map(RecordsFinder[F](_))
-    migrationsDSClient      <- MigrationsConnectionConfig[F]().map(TSClient[F](_))
+    recordsFinder           <- ProjectsConnectionConfig.fromConfig[F]().map(RecordsFinder[F](_))
+    migrationsDSClient      <- MigrationsConnectionConfig.fromConfig[F]().map(TSClient[F](_))
   } yield new BacklogCreatorImpl[F](recordsFinder, migrationsDSClient)
 
   def asToBeMigratedInserts(implicit ru: RenkuUrl): List[projects.Slug] => Option[SparqlQuery] =

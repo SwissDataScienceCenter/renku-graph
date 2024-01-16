@@ -1,5 +1,5 @@
 /*
- * Copyright 2023 Swiss Data Science Center (SDSC)
+ * Copyright 2024 Swiss Data Science Center (SDSC)
  * A partnership between École Polytechnique Fédérale de Lausanne (EPFL) and
  * Eidgenössische Technische Hochschule Zürich (ETHZ).
  *
@@ -43,20 +43,9 @@ class GitLabRepoUrlFinderSpec extends AnyWordSpec with MockFactory with should.M
       val port = positiveInts(9999).generateOne
       val slug = projectSlugs.generateOne
 
-      s"return '$protocol://$host:$port/$slug.git' when no access token" in new TestCase {
-
-        implicit val maybeAccessToken: Option[AccessToken] = Option.empty
-
-        val repoUrlFinder = newRepoUrlFinder(GitLabUrl(s"$protocol://$host:$port"))
-
-        repoUrlFinder.findRepositoryUrl(slug) shouldBe
-          ServiceUrl(s"$protocol://$host:$port/$slug.git").pure[Try]
-      }
-
       s"return '$protocol://gitlab-ci-token:<token>@$host:$port/$slug.git' for Personal Access Token" in new TestCase {
 
-        val accessToken = personalAccessTokens.generateOne
-        implicit val iat: Option[AccessToken] = accessToken.some
+        implicit val accessToken: AccessToken = personalAccessTokens.generateOne
 
         val repoUrlFinder = newRepoUrlFinder(GitLabUrl(s"$protocol://$host:$port"))
 
@@ -73,7 +62,7 @@ class GitLabRepoUrlFinderSpec extends AnyWordSpec with MockFactory with should.M
       } { (tokenType, accessToken: AccessToken) =>
         s"return '$protocol://oauth2:<token>@$host:$port/$slug.git' for $tokenType" in new TestCase {
 
-          implicit val someToken: Option[AccessToken] = accessToken.some
+          implicit val at: AccessToken = accessToken
 
           val repoUrlFinder = newRepoUrlFinder(GitLabUrl(s"$protocol://$host:$port"))
 

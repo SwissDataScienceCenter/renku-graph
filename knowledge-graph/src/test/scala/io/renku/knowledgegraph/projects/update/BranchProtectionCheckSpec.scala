@@ -1,5 +1,5 @@
 /*
- * Copyright 2023 Swiss Data Science Center (SDSC)
+ * Copyright 2024 Swiss Data Science Center (SDSC)
  * A partnership between École Polytechnique Fédérale de Lausanne (EPFL) and
  * Eidgenössische Technische Hochschule Zürich (ETHZ).
  *
@@ -34,12 +34,12 @@ import io.renku.generators.Generators.Implicits._
 import io.renku.generators.Generators.booleans
 import io.renku.graph.model.RenkuTinyTypeGenerators.projectSlugs
 import io.renku.graph.model.projects
+import io.renku.http.RenkuEntityCodec
 import io.renku.http.client.RestClient.ResponseMappingF
 import io.renku.http.client.{AccessToken, GitLabClient}
 import io.renku.http.tinytypes.TinyTypeURIEncoder._
 import io.renku.testtools.GitLabClientTools
 import org.http4s.Status.{NotFound, Ok}
-import org.http4s.circe._
 import org.http4s.implicits._
 import org.http4s.{Request, Response, Uri}
 import org.scalacheck.Gen
@@ -54,6 +54,7 @@ class BranchProtectionCheckSpec
     with AsyncMockFactory
     with should.Matchers
     with EitherValues
+    with RenkuEntityCodec
     with GitLabClientTools[IO] {
 
   it should "call GL's GET gl/projects/:slug/repository/branches and return Unprotected " +

@@ -1,5 +1,5 @@
 /*
- * Copyright 2023 Swiss Data Science Center (SDSC)
+ * Copyright 2024 Swiss Data Science Center (SDSC)
  * A partnership between École Polytechnique Fédérale de Lausanne (EPFL) and
  * Eidgenössische Technische Hochschule Zürich (ETHZ).
  *
@@ -32,7 +32,7 @@ private trait ProjectsFinder[F[_]] {
 
 private object ProjectsFinder {
   def apply[F[_]: Async: Logger: SparqlQueryTimeRecorder](query: SparqlQuery): F[ProjectsFinder[F]] =
-    ProjectsConnectionConfig[F]().map(new ProjectsFinderImpl(query, _))
+    ProjectsConnectionConfig.fromConfig[F]().map(new ProjectsFinderImpl(query, _))
 }
 
 private class ProjectsFinderImpl[F[_]: Async: Logger: SparqlQueryTimeRecorder](

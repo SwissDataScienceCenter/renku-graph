@@ -1,5 +1,5 @@
 /*
- * Copyright 2023 Swiss Data Science Center (SDSC)
+ * Copyright 2024 Swiss Data Science Center (SDSC)
  * A partnership between École Polytechnique Fédérale de Lausanne (EPFL) and
  * Eidgenössische Technische Hochschule Zürich (ETHZ).
  *
@@ -38,6 +38,7 @@ import io.renku.graph.model.images.ImageUri
 import io.renku.graph.model.persons.{Affiliation, Email, Name => UserName}
 import io.renku.graph.model.projects.Slug
 import io.renku.graph.model.testentities.generators.EntitiesGenerators
+import io.renku.http.RenkuEntityCodec
 import io.renku.http.rest.Links
 import io.renku.http.rest.Links.Rel.Self
 import io.renku.http.rest.Links.{Href, Rel}
@@ -68,6 +69,7 @@ class EndpointSpec
     with MockFactory
     with ScalaCheckPropertyChecks
     with EntitiesGenerators
+    with RenkuEntityCodec
     with IOSpec {
 
   "GET /datasets/:id" should {

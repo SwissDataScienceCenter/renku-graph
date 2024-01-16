@@ -1,5 +1,5 @@
 /*
- * Copyright 2023 Swiss Data Science Center (SDSC)
+ * Copyright 2024 Swiss Data Science Center (SDSC)
  * A partnership between École Polytechnique Fédérale de Lausanne (EPFL) and
  * Eidgenössische Technische Hochschule Zürich (ETHZ).
  *
@@ -41,13 +41,11 @@ private trait MigrationStartTimeFinder[F[_]] {
 private object MigrationStartTimeFinder {
   def apply[F[_]: Async: Logger: SparqlQueryTimeRecorder]: F[MigrationStartTimeFinder[F]] = for {
     implicit0(ru: RenkuUrl) <- RenkuUrlLoader[F]()
-    tsClient                <- MigrationsConnectionConfig[F]().map(TSClient[F](_))
+    tsClient                <- MigrationsConnectionConfig.fromConfig[F]().map(TSClient[F](_))
   } yield new MigrationStartTimeFinderImpl[F](tsClient)
 }
 
-private class MigrationStartTimeFinderImpl[F[_]: Async: Logger: SparqlQueryTimeRecorder](
-    tsClient: TSClient[F]
-)(implicit ru: RenkuUrl)
+private class MigrationStartTimeFinderImpl[F[_]: Async: Logger](tsClient: TSClient[F])(implicit ru: RenkuUrl)
     extends MigrationStartTimeFinder[F] {
 
   import ResultsDecoder._

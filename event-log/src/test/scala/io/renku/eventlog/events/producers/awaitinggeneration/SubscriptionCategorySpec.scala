@@ -1,5 +1,5 @@
 /*
- * Copyright 2023 Swiss Data Science Center (SDSC)
+ * Copyright 2024 Swiss Data Science Center (SDSC)
  * A partnership between École Polytechnique Fédérale de Lausanne (EPFL) and
  * Eidgenössische Technische Hochschule Zürich (ETHZ).
  *
@@ -19,27 +19,40 @@
 package io.renku.eventlog.events.producers.awaitinggeneration
 
 import cats.effect.IO
-import io.renku.eventlog.events.producers.{CapacityFinder, CapacityFindingQuerySpec, UsedCapacity}
+import cats.effect.testing.scalatest.AsyncIOSpec
+import io.renku.eventlog.EventLogPostgresSpec
+import io.renku.eventlog.events.producers.{CapacityFinder, UsedCapacity}
+import io.renku.eventlog.metrics.{QueriesExecutionTimes, TestQueriesExecutionTimes}
 import io.renku.generators.Generators.Implicits._
 import io.renku.graph.model.events.EventStatus
 import io.renku.graph.model.events.EventStatus.GeneratingTriples
 import org.scalacheck.Gen
+import org.scalamock.scalatest.AsyncMockFactory
+import org.scalatest.Succeeded
 import org.scalatest.matchers.should
-import org.scalatest.wordspec.AnyWordSpec
+import org.scalatest.wordspec.AsyncWordSpec
 
-class SubscriptionCategorySpec extends AnyWordSpec with should.Matchers with CapacityFindingQuerySpec {
+class SubscriptionCategorySpec
+    extends AsyncWordSpec
+    with AsyncIOSpec
+    with EventLogPostgresSpec
+    with AsyncMockFactory
+    with should.Matchers {
 
   "capacityFindingQuery" should {
 
-    s"count events in the $GeneratingTriples status" in {
+    s"count events in the $GeneratingTriples status" in testDBResource.use { implicit cfg =>
+      for {
+        _ <- storeGeneratedEvent(status = EventStatus.GeneratingTriples)
+        _ <- storeGeneratedEvent(status = Gen.oneOf(EventStatus.all - EventStatus.GeneratingTriples).generateOne)
 
-      createEvent(EventStatus.GeneratingTriples)
-      createEvent(Gen.oneOf(EventStatus.all - EventStatus.GeneratingTriples).generateOne)
-
-      CapacityFinder
-        .ofStatus[IO](EventStatus.GeneratingTriples)
-        .findUsedCapacity
-        .unsafeRunSync() shouldBe UsedCapacity(1)
+        _ <- CapacityFinder
+               .ofStatus[IO](EventStatus.GeneratingTriples)
+               .findUsedCapacity
+               .asserting(_ shouldBe UsedCapacity(1))
+      } yield Succeeded
     }
   }
+
+  private implicit lazy val qet: QueriesExecutionTimes[IO] = TestQueriesExecutionTimes[IO]
 }

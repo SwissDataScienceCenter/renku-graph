@@ -1,5 +1,5 @@
 /*
- * Copyright 2023 Swiss Data Science Center (SDSC)
+ * Copyright 2024 Swiss Data Science Center (SDSC)
  * A partnership between École Polytechnique Fédérale de Lausanne (EPFL) and
  * Eidgenössische Technische Hochschule Zürich (ETHZ).
  *
@@ -30,11 +30,10 @@ import io.renku.generators.Generators.exceptions
 import io.renku.graph.model.GraphModelGenerators.projectSlugs
 import io.renku.graph.model.projects.Slug
 import io.renku.graph.model.testentities.generators.EntitiesGenerators._
-import io.renku.graph.tokenrepository.AccessTokenFinder
-import io.renku.graph.tokenrepository.AccessTokenFinder.Implicits.projectSlugToPath
 import io.renku.http.client.AccessToken
 import io.renku.http.server.security.model.AuthUser
 import io.renku.testtools.IOSpec
+import io.renku.tokenrepository.api.TokenRepositoryClient
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
@@ -105,11 +104,7 @@ class ProjectFinderSpec extends AnyWordSpec with MockFactory with should.Matcher
 
       val kgProject = anyProjectEntities.generateOne.to(kgProjectConverter)
       givenKgProjectFinder(kgProject.slug, maybeAuthUser = None, returning = kgProject.some.pure[IO])
-
-      (accessTokenFinder
-        .findAccessToken(_: Slug)(_: Slug => String))
-        .expects(kgProject.slug, projectSlugToPath)
-        .returning(Option.empty[AccessToken].pure[IO])
+      givenAccessTokenFinding(kgProject.slug, returning = Option.empty[AccessToken].pure[IO])
 
       projectFinder.findProject(kgProject.slug, maybeAuthUser = None).unsafeRunSync() shouldBe None
     }
@@ -136,10 +131,7 @@ class ProjectFinderSpec extends AnyWordSpec with MockFactory with should.Matcher
       givenKgProjectFinder(kgProject.slug, maybeAuthUser = None, returning = kgProject.some.pure[IO])
 
       val exception = exceptions.generateOne
-      (accessTokenFinder
-        .findAccessToken(_: Slug)(_: Slug => String))
-        .expects(kgProject.slug, projectSlugToPath)
-        .returning(exception.raiseError[IO, Option[AccessToken]])
+      givenAccessTokenFinding(kgProject.slug, returning = exception.raiseError[IO, Option[AccessToken]])
 
       intercept[Exception] {
         projectFinder.findProject(kgProject.slug, maybeAuthUser = None).unsafeRunSync()
@@ -164,10 +156,10 @@ class ProjectFinderSpec extends AnyWordSpec with MockFactory with should.Matcher
   }
 
   private trait TestCase {
-    implicit val accessTokenFinder: AccessTokenFinder[IO] = mock[AccessTokenFinder[IO]]
-    val kgProjectFinder     = mock[KGProjectFinder[IO]]
-    val gitLabProjectFinder = mock[GitLabProjectFinder[IO]]
-    val projectFinder       = new ProjectFinderImpl[IO](kgProjectFinder, gitLabProjectFinder)
+    private val trClient: TokenRepositoryClient[IO] = mock[TokenRepositoryClient[IO]]
+    private val kgProjectFinder     = mock[KGProjectFinder[IO]]
+    private val gitLabProjectFinder = mock[GitLabProjectFinder[IO]]
+    val projectFinder               = new ProjectFinderImpl[IO](trClient, kgProjectFinder, gitLabProjectFinder)
 
     def givenKgProjectFinder(slug: Slug, maybeAuthUser: Option[AuthUser], returning: IO[Option[KGProject]]) =
       (kgProjectFinder
@@ -183,12 +175,15 @@ class ProjectFinderSpec extends AnyWordSpec with MockFactory with should.Matcher
 
     def givenAccessToken(existsFor: Slug): AccessToken = {
       val accessToken = accessTokens.generateOne
-      (accessTokenFinder
-        .findAccessToken(_: Slug)(_: Slug => String))
-        .expects(existsFor, projectSlugToPath)
-        .returning(Some(accessToken).pure[IO])
+      givenAccessTokenFinding(existsFor, returning = Some(accessToken).pure[IO])
       accessToken
     }
+
+    def givenAccessTokenFinding(project: Slug, returning: IO[Option[AccessToken]]) =
+      (trClient
+        .findAccessToken(_: Slug))
+        .expects(project)
+        .returning(returning)
   }
 
   private def projectFrom(kgProject: KGProject, gitLabProject: GitLabProject) =

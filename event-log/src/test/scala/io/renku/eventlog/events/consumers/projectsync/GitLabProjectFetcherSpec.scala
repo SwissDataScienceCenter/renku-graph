@@ -1,5 +1,5 @@
 /*
- * Copyright 2023 Swiss Data Science Center (SDSC)
+ * Copyright 2024 Swiss Data Science Center (SDSC)
  * A partnership between École Polytechnique Fédérale de Lausanne (EPFL) and
  * Eidgenössische Technische Hochschule Zürich (ETHZ).
  *
@@ -30,13 +30,13 @@ import io.renku.generators.Generators.Implicits._
 import io.renku.generators.Generators.exceptions
 import io.renku.graph.model.GraphModelGenerators._
 import io.renku.graph.model.projects
-import io.renku.graph.tokenrepository.AccessTokenFinder
-import io.renku.graph.tokenrepository.AccessTokenFinder.Implicits._
+import io.renku.http.RenkuEntityCodec
 import io.renku.http.client.RestClient.ResponseMappingF
 import io.renku.http.client.RestClientError.UnauthorizedException
 import io.renku.http.client.{AccessToken, GitLabClient}
-import io.renku.http.server.EndpointTester._
+import io.renku.http.tinytypes.TinyTypeURIEncoder._
 import io.renku.testtools.{GitLabClientTools, IOSpec}
+import io.renku.tokenrepository.api.TokenRepositoryClient
 import org.http4s.Status.{Forbidden, InternalServerError, NotFound, Unauthorized}
 import org.http4s.implicits._
 import org.http4s.{Request, Response, Status, Uri}
@@ -49,27 +49,37 @@ class GitLabProjectFetcherSpec
     with IOSpec
     with MockFactory
     with should.Matchers
+    with RenkuEntityCodec
     with GitLabClientTools[IO] {
+
+  private val apiName: String Refined NonEmpty = "single-project"
 
   "fetchGitLabProject" should {
 
     "fetches relevant project info from GitLab" in new TestCase {
 
-      givenFindAccessToken(by = projectId, returning = maybeAccessToken.pure[IO])
+      givenFindAccessToken(by = projectId, returning = accessToken.some.pure[IO])
 
       val projectSlug = projectSlugs.generateSome
-      val singleProjectEndpoint: String Refined NonEmpty = "single-project"
       (gitLabClient
         .get(_: Uri, _: String Refined NonEmpty)(
           _: ResponseMappingF[IO, Either[UnauthorizedException, Option[projects.Slug]]]
         )(_: Option[AccessToken]))
-        .expects(uri"projects" / projectId.show, singleProjectEndpoint, *, maybeAccessToken)
+        .expects(uri"projects" / projectId, apiName, *, accessToken.some)
         .returning(projectSlug.asRight.pure[IO])
 
       fetcher.fetchGitLabProject(projectId).unsafeRunSync() shouldBe projectSlug.asRight
     }
 
+    "return None if no access token found for the project" in new TestCase {
+
+      givenFindAccessToken(by = projectId, returning = None.pure[IO])
+
+      fetcher.fetchGitLabProject(projectId).unsafeRunSync() shouldBe None.asRight
+    }
+
     "fail if finding access token fails" in new TestCase {
+
       val exception = exceptions.generateOne
       givenFindAccessToken(by = projectId, returning = exception.raiseError[IO, Option[AccessToken]])
 
@@ -107,16 +117,16 @@ class GitLabProjectFetcherSpec
   }
 
   private trait TestCase {
-    implicit val maybeAccessToken: Option[AccessToken] = accessTokens.generateOption
-    val projectId = projectIds.generateOne
+    val accessToken = accessTokens.generateOne
+    val projectId   = projectIds.generateOne
 
-    implicit val gitLabClient:      GitLabClient[IO]      = mock[GitLabClient[IO]]
-    implicit val accessTokenFinder: AccessTokenFinder[IO] = mock[AccessTokenFinder[IO]]
-    val fetcher = new GitLabProjectFetcherImpl[IO]
+    implicit val gitLabClient: GitLabClient[IO]          = mock[GitLabClient[IO]]
+    implicit val trClient:     TokenRepositoryClient[IO] = mock[TokenRepositoryClient[IO]]
+    val fetcher = new GitLabProjectFetcherImpl[IO](trClient)
 
     lazy val mapResponse = captureMapping(gitLabClient)(
       {
-        givenFindAccessToken(by = projectId, returning = maybeAccessToken.pure[IO])
+        givenFindAccessToken(by = projectId, returning = accessToken.some.pure[IO])
         fetcher.fetchGitLabProject(projectId).unsafeRunSync()
       },
       projectSlugs.generateOption.asRight[UnauthorizedException],
@@ -124,9 +134,9 @@ class GitLabProjectFetcherSpec
     )
 
     def givenFindAccessToken(by: projects.GitLabId, returning: IO[Option[AccessToken]]) =
-      (accessTokenFinder
-        .findAccessToken(_: projects.GitLabId)(_: projects.GitLabId => String))
-        .expects(by, projectIdToPath)
+      (trClient
+        .findAccessToken(_: projects.GitLabId))
+        .expects(by)
         .returning(returning)
   }
 

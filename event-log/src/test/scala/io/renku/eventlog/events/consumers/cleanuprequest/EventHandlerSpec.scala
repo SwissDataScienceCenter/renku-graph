@@ -1,5 +1,5 @@
 /*
- * Copyright 2023 Swiss Data Science Center (SDSC)
+ * Copyright 2024 Swiss Data Science Center (SDSC)
  * A partnership between École Polytechnique Fédérale de Lausanne (EPFL) and
  * Eidgenössische Technische Hochschule Zürich (ETHZ).
  *
@@ -20,9 +20,10 @@ package io.renku.eventlog.events.consumers.cleanuprequest
 
 import cats.effect.IO
 import cats.syntax.all._
-import io.circe.{Encoder, Json}
+import io.circe.Json
 import io.circe.literal._
 import io.circe.syntax._
+import io.renku.eventlog.api.events.CleanUpRequest
 import io.renku.events.EventRequestContent
 import io.renku.generators.Generators.Implicits._
 import io.renku.graph.model.GraphModelGenerators.{projectIds, projectSlugs}
@@ -33,9 +34,9 @@ import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
 
 class EventHandlerSpec extends AnyWordSpec with IOSpec with MockFactory with should.Matchers {
-  val fullEvent:    CleanUpRequestEvent = CleanUpRequestEvent.Full(projectIds.generateOne, projectSlugs.generateOne)
-  val partialEvent: CleanUpRequestEvent = CleanUpRequestEvent.Partial(projectSlugs.generateOne)
-  val events: List[CleanUpRequestEvent] = List(fullEvent, partialEvent)
+  val fullEvent:    CleanUpRequest       = CleanUpRequest.Full(projectIds.generateOne, projectSlugs.generateOne)
+  val partialEvent: CleanUpRequest       = CleanUpRequest.Partial(projectSlugs.generateOne)
+  val events:       List[CleanUpRequest] = List(fullEvent, partialEvent)
 
   "createHandlingDefinition.decode" should {
     events.foreach { event =>
@@ -72,24 +73,5 @@ class EventHandlerSpec extends AnyWordSpec with IOSpec with MockFactory with sho
     implicit val logger: TestLogger[IO] = TestLogger[IO]()
     val processor = mock[EventProcessor[IO]]
     val handler   = new EventHandler[IO](processor)
-
-    implicit val eventRequestEncoder: Encoder[CleanUpRequestEvent] =
-      Encoder.instance {
-        case CleanUpRequestEvent.Full(id, slug) =>
-          json"""{
-              "categoryName": "CLEAN_UP_REQUEST",
-              "project": {
-                "id":   $id,
-                "slug": $slug
-              }
-            }"""
-        case CleanUpRequestEvent.Partial(slug) =>
-          json"""{
-              "categoryName": "CLEAN_UP_REQUEST",
-              "project": {
-                "slug": $slug
-              }
-            }"""
-      }
   }
 }

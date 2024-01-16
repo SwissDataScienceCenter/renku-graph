@@ -1,5 +1,5 @@
 /*
- * Copyright 2023 Swiss Data Science Center (SDSC)
+ * Copyright 2024 Swiss Data Science Center (SDSC)
  * A partnership between École Polytechnique Fédérale de Lausanne (EPFL) and
  * Eidgenössische Technische Hochschule Zürich (ETHZ).
  *
@@ -19,6 +19,7 @@
 package io.renku.triplesgenerator.events.consumers.tsmigrationrequest.migrations.tooling
 
 import cats.effect.IO
+import cats.effect.testing.scalatest.AsyncIOSpec
 import eu.timepit.refined.auto._
 import io.circe.Decoder
 import io.renku.generators.Generators.Implicits._
@@ -27,47 +28,44 @@ import io.renku.generators.jsonld.JsonLDGenerators.entityIds
 import io.renku.graph.model.Schemas.schema
 import io.renku.interpreters.TestLogger
 import io.renku.logging.TestSparqlQueryTimeRecorder
-import io.renku.testtools.IOSpec
+import io.renku.triplesstore.ResultsDecoder._
 import io.renku.triplesstore.SparqlQuery.Prefixes
 import io.renku.triplesstore._
 import io.renku.triplesstore.client.model.Quad
 import io.renku.triplesstore.client.syntax._
+import org.scalatest.Succeeded
 import org.scalatest.matchers.should
-import org.scalatest.wordspec.AnyWordSpec
+import org.scalatest.wordspec.AsyncWordSpec
 
-class RecordsFinderSpec
-    extends AnyWordSpec
-    with should.Matchers
-    with InMemoryJenaForSpec
-    with ProjectsDataset
-    with IOSpec {
+class RecordsFinderSpec extends AsyncWordSpec with AsyncIOSpec with GraphJenaSpec with should.Matchers {
 
   "findRecords" should {
 
-    "use the given query and decoder and run it against the TS" in new TestCase {
-
+    "use the given query and decoder and run it against the TS" in projectsDSConfig.use { implicit pcc =>
       val graphId  = entityIds.generateOne
       val entityId = entityIds.generateOne
       val name     = nonEmptyStrings().generateOne
-      insert(to = projectsDataset, Quad(graphId, entityId, schema / "name", name.asTripleObject))
-
       implicit val decoder: Decoder[List[String]] =
         ResultsDecoder[List, String](implicit cur => extract[String]("name"))
 
-      client
-        .findRecords[String](
-          SparqlQuery.of(nonBlankStrings().generateOne,
-                         Prefixes of schema -> "schema",
-                         "SELECT ?name WHERE { GRAPH ?g { ?s schema:name ?name } }"
-          )
-        )
-        .unsafeRunSync() shouldBe List(name)
+      for {
+        _ <- insert(Quad(graphId, entityId, schema / "name", name.asTripleObject))
+
+        _ <- client
+               .findRecords[String](
+                 SparqlQuery.of(nonBlankStrings().generateOne,
+                                Prefixes of schema -> "schema",
+                                "SELECT ?name WHERE { GRAPH ?g { ?s schema:name ?name } }"
+                 )
+               )
+               .asserting(_ shouldBe List(name))
+      } yield Succeeded
     }
   }
 
-  private trait TestCase {
-    private implicit val logger:       TestLogger[IO]              = TestLogger[IO]()
-    private implicit val timeRecorder: SparqlQueryTimeRecorder[IO] = TestSparqlQueryTimeRecorder[IO].unsafeRunSync()
-    val client = new RecordsFinderImpl[IO](projectsDSConnectionInfo)
+  private implicit lazy val logger: TestLogger[IO] = TestLogger[IO]()
+  private def client(implicit pcc: ProjectsConnectionConfig) = {
+    implicit val tr: SparqlQueryTimeRecorder[IO] = TestSparqlQueryTimeRecorder.createUnsafe
+    new RecordsFinderImpl[IO](pcc)
   }
 }

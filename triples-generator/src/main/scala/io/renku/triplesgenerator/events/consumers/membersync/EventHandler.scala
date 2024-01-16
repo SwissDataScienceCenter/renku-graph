@@ -1,5 +1,5 @@
 /*
- * Copyright 2023 Swiss Data Science Center (SDSC)
+ * Copyright 2024 Swiss Data Science Center (SDSC)
  * A partnership between École Polytechnique Fédérale de Lausanne (EPFL) and
  * Eidgenössische Technische Hochschule Zürich (ETHZ).
  *
@@ -27,7 +27,6 @@ import io.renku.events.consumers.ProcessExecutor
 import io.renku.events.consumers.subscriptions.SubscriptionMechanism
 import io.renku.events.{CategoryName, consumers}
 import io.renku.graph.model.projects
-import io.renku.graph.tokenrepository.AccessTokenFinder
 import io.renku.http.client.GitLabClient
 import io.renku.lock.Lock
 import io.renku.lock.syntax._
@@ -65,9 +64,7 @@ private object EventHandler {
 
   import eu.timepit.refined.auto._
 
-  def apply[F[
-      _
-  ]: Async: Network: ReProvisioningStatus: GitLabClient: AccessTokenFinder: MetricsRegistry: SparqlQueryTimeRecorder: Logger](
+  def apply[F[_]: Async: Network: ReProvisioningStatus: GitLabClient: MetricsRegistry: SparqlQueryTimeRecorder: Logger](
       subscriptionMechanism: SubscriptionMechanism[F],
       tsWriteLock:           TsWriteLock[F],
       projectSparqlClient:   ProjectSparqlClient[F],

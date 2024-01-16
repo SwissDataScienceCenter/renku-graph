@@ -1,5 +1,5 @@
 /*
- * Copyright 2023 Swiss Data Science Center (SDSC)
+ * Copyright 2024 Swiss Data Science Center (SDSC)
  * A partnership between École Polytechnique Fédérale de Lausanne (EPFL) and
  * Eidgenössische Technische Hochschule Zürich (ETHZ).
  *
@@ -19,6 +19,7 @@
 package io.renku.eventlog.events.consumers.statuschange
 package projecteventstonew
 
+import cats.NonEmptyParallel
 import cats.data.Kleisli
 import cats.effect.Async
 import cats.syntax.all._
@@ -37,7 +38,6 @@ import io.renku.events.consumers.Project
 import io.renku.graph.model.events.EventStatus.{AwaitingDeletion, Deleting, GeneratingTriples, New, Skipped}
 import io.renku.graph.model.events.{EventDate, EventStatus, ExecutionDate}
 import io.renku.graph.model.projects
-import io.renku.graph.tokenrepository.AccessTokenFinder
 import io.renku.metrics.MetricsRegistry
 import org.typelevel.log4cats.Logger
 import skunk._
@@ -51,7 +51,7 @@ private[statuschange] trait DequeuedEventHandler[F[_]] extends DBUpdater[F, Proj
 
 private[statuschange] object DequeuedEventHandler {
 
-  def apply[F[_]: Async: AccessTokenFinder: Logger: QueriesExecutionTimes: MetricsRegistry]
+  def apply[F[_]: Async: NonEmptyParallel: Logger: QueriesExecutionTimes: MetricsRegistry]
       : F[DBUpdater[F, ProjectEventsToNew]] =
     ProjectCleaner[F].map(new DequeuedEventHandlerImpl(_))
 

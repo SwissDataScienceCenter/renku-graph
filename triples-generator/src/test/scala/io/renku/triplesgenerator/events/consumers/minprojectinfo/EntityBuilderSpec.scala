@@ -1,5 +1,5 @@
 /*
- * Copyright 2023 Swiss Data Science Center (SDSC)
+ * Copyright 2024 Swiss Data Science Center (SDSC)
  * A partnership between École Polytechnique Fédérale de Lausanne (EPFL) and
  * Eidgenössische Technische Hochschule Zürich (ETHZ).
  *
@@ -108,15 +108,15 @@ class EntityBuilderSpec
   }
 
   private trait TestCase {
-    implicit val maybeAccessToken: Option[AccessToken] = accessTokens.generateOption
+    implicit val accessToken: AccessToken = accessTokens.generateOne
     private val projectInfoFinder = mock[ProjectInfoFinder[Try]]
     val entityBuilder             = new EntityBuilderImpl[Try](projectInfoFinder)
 
     def givenFindProjectInfo(projectSlug: projects.Slug) = new {
       def returning(result: EitherT[Try, ProcessingRecoverableError, Option[GitLabProjectInfo]]) =
         (projectInfoFinder
-          .findProjectInfo(_: projects.Slug)(_: Option[AccessToken]))
-          .expects(projectSlug, maybeAccessToken)
+          .findProjectInfo(_: projects.Slug)(_: AccessToken))
+          .expects(projectSlug, accessToken)
           .returning(result)
     }
   }

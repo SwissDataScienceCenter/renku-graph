@@ -1,5 +1,5 @@
 /*
- * Copyright 2023 Swiss Data Science Center (SDSC)
+ * Copyright 2024 Swiss Data Science Center (SDSC)
  * A partnership between École Polytechnique Fédérale de Lausanne (EPFL) and
  * Eidgenössische Technische Hochschule Zürich (ETHZ).
  *
@@ -38,7 +38,7 @@ trait EventsQueuePostgresSpec extends PostgresSpec[TestDB] { self: Suite =>
 
   private type IOChannel = Channel[IO, String, String]
 
-  lazy val server: PostgresServer = EventsQueuePostgresServer
+  lazy val server: PostgresServer = PostgresServer
 
   implicit val logger: TestLogger[IO] = TestLogger()
   private val timeout     = 10 seconds

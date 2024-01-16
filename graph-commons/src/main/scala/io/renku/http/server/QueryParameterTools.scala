@@ -1,5 +1,5 @@
 /*
- * Copyright 2023 Swiss Data Science Center (SDSC)
+ * Copyright 2024 Swiss Data Science Center (SDSC)
  * A partnership between École Polytechnique Fédérale de Lausanne (EPFL) and
  * Eidgenössische Technische Hochschule Zürich (ETHZ).
  *
@@ -23,6 +23,7 @@ import cats.data.NonEmptyList
 import eu.timepit.refined.auto._
 import io.renku.data.Message
 import org.http4s.{ParseFailure, Response, Status}
+import io.renku.http.RenkuEntityCodec._
 
 object QueryParameterTools {
 

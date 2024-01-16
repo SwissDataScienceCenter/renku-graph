@@ -1,5 +1,5 @@
 /*
- * Copyright 2023 Swiss Data Science Center (SDSC)
+ * Copyright 2024 Swiss Data Science Center (SDSC)
  * A partnership between École Polytechnique Fédérale de Lausanne (EPFL) and
  * Eidgenössische Technische Hochschule Zürich (ETHZ).
  *
@@ -29,6 +29,8 @@ import scala.concurrent.duration._
 trait FusekiClient[F[_]] {
 
   def createDataset(name: String, persistent: Boolean): F[Unit]
+
+  def createDataset(definition: DatasetDefinition): F[Unit]
 
   def deleteDataset(name: String): F[Unit]
 

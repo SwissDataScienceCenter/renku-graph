@@ -1,5 +1,5 @@
 /*
- * Copyright 2023 Swiss Data Science Center (SDSC)
+ * Copyright 2024 Swiss Data Science Center (SDSC)
  * A partnership between École Polytechnique Fédérale de Lausanne (EPFL) and
  * Eidgenössische Technische Hochschule Zürich (ETHZ).
  *
@@ -27,7 +27,7 @@ import eu.timepit.refined.string.MatchesRegex
 import io.circe.parser._
 import io.circe.{Decoder, HCursor, Json}
 import io.renku.crypto.AesCrypto
-import io.renku.crypto.AesCrypto.Secret
+import io.renku.crypto.Secret
 import io.renku.graph.model.projects.GitLabId
 import io.renku.tinytypes.json.TinyTypeDecoders._
 import io.renku.webhookservice.crypto.HookTokenCrypto.SerializedHookToken
@@ -83,6 +83,7 @@ class HookTokenCryptoImpl[F[_]: MonadThrow](
 object HookTokenCrypto {
 
   import io.renku.config.ConfigLoader._
+  import io.renku.crypto.SecretConfigReader._
 
   def apply[F[_]: MonadThrow](config: Config = ConfigFactory.load()): F[HookTokenCrypto[F]] =
     find[F, Secret]("services.gitlab.hook-token-secret", config)

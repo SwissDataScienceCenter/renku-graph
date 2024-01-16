@@ -1,5 +1,5 @@
 /*
- * Copyright 2023 Swiss Data Science Center (SDSC)
+ * Copyright 2024 Swiss Data Science Center (SDSC)
  * A partnership between École Polytechnique Fédérale de Lausanne (EPFL) and
  * Eidgenössische Technische Hochschule Zürich (ETHZ).
  *
@@ -19,101 +19,95 @@
 package io.renku.eventlog.events.producers.zombieevents
 
 import cats.effect.IO
+import cats.effect.testing.scalatest.AsyncIOSpec
 import cats.syntax.all._
-import io.renku.eventlog.InMemoryEventLogDbSpec
-import io.renku.eventlog.metrics.QueriesExecutionTimes
+import io.renku.db.DBConfigProvider.DBConfig
+import io.renku.eventlog.metrics.{QueriesExecutionTimes, TestQueriesExecutionTimes}
+import io.renku.eventlog.{EventLogDB, EventLogPostgresSpec}
 import io.renku.generators.Generators.Implicits._
 import io.renku.generators.Generators.relativeTimestamps
 import io.renku.graph.model.EventContentGenerators.{eventDates, executionDates}
 import io.renku.graph.model.EventsGenerators.{compoundEventIds, eventBodies, eventStatuses, processingStatuses}
 import io.renku.graph.model.GraphModelGenerators._
 import io.renku.graph.model.events._
-import io.renku.metrics.TestMetricsRegistry
-import io.renku.testtools.IOSpec
+import org.scalamock.scalatest.AsyncMockFactory
+import org.scalatest.Succeeded
+import org.scalatest.flatspec.AsyncFlatSpec
 import org.scalatest.matchers.should
-import org.scalatest.wordspec.AnyWordSpec
 
 import java.time.Duration
 
-class LostZombieEventFinderSpec extends AnyWordSpec with IOSpec with InMemoryEventLogDbSpec with should.Matchers {
+class LostZombieEventFinderSpec
+    extends AsyncFlatSpec
+    with AsyncIOSpec
+    with EventLogPostgresSpec
+    with AsyncMockFactory
+    with should.Matchers {
+  private val projectSlug = projectSlugs.generateOne
 
-  "popEvent" should {
-    "do nothing if there are no zombie events in the table" in new TestCase {
-      addRandomEvent()
-      finder.popEvent().unsafeRunSync() shouldBe None
-    }
-
-    "do nothing if there are zombie events in the table but all were added less than 5 minutes ago" in new TestCase {
-      addRandomEvent()
-      addZombieEvent(compoundEventIds.generateOne, activeZombieEventExecutionDate.generateOne)
-      addZombieEvent(compoundEventIds.generateOne, activeZombieEventExecutionDate.generateOne)
-
-      finder.popEvent().unsafeRunSync() shouldBe None
-    }
-
-    "return a zombie event which has not been picked up" in new TestCase {
-      addRandomEvent()
-      addZombieEvent(compoundEventIds.generateOne, activeZombieEventExecutionDate.generateOne)
-
-      val zombieEventId: CompoundEventId = compoundEventIds.generateOne
-      val zombieEventStatus = processingStatuses.generateOne
-      addZombieEvent(zombieEventId, lostZombieEventExecutionDate.generateOne, zombieEventStatus)
-
-      finder.popEvent().unsafeRunSync() shouldBe ZombieEvent(finder.processName,
-                                                             zombieEventId,
-                                                             projectSlug,
-                                                             zombieEventStatus
-      ).some
-
-      finder.popEvent().unsafeRunSync() shouldBe None
-    }
-
-    "return None if an event is in the past and the status is GeneratingTriples or TransformingTriples " +
-      "but the message is not a zombie message" in new TestCase {
-        addRandomEvent(lostZombieEventExecutionDate.generateOne, processingStatuses.generateOne)
-        addZombieEvent(compoundEventIds.generateOne, activeZombieEventExecutionDate.generateOne)
-
-        finder.popEvent().unsafeRunSync() shouldBe None
-      }
+  it should "do nothing if there are no zombie events in the table" in testDBResource.use { implicit cfg =>
+    addRandomEvent() >>
+      finder.popEvent().asserting(_ shouldBe None)
   }
 
-  private trait TestCase {
+  it should "do nothing if there are zombie events in the table but all were added less than 5 minutes ago" in testDBResource
+    .use { implicit cfg =>
+      addRandomEvent() >>
+        addZombieEvent(compoundEventIds.generateOne, activeZombieEventExecutionDate.generateOne) >>
+        addZombieEvent(compoundEventIds.generateOne, activeZombieEventExecutionDate.generateOne) >>
+        finder.popEvent().asserting(_ shouldBe None)
+    }
 
-    val executionDateThreshold = 5 * 60
+  it should "return a zombie event which has not been picked up" in testDBResource.use { implicit cfg =>
+    for {
+      _ <- addRandomEvent()
+      _ <- addZombieEvent(compoundEventIds.generateOne, activeZombieEventExecutionDate.generateOne)
 
-    val activeZombieEventExecutionDate =
-      relativeTimestamps(lessThanAgo = Duration.ofSeconds(executionDateThreshold - 2)).toGeneratorOf(ExecutionDate)
+      zombieEventId     = compoundEventIds.generateOne
+      zombieEventStatus = processingStatuses.generateOne
+      _ <- addZombieEvent(zombieEventId, lostZombieEventExecutionDate.generateOne, zombieEventStatus)
 
-    val lostZombieEventExecutionDate =
-      relativeTimestamps(moreThanAgo = Duration.ofSeconds(executionDateThreshold + 2)).toGeneratorOf(ExecutionDate)
+      _ <- finder
+             .popEvent()
+             .asserting(_ shouldBe ZombieEvent(finder.processName, zombieEventId, projectSlug, zombieEventStatus).some)
 
-    val projectSlug = projectSlugs.generateOne
-
-    private implicit val metricsRegistry:  TestMetricsRegistry[IO]   = TestMetricsRegistry[IO]
-    private implicit val queriesExecTimes: QueriesExecutionTimes[IO] = QueriesExecutionTimes[IO]().unsafeRunSync()
-    val finder = new LostZombieEventFinder[IO]
-
-    def addRandomEvent(executionDate: ExecutionDate = executionDates.generateOne,
-                       status:        EventStatus = eventStatuses.generateOne
-    ): Unit = storeEvent(
-      compoundEventIds.generateOne,
-      status,
-      executionDate,
-      eventDates.generateOne,
-      eventBodies.generateOne
-    )
-
-    def addZombieEvent(eventId:       CompoundEventId,
-                       executionDate: ExecutionDate,
-                       status:        EventStatus = processingStatuses.generateOne
-    ): Unit = storeEvent(
-      eventId,
-      status,
-      executionDate,
-      eventDates.generateOne,
-      eventBodies.generateOne,
-      projectSlug = projectSlug,
-      maybeMessage = Some(EventMessage(zombieMessage))
-    )
+      _ <- finder.popEvent().asserting(_ shouldBe None)
+    } yield Succeeded
   }
+
+  it should "return None if an event is in the past and the status is GeneratingTriples or TransformingTriples " +
+    "but the message is not a zombie message" in testDBResource.use { implicit cfg =>
+      addRandomEvent(lostZombieEventExecutionDate.generateOne, processingStatuses.generateOne) >>
+        addZombieEvent(compoundEventIds.generateOne, activeZombieEventExecutionDate.generateOne) >>
+        finder.popEvent().asserting(_ shouldBe None)
+    }
+
+  private val executionDateThreshold = Duration.ofMinutes(5)
+  private lazy val activeZombieEventExecutionDate =
+    relativeTimestamps(lessThanAgo = executionDateThreshold minus Duration.ofSeconds(10)).toGeneratorOf(ExecutionDate)
+  private lazy val lostZombieEventExecutionDate =
+    relativeTimestamps(moreThanAgo = executionDateThreshold plus Duration.ofSeconds(10)).toGeneratorOf(ExecutionDate)
+
+  private def finder(implicit cfg: DBConfig[EventLogDB]) = {
+    implicit val qet: QueriesExecutionTimes[IO] = TestQueriesExecutionTimes[IO]
+    new LostZombieEventFinder[IO]
+  }
+
+  private def addRandomEvent(executionDate: ExecutionDate = executionDates.generateOne,
+                             status:        EventStatus = eventStatuses.generateOne
+  )(implicit cfg: DBConfig[EventLogDB]): IO[Unit] =
+    storeEvent(compoundEventIds.generateOne, status, executionDate, eventDates.generateOne, eventBodies.generateOne)
+
+  private def addZombieEvent(eventId:       CompoundEventId,
+                             executionDate: ExecutionDate,
+                             status:        EventStatus = processingStatuses.generateOne
+  )(implicit cfg: DBConfig[EventLogDB]): IO[Unit] =
+    storeEvent(eventId,
+               status,
+               executionDate,
+               eventDates.generateOne,
+               eventBodies.generateOne,
+               projectSlug = projectSlug,
+               maybeMessage = Some(EventMessage(zombieMessage))
+    )
 }

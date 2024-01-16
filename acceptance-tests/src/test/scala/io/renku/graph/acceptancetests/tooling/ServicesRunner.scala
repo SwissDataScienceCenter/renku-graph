@@ -1,5 +1,5 @@
 /*
- * Copyright 2023 Swiss Data Science Center (SDSC)
+ * Copyright 2024 Swiss Data Science Center (SDSC)
  * A partnership between École Polytechnique Fédérale de Lausanne (EPFL) and
  * Eidgenössische Technische Hochschule Zürich (ETHZ).
  *
@@ -47,7 +47,7 @@ class ServicesRunner(semaphore: Semaphore[IO])(implicit logger: Logger[IO]) {
 
   import scala.concurrent.duration._
 
-  def run(services: ServiceRun*)(implicit ioRuntime: IORuntime): IO[Unit] =
+  def run(services: ServiceRun*): IO[Unit] =
     semaphore.tryPermit.use {
       case false =>
         new Exception("A permit to run services wasn't acquired").raiseError[IO, Unit]
@@ -57,7 +57,7 @@ class ServicesRunner(semaphore: Semaphore[IO])(implicit logger: Logger[IO]) {
         }
     }
 
-  private def start(serviceRun: ServiceRun)(implicit ioRuntime: IORuntime): IO[Unit] = {
+  private def start(serviceRun: ServiceRun): IO[Unit] = {
     import serviceRun._
     serviceClient.ping >>= {
       case ServiceUp => IO.unit

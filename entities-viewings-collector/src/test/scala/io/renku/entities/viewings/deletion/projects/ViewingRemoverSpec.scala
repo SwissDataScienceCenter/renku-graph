@@ -1,5 +1,5 @@
 /*
- * Copyright 2023 Swiss Data Science Center (SDSC)
+ * Copyright 2024 Swiss Data Science Center (SDSC)
  * A partnership between École Polytechnique Fédérale de Lausanne (EPFL) and
  * Eidgenössische Technische Hochschule Zürich (ETHZ).
  *
@@ -20,8 +20,10 @@ package io.renku.entities.viewings
 package deletion.projects
 
 import cats.effect.IO
+import cats.effect.testing.scalatest.AsyncIOSpec
 import cats.syntax.all._
 import eu.timepit.refined.auto._
+import io.renku.entities.searchgraphs.TestSearchInfoDatasets
 import io.renku.entities.viewings.collector.projects.viewed.EventPersister
 import io.renku.generators.Generators.Implicits._
 import io.renku.generators.Generators.fixed
@@ -30,125 +32,128 @@ import io.renku.graph.model.testentities._
 import io.renku.graph.model.{GraphClass, persons, projects}
 import io.renku.interpreters.TestLogger
 import io.renku.jsonld.syntax._
-import io.renku.logging.TestSparqlQueryTimeRecorder
-import io.renku.testtools.IOSpec
 import io.renku.triplesgenerator.api.events.Generators._
 import io.renku.triplesgenerator.api.events.{ProjectViewingDeletion, UserId}
 import io.renku.triplesstore.SparqlQuery.Prefixes
 import io.renku.triplesstore._
 import io.renku.triplesstore.client.syntax._
-import org.scalatest.OptionValues
 import org.scalatest.matchers.should
-import org.scalatest.wordspec.AnyWordSpec
+import org.scalatest.wordspec.AsyncWordSpec
+import org.scalatest.{OptionValues, Succeeded}
 
 class ViewingRemoverSpec
-    extends AnyWordSpec
+    extends AsyncWordSpec
+    with AsyncIOSpec
+    with GraphJenaSpec
+    with TestSearchInfoDatasets
     with should.Matchers
-    with OptionValues
-    with IOSpec
-    with InMemoryJenaForSpec
-    with ProjectsDataset {
+    with OptionValues {
 
   "removeViewing" should {
 
-    "remove the relevant triples from the ProjectViewedTime and PersonViewing graphs" in new TestCase {
+    "remove the relevant triples from the ProjectViewedTime and PersonViewing graphs" in projectsDSConfig.use {
+      implicit pcc =>
+        val userId  = userIds.generateOne
+        val project = generateProjectWithCreator(userId)
+        for {
+          _ <- insertViewing(project, userId)
 
-      val userId  = userIds.generateOne
-      val project = generateProjectWithCreator(userId)
-      insertViewing(project, userId)
+          otherProject = generateProjectWithCreator(userId)
+          _ <- insertViewing(otherProject, userId)
 
-      val otherProject = generateProjectWithCreator(userId)
-      insertViewing(otherProject, userId)
+          personId = otherProject.maybeCreator.value.resourceId
+          _ <- findProjectsWithViewings.asserting(_ shouldBe Set(project.resourceId, otherProject.resourceId))
+          _ <- findPersonViewings.asserting(
+                 _ shouldBe Set(personId -> project.resourceId, personId -> otherProject.resourceId)
+               )
 
-      val personId = otherProject.maybeCreator.value.resourceId
-      findProjectsWithViewings shouldBe Set(project.resourceId, otherProject.resourceId)
-      findPersonViewings       shouldBe Set(personId -> project.resourceId, personId -> otherProject.resourceId)
+          event = ProjectViewingDeletion(project.slug)
 
-      val event = ProjectViewingDeletion(project.slug)
+          _ <- remover.removeViewing(event).assertNoException
 
-      remover.removeViewing(event).unsafeRunSync() shouldBe ()
-
-      findProjectsWithViewings shouldBe Set(otherProject.resourceId)
-      findPersonViewings       shouldBe Set(personId -> otherProject.resourceId)
+          _ <- findProjectsWithViewings.asserting(_ shouldBe Set(otherProject.resourceId))
+          _ <- findPersonViewings.asserting(_ shouldBe Set(personId -> otherProject.resourceId))
+        } yield Succeeded
     }
 
     "remove all person data from the PersonViewing graph " +
-      "if he had viewings only from the project that is gone" in new TestCase {
-
+      "if he had viewings only from the project that is gone" in projectsDSConfig.use { implicit pcc =>
         val userId  = userIds.generateOne
         val project = generateProjectWithCreator(userId)
-        insertViewing(project, userId)
+        for {
+          _ <- insertViewing(project, userId)
 
-        val otherUserId  = userIds.generateOne
-        val otherProject = generateProjectWithCreator(otherUserId)
-        insertViewing(otherProject, otherUserId)
+          otherUserId  = userIds.generateOne
+          otherProject = generateProjectWithCreator(otherUserId)
+          _ <- insertViewing(otherProject, otherUserId)
 
-        val personId      = project.maybeCreator.value.resourceId
-        val otherPersonId = otherProject.maybeCreator.value.resourceId
-        findProjectsWithViewings shouldBe Set(project.resourceId, otherProject.resourceId)
-        findPersonViewings       shouldBe Set(personId -> project.resourceId, otherPersonId -> otherProject.resourceId)
+          personId      = project.maybeCreator.value.resourceId
+          otherPersonId = otherProject.maybeCreator.value.resourceId
+          _ <- findProjectsWithViewings.asserting(_ shouldBe Set(project.resourceId, otherProject.resourceId))
+          _ <- findPersonViewings.asserting(
+                 _ shouldBe Set(personId -> project.resourceId, otherPersonId -> otherProject.resourceId)
+               )
 
-        val event = ProjectViewingDeletion(project.slug)
+          event = ProjectViewingDeletion(project.slug)
 
-        remover.removeViewing(event).unsafeRunSync() shouldBe ()
+          _ <- remover.removeViewing(event).assertNoException
 
-        findProjectsWithViewings             shouldBe Set(otherProject.resourceId)
-        findPersonViewings                   shouldBe Set(otherPersonId -> otherProject.resourceId)
-        countPersonViewingsTriples(personId) shouldBe 0
+          _ <- findProjectsWithViewings.asserting(_ shouldBe Set(otherProject.resourceId))
+          _ <- findPersonViewings.asserting(_ shouldBe Set(otherPersonId -> otherProject.resourceId))
+          _ <- countPersonViewingsTriples(personId).asserting(_ shouldBe 0)
+        } yield Succeeded
       }
 
-    "do nothing if there's no project with the given slug" in new TestCase {
+    "do nothing if there's no project with the given slug" in projectsDSConfig.use { implicit pcc =>
+      for {
+        _ <- findProjectsWithViewings.asserting(_ shouldBe Set.empty)
 
-      findProjectsWithViewings shouldBe Set.empty
+        event = ProjectViewingDeletion(projectSlugs.generateOne)
 
-      val event = ProjectViewingDeletion(projectSlugs.generateOne)
+        _ <- remover.removeViewing(event).assertNoException
 
-      remover.removeViewing(event).unsafeRunSync() shouldBe ()
-
-      findProjectsWithViewings shouldBe Set.empty
+        _ <- findProjectsWithViewings.asserting(_ shouldBe Set.empty)
+      } yield Succeeded
     }
 
-    "do nothing if there are no triples in the PersonViewing graph for the given slug" in new TestCase {
+    "do nothing if there are no triples in the PersonViewing graph for the given slug" in projectsDSConfig.use {
+      implicit pcc =>
+        val userId  = userIds.generateOne
+        val project = generateProjectWithCreator(userId)
 
-      val userId  = userIds.generateOne
-      val project = generateProjectWithCreator(userId)
+        for {
+          _ <- provisionTestProject(project)
 
-      upload(to = projectsDataset, project)
+          projectViewedEvent = projectViewedEvents.generateOne.copy(slug = project.slug, maybeUserId = None)
 
-      val projectViewedEvent = projectViewedEvents.generateOne.copy(slug = project.slug, maybeUserId = None)
+          _ <- eventPersister.persist(projectViewedEvent).assertNoException
 
-      eventPersister.persist(projectViewedEvent).unsafeRunSync()
+          _ <- findProjectsWithViewings.asserting(_ shouldBe Set(project.resourceId))
+          _ <- findPersonViewings.asserting(_ shouldBe Set.empty)
 
-      findProjectsWithViewings shouldBe Set(project.resourceId)
-      findPersonViewings       shouldBe Set.empty
+          viewingDeletionEvent = ProjectViewingDeletion(project.slug)
 
-      val viewingDeletionEvent = ProjectViewingDeletion(project.slug)
+          _ <- remover.removeViewing(viewingDeletionEvent).assertNoException
 
-      remover.removeViewing(viewingDeletionEvent).unsafeRunSync() shouldBe ()
-
-      findProjectsWithViewings                                          shouldBe Set.empty
-      findPersonViewings                                                shouldBe Set.empty
-      countPersonViewingsTriples(project.maybeCreator.value.resourceId) shouldBe 0
-    }
-  }
-
-  private trait TestCase {
-    private implicit val logger: TestLogger[IO]              = TestLogger[IO]()
-    private implicit val sqtr:   SparqlQueryTimeRecorder[IO] = TestSparqlQueryTimeRecorder[IO].unsafeRunSync()
-    val remover = new ViewingRemoverImpl[IO](TSClient[IO](projectsDSConnectionInfo))
-
-    private val tsClient = TSClient[IO](projectsDSConnectionInfo)
-    val eventPersister   = EventPersister[IO](tsClient)
-
-    def insertViewing(project: Project, userId: UserId): Unit = {
-
-      upload(to = projectsDataset, project)
-
-      val event = projectViewedEvents.generateOne.copy(slug = project.slug, maybeUserId = userId.some)
-
-      eventPersister.persist(event).unsafeRunSync()
+          _ <- findProjectsWithViewings.asserting(_ shouldBe Set.empty)
+          _ <- findPersonViewings.asserting(_ shouldBe Set.empty)
+          _ <- countPersonViewingsTriples(project.maybeCreator.value.resourceId).asserting(_ shouldBe 0)
+        } yield Succeeded
     }
   }
+
+  implicit val ioLogger: TestLogger[IO] = TestLogger[IO]()
+  private def remover(implicit pcc: ProjectsConnectionConfig) = new ViewingRemoverImpl[IO](tsClient)
+
+  private def eventPersister(implicit pcc: ProjectsConnectionConfig) = EventPersister[IO](tsClient)
+
+  private def insertViewing(project: Project, userId: UserId)(implicit pcc: ProjectsConnectionConfig) =
+    for {
+      _ <- provisionTestProject(project)
+
+      event = projectViewedEvents.generateOne.copy(slug = project.slug, maybeUserId = userId.some)
+      _ <- eventPersister.persist(event).assertNoException
+    } yield Succeeded
 
   private def generateProjectWithCreator(userId: UserId) = {
 
@@ -164,9 +169,8 @@ class ViewingRemoverSpec
       .generateOne
   }
 
-  private def findProjectsWithViewings =
+  private def findProjectsWithViewings(implicit pcc: ProjectsConnectionConfig) =
     runSelect(
-      on = projectsDataset,
       SparqlQuery.of(
         "test find project viewing",
         Prefixes of renku -> "renku",
@@ -176,13 +180,10 @@ class ViewingRemoverSpec
                  |}
                  |""".stripMargin
       )
-    ).unsafeRunSync()
-      .map(row => projects.ResourceId(row("id")))
-      .toSet
+    ).map(_.map(row => projects.ResourceId(row("id"))).toSet)
 
-  private def findPersonViewings =
+  private def findPersonViewings(implicit pcc: ProjectsConnectionConfig) =
     runSelect(
-      on = projectsDataset,
       SparqlQuery.of(
         "test find person viewing",
         Prefixes of renku -> "renku",
@@ -194,13 +195,10 @@ class ViewingRemoverSpec
                  |}
                  |""".stripMargin
       )
-    ).unsafeRunSync()
-      .map(row => persons.ResourceId(row("userId")) -> projects.ResourceId(row("projectId")))
-      .toSet
+    ).map(_.map(row => persons.ResourceId(row("userId")) -> projects.ResourceId(row("projectId"))).toSet)
 
-  private def countPersonViewingsTriples(personId: persons.ResourceId) =
+  private def countPersonViewingsTriples(personId: persons.ResourceId)(implicit pcc: ProjectsConnectionConfig) =
     runSelect(
-      on = projectsDataset,
       SparqlQuery.of(
         "test find person viewing triples count",
         Prefixes of renku -> "renku",
@@ -211,5 +209,5 @@ class ViewingRemoverSpec
                  |}
                  |""".stripMargin
       )
-    ).unsafeRunSync().size
+    ).map(_.size)
 }

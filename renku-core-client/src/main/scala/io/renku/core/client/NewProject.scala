@@ -1,5 +1,5 @@
 /*
- * Copyright 2023 Swiss Data Science Center (SDSC)
+ * Copyright 2024 Swiss Data Science Center (SDSC)
  * A partnership between École Polytechnique Fédérale de Lausanne (EPFL) and
  * Eidgenössische Technische Hochschule Zürich (ETHZ).
  *
@@ -38,8 +38,10 @@ object NewProject {
     case NewProject(projectRepository, namespace, name, maybeDescription, keywords, template, branch, _) =>
       Json.obj(
         List(
-          ("url"                -> template.repositoryUrl.asJson).some,
-          ("identifier"         -> template.identifier.asJson).some,
+          ("url"        -> template.repositoryUrl.asJson).some,
+          ("identifier" -> template.identifier.asJson).some,
+          template.maybeRef.map("ref" -> _.asJson),
+          template.maybeParameters.map("parameters" -> _.value.asJson),
           ("project_repository" -> projectRepository.asJson).some,
           ("project_namespace"  -> namespace.asJson).some,
           ("project_name"       -> name.asJson).some,

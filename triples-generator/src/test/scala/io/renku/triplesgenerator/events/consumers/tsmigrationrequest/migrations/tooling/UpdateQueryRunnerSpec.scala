@@ -1,5 +1,5 @@
 /*
- * Copyright 2023 Swiss Data Science Center (SDSC)
+ * Copyright 2024 Swiss Data Science Center (SDSC)
  * A partnership between École Polytechnique Fédérale de Lausanne (EPFL) and
  * Eidgenössische Technische Hochschule Zürich (ETHZ).
  *
@@ -19,6 +19,7 @@
 package io.renku.triplesgenerator.events.consumers.tsmigrationrequest.migrations.tooling
 
 import cats.effect.IO
+import cats.effect.testing.scalatest.AsyncIOSpec
 import eu.timepit.refined.auto._
 import io.renku.generators.Generators.Implicits._
 import io.renku.generators.Generators.nonEmptyStrings
@@ -26,22 +27,16 @@ import io.renku.generators.jsonld.JsonLDGenerators.entityIds
 import io.renku.graph.model.Schemas.schema
 import io.renku.interpreters.TestLogger
 import io.renku.logging.TestSparqlQueryTimeRecorder
-import io.renku.testtools.IOSpec
 import io.renku.triplesstore.SparqlQuery.Prefixes
 import io.renku.triplesstore._
 import org.scalatest.matchers.should
-import org.scalatest.wordspec.AnyWordSpec
+import org.scalatest.wordspec.AsyncWordSpec
 
-class UpdateQueryRunnerSpec
-    extends AnyWordSpec
-    with should.Matchers
-    with IOSpec
-    with InMemoryJenaForSpec
-    with ProjectsDataset {
+class UpdateQueryRunnerSpec extends AsyncWordSpec with AsyncIOSpec with GraphJenaSpec with should.Matchers {
 
   "run" should {
 
-    "execute the given update query" in new TestCase {
+    "execute the given update query" in projectsDSConfig.use { implicit pcc =>
       val string = nonEmptyStrings().generateOne
       val query = SparqlQuery.of(
         "test query",
@@ -49,27 +44,25 @@ class UpdateQueryRunnerSpec
         s"""INSERT DATA { GRAPH <$graphId> { <$entityId> schema:name '$string' } }""".stripMargin
       )
 
-      (runner run query).unsafeRunSync() shouldBe ()
-
-      findString shouldBe List(string)
+      (runner run query).assertNoException >>
+        findString.asserting(_ shouldBe List(string))
     }
   }
 
-  private trait TestCase {
-    val graphId  = entityIds.generateOne
-    val entityId = entityIds.generateOne
+  private lazy val graphId  = entityIds.generateOne
+  private lazy val entityId = entityIds.generateOne
 
-    private implicit val logger:       TestLogger[IO]              = TestLogger[IO]()
-    private implicit val timeRecorder: SparqlQueryTimeRecorder[IO] = TestSparqlQueryTimeRecorder[IO].unsafeRunSync()
-    val runner = new UpdateQueryRunnerImpl[IO](projectsDSConnectionInfo)
+  private implicit lazy val logger: TestLogger[IO] = TestLogger[IO]()
+  private def runner(implicit pcc: ProjectsConnectionConfig) = {
+    implicit val tr: SparqlQueryTimeRecorder[IO] = TestSparqlQueryTimeRecorder.createUnsafe
+    new UpdateQueryRunnerImpl[IO](pcc)
+  }
 
-    def findString = runSelect(
-      on = projectsDataset,
+  private def findString(implicit pcc: ProjectsConnectionConfig) =
+    runSelect(
       SparqlQuery.of("find triple",
                      Prefixes of schema -> "schema",
                      s"SELECT ?str WHERE { GRAPH <$graphId> { <$entityId> schema:name ?str } }"
       )
-    ).unsafeRunSync()
-      .map(_("str"))
-  }
+    ).map(_.map(_("str")))
 }

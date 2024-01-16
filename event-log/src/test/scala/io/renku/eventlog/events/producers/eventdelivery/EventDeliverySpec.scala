@@ -1,5 +1,5 @@
 /*
- * Copyright 2023 Swiss Data Science Center (SDSC)
+ * Copyright 2024 Swiss Data Science Center (SDSC)
  * A partnership between École Polytechnique Fédérale de Lausanne (EPFL) and
  * Eidgenössische Technische Hochschule Zürich (ETHZ).
  *
@@ -21,118 +21,135 @@ package eventdelivery
 
 import TestCompoundIdEvent.testCompoundIdEvent
 import cats.effect.IO
-import io.renku.eventlog.InMemoryEventLogDbSpec
-import io.renku.eventlog.metrics.QueriesExecutionTimes
+import cats.effect.testing.scalatest.AsyncIOSpec
+import io.renku.db.DBConfigProvider.DBConfig
+import io.renku.eventlog.metrics.{QueriesExecutionTimes, TestQueriesExecutionTimes}
+import io.renku.eventlog.{EventLogDB, EventLogPostgresSpec}
 import io.renku.events.Generators._
 import io.renku.generators.CommonGraphGenerators.microserviceBaseUrls
 import io.renku.generators.Generators.Implicits._
 import io.renku.graph.model.EventContentGenerators._
 import io.renku.graph.model.EventsGenerators._
 import io.renku.graph.model.events.CompoundEventId
-import io.renku.metrics.TestMetricsRegistry
-import io.renku.testtools.IOSpec
-import org.scalamock.scalatest.MockFactory
+import org.scalamock.scalatest.AsyncMockFactory
+import org.scalatest.Succeeded
+import org.scalatest.flatspec.AsyncFlatSpec
 import org.scalatest.matchers.should
-import org.scalatest.wordspec.AnyWordSpec
 
 class EventDeliverySpec
-    extends AnyWordSpec
-    with IOSpec
-    with InMemoryEventLogDbSpec
-    with MockFactory
+    extends AsyncFlatSpec
+    with AsyncIOSpec
+    with EventLogPostgresSpec
+    with AsyncMockFactory
     with should.Matchers {
 
-  "registerSending" should {
+  private val event         = testCompoundIdEvent.generateOne
+  private val subscriberId  = subscriberIds.generateOne
+  private val subscriberUrl = subscriberUrls.generateOne
+  private val sourceUrl     = microserviceBaseUrls.generateOne
 
-    "add association between the given event and subscriber id " +
-      "if it does not exist" in new TestCase {
+  it should "add association between the given event and subscriber id " +
+    "if it does not exist" in testDBResource.use { implicit cfg =>
+      for {
+        _ <- addEvent(event.compoundEventId)
 
-        addEvent(event.compoundEventId)
-        upsertSubscriber(subscriberId, subscriberUrl, sourceUrl)
-        upsertSubscriber(subscriberId, subscriberUrl, sourceUrl = microserviceBaseUrls.generateOne)
+        _ <- upsertSubscriber(subscriberId, subscriberUrl, sourceUrl)
+        _ <- upsertSubscriber(subscriberId, subscriberUrl, sourceUrl = microserviceBaseUrls.generateOne)
 
-        findAllEventDeliveries shouldBe Nil
+        _ <- findAllEventDeliveries.asserting(_ shouldBe Nil)
 
-        delivery.registerSending(event, subscriberUrl).unsafeRunSync() shouldBe ()
+        _ <- delivery.registerSending(event, subscriberUrl).assertNoException
 
-        findAllEventDeliveries shouldBe List(event.compoundEventId -> subscriberId)
+        _ <- findAllEventDeliveries.asserting(_ shouldBe List(FoundDelivery(event.compoundEventId, subscriberId)))
 
-        val otherEvent = testCompoundIdEvent.generateOne
-        addEvent(otherEvent.compoundEventId)
+        otherEvent = testCompoundIdEvent.generateOne
+        _ <- addEvent(otherEvent.compoundEventId)
 
-        delivery.registerSending(otherEvent, subscriberUrl).unsafeRunSync() shouldBe ()
+        _ <- delivery.registerSending(otherEvent, subscriberUrl).assertNoException
 
-        findAllEventDeliveries.toSet shouldBe Set(
-          event.compoundEventId      -> subscriberId,
-          otherEvent.compoundEventId -> subscriberId
-        )
-      }
-
-    "replace the delivery_id if the association between the given event and subscriber url already exists" in new TestCase {
-
-      addEvent(event.compoundEventId)
-      upsertSubscriber(subscriberId, subscriberUrl, sourceUrl)
-
-      delivery.registerSending(event, subscriberUrl).unsafeRunSync() shouldBe ()
-
-      findAllEventDeliveries shouldBe List(event.compoundEventId -> subscriberId)
-
-      val newSubscriberId = subscriberIds.generateOne
-      upsertSubscriber(newSubscriberId, subscriberUrl, sourceUrl)
-
-      delivery.registerSending(event, subscriberUrl).unsafeRunSync() shouldBe ()
-      findAllEventDeliveries shouldBe List(event.compoundEventId -> newSubscriberId)
+        _ <- findAllEventDeliveries.asserting(
+               _.toSet shouldBe Set(FoundDelivery(event.compoundEventId, subscriberId),
+                                    FoundDelivery(otherEvent.compoundEventId, subscriberId)
+               )
+             )
+      } yield Succeeded
     }
 
-    "update the delivery_id if the id is a DeletingProjectDeliverId" in new DeletingProjectTestCase {
-      addEvent(event.compoundEventId)
-      upsertSubscriber(subscriberId, subscriberUrl, sourceUrl)
+  it should "replace the delivery_id if the association between the given event and subscriber url already exists" in testDBResource
+    .use { implicit cfg =>
+      for {
+        _ <- addEvent(event.compoundEventId)
+        _ <- upsertSubscriber(subscriberId, subscriberUrl, sourceUrl)
 
-      delivery.registerSending(event, subscriberUrl).unsafeRunSync() shouldBe ()
+        _ <- delivery.registerSending(event, subscriberUrl).assertNoException
 
-      findAllProjectDeliveries shouldBe List((event.compoundEventId.projectId, subscriberId, DeletingProjectTypeId))
+        _ <- findAllEventDeliveries.asserting(_ shouldBe List(FoundDelivery(event.compoundEventId, subscriberId)))
+
+        newSubscriberId = subscriberIds.generateOne
+        _ <- upsertSubscriber(newSubscriberId, subscriberUrl, sourceUrl)
+
+        _ <- delivery.registerSending(event, subscriberUrl).assertNoException
+        _ <- findAllEventDeliveries.asserting(_ shouldBe List(FoundDelivery(event.compoundEventId, newSubscriberId)))
+      } yield Succeeded
     }
 
-    "do nothing if the same event is delivered twice with a DeletingProjectTypeId" in new DeletingProjectTestCase {
-      addEvent(event.compoundEventId)
-      upsertSubscriber(subscriberId, subscriberUrl, sourceUrl)
+  it should "update the delivery_id if the id is a DeletingProjectDeliverId" in testDBResource.use { implicit cfg =>
+    for {
+      _ <- addEvent(event.compoundEventId)
+      _ <- upsertSubscriber(subscriberId, subscriberUrl, sourceUrl)
 
-      delivery.registerSending(event, subscriberUrl).unsafeRunSync() shouldBe ()
+      _ <- deliveryWhileDeletingProject.registerSending(event, subscriberUrl).assertNoException
 
-      findAllProjectDeliveries shouldBe List((event.compoundEventId.projectId, subscriberId, DeletingProjectTypeId))
-
-      delivery.registerSending(event, subscriberUrl).unsafeRunSync() shouldBe ()
-
-      findAllProjectDeliveries shouldBe List((event.compoundEventId.projectId, subscriberId, DeletingProjectTypeId))
-    }
+      _ <- findAllProjectDeliveries.asserting {
+             _ shouldBe
+               List(FoundProjectDelivery(event.compoundEventId.projectId, subscriberId, DeletingProjectTypeId))
+           }
+    } yield Succeeded
   }
 
-  private trait CommonTestCase {
-    val event         = testCompoundIdEvent.generateOne
-    val subscriberId  = subscriberIds.generateOne
-    val subscriberUrl = subscriberUrls.generateOne
-    val sourceUrl     = microserviceBaseUrls.generateOne
-    private implicit val metricsRegistry: TestMetricsRegistry[IO]   = TestMetricsRegistry[IO]
-    implicit val queriesExecTimes:        QueriesExecutionTimes[IO] = QueriesExecutionTimes[IO]().unsafeRunSync()
+  it should "do nothing if the same event is delivered twice with a DeletingProjectTypeId" in testDBResource.use {
+    implicit cfg =>
+      for {
+        _ <- addEvent(event.compoundEventId)
+        _ <- upsertSubscriber(subscriberId, subscriberUrl, sourceUrl)
+
+        _ <- deliveryWhileDeletingProject.registerSending(event, subscriberUrl).assertNoException
+
+        _ <- findAllProjectDeliveries.asserting {
+               _ shouldBe List(
+                 FoundProjectDelivery(event.compoundEventId.projectId, subscriberId, DeletingProjectTypeId)
+               )
+             }
+
+        _ <- delivery.registerSending(event, subscriberUrl).assertNoException
+
+        _ <- findAllProjectDeliveries.asserting {
+               _ shouldBe List(
+                 FoundProjectDelivery(event.compoundEventId.projectId, subscriberId, DeletingProjectTypeId)
+               )
+             }
+      } yield Succeeded
   }
 
-  private trait TestCase extends CommonTestCase {
+  private implicit val qet: QueriesExecutionTimes[IO] = TestQueriesExecutionTimes[IO]
 
-    val compoundIdExtractor: TestCompoundIdEvent => CompoundEventDeliveryId = e =>
-      CompoundEventDeliveryId(e.compoundEventId)
-    val delivery = new EventDeliveryImpl[IO, TestCompoundIdEvent](compoundIdExtractor, sourceUrl)
+  private def delivery(implicit cfg: DBConfig[EventLogDB]) = {
+    val compoundIdExtractor: TestCompoundIdEvent => CompoundEventDeliveryId =
+      e => CompoundEventDeliveryId(e.compoundEventId)
+    new EventDeliveryImpl[IO, TestCompoundIdEvent](compoundIdExtractor, sourceUrl)
   }
 
-  private trait DeletingProjectTestCase extends CommonTestCase {
-
-    val compoundIdExtractor: TestCompoundIdEvent => EventDeliveryId = event => DeletingProjectDeliverId(event.projectId)
-    val delivery = new EventDeliveryImpl[IO, TestCompoundIdEvent](compoundIdExtractor, sourceUrl)
+  private def deliveryWhileDeletingProject(implicit cfg: DBConfig[EventLogDB]) = {
+    val compoundIdExtractor: TestCompoundIdEvent => EventDeliveryId =
+      event => DeletingProjectDeliverId(event.projectId)
+    new EventDeliveryImpl[IO, TestCompoundIdEvent](compoundIdExtractor, sourceUrl)
   }
 
-  private def addEvent(eventId: CompoundEventId): Unit = storeEvent(eventId,
-                                                                    eventStatuses.generateOne,
-                                                                    executionDates.generateOne,
-                                                                    eventDates.generateOne,
-                                                                    eventBodies.generateOne
-  )
+  private def addEvent(eventId: CompoundEventId)(implicit cfg: DBConfig[EventLogDB]): IO[Unit] =
+    storeEvent(eventId,
+               eventStatuses.generateOne,
+               executionDates.generateOne,
+               eventDates.generateOne,
+               eventBodies.generateOne
+    )
 }

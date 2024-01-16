@@ -1,5 +1,5 @@
 /*
- * Copyright 2023 Swiss Data Science Center (SDSC)
+ * Copyright 2024 Swiss Data Science Center (SDSC)
  * A partnership between École Polytechnique Fédérale de Lausanne (EPFL) and
  * Eidgenössische Technische Hochschule Zürich (ETHZ).
  *
@@ -20,12 +20,16 @@ package io.renku.eventlog.events.producers
 
 import io.circe.Decoder
 import io.renku.events.CategoryName
+import io.renku.events.consumers.Project
 import io.renku.graph.model.projects
 import io.renku.tinytypes._
 import io.renku.tinytypes.constraints.{NonNegativeInt, Url}
 import io.renku.tinytypes.json.TinyTypeDecoders.{intDecoder, stringDecoder}
 
 private final case class ProjectIds(id: projects.GitLabId, slug: projects.Slug)
+private object ProjectIds {
+  def apply(project: Project): ProjectIds = ProjectIds(project.id, project.slug)
+}
 
 final class TotalCapacity private (val value: Int) extends AnyVal with IntTinyType {
 

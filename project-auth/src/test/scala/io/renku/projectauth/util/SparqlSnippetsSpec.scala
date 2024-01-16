@@ -1,5 +1,5 @@
 /*
- * Copyright 2023 Swiss Data Science Center (SDSC)
+ * Copyright 2024 Swiss Data Science Center (SDSC)
  * A partnership between École Polytechnique Fédérale de Lausanne (EPFL) and
  * Eidgenössische Technische Hochschule Zürich (ETHZ).
  *
@@ -28,17 +28,21 @@ import io.renku.graph.model.{RenkuUrl, Schemas, persons}
 import io.renku.projectauth._
 import io.renku.triplesstore.client.sparql.Fragment
 import io.renku.triplesstore.client.syntax._
+import io.renku.triplesstore.client.util.JenaSpec
 import org.scalatest.flatspec.AsyncFlatSpec
 import org.scalatest.matchers.should
 import org.typelevel.log4cats.Logger
 import org.typelevel.log4cats.slf4j.Slf4jLogger
 
-class SparqlSnippetsSpec extends AsyncFlatSpec with AsyncIOSpec with ProjectAuthServiceSupport with should.Matchers {
+class SparqlSnippetsSpec
+    extends AsyncFlatSpec
+    with AsyncIOSpec
+    with JenaSpec
+    with ProjectAuthServiceSupport
+    with should.Matchers {
 
   implicit val logger:   Logger[IO] = Slf4jLogger.getLogger[IO]
   implicit val renkuUrl: RenkuUrl   = RenkuUrl("http://localhost/renku")
-
-  override val datasetName = "sparqlsnippetspec"
 
   def randomData(num: Int) = Generators.projectAuthDataGen.asStream.take(num)
 
@@ -63,7 +67,7 @@ class SparqlSnippetsSpec extends AsyncFlatSpec with AsyncIOSpec with ProjectAuth
             |ORDER BY ?slug
             |""".stripMargin
 
-  def clientAndData = withDataset(datasetName).evalMap { sc =>
+  private def clientAndData = testDSResource.evalMap { sc =>
     val pa = ProjectAuthService(sc, renkuUrl)
     insertData(pa, randomData(10)).map(data => (sc, data))
   }
@@ -148,7 +152,7 @@ class SparqlSnippetsSpec extends AsyncFlatSpec with AsyncIOSpec with ProjectAuth
   }
 
   it should "select possible projects when no members exist" in {
-    def clientAndData = withDataset(datasetName).evalMap { sc =>
+    def clientAndData = testDSResource.evalMap { sc =>
       val pa = ProjectAuthService(sc, renkuUrl)
       insertData(pa, randomData(10).map(_.copy(members = Set.empty))).map(data => (sc, data))
     }

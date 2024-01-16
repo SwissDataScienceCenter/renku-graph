@@ -1,5 +1,5 @@
 /*
- * Copyright 2023 Swiss Data Science Center (SDSC)
+ * Copyright 2024 Swiss Data Science Center (SDSC)
  * A partnership between École Polytechnique Fédérale de Lausanne (EPFL) and
  * Eidgenössische Technische Hochschule Zürich (ETHZ).
  *
@@ -22,19 +22,32 @@ import cats.syntax.all._
 import io.circe._
 import io.renku.tinytypes.constraints.NonBlank
 import io.renku.tinytypes.{Sensitive, StringTinyType, TinyTypeFactory}
+import org.http4s.AuthScheme.Bearer
+import org.http4s.Credentials.Token
+import org.http4s.headers.Authorization
+import org.http4s.{Header, Headers}
+import org.typelevel.ci._
 
 import java.nio.charset.StandardCharsets.UTF_8
 import java.util.Base64
 
-sealed trait AccessToken extends Any with StringTinyType with Sensitive
+sealed trait AccessToken extends Any with StringTinyType with Sensitive {
+  def asAuthHeader: Headers
+}
 
 sealed trait UserAccessToken extends Any with AccessToken
 
-sealed trait OAuthAccessToken extends Any with AccessToken
+sealed trait OAuthAccessToken extends Any with AccessToken {
+  def asAuthHeader: Headers =
+    Headers(Authorization(Token(Bearer, value)))
+}
 
 object AccessToken {
 
-  final class PersonalAccessToken private (val value: String) extends AnyVal with UserAccessToken
+  final class PersonalAccessToken private (val value: String) extends AnyVal with UserAccessToken {
+    def asAuthHeader: Headers =
+      Headers(Header.Raw(ci"PRIVATE-TOKEN", value))
+  }
   object PersonalAccessToken
       extends TinyTypeFactory[PersonalAccessToken](new PersonalAccessToken(_))
       with NonBlank[PersonalAccessToken]

@@ -1,5 +1,5 @@
 /*
- * Copyright 2023 Swiss Data Science Center (SDSC)
+ * Copyright 2024 Swiss Data Science Center (SDSC)
  * A partnership between École Polytechnique Fédérale de Lausanne (EPFL) and
  * Eidgenössische Technische Hochschule Zürich (ETHZ).
  *
@@ -34,9 +34,7 @@ import io.renku.triplesgenerator.events.consumers.projectinfo.ProjectInfoFinder
 import org.typelevel.log4cats.Logger
 
 private trait EntityBuilder[F[_]] {
-  def buildEntity(event: MinProjectInfoEvent)(implicit
-      maybeAccessToken: Option[AccessToken]
-  ): EitherT[F, ProcessingRecoverableError, Project]
+  def buildEntity(event: MinProjectInfoEvent)(implicit at: AccessToken): EitherT[F, ProcessingRecoverableError, Project]
 }
 
 private class EntityBuilderImpl[F[_]: MonadThrow](projectInfoFinder: ProjectInfoFinder[F])(implicit renkuUrl: RenkuUrl)
@@ -45,11 +43,11 @@ private class EntityBuilderImpl[F[_]: MonadThrow](projectInfoFinder: ProjectInfo
   import projectInfoFinder._
 
   override def buildEntity(event: MinProjectInfoEvent)(implicit
-      maybeAccessToken: Option[AccessToken]
+      at: AccessToken
   ): EitherT[F, ProcessingRecoverableError, Project] =
     findGLProject(event) >>= toProject
 
-  private def findGLProject(event: MinProjectInfoEvent)(implicit mat: Option[AccessToken]) =
+  private def findGLProject(event: MinProjectInfoEvent)(implicit at: AccessToken) =
     findProjectInfo(event.project.slug)
       .semiflatMap {
         case Some(projectInfo) => projectInfo.pure[F]

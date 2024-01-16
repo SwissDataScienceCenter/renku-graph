@@ -1,5 +1,5 @@
 /*
- * Copyright 2023 Swiss Data Science Center (SDSC)
+ * Copyright 2024 Swiss Data Science Center (SDSC)
  * A partnership between École Polytechnique Fédérale de Lausanne (EPFL) and
  * Eidgenössische Technische Hochschule Zürich (ETHZ).
  *
@@ -20,12 +20,11 @@ package io.renku.eventlog.events.consumers.cleanuprequest
 
 import cats.effect.{Async, MonadCancelThrow}
 import cats.syntax.all._
-import io.circe.{Decoder, Json}
 import io.renku.eventlog.EventLogDB.SessionResource
+import io.renku.eventlog.api.events.CleanUpRequest
 import io.renku.eventlog.metrics.QueriesExecutionTimes
-import io.renku.events.{CategoryName, consumers}
 import io.renku.events.consumers.ProcessExecutor
-import io.renku.graph.model.projects
+import io.renku.events.{CategoryName, consumers}
 import org.typelevel.log4cats.Logger
 
 private class EventHandler[F[_]: MonadCancelThrow: Logger](
@@ -33,24 +32,13 @@ private class EventHandler[F[_]: MonadCancelThrow: Logger](
     override val categoryName: CategoryName = categoryName
 ) extends consumers.EventHandlerWithProcessLimiter[F](ProcessExecutor.sequential) {
 
-  protected override type Event = CleanUpRequestEvent
+  protected override type Event = CleanUpRequest
 
   override def createHandlingDefinition(): EventHandlingDefinition =
     EventHandlingDefinition(
-      decode = _.event.as[CleanUpRequestEvent],
+      decode = _.event.as[CleanUpRequest],
       process = processor.process
     )
-
-  private implicit val decoder: Decoder[CleanUpRequestEvent] = {
-    import io.renku.tinytypes.json.TinyTypeDecoders._
-
-    _.downField("project").as[Json].map(_.hcursor) >>= { cursor =>
-      (cursor.downField("id").as[Option[projects.GitLabId]], cursor.downField("slug").as[projects.Slug]).mapN {
-        case (Some(id), slug) => CleanUpRequestEvent(id, slug)
-        case (None, slug)     => CleanUpRequestEvent(slug)
-      }
-    }
-  }
 }
 
 private object EventHandler {

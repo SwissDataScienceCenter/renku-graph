@@ -1,5 +1,5 @@
 /*
- * Copyright 2023 Swiss Data Science Center (SDSC)
+ * Copyright 2024 Swiss Data Science Center (SDSC)
  * A partnership between École Polytechnique Fédérale de Lausanne (EPFL) and
  * Eidgenössische Technische Hochschule Zürich (ETHZ).
  *
@@ -39,7 +39,7 @@ private trait ProgressFinder[F[_]] {
 private object ProgressFinder {
   def apply[F[_]: Async: Logger: SparqlQueryTimeRecorder]: F[ProgressFinder[F]] = for {
     implicit0(ru: RenkuUrl) <- RenkuUrlLoader[F]()
-    migrationsDSClient      <- MigrationsConnectionConfig[F]().map(TSClient[F](_))
+    migrationsDSClient      <- MigrationsConnectionConfig.fromConfig[F]().map(TSClient[F](_))
   } yield new ProgressFinderImpl[F](migrationsDSClient)
 }
 

@@ -1,5 +1,5 @@
 /*
- * Copyright 2023 Swiss Data Science Center (SDSC)
+ * Copyright 2024 Swiss Data Science Center (SDSC)
  * A partnership between École Polytechnique Fédérale de Lausanne (EPFL) and
  * Eidgenössische Technische Hochschule Zürich (ETHZ).
  *
@@ -28,7 +28,7 @@ import io.renku.generators.Generators.nonEmptyStrings
 import io.renku.graph.model.testentities._
 import io.renku.interpreters.TestLogger
 import io.renku.jsonld.syntax._
-import io.renku.triplesgenerator.api.events.Generators.eventPayloads
+import io.renku.triplesgenerator.Generators.eventPayloads
 import org.scalacheck.Arbitrary
 import org.scalatest.OptionValues
 import org.scalatest.flatspec.AsyncFlatSpec

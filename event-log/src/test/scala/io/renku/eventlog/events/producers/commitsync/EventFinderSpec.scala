@@ -1,5 +1,5 @@
 /*
- * Copyright 2023 Swiss Data Science Center (SDSC)
+ * Copyright 2024 Swiss Data Science Center (SDSC)
  * A partnership between École Polytechnique Fédérale de Lausanne (EPFL) and
  * Eidgenössische Technische Hochschule Zürich (ETHZ).
  *
@@ -19,218 +19,229 @@
 package io.renku.eventlog.events.producers.commitsync
 
 import cats.effect.IO
-import io.renku.eventlog.InMemoryEventLogDbSpec
-import io.renku.eventlog.events.producers.SubscriptionDataProvisioning
-import io.renku.eventlog.metrics.QueriesExecutionTimes
-import io.renku.events.consumers.Project
+import cats.effect.testing.scalatest.AsyncIOSpec
+import cats.syntax.all._
+import io.renku.db.DBConfigProvider.DBConfig
+import io.renku.eventlog.events.producers.SubscriptionProvisioning
+import io.renku.eventlog.metrics.{QueriesExecutionTimes, TestQueriesExecutionTimes}
+import io.renku.eventlog.{EventLogDB, EventLogPostgresSpec}
+import io.renku.events.consumers.ConsumersModelGenerators.consumerProjects
 import io.renku.generators.Generators.Implicits._
-import io.renku.generators.Generators._
+import io.renku.generators.Generators.relativeTimestamps
 import io.renku.graph.model.EventContentGenerators._
 import io.renku.graph.model.EventsGenerators._
 import io.renku.graph.model.GraphModelGenerators._
 import io.renku.graph.model.events.EventStatus.AwaitingDeletion
 import io.renku.graph.model.events._
 import io.renku.graph.model.projects
-import io.renku.metrics.TestMetricsRegistry
-import io.renku.testtools.IOSpec
 import org.scalacheck.Gen
-import org.scalamock.scalatest.MockFactory
+import org.scalamock.scalatest.AsyncMockFactory
+import org.scalatest.Succeeded
+import org.scalatest.flatspec.AsyncFlatSpec
 import org.scalatest.matchers.should
-import org.scalatest.wordspec.AnyWordSpec
 
 import java.time.Duration
 import java.time.temporal.ChronoUnit
 
 class EventFinderSpec
-    extends AnyWordSpec
-    with IOSpec
-    with InMemoryEventLogDbSpec
-    with SubscriptionDataProvisioning
-    with MockFactory
+    extends AsyncFlatSpec
+    with AsyncIOSpec
+    with EventLogPostgresSpec
+    with SubscriptionProvisioning
+    with AsyncMockFactory
     with should.Matchers {
 
-  "popEvent" should {
+  it should "return the full event for the project with the latest event date " +
+    s"when the subscription_category_sync_times table does not have rows for the $categoryName " +
+    "but there are events for the project" in testDBResource.use { implicit cfg =>
+      for {
+        _ <- finder.popEvent().asserting(_ shouldBe None)
 
-    "return the full event for the project with the latest event date " +
-      s"when the subscription_category_sync_times table does not have rows for the $categoryName " +
-      "but there are events for the project" in new TestCase {
+        event0Id          = compoundEventIds.generateOne
+        event0Date        = eventDates.generateOne
+        event0ProjectSlug = projectSlugs.generateOne
+        _ <- addEvent(event0Id, event0Date, event0ProjectSlug)
 
-        finder.popEvent().unsafeRunSync() shouldBe None
+        event1Id          = compoundEventIds.generateOne
+        event1Date        = eventDates.generateOne
+        event1ProjectSlug = projectSlugs.generateOne
+        _ <- addEvent(event1Id, event1Date, event1ProjectSlug)
 
-        val event0Id          = compoundEventIds.generateOne
-        val event0Date        = eventDates.generateOne
-        val event0ProjectSlug = projectSlugs.generateOne
-        addEvent(event0Id, event0Date, event0ProjectSlug)
+        _ <- List(
+               FullCommitSyncEvent(event0Id, event0ProjectSlug, LastSyncedDate(event0Date.value)),
+               FullCommitSyncEvent(event1Id, event1ProjectSlug, LastSyncedDate(event1Date.value))
+             ).sortBy(_.lastSyncedDate)
+               .reverse
+               .map(event => finder.popEvent().asserting(_ shouldBe Some(event)))
+               .sequence
+        _ <- finder.popEvent().asserting(_ shouldBe None)
+      } yield Succeeded
+    }
 
-        val event1Id          = compoundEventIds.generateOne
-        val event1Date        = eventDates.generateOne
-        val event1ProjectSlug = projectSlugs.generateOne
-        addEvent(event1Id, event1Date, event1ProjectSlug)
+  it should "return the minimal event for the project with the latest event date " +
+    s"when there are neither rows in subscription_category_sync_times table with the $categoryName " +
+    "nor events for the project" in testDBResource.use { implicit cfg =>
+      for {
+        _ <- finder.popEvent().asserting(_ shouldBe None)
 
-        List(
-          (event0Id, event0ProjectSlug, event0Date),
-          (event1Id, event1ProjectSlug, event1Date)
-        ).sortBy(_._3).reverse foreach { case (eventId, slug, eventDate) =>
-          finder.popEvent().unsafeRunSync() shouldBe Some(
-            FullCommitSyncEvent(eventId, slug, LastSyncedDate(eventDate.value))
-          )
-        }
-        finder.popEvent().unsafeRunSync() shouldBe None
-      }
+        project1          = consumerProjects.generateOne
+        project1EventDate = eventDates.generateOne
+        _ <- upsertProject(project1, project1EventDate)
 
-    "return the minimal event for the project with the latest event date " +
-      s"when there are neither rows in subscription_category_sync_times table with the $categoryName " +
-      "nor events for the project" in new TestCase {
+        project2          = consumerProjects.generateOne
+        project2EventDate = eventDates.generateOne
+        _ <- upsertProject(project2, project2EventDate)
 
-        finder.popEvent().unsafeRunSync() shouldBe None
+        _ <-
+          List(
+            (project1, project1EventDate),
+            (project2, project2EventDate)
+          ).sortBy(_._2)
+            .reverse
+            .map { case (project, _) => finder.popEvent().asserting(_ shouldBe Some(MinimalCommitSyncEvent(project))) }
+            .sequence
+        _ <- finder.popEvent().asserting(_ shouldBe None)
+      } yield Succeeded
+    }
 
-        val project1Id        = projectIds.generateOne
-        val project1Slug      = projectSlugs.generateOne
-        val project1EventDate = eventDates.generateOne
-        upsertProject(project1Id, project1Slug, project1EventDate)
+  it should "return events for " +
+    "projects with the latest event date less than a week ago " +
+    "and the last sync time more than an hour ago " +
+    "AND not projects with a latest event date less than a week ago " +
+    "and a last sync time less than an hour ago" in testDBResource.use { implicit cfg =>
+      for {
+        _ <- finder.popEvent().asserting(_ shouldBe None)
 
-        val project2Id        = projectIds.generateOne
-        val project2Slug      = projectSlugs.generateOne
-        val project2EventDate = eventDates.generateOne
-        upsertProject(project2Id, project2Slug, project2EventDate)
+        event0Id          = compoundEventIds.generateOne
+        event0ProjectSlug = projectSlugs.generateOne
+        event0Date        = EventDate(relativeTimestamps(lessThanAgo = Duration.ofDays(7)).generateOne)
+        event0LastSynced  = LastSyncedDate(relativeTimestamps(moreThanAgo = Duration.ofMinutes(61)).generateOne)
+        _ <- addEvent(event0Id, event0Date, event0ProjectSlug)
+        _ <- upsertCategorySyncTime(event0Id.projectId, categoryName, event0LastSynced)
 
-        List(
-          (project1Id, project1Slug, project1EventDate),
-          (project2Id, project2Slug, project2EventDate)
-        ).sortBy(_._3).reverse foreach { case (projectId, slug, _) =>
-          finder.popEvent().unsafeRunSync() shouldBe Some(MinimalCommitSyncEvent(Project(projectId, slug)))
-        }
-        finder.popEvent().unsafeRunSync() shouldBe None
-      }
+        event1Id          = compoundEventIds.generateOne
+        event1ProjectSlug = projectSlugs.generateOne
+        event1Date        = EventDate(relativeTimestamps(lessThanAgo = Duration.ofDays(7)).generateOne)
+        event1LastSynced  = LastSyncedDate(relativeTimestamps(lessThanAgo = Duration.ofMinutes(59)).generateOne)
+        _ <- addEvent(event1Id, event1Date, event1ProjectSlug)
+        _ <- upsertCategorySyncTime(event1Id.projectId, categoryName, event1LastSynced)
 
-    "return events for " +
-      "projects with the latest event date less than a week ago " +
-      "and the last sync time more than an hour ago " +
-      "AND not projects with a latest event date less than a week ago " +
-      "and a last sync time less than an hour ago" in new TestCase {
-        val event0Id          = compoundEventIds.generateOne
-        val event0ProjectSlug = projectSlugs.generateOne
-        val event0Date        = EventDate(relativeTimestamps(lessThanAgo = Duration.ofDays(7)).generateOne)
-        val event0LastSynced  = LastSyncedDate(relativeTimestamps(moreThanAgo = Duration.ofMinutes(61)).generateOne)
-        addEvent(event0Id, event0Date, event0ProjectSlug)
-        upsertCategorySyncTime(event0Id.projectId, categoryName, event0LastSynced)
+        _ <- finder
+               .popEvent()
+               .asserting(_ shouldBe Some(FullCommitSyncEvent(event0Id, event0ProjectSlug, event0LastSynced)))
+        _ <- finder.popEvent().asserting(_ shouldBe None)
+      } yield Succeeded
+    }
 
-        val event1Id          = compoundEventIds.generateOne
-        val event1ProjectSlug = projectSlugs.generateOne
-        val event1Date        = EventDate(relativeTimestamps(lessThanAgo = Duration.ofDays(7)).generateOne)
-        val event1LastSynced  = LastSyncedDate(relativeTimestamps(lessThanAgo = Duration.ofMinutes(59)).generateOne)
-        addEvent(event1Id, event1Date, event1ProjectSlug)
-        upsertCategorySyncTime(event1Id.projectId, categoryName, event1LastSynced)
+  it should "return events for " +
+    "projects with a latest event date more than a week ago " +
+    "and a last sync time more than a day ago " +
+    "AND not projects with a latest event date more than a week ago " +
+    "and a last sync time less than an day ago" in testDBResource.use { implicit cfg =>
+      for {
+        _ <- finder.popEvent().asserting(_ shouldBe None)
 
-        finder.popEvent().unsafeRunSync() shouldBe Some(
-          FullCommitSyncEvent(event0Id, event0ProjectSlug, event0LastSynced)
-        )
-        finder.popEvent().unsafeRunSync() shouldBe None
-      }
+        event0Id          = compoundEventIds.generateOne
+        event0ProjectSlug = projectSlugs.generateOne
+        event0Date        = EventDate(relativeTimestamps(moreThanAgo = Duration.ofHours(7 * 24 + 1)).generateOne)
+        event0LastSynced  = LastSyncedDate(relativeTimestamps(moreThanAgo = Duration.ofHours(25)).generateOne)
+        _ <- addEvent(event0Id, event0Date, event0ProjectSlug)
+        _ <- upsertCategorySyncTime(event0Id.projectId, categoryName, event0LastSynced)
 
-    "return events for " +
-      "projects with a latest event date more than a week ago " +
-      "and a last sync time more than a day ago " +
-      "AND not projects with a latest event date more than a week ago " +
-      "and a last sync time less than an day ago" in new TestCase {
-        val event0Id          = compoundEventIds.generateOne
-        val event0ProjectSlug = projectSlugs.generateOne
-        val event0Date        = EventDate(relativeTimestamps(moreThanAgo = Duration.ofHours(7 * 24 + 1)).generateOne)
-        val event0LastSynced  = LastSyncedDate(relativeTimestamps(moreThanAgo = Duration.ofHours(25)).generateOne)
-        addEvent(event0Id, event0Date, event0ProjectSlug)
-        upsertCategorySyncTime(event0Id.projectId, categoryName, event0LastSynced)
+        event1Id          = compoundEventIds.generateOne
+        event1ProjectSlug = projectSlugs.generateOne
+        event1Date        = EventDate(relativeTimestamps(moreThanAgo = Duration.ofHours(7 * 24 + 1)).generateOne)
+        event1LastSynced  = LastSyncedDate(relativeTimestamps(lessThanAgo = Duration.ofHours(23)).generateOne)
+        _ <- addEvent(event1Id, event1Date, event1ProjectSlug)
+        _ <- upsertCategorySyncTime(event1Id.projectId, categoryName, event1LastSynced)
 
-        val event1Id          = compoundEventIds.generateOne
-        val event1ProjectSlug = projectSlugs.generateOne
-        val event1Date        = EventDate(relativeTimestamps(moreThanAgo = Duration.ofHours(7 * 24 + 1)).generateOne)
-        val event1LastSynced  = LastSyncedDate(relativeTimestamps(lessThanAgo = Duration.ofHours(23)).generateOne)
-        addEvent(event1Id, event1Date, event1ProjectSlug)
-        upsertCategorySyncTime(event1Id.projectId, categoryName, event1LastSynced)
+        _ <- finder
+               .popEvent()
+               .asserting(_ shouldBe Some(FullCommitSyncEvent(event0Id, event0ProjectSlug, event0LastSynced)))
+        _ <- finder.popEvent().asserting(_ shouldBe None)
+      } yield Succeeded
+    }
 
-        finder.popEvent().unsafeRunSync() shouldBe Some(
-          FullCommitSyncEvent(event0Id, event0ProjectSlug, event0LastSynced)
-        )
-        finder.popEvent().unsafeRunSync() shouldBe None
-      }
+  it should "return events for projects" +
+    "which falls into the categories above " +
+    "and have more than one event with the latest event date" in testDBResource.use { implicit cfg =>
+      for {
+        _ <- finder.popEvent().asserting(_ shouldBe None)
 
-    "return events for projects" +
-      "which falls into the categories above " +
-      "and have more than one event with the latest event date" in new TestCase {
-        val commonEventDate = relativeTimestamps(moreThanAgo = Duration.ofHours(7 * 24 + 1)).generateAs(EventDate)
-        val lastSynced      = relativeTimestamps(moreThanAgo = Duration.ofHours(25)).generateAs(LastSyncedDate)
-        val projectId       = projectIds.generateOne
-        val projectSlug     = projectSlugs.generateOne
+        commonEventDate = relativeTimestamps(moreThanAgo = Duration.ofHours(7 * 24 + 1)).generateAs(EventDate)
+        lastSynced      = relativeTimestamps(moreThanAgo = Duration.ofHours(25)).generateAs(LastSyncedDate)
+        projectId       = projectIds.generateOne
+        projectSlug     = projectSlugs.generateOne
 
-        val event0Id          = compoundEventIds.generateOne.copy(projectId = projectId)
-        val event0CreatedDate = createdDates.generateOne
-        addEvent(event0Id, commonEventDate, projectSlug, event0CreatedDate)
-        upsertCategorySyncTime(projectId, categoryName, lastSynced)
+        event0Id          = compoundEventIds(projectId).generateOne
+        event0CreatedDate = createdDates.generateOne
+        _ <- addEvent(event0Id, commonEventDate, projectSlug, event0CreatedDate)
+        _ <- upsertCategorySyncTime(projectId, categoryName, lastSynced)
 
-        val event1Id          = compoundEventIds.generateOne.copy(projectId = projectId)
-        val event1CreatedDate = createdDates.generateOne
-        addEvent(event1Id, commonEventDate, projectSlug, event1CreatedDate)
-        upsertCategorySyncTime(projectId, categoryName, lastSynced)
+        event1Id          = compoundEventIds(projectId).generateOne
+        event1CreatedDate = createdDates.generateOne
+        _ <- addEvent(event1Id, commonEventDate, projectSlug, event1CreatedDate)
+        _ <- upsertCategorySyncTime(projectId, categoryName, lastSynced)
 
-        finder.popEvent().unsafeRunSync().map {
-          case FullCommitSyncEvent(id, _, _) => id
-          case _                             => fail("the test does not expect this kind of sync events")
-        } shouldBe List(
-          event0Id -> event0CreatedDate,
-          event1Id -> event1CreatedDate
-        ).sortBy(_._2).reverse.headOption.map(_._1)
+        _ <- finder.popEvent().asserting {
+               _.map {
+                 case FullCommitSyncEvent(id, _, _) => id
+                 case _                             => fail("the test does not expect this kind of sync events")
+               } shouldBe List(
+                 event0Id -> event0CreatedDate,
+                 event1Id -> event1CreatedDate
+               ).sortBy(_._2).reverse.headOption.map(_._1)
+             }
+        _ <- finder.popEvent().asserting(_ shouldBe None)
+      } yield Succeeded
+    }
 
-        finder.popEvent().unsafeRunSync() shouldBe None
-      }
+  it should "not return events for projects" +
+    "where event statuses are AWAITING_DELETION but still update the last sync date" in testDBResource.use {
+      implicit cfg =>
+        for {
+          _ <- finder.popEvent().asserting(_ shouldBe None)
 
-    "not return events for projects" +
-      "where event statuses are AWAITING_DELETION but still update the last sync date" in new TestCase {
+          sharedProjectSlug = projectSlugs.generateOne
 
-        finder.popEvent().unsafeRunSync() shouldBe None
-        val sharedProjectSlug = projectSlugs.generateOne
+          event0Date = EventDate(eventDates.generateOne.value.minus(1L, ChronoUnit.DAYS))
+          event0Id   = compoundEventIds.generateOne
+          _ <- addEvent(event0Id, event0Date, sharedProjectSlug, eventStatus = AwaitingDeletion)
 
-        val event0Date = EventDate(eventDates.generateOne.value.minus(1L, ChronoUnit.DAYS))
-        val event0Id   = compoundEventIds.generateOne
-        addEvent(event0Id, event0Date, sharedProjectSlug, eventStatus = AwaitingDeletion)
+          event1Id   = compoundEventIds(event0Id.projectId).generateOne
+          event1Date = EventDate(event0Date.value.plus(1L, ChronoUnit.MINUTES))
+          _ <- addEvent(event1Id, event1Date, sharedProjectSlug, eventStatus = AwaitingDeletion)
 
-        val event1Id   = compoundEventIds.generateOne.copy(projectId = event0Id.projectId)
-        val event1Date = EventDate(event0Date.value.plus(1L, ChronoUnit.MINUTES))
-        addEvent(event1Id, event1Date, sharedProjectSlug, eventStatus = AwaitingDeletion)
+          lastSynced = relativeTimestamps(moreThanAgo = Duration.ofDays(1)).generateAs(LastSyncedDate)
+          _ <- upsertCategorySyncTime(event1Id.projectId, categoryName, lastSynced)
 
-        val lastSynced = relativeTimestamps(moreThanAgo = Duration.ofDays(1)).generateAs(LastSyncedDate)
+          _ <- finder.popEvent().asserting(_ shouldBe None)
 
-        upsertCategorySyncTime(event1Id.projectId, categoryName, lastSynced)
+          // This event should not be picked up as the last sync date was set to NOW()
+          _ <- addEvent(compoundEventIds(event0Id.projectId).generateOne, eventDates.generateOne, sharedProjectSlug)
 
-        finder.popEvent().unsafeRunSync() shouldBe None
+          _ <- finder.popEvent().asserting(_ shouldBe None)
+        } yield Succeeded
+    }
 
-        // This event should not be picked up as the last sync date was set to NOW()
-        addEvent(compoundEventIds.generateOne.copy(projectId = event0Id.projectId),
-                 eventDates.generateOne,
-                 sharedProjectSlug
-        )
-
-        finder.popEvent().unsafeRunSync() shouldBe None
-      }
+  private def finder(implicit cfg: DBConfig[EventLogDB]) = {
+    implicit val queriesExecTimes: QueriesExecutionTimes[IO] = TestQueriesExecutionTimes[IO]
+    new EventFinderImpl[IO]
   }
 
-  private trait TestCase {
-    private implicit val metricsRegistry:  TestMetricsRegistry[IO]   = TestMetricsRegistry[IO]
-    private implicit val queriesExecTimes: QueriesExecutionTimes[IO] = QueriesExecutionTimes[IO]().unsafeRunSync()
-    val finder = new EventFinderImpl[IO]
-  }
-
-  private def addEvent(eventId:     CompoundEventId,
-                       eventDate:   EventDate,
-                       projectSlug: projects.Slug,
-                       createdDate: CreatedDate = createdDates.generateOne,
-                       eventStatus: EventStatus =
-                         Gen.oneOf(EventStatus.all.filterNot(_ == AwaitingDeletion)).generateOne
-  ): Unit = storeEvent(
-    eventId,
-    eventStatus,
-    executionDates.generateOne,
-    eventDate,
-    eventBodies.generateOne,
-    createdDate,
-    projectSlug = projectSlug
-  )
+  private def addEvent(
+      eventId:     CompoundEventId,
+      eventDate:   EventDate,
+      projectSlug: projects.Slug,
+      createdDate: CreatedDate = createdDates.generateOne,
+      eventStatus: EventStatus = Gen.oneOf(EventStatus.all.filterNot(_ == AwaitingDeletion)).generateOne
+  )(implicit cfg: DBConfig[EventLogDB]): IO[Unit] =
+    storeEvent(eventId,
+               eventStatus,
+               executionDates.generateOne,
+               eventDate,
+               eventBodies.generateOne,
+               createdDate,
+               projectSlug = projectSlug
+    )
 }

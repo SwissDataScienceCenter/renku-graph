@@ -1,5 +1,5 @@
 /*
- * Copyright 2023 Swiss Data Science Center (SDSC)
+ * Copyright 2024 Swiss Data Science Center (SDSC)
  * A partnership between École Polytechnique Fédérale de Lausanne (EPFL) and
  * Eidgenössische Technische Hochschule Zürich (ETHZ).
  *
@@ -22,6 +22,7 @@ import cats.MonadThrow
 import cats.effect._
 import cats.syntax.all._
 import io.renku.graph.http.server.binders.{ProjectId, ProjectSlug}
+import io.renku.http.RenkuEntityCodec
 import io.renku.http.client.{AccessToken, GitLabClient}
 import io.renku.http.server.security.RequestTokenFinder.getAccessToken
 import io.renku.http.server.version
@@ -48,7 +49,8 @@ private class MicroserviceRoutesImpl[F[_]: MonadThrow](
     versionRoutes:          version.Routes[F],
     dbReady:                Ref[F, Boolean]
 ) extends Http4sDsl[F]
-    with MicroserviceRoutes[F] {
+    with MicroserviceRoutes[F]
+    with RenkuEntityCodec {
 
   import associateTokenEndpoint._
   import deleteTokenEndpoint._

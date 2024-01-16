@@ -1,5 +1,5 @@
 /*
- * Copyright 2023 Swiss Data Science Center (SDSC)
+ * Copyright 2024 Swiss Data Science Center (SDSC)
  * A partnership between École Polytechnique Fédérale de Lausanne (EPFL) and
  * Eidgenössische Technische Hochschule Zürich (ETHZ).
  *
@@ -28,9 +28,9 @@ class DatasetTTLsSpec extends AnyWordSpec with should.Matchers {
   "allNamesAndConfigs" should {
 
     "return a List comprised of Renku and Migrations datasets" in {
-      DatasetTTLs.allNamesAndConfigs shouldBe List(
-        ProjectsTTL.fromTtlFile().map(ProjectsTTL.datasetName -> _),
-        MigrationsTTL.fromTtlFile().map(MigrationsTTL.datasetName -> _)
+      DatasetTTLs.allConfigs shouldBe List(
+        ProjectsTTL.fromTtlFile(),
+        MigrationsTTL.fromTtlFile()
       ).sequence
     }
   }

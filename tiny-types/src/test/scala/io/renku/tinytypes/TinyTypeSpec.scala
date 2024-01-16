@@ -1,5 +1,5 @@
 /*
- * Copyright 2023 Swiss Data Science Center (SDSC)
+ * Copyright 2024 Swiss Data Science Center (SDSC)
  * A partnership between École Polytechnique Fédérale de Lausanne (EPFL) and
  * Eidgenössische Technische Hochschule Zürich (ETHZ).
  *
@@ -156,30 +156,6 @@ class TinyTypeFactorySpec extends AnyWordSpec with should.Matchers {
 
         tinyType.show shouldBe someValue.toString
       }
-    }
-  }
-
-  "asTripleObject" should {
-
-    import io.renku.triplesstore.client.model.{TripleObject, TripleObjectEncoder}
-
-    import java.util.UUID
-
-    "return a TripleObjectEncoder for the TinyType if encoder for its value is available" in {
-
-      case class SomeTinyType(v: UUID) extends TinyType {
-        type V = UUID
-        override val value: UUID = v
-      }
-      object SomeTinyType extends TinyTypeFactory[SomeTinyType](new SomeTinyType(_))
-
-      implicit val uuidEncoder: TripleObjectEncoder[UUID] =
-        TripleObjectEncoder.instance(v => TripleObject.String(v.toString))
-
-      val value = Gen.uuid.generateOne
-      val tt    = SomeTinyType(value)
-
-      tt.asObject shouldBe TripleObject.String(value.toString)
     }
   }
 

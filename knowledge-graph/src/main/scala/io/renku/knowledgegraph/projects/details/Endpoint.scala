@@ -1,5 +1,5 @@
 /*
- * Copyright 2023 Swiss Data Science Center (SDSC)
+ * Copyright 2024 Swiss Data Science Center (SDSC)
  * A partnership between École Polytechnique Fédérale de Lausanne (EPFL) and
  * Eidgenössische Technische Hochschule Zürich (ETHZ).
  *
@@ -23,14 +23,14 @@ import cats.syntax.all._
 import cats.{MonadThrow, Parallel}
 import io.renku.config.renku
 import io.renku.data.Message
+import io.renku.data.MessageJsonLDEncoder._
 import io.renku.graph.config.GitLabUrlLoader
 import io.renku.graph.model.{GitLabUrl, projects}
-import io.renku.graph.tokenrepository.AccessTokenFinder
 import io.renku.http.client.GitLabClient
 import io.renku.http.rest.Links.Href
 import io.renku.http.server.security.model.AuthUser
 import io.renku.jsonld.syntax._
-import io.renku.logging.ExecutionTimeRecorder
+import io.renku.logging.{ExecutionTimeRecorder, ExecutionTimeRecorderLoader}
 import io.renku.metrics.MetricsRegistry
 import io.renku.triplesgenerator
 import io.renku.triplesgenerator.api.events.ProjectViewedEvent
@@ -119,13 +119,12 @@ class EndpointImpl[F[_]: MonadThrow: Logger](
 
 object Endpoint {
 
-  def apply[F[_]: Parallel: Async: GitLabClient: AccessTokenFinder: Logger: SparqlQueryTimeRecorder: MetricsRegistry]
-      : F[Endpoint[F]] =
+  def apply[F[_]: Parallel: Async: GitLabClient: Logger: SparqlQueryTimeRecorder: MetricsRegistry]: F[Endpoint[F]] =
     for {
       projectFinder         <- ProjectFinder[F]
       jsonEncoder           <- ProjectJsonEncoder[F]
       tgClient              <- triplesgenerator.api.events.Client[F]
-      executionTimeRecorder <- ExecutionTimeRecorder[F]()
+      executionTimeRecorder <- ExecutionTimeRecorderLoader[F]()
       gitLabUrl             <- GitLabUrlLoader[F]()
     } yield new EndpointImpl[F](projectFinder,
                                 jsonEncoder,

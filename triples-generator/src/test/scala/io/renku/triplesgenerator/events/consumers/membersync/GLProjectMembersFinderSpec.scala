@@ -1,5 +1,5 @@
 /*
- * Copyright 2023 Swiss Data Science Center (SDSC)
+ * Copyright 2024 Swiss Data Science Center (SDSC)
  * A partnership between École Polytechnique Fédérale de Lausanne (EPFL) and
  * Eidgenössische Technische Hochschule Zürich (ETHZ).
  *
@@ -18,24 +18,6 @@
 
 package io.renku.triplesgenerator.events.consumers.membersync
 
-/*
- * Copyright 2021 Swiss Data Science Center (SDSC)
- * A partnership between École Polytechnique Fédérale de Lausanne (EPFL) and
- * Eidgenössische Technische Hochschule Zürich (ETHZ).
- *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- *     http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
- */
-
 import Generators._
 import cats.effect.IO
 import cats.effect.testing.scalatest.AsyncIOSpec
@@ -50,9 +32,9 @@ import io.renku.generators.CommonGraphGenerators.accessTokens
 import io.renku.generators.Generators.Implicits._
 import io.renku.graph.model.GraphModelGenerators.projectSlugs
 import io.renku.graph.model.projects
+import io.renku.http.RenkuEntityCodec
 import io.renku.http.client.RestClient.ResponseMappingF
 import io.renku.http.client.{AccessToken, GitLabClient}
-import io.renku.http.server.EndpointTester.jsonEntityEncoder
 import io.renku.http.tinytypes.TinyTypeURIEncoder._
 import io.renku.interpreters.TestLogger
 import io.renku.stubbing.ExternalServiceStubbing
@@ -74,9 +56,10 @@ class GLProjectMembersFinderSpec
     with AsyncMockFactory
     with ScalaCheckPropertyChecks
     with should.Matchers
+    with RenkuEntityCodec
     with GitLabClientTools[IO] {
 
-  private implicit val maybeAccessToken: Option[AccessToken] = accessTokens.generateOption
+  private implicit val accessToken: AccessToken = accessTokens.generateOne
 
   it should "return a set of all project members" in {
 
@@ -109,7 +92,7 @@ class GLProjectMembersFinderSpec
       List(Header.Raw(ci"X-Next-Page", nextPage.toString), Header.Raw(ci"X-Total-Pages", totalPages.toString))
     )
 
-    mapResponse(Status.Ok, Request(), Response().withEntity(members.asJson).withHeaders(headers))
+    mapResponse(Status.Ok, Request[IO](), Response[IO]().withEntity(members.asJson).withHeaders(headers))
       .asserting(_ shouldBe (members, Some(2)))
   }
 
@@ -120,7 +103,7 @@ class GLProjectMembersFinderSpec
     val memberWithoutIdAndName = json"""{"access_level": 40}"""
 
     mapResponse(Status.Ok,
-                Request(),
+                Request[IO](),
                 Response().withEntity(Json.arr(memberWithoutIdAndName :: members.map(_.asJson).toList: _*))
     ).asserting(_ shouldBe (members, None))
   }
@@ -131,32 +114,14 @@ class GLProjectMembersFinderSpec
   }
 
   Forbidden +: Unauthorized +: Nil foreach { status =>
-    it should s"try without an access token when service responds with $status" in {
+    it should s"return an empty set when service responds with $status" in {
 
-      val mat     = accessTokens.generateSome
-      val slug    = projectSlugs.generateOne
-      val members = gitLabProjectMembers.generateNonEmptyList().toList.toSet
-
-      val mapResponse =
-        captureMapping(gitLabClient)(
-          finder.findProjectMembers(slug)(mat).unsafeRunSync(),
-          Gen.const((Set.empty[GitLabProjectMember], Option.empty[Int])),
-          underlyingMethod = Get
-        )
-
-      setGitLabClientExpectation(slug, maybePage = None, maybeAccessTokenOverride = None, returning = (members, None))
-
-      mapResponse(status, Request(), Response()).asserting(_ shouldBe (members, None))
-    }
-
-    it should s"return an empty set when service responds with $status without access token" in {
-
-      val mat  = Option.empty[AccessToken]
+      val at   = accessTokens.generateOne
       val slug = projectSlugs.generateOne
 
       val mapResponse =
         captureMapping(gitLabClient)(
-          finder.findProjectMembers(slug)(mat).unsafeRunSync(),
+          finder.findProjectMembers(slug)(at).unsafeRunSync(),
           Gen.const((Set.empty[GitLabProjectMember], Option.empty[Int])),
           underlyingMethod = Get
         )
@@ -169,10 +134,9 @@ class GLProjectMembersFinderSpec
   implicit lazy val gitLabClient: GitLabClient[IO] = mock[GitLabClient[IO]]
   private lazy val finder = new GLProjectMembersFinderImpl[IO]
 
-  private def setGitLabClientExpectation(projectSlug:              projects.Slug,
-                                         maybePage:                Option[Int] = None,
-                                         maybeAccessTokenOverride: Option[AccessToken] = maybeAccessToken,
-                                         returning:                (Set[GitLabProjectMember], Option[Int])
+  private def setGitLabClientExpectation(projectSlug: projects.Slug,
+                                         maybePage:   Option[Int] = None,
+                                         returning:   (Set[GitLabProjectMember], Option[Int])
   ) = {
     val endpointName: String Refined NonEmpty = "project-members"
 
@@ -188,13 +152,13 @@ class GLProjectMembersFinderSpec
       .get(_: Uri, _: String Refined NonEmpty)(
         _: ResponseMappingF[IO, (Set[GitLabProjectMember], Option[Int])]
       )(_: Option[AccessToken]))
-      .expects(uri, endpointName, *, maybeAccessTokenOverride)
+      .expects(uri, endpointName, *, accessToken.some)
       .returning(returning.pure[IO])
   }
 
   private lazy val mapResponse =
     captureMapping(gitLabClient)(
-      finder.findProjectMembers(projectSlugs.generateOne)(maybeAccessToken).unsafeRunSync(),
+      finder.findProjectMembers(projectSlugs.generateOne)(accessToken).unsafeRunSync(),
       Gen.const((Set.empty[GitLabProjectMember], Option.empty[Int])),
       underlyingMethod = Get
     )

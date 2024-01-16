@@ -1,5 +1,5 @@
 /*
- * Copyright 2023 Swiss Data Science Center (SDSC)
+ * Copyright 2024 Swiss Data Science Center (SDSC)
  * A partnership between École Polytechnique Fédérale de Lausanne (EPFL) and
  * Eidgenössische Technische Hochschule Zürich (ETHZ).
  *
@@ -34,6 +34,7 @@ import io.renku.generators.Generators.{jsons, nonEmptyStrings}
 import io.renku.graph.model.EventContentGenerators._
 import io.renku.graph.model.EventsGenerators.{compoundEventIds, eventIds, eventStatuses}
 import io.renku.graph.model.GraphModelGenerators._
+import io.renku.http.RenkuEntityCodec
 import io.renku.http.rest.Sorting
 import io.renku.http.rest.paging.PagingRequest
 import io.renku.http.server.EndpointTester._
@@ -64,7 +65,8 @@ class MicroserviceRoutesSpec
     with IOSpec
     with MockFactory
     with should.Matchers
-    with TableDrivenPropertyChecks {
+    with TableDrivenPropertyChecks
+    with RenkuEntityCodec {
 
   implicit val logger: Logger[IO] = Slf4jLogger.getLogger[IO]
 

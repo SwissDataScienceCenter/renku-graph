@@ -1,5 +1,5 @@
 /*
- * Copyright 2023 Swiss Data Science Center (SDSC)
+ * Copyright 2024 Swiss Data Science Center (SDSC)
  * A partnership between École Polytechnique Fédérale de Lausanne (EPFL) and
  * Eidgenössische Technische Hochschule Zürich (ETHZ).
  *
@@ -19,7 +19,7 @@
 package io.renku.eventlog.events.consumers.statuschange
 package projecteventstonew.cleaning
 
-import cats.Applicative
+import cats.{Applicative, NonEmptyParallel}
 import cats.data.Kleisli
 import cats.data.Kleisli.liftF
 import cats.effect.Async
@@ -30,7 +30,6 @@ import io.renku.eventlog.TypeSerializers.{projectIdEncoder, projectSlugEncoder}
 import io.renku.eventlog.metrics.QueriesExecutionTimes
 import io.renku.events.consumers.Project
 import io.renku.graph.model.projects
-import io.renku.graph.tokenrepository.AccessTokenFinder
 import io.renku.metrics.MetricsRegistry
 import io.renku.triplesgenerator
 import io.renku.triplesgenerator.api.events.ProjectViewingDeletion
@@ -44,7 +43,7 @@ private[statuschange] trait ProjectCleaner[F[_]] {
 }
 
 private[statuschange] object ProjectCleaner {
-  def apply[F[_]: Async: AccessTokenFinder: Logger: QueriesExecutionTimes: MetricsRegistry]: F[ProjectCleaner[F]] =
+  def apply[F[_]: Async: NonEmptyParallel: Logger: QueriesExecutionTimes: MetricsRegistry]: F[ProjectCleaner[F]] =
     for {
       tgClient                      <- triplesgenerator.api.events.Client[F]
       projectWebhookAndTokenRemover <- ProjectWebhookAndTokenRemover[F]

@@ -1,5 +1,5 @@
 /*
- * Copyright 2023 Swiss Data Science Center (SDSC)
+ * Copyright 2024 Swiss Data Science Center (SDSC)
  * A partnership between École Polytechnique Fédérale de Lausanne (EPFL) and
  * Eidgenössische Technische Hochschule Zürich (ETHZ).
  *
@@ -19,10 +19,12 @@
 package io.renku.triplesgenerator.tsprovisioning.transformation.namedgraphs.datasets
 
 import cats.data.NonEmptyList
+import cats.effect.IO
+import cats.effect.testing.scalatest.AsyncIOSpec
 import cats.syntax.all._
 import eu.timepit.refined.auto._
 import io.renku.generators.Generators.Implicits._
-import io.renku.generators.Generators.fixed
+import io.renku.generators.Generators.{countingGen, fixed}
 import io.renku.graph.model.Schemas.{prov, renku, schema}
 import io.renku.graph.model._
 import io.renku.graph.model.datasets.{SameAs, TopmostSameAs}
@@ -30,28 +32,29 @@ import io.renku.graph.model.entities.Dataset.Provenance
 import io.renku.graph.model.testentities.generators.EntitiesGenerators
 import io.renku.graph.model.testentities.{Dataset, ModelOps}
 import io.renku.graph.model.views.RdfResource
+import io.renku.interpreters.TestLogger
 import io.renku.jsonld.syntax._
 import io.renku.jsonld.{EntityId, NamedGraph}
-import io.renku.testtools.IOSpec
 import io.renku.triplesstore.SparqlQuery.Prefixes
 import io.renku.triplesstore._
 import io.renku.triplesstore.client.model.Quad
 import io.renku.triplesstore.client.syntax._
+import org.scalatest.Succeeded
 import org.scalatest.matchers.should
-import org.scalatest.wordspec.AnyWordSpec
+import org.scalatest.wordspec.AsyncWordSpec
 import org.scalatestplus.scalacheck.ScalaCheckPropertyChecks
+import org.typelevel.log4cats.Logger
 
 import java.time.Instant
 import scala.util.Random
 
 class UpdatesCreatorSpec
-    extends AnyWordSpec
-    with IOSpec
+    extends AsyncWordSpec
+    with AsyncIOSpec
+    with GraphJenaSpec
     with should.Matchers
     with EntitiesGenerators
     with ModelOps
-    with InMemoryJenaForSpec
-    with ProjectsDataset
     with ScalaCheckPropertyChecks {
 
   "prepareUpdatesWhenInvalidated" should {
@@ -61,65 +64,80 @@ class UpdatesCreatorSpec
       "find datasets which have sameAs pointing to the deleted dataset " +
       "update their sameAs to None " +
       "select dataset with the oldest date " +
-      "and update all datasets which have topmostSameAs pointing to the deleted DS with the selected resourceId" in {
-        val (grandparent, grandparentProject) = anyRenkuProjectEntities
-          .addDataset(datasetEntities(provenanceInternal))
-          .generateOne
-          .leftMap(_.copy(parts = Nil))
-
-        val (parent1, parent1Project) = anyRenkuProjectEntities.importDataset(grandparent).generateOne
-        val (parent2, parent2Project) =
-          anyRenkuProjectEntities
-            .importDataset(grandparent)
-            .map { case (ds, proj) =>
-              val updatedDS = ds.modifyProvenance(
-                _.copy(date = datasetCreatedDates(min = parent1.provenance.date.instant).generateOne)
-              )
-              updatedDS -> proj.replaceDatasets(updatedDS)
-            }
+      "and update all datasets which have topmostSameAs pointing to the deleted DS with the selected resourceId" in projectsDSConfig
+        .use { implicit pcc =>
+          val (grandparent, grandparentProject) = anyRenkuProjectEntities
+            .addDataset(datasetEntities(provenanceInternal))
             .generateOne
-        val (child2, child2Project) = anyRenkuProjectEntities.importDataset(parent2).generateOne
+            .leftMap(_.copy(parts = Nil))
 
-        val entitiesGrandparent = grandparent.to[entities.Dataset[entities.Dataset.Provenance.Internal]]
-        val entitiesParent1 = parent1.to[entities.Dataset[entities.Dataset.Provenance.ImportedInternalAncestorInternal]]
-        val entitiesParent2 = parent2.to[entities.Dataset[entities.Dataset.Provenance.ImportedInternalAncestorInternal]]
-        val entitiesChild2  = child2.to[entities.Dataset[entities.Dataset.Provenance.ImportedInternalAncestorInternal]]
+          val (parent1, parent1Project) = anyRenkuProjectEntities.importDataset(grandparent).generateOne
+          val (parent2, parent2Project) =
+            anyRenkuProjectEntities
+              .importDataset(grandparent)
+              .map { case (ds, proj) =>
+                val updatedDS = ds.modifyProvenance(
+                  _.copy(date = datasetCreatedDates(min = parent1.provenance.date.instant).generateOne)
+                )
+                updatedDS -> proj.replaceDatasets(updatedDS)
+              }
+              .generateOne
+          val (child2, child2Project) = anyRenkuProjectEntities.importDataset(parent2).generateOne
 
-        upload(to = projectsDataset, grandparentProject, parent1Project, parent2Project, child2Project)
+          val entitiesGrandparent = grandparent.to[entities.Dataset[entities.Dataset.Provenance.Internal]]
+          val entitiesParent1 =
+            parent1.to[entities.Dataset[entities.Dataset.Provenance.ImportedInternalAncestorInternal]]
+          val entitiesParent2 =
+            parent2.to[entities.Dataset[entities.Dataset.Provenance.ImportedInternalAncestorInternal]]
+          val entitiesChild2 = child2.to[entities.Dataset[entities.Dataset.Provenance.ImportedInternalAncestorInternal]]
 
-        findDatasets.map(onlySameAsAndTop) shouldBe Set(
-          (entitiesGrandparent.resourceId.value, None, entitiesGrandparent.provenance.topmostSameAs.value.some),
-          (entitiesParent1.resourceId.value,
-           entitiesGrandparent.resourceId.value.some,
-           entitiesGrandparent.resourceId.value.some
-          ),
-          (entitiesParent2.resourceId.value,
-           entitiesGrandparent.resourceId.value.some,
-           entitiesGrandparent.resourceId.value.some
-          ),
-          (entitiesChild2.resourceId.value,
-           entitiesParent2.resourceId.value.some,
-           entitiesGrandparent.resourceId.value.some
-          )
-        )
+          for {
+            _ <- uploadToProjects(grandparentProject, parent1Project, parent2Project, child2Project)
 
-        UpdatesCreator.prepareUpdatesWhenInvalidated(entitiesGrandparent).runAll(on = projectsDataset).unsafeRunSync()
+            _ <- findDatasets.asserting {
+                   _.map(onlySameAsAndTop) shouldBe Set(
+                     (entitiesGrandparent.resourceId.value,
+                      None,
+                      entitiesGrandparent.provenance.topmostSameAs.value.some
+                     ),
+                     (entitiesParent1.resourceId.value,
+                      entitiesGrandparent.resourceId.value.some,
+                      entitiesGrandparent.resourceId.value.some
+                     ),
+                     (entitiesParent2.resourceId.value,
+                      entitiesGrandparent.resourceId.value.some,
+                      entitiesGrandparent.resourceId.value.some
+                     ),
+                     (entitiesChild2.resourceId.value,
+                      entitiesParent2.resourceId.value.some,
+                      entitiesGrandparent.resourceId.value.some
+                     )
+                   )
+                 }
 
-        findDatasets.map(onlySameAsAndTop) shouldBe Set(
-          (entitiesGrandparent.resourceId.value, None, entitiesGrandparent.provenance.topmostSameAs.value.some),
-          (entitiesParent1.resourceId.value, None, entitiesParent1.resourceId.value.some),
-          (entitiesParent2.resourceId.value, None, entitiesParent1.resourceId.value.some),
-          (entitiesChild2.resourceId.value,
-           entitiesParent2.resourceId.value.some,
-           entitiesParent1.resourceId.value.some
-          )
-        )
-      }
+            _ <- runUpdates(UpdatesCreator.prepareUpdatesWhenInvalidated(entitiesGrandparent))
+
+            _ <- findDatasets.asserting {
+                   _.map(onlySameAsAndTop) shouldBe Set(
+                     (entitiesGrandparent.resourceId.value,
+                      None,
+                      entitiesGrandparent.provenance.topmostSameAs.value.some
+                     ),
+                     (entitiesParent1.resourceId.value, None, entitiesParent1.resourceId.value.some),
+                     (entitiesParent2.resourceId.value, None, entitiesParent1.resourceId.value.some),
+                     (entitiesChild2.resourceId.value,
+                      entitiesParent2.resourceId.value.some,
+                      entitiesParent1.resourceId.value.some
+                     )
+                   )
+                 }
+          } yield Succeeded
+        }
 
     "generate queries for deleted dataset which, " +
       "in case of imported external dataset, " +
       "find datasets which have sameAs pointing to the deleted dataset " +
-      "update their sameAs to their topmostSameAs" in {
+      "update their sameAs to their topmostSameAs" in projectsDSConfig.use { implicit pcc =>
         val (grandparent, grandparentProject) = anyRenkuProjectEntities
           .addDataset(datasetEntities(provenanceImportedExternal))
           .generateOne
@@ -144,58 +162,63 @@ class UpdatesCreatorSpec
         val entitiesParent2 = parent2.to[entities.Dataset[entities.Dataset.Provenance.ImportedInternalAncestorExternal]]
         val entitiesChild2  = child2.to[entities.Dataset[entities.Dataset.Provenance.ImportedInternalAncestorExternal]]
 
-        upload(to = projectsDataset, grandparentProject, parent1Project, child1Project, parent2Project, child2Project)
+        for {
+          _ <- uploadToProjects(grandparentProject, parent1Project, child1Project, parent2Project, child2Project)
 
-        findDatasets.map(onlySameAsAndTop) shouldBe Set(
-          (entitiesGrandparent.resourceId.value,
-           entitiesGrandparent.provenance.sameAs.value.some,
-           entitiesGrandparent.provenance.topmostSameAs.value.some
-          ),
-          (entitiesParent1.resourceId.value,
-           entitiesGrandparent.resourceId.value.some,
-           entitiesGrandparent.provenance.topmostSameAs.value.some
-          ),
-          (entitiesChild1.resourceId.value,
-           entitiesParent1.resourceId.value.some,
-           entitiesGrandparent.provenance.topmostSameAs.value.some
-          ),
-          (entitiesParent2.resourceId.value,
-           entitiesGrandparent.resourceId.value.some,
-           entitiesGrandparent.provenance.topmostSameAs.value.some
-          ),
-          (entitiesChild2.resourceId.value,
-           entitiesParent2.resourceId.value.some,
-           entitiesGrandparent.provenance.topmostSameAs.value.some
-          )
-        )
+          _ <- findDatasets.asserting {
+                 _.map(onlySameAsAndTop) shouldBe Set(
+                   (entitiesGrandparent.resourceId.value,
+                    entitiesGrandparent.provenance.sameAs.value.some,
+                    entitiesGrandparent.provenance.topmostSameAs.value.some
+                   ),
+                   (entitiesParent1.resourceId.value,
+                    entitiesGrandparent.resourceId.value.some,
+                    entitiesGrandparent.provenance.topmostSameAs.value.some
+                   ),
+                   (entitiesChild1.resourceId.value,
+                    entitiesParent1.resourceId.value.some,
+                    entitiesGrandparent.provenance.topmostSameAs.value.some
+                   ),
+                   (entitiesParent2.resourceId.value,
+                    entitiesGrandparent.resourceId.value.some,
+                    entitiesGrandparent.provenance.topmostSameAs.value.some
+                   ),
+                   (entitiesChild2.resourceId.value,
+                    entitiesParent2.resourceId.value.some,
+                    entitiesGrandparent.provenance.topmostSameAs.value.some
+                   )
+                 )
+               }
 
-        UpdatesCreator
-          .prepareUpdatesWhenInvalidated(grandparentProject.resourceId, entitiesGrandparent)
-          .runAll(on = projectsDataset)
-          .unsafeRunSync()
+          _ <- runUpdates {
+                 UpdatesCreator.prepareUpdatesWhenInvalidated(grandparentProject.resourceId, entitiesGrandparent)
+               }
 
-        findDatasets.map(onlySameAsAndTop) shouldBe Set(
-          (entitiesGrandparent.resourceId.value,
-           entitiesGrandparent.provenance.sameAs.value.some,
-           entitiesGrandparent.provenance.topmostSameAs.value.some
-          ),
-          (entitiesParent1.resourceId.value,
-           entitiesGrandparent.provenance.sameAs.value.some,
-           entitiesGrandparent.provenance.topmostSameAs.value.some
-          ),
-          (entitiesChild1.resourceId.value,
-           entitiesParent1.resourceId.value.some,
-           entitiesGrandparent.provenance.topmostSameAs.value.some
-          ),
-          (entitiesParent2.resourceId.value,
-           entitiesGrandparent.provenance.sameAs.value.some,
-           entitiesGrandparent.provenance.topmostSameAs.value.some
-          ),
-          (entitiesChild2.resourceId.value,
-           entitiesParent2.resourceId.value.some,
-           entitiesGrandparent.provenance.topmostSameAs.value.some
-          )
-        )
+          _ <- findDatasets.asserting {
+                 _.map(onlySameAsAndTop) shouldBe Set(
+                   (entitiesGrandparent.resourceId.value,
+                    entitiesGrandparent.provenance.sameAs.value.some,
+                    entitiesGrandparent.provenance.topmostSameAs.value.some
+                   ),
+                   (entitiesParent1.resourceId.value,
+                    entitiesGrandparent.provenance.sameAs.value.some,
+                    entitiesGrandparent.provenance.topmostSameAs.value.some
+                   ),
+                   (entitiesChild1.resourceId.value,
+                    entitiesParent1.resourceId.value.some,
+                    entitiesGrandparent.provenance.topmostSameAs.value.some
+                   ),
+                   (entitiesParent2.resourceId.value,
+                    entitiesGrandparent.provenance.sameAs.value.some,
+                    entitiesGrandparent.provenance.topmostSameAs.value.some
+                   ),
+                   (entitiesChild2.resourceId.value,
+                    entitiesParent2.resourceId.value.some,
+                    entitiesGrandparent.provenance.topmostSameAs.value.some
+                   )
+                 )
+               }
+        } yield Succeeded
       }
 
     forAll {
@@ -222,7 +245,7 @@ class UpdatesCreatorSpec
       "generate queries for deleted dataset which, " +
         s"in case of $datasetType dataset, " +
         "find datasets which have sameAs pointing to the deleted dataset " +
-        "update their sameAs to the deleted dataset sameAs" in {
+        "update their sameAs to the deleted dataset sameAs" in projectsDSConfig.use { implicit pcc =>
           val (parent, parentProject) = anyRenkuProjectEntities.importDataset(grandparent)(importedInternal).generateOne
           val (child1, child1Project) = anyRenkuProjectEntities.importDataset(parent)(importedInternal).generateOne
           val (child2, child2Project) = anyRenkuProjectEntities.importDataset(parent)(importedInternal).generateOne
@@ -241,26 +264,47 @@ class UpdatesCreatorSpec
 
           val grandparentTopmostSameAs = entitiesGrandparent.provenance.topmostSameAs.value.some
 
-          upload(to = projectsDataset, grandparentProject, parentProject, child1Project, child2Project)
+          for {
+            _ <- uploadToProjects(grandparentProject, parentProject, child1Project, child2Project)
 
-          findDatasets.map(onlySameAsAndTop) shouldBe Set(
-            (entitiesGrandparent.resourceId.value, maybeGrandparentSameAs.map(_.value), grandparentTopmostSameAs),
-            (entitiesParent.resourceId.value, entitiesGrandparent.resourceId.value.some, grandparentTopmostSameAs),
-            (entitiesChild1.resourceId.value, entitiesParent.resourceId.value.some, grandparentTopmostSameAs),
-            (entitiesChild2.resourceId.value, entitiesParent.resourceId.value.some, grandparentTopmostSameAs)
-          )
+            _ <- findDatasets.asserting {
+                   _.map(onlySameAsAndTop) shouldBe Set(
+                     (entitiesGrandparent.resourceId.value,
+                      maybeGrandparentSameAs.map(_.value),
+                      grandparentTopmostSameAs
+                     ),
+                     (entitiesParent.resourceId.value,
+                      entitiesGrandparent.resourceId.value.some,
+                      grandparentTopmostSameAs
+                     ),
+                     (entitiesChild1.resourceId.value, entitiesParent.resourceId.value.some, grandparentTopmostSameAs),
+                     (entitiesChild2.resourceId.value, entitiesParent.resourceId.value.some, grandparentTopmostSameAs)
+                   )
+                 }
 
-          UpdatesCreator
-            .prepareUpdatesWhenInvalidated(parentProject.resourceId, entitiesParent)
-            .runAll(on = projectsDataset)
-            .unsafeRunSync()
+            _ <- runUpdates(UpdatesCreator.prepareUpdatesWhenInvalidated(parentProject.resourceId, entitiesParent))
 
-          findDatasets.map(onlySameAsAndTop) shouldBe Set(
-            (entitiesGrandparent.resourceId.value, maybeGrandparentSameAs.map(_.value), grandparentTopmostSameAs),
-            (entitiesParent.resourceId.value, entitiesGrandparent.resourceId.value.some, grandparentTopmostSameAs),
-            (entitiesChild1.resourceId.value, entitiesGrandparent.resourceId.value.some, grandparentTopmostSameAs),
-            (entitiesChild2.resourceId.value, entitiesGrandparent.resourceId.value.some, grandparentTopmostSameAs)
-          )
+            _ <- findDatasets.asserting {
+                   _.map(onlySameAsAndTop) shouldBe Set(
+                     (entitiesGrandparent.resourceId.value,
+                      maybeGrandparentSameAs.map(_.value),
+                      grandparentTopmostSameAs
+                     ),
+                     (entitiesParent.resourceId.value,
+                      entitiesGrandparent.resourceId.value.some,
+                      grandparentTopmostSameAs
+                     ),
+                     (entitiesChild1.resourceId.value,
+                      entitiesGrandparent.resourceId.value.some,
+                      grandparentTopmostSameAs
+                     ),
+                     (entitiesChild2.resourceId.value,
+                      entitiesGrandparent.resourceId.value.some,
+                      grandparentTopmostSameAs
+                     )
+                   )
+                 }
+          } yield Succeeded
         }
     }
   }
@@ -269,44 +313,51 @@ class UpdatesCreatorSpec
 
     "generate queries which " +
       "updates topmostSameAs on all datasets where topmostSameAs points to the current dataset" +
-      "when the topmostSameAs on the current dataset is different than the value in KG" in {
-        val theVeryTopmostSameAs = TopmostSameAs(datasetResourceIds.generateOne.value)
+      "when the topmostSameAs on the current dataset is different than the value in KG" in projectsDSConfig.use {
+        implicit pcc =>
+          val theVeryTopmostSameAs = TopmostSameAs(datasetResourceIds.generateOne.value)
 
-        val (ds1, _) = anyRenkuProjectEntities
-          .addDataset(
-            datasetEntities(provenanceImportedInternal).modify(
-              _.modifyProvenance(replaceTopmostSameAs(theVeryTopmostSameAs))
+          val (ds1, _) = anyRenkuProjectEntities
+            .addDataset(
+              datasetEntities(provenanceImportedInternal).modify(
+                _.modifyProvenance(replaceTopmostSameAs(theVeryTopmostSameAs))
+              )
             )
-          )
-          .generateOne
-          .bimap(_.to[entities.Dataset[entities.Dataset.Provenance.ImportedInternal]], identity)
+            .generateOne
+            .bimap(_.to[entities.Dataset[entities.Dataset.Provenance.ImportedInternal]], identity)
 
-        val (ds2, ds2Project) = anyRenkuProjectEntities
-          .addDataset(
-            datasetEntities(provenanceImportedInternal).modify(
-              _.modifyProvenance(replaceTopmostSameAs(TopmostSameAs(ds1.resourceId.value)))
+          val (ds2, ds2Project) = anyRenkuProjectEntities
+            .addDataset(
+              datasetEntities(provenanceImportedInternal).modify(
+                _.modifyProvenance(replaceTopmostSameAs(TopmostSameAs(ds1.resourceId.value)))
+              )
             )
-          )
-          .generateOne
-          .bimap(_.to[entities.Dataset[entities.Dataset.Provenance.ImportedInternal]], identity)
+            .generateOne
+            .bimap(_.to[entities.Dataset[entities.Dataset.Provenance.ImportedInternal]], identity)
 
-        upload(to = projectsDataset, ds2Project)
+          for {
+            _ <- uploadToProjects(ds2Project)
 
-        findDatasets.map(onlyTopmostSameAs) shouldBe Set(
-          (ds2.resourceId.value, TopmostSameAs(ds1.resourceId.value).value.some)
-        )
+            _ <- findDatasets.asserting {
+                   _.map(onlyTopmostSameAs) shouldBe Set(
+                     (ds2.resourceId.value, TopmostSameAs(ds1.resourceId.value).value.some)
+                   )
+                 }
 
-        UpdatesCreator.prepareUpdates(ds1, Set.empty).runAll(on = projectsDataset).unsafeRunSync()
+            _ <- runUpdates(UpdatesCreator.prepareUpdates(ds1, Set.empty))
 
-        findDatasets.map(onlyTopmostSameAs) shouldBe Set(
-          (ds2.resourceId.value, theVeryTopmostSameAs.value.some)
-        )
+            _ <- findDatasets.asserting {
+                   _.map(onlyTopmostSameAs) shouldBe Set(
+                     (ds2.resourceId.value, theVeryTopmostSameAs.value.some)
+                   )
+                 }
+          } yield Succeeded
       }
 
     "generate queries which " +
       "updates topmostSameAs for all datasets where topmostSameAs points to the current dataset" +
       "when the topmostSameAs on the current dataset is different than the value in KG -" +
-      "case when some datasets have multiple topmostSameAs" in {
+      "case when some datasets have multiple topmostSameAs" in projectsDSConfig.use { implicit pcc =>
         val theVeryTopmostSameAs = TopmostSameAs(datasetResourceIds.generateOne.value)
 
         val (ds1, _) = anyRenkuProjectEntities
@@ -326,32 +377,35 @@ class UpdatesCreatorSpec
           .generateOne
           .leftMap(_.to[entities.Dataset[entities.Dataset.Provenance.ImportedInternal]])
 
-        upload(to = projectsDataset, ds2Project)
+        for {
+          _ <- uploadToProjects(ds2Project)
 
-        val otherTopmostSameAs = datasetTopmostSameAs.generateOne
-        insert(to = projectsDataset,
-               Quad(GraphClass.Project.id(ds2Project.resourceId),
-                    ds2.resourceId.asEntityId,
-                    renku / "topmostSameAs",
-                    otherTopmostSameAs.asEntityId
+          otherTopmostSameAs = datasetTopmostSameAs.generateOne
+          _ <- insert(
+                 Quad(GraphClass.Project.id(ds2Project.resourceId),
+                      ds2.resourceId.asEntityId,
+                      renku / "topmostSameAs",
+                      otherTopmostSameAs.asEntityId
+                 )
                )
-        )
 
-        findDatasets.map(onlyTopmostSameAs) shouldBe Set(
-          (ds2.resourceId.value, TopmostSameAs(ds1.resourceId.value).value.some),
-          (ds2.resourceId.value, otherTopmostSameAs.value.some)
-        )
+          _ <- findDatasets.asserting {
+                 _.map(onlyTopmostSameAs) shouldBe Set(
+                   (ds2.resourceId.value, TopmostSameAs(ds1.resourceId.value).value.some),
+                   (ds2.resourceId.value, otherTopmostSameAs.value.some)
+                 )
+               }
 
-        UpdatesCreator.prepareUpdates(ds1, Set.empty).runAll(on = projectsDataset).unsafeRunSync()
+          _ <- runUpdates(UpdatesCreator.prepareUpdates(ds1, Set.empty))
 
-        findDatasets.map(onlyTopmostSameAs) shouldBe Set(
-          (ds2.resourceId.value, theVeryTopmostSameAs.value.some)
-        )
+          _ <- findDatasets.asserting {
+                 _.map(onlyTopmostSameAs) shouldBe Set((ds2.resourceId.value, theVeryTopmostSameAs.value.some))
+               }
+        } yield Succeeded
       }
 
     "generate no queries " +
       "if the topmostSameAs on the current DS is the only topmostSameAs for that DS in KG" in {
-
         val ds = datasetEntities(provenanceImportedInternal).decoupledFromProject.generateOne
           .to[entities.Dataset[entities.Dataset.Provenance.ImportedInternal]]
 
@@ -362,7 +416,6 @@ class UpdatesCreatorSpec
   "prepareTopmostSameAsCleanup" should {
 
     "return no updates if there is no parent TopmostSameAs given" in {
-
       val ds = datasetEntities(provenanceImportedInternal).decoupledFromProject.generateOne
         .to[entities.Dataset[Provenance.ImportedInternal]]
 
@@ -372,98 +425,116 @@ class UpdatesCreatorSpec
       ) shouldBe Nil
     }
 
-    "return updates deleting additional TopmostSameAs if there is parent TopmostSameAs given" in {
-      val (ds, project) = anyRenkuProjectEntities
-        .addDataset(datasetEntities(provenanceImportedInternal))
-        .generateOne
-        .leftMap(_.to[entities.Dataset[entities.Dataset.Provenance.ImportedInternal]])
+    "return updates deleting additional TopmostSameAs if there is parent TopmostSameAs given" in projectsDSConfig.use {
+      implicit pcc =>
+        val (ds, project) = anyRenkuProjectEntities
+          .addDataset(datasetEntities(provenanceImportedInternal))
+          .generateOne
+          .leftMap(_.to[entities.Dataset[entities.Dataset.Provenance.ImportedInternal]])
 
-      upload(to = projectsDataset, project)
+        for {
+          _ <- uploadToProjects(project)
 
-      // simulate DS having two topmostSameAs
-      val parentTopmostSameAs = TopmostSameAs(datasetResourceIds.generateOne.value)
-      insert(to = projectsDataset,
-             Quad(GraphClass.Project.id(project.resourceId),
-                  ds.resourceId.asEntityId,
-                  renku / "topmostSameAs",
-                  parentTopmostSameAs.asEntityId
-             )
-      )
+          // simulate DS having two topmostSameAs
+          parentTopmostSameAs = TopmostSameAs(datasetResourceIds.generateOne.value)
+          _ <- insert(
+                 Quad(GraphClass.Project.id(project.resourceId),
+                      ds.resourceId.asEntityId,
+                      renku / "topmostSameAs",
+                      parentTopmostSameAs.asEntityId
+                 )
+               )
 
-      findDatasets.map(onlyTopmostSameAs) shouldBe Set(
-        (ds.resourceId.value, ds.provenance.topmostSameAs.value.some),
-        (ds.resourceId.value, parentTopmostSameAs.value.some)
-      )
+          _ <- findDatasets.asserting {
+                 _.map(onlyTopmostSameAs) shouldBe Set(
+                   (ds.resourceId.value, ds.provenance.topmostSameAs.value.some),
+                   (ds.resourceId.value, parentTopmostSameAs.value.some)
+                 )
+               }
 
-      UpdatesCreator
-        .prepareTopmostSameAsCleanup(project.resourceId, ds, maybeParentTopmostSameAs = parentTopmostSameAs.some)
-        .runAll(on = projectsDataset)
-        .unsafeRunSync()
+          _ <- runUpdates {
+                 UpdatesCreator.prepareTopmostSameAsCleanup(project.resourceId,
+                                                            ds,
+                                                            maybeParentTopmostSameAs = parentTopmostSameAs.some
+                 )
+               }
 
-      findDatasets.map(onlyTopmostSameAs) shouldBe Set(
-        (ds.resourceId.value, parentTopmostSameAs.value.some)
-      )
+          _ <- findDatasets.asserting {
+                 _.map(onlyTopmostSameAs) shouldBe Set((ds.resourceId.value, parentTopmostSameAs.value.some))
+               }
+        } yield Succeeded
     }
 
-    "return updates not deleting sole TopmostSameAs if there is parent TopmostSameAs given" in {
-      val (ds, project) = anyRenkuProjectEntities
-        .addDataset(datasetEntities(provenanceImportedInternal))
-        .generateOne
-        .leftMap(_.to[entities.Dataset[entities.Dataset.Provenance.ImportedInternal]])
+    "return updates not deleting sole TopmostSameAs if there is parent TopmostSameAs given" in projectsDSConfig.use {
+      implicit pcc =>
+        val (ds, project) = anyRenkuProjectEntities
+          .addDataset(datasetEntities(provenanceImportedInternal))
+          .generateOne
+          .leftMap(_.to[entities.Dataset[entities.Dataset.Provenance.ImportedInternal]])
 
-      upload(to = projectsDataset, project)
+        for {
+          _ <- uploadToProjects(project)
 
-      findDatasets.map(onlyTopmostSameAs) shouldBe Set(
-        (ds.resourceId.value, ds.provenance.topmostSameAs.value.some)
-      )
+          _ <- findDatasets.asserting {
+                 _.map(onlyTopmostSameAs) shouldBe Set((ds.resourceId.value, ds.provenance.topmostSameAs.value.some))
+               }
 
-      UpdatesCreator
-        .prepareTopmostSameAsCleanup(project.resourceId,
-                                     ds,
-                                     maybeParentTopmostSameAs = TopmostSameAs(datasetResourceIds.generateOne.value).some
-        )
-        .runAll(on = projectsDataset)
-        .unsafeRunSync()
+          _ <- runUpdates {
+                 UpdatesCreator.prepareTopmostSameAsCleanup(project.resourceId,
+                                                            ds,
+                                                            maybeParentTopmostSameAs =
+                                                              TopmostSameAs(datasetResourceIds.generateOne.value).some
+                 )
+               }
 
-      findDatasets.map(onlyTopmostSameAs) shouldBe Set(
-        (ds.resourceId.value, ds.provenance.topmostSameAs.value.some)
-      )
+          _ <- findDatasets.asserting {
+                 _.map(onlyTopmostSameAs) shouldBe Set((ds.resourceId.value, ds.provenance.topmostSameAs.value.some))
+               }
+        } yield Succeeded
     }
   }
 
   "queriesUnlinkingCreators" should {
 
-    "prepare delete queries for all dataset creators existing in KG but not in the model" in {
-      forAll(
-        anyRenkuProjectEntities
-          .addDataset(
-            datasetEntities(provenanceNonModified)
-              .modify(provenanceLens.modify(creatorsLens.modify(_ => personEntities.generateNonEmptyList())))
-          )
-          .map(_.map(_.to[entities.RenkuProject]))
-      ) { case (ds, project) =>
-        val entitiesDS = ds.to[entities.Dataset[entities.Dataset.Provenance]]
+    forAll(
+      anyRenkuProjectEntities
+        .addDataset(
+          datasetEntities(provenanceNonModified)
+            .modify(provenanceLens.modify(creatorsLens.modify(_ => personEntities.generateNonEmptyList())))
+        )
+        .map(_.map(_.to[entities.RenkuProject])),
+      countingGen
+    ) { case ((ds, project), attempt) =>
+      s"prepare delete queries for all dataset creators existing in KG but not in the model - #$attempt" in projectsDSConfig
+        .use { implicit pcc =>
+          val entitiesDS = ds.to[entities.Dataset[entities.Dataset.Provenance]]
 
-        upload(to = projectsDataset, project)
+          for {
+            _ <- uploadToProjects(project)
 
-        val creators = ds.provenance.creators
-        findCreators(project.resourceId, entitiesDS.resourceId) shouldBe creators.map(_.resourceId).toList.toSet
+            creators = ds.provenance.creators
+            _ <- findCreators(project.resourceId, entitiesDS.resourceId)
+                   .asserting(_ shouldBe creators.map(_.resourceId).toList.toSet)
 
-        val someCreator        = Random.shuffle(creators.toList).head
-        val creatorsNotChanged = creators.filterNot(_ == someCreator)
-        val newCreators =
-          NonEmptyList.fromListUnsafe(creatorsNotChanged ::: personEntities.generateNonEmptyList().toList)
-        val dsWithNewCreators = provenanceLens[Dataset.Provenance.NonModified]
-          .modify(creatorsLens.modify(_ => newCreators))(ds)
-          .to[entities.Dataset[entities.Dataset.Provenance]]
+            someCreator        = Random.shuffle(creators.toList).head
+            creatorsNotChanged = creators.filterNot(_ == someCreator)
+            newCreators =
+              NonEmptyList.fromListUnsafe(creatorsNotChanged ::: personEntities.generateNonEmptyList().toList)
+            dsWithNewCreators = provenanceLens[Dataset.Provenance.NonModified]
+                                  .modify(creatorsLens.modify(_ => newCreators))(ds)
+                                  .to[entities.Dataset[entities.Dataset.Provenance]]
 
-        UpdatesCreator
-          .queriesUnlinkingCreators(project.resourceId, dsWithNewCreators, creators.map(_.resourceId).toList.toSet)
-          .runAll(on = projectsDataset)
-          .unsafeRunSync()
+            _ <- runUpdates {
+                   UpdatesCreator.queriesUnlinkingCreators(project.resourceId,
+                                                           dsWithNewCreators,
+                                                           creators.map(_.resourceId).toList.toSet
+                   )
+                 }
 
-        findCreators(project.resourceId, entitiesDS.resourceId) shouldBe creatorsNotChanged.map(_.resourceId).toSet
-      }
+            _ <- findCreators(project.resourceId, entitiesDS.resourceId)
+                   .asserting(_ shouldBe creatorsNotChanged.map(_.resourceId).toSet)
+          } yield Succeeded
+        }
     }
 
     "prepare no queries if there's no change in DS creators" in {
@@ -484,45 +555,48 @@ class UpdatesCreatorSpec
 
   "removeOtherOriginalIdentifiers" should {
 
-    "prepare queries that removes all additional originalIdentifier triples on the DS" in {
-      val (ds, project) = anyRenkuProjectEntities
-        .addDataset(datasetEntities(provenanceNonModified))
-        .generateOne
-        .bimap(_.to[entities.Dataset[entities.Dataset.Provenance]], _.to[entities.Project])
+    "prepare queries that removes all additional originalIdentifier triples on the DS" in projectsDSConfig.use {
+      implicit pcc =>
+        val (ds, project) = anyRenkuProjectEntities
+          .addDataset(datasetEntities(provenanceNonModified))
+          .generateOne
+          .bimap(_.to[entities.Dataset[entities.Dataset.Provenance]], _.to[entities.Project])
 
-      upload(to = projectsDataset, project)
+        for {
+          _ <- uploadToProjects(project)
 
-      val existingOriginalId1 = datasetOriginalIdentifiers.generateOne
-      insert(to = projectsDataset,
-             Quad(GraphClass.Project.id(project.resourceId),
-                  ds.resourceId.asEntityId,
-                  renku / "originalIdentifier",
-                  existingOriginalId1.asObject
-             )
-      )
-      val existingOriginalId2 = datasetOriginalIdentifiers.generateOne
-      insert(to = projectsDataset,
-             Quad(GraphClass.Project.id(project.resourceId),
-                  ds.resourceId.asEntityId,
-                  renku / "originalIdentifier",
-                  existingOriginalId2.asObject
-             )
-      )
+          existingOriginalId1 = datasetOriginalIdentifiers.generateOne
+          _ <- insert(
+                 Quad(GraphClass.Project.id(project.resourceId),
+                      ds.resourceId.asEntityId,
+                      renku / "originalIdentifier",
+                      existingOriginalId1.asObject
+                 )
+               )
+          existingOriginalId2 = datasetOriginalIdentifiers.generateOne
+          _ <- insert(
+                 Quad(GraphClass.Project.id(project.resourceId),
+                      ds.resourceId.asEntityId,
+                      renku / "originalIdentifier",
+                      existingOriginalId2.asObject
+                 )
+               )
 
-      findOriginalIdentifiers(project.resourceId, ds.identification.identifier) shouldBe Set(
-        ds.provenance.originalIdentifier,
-        existingOriginalId1,
-        existingOriginalId2
-      )
+          _ <- findOriginalIdentifiers(project.resourceId, ds.identification.identifier)
+                 .asserting {
+                   _ shouldBe Set(ds.provenance.originalIdentifier, existingOriginalId1, existingOriginalId2)
+                 }
 
-      UpdatesCreator
-        .removeOtherOriginalIdentifiers(project.resourceId, ds, Set(existingOriginalId1, existingOriginalId2))
-        .runAll(on = projectsDataset)
-        .unsafeRunSync()
+          _ <- runUpdates {
+                 UpdatesCreator.removeOtherOriginalIdentifiers(project.resourceId,
+                                                               ds,
+                                                               Set(existingOriginalId1, existingOriginalId2)
+                 )
+               }
 
-      findOriginalIdentifiers(project.resourceId, ds.identification.identifier) shouldBe Set(
-        ds.provenance.originalIdentifier
-      )
+          _ <- findOriginalIdentifiers(project.resourceId, ds.identification.identifier)
+                 .asserting(_ shouldBe Set(ds.provenance.originalIdentifier))
+        } yield Succeeded
     }
 
     "prepare no queries if there's only the correct originalIdentifier for the DS in KG" in {
@@ -549,44 +623,46 @@ class UpdatesCreatorSpec
 
   "removeOtherDSDateCreated" should {
 
-    "prepare queries that removes all additional dateCreated triples on the DS" in {
-      val (ds, project) = anyRenkuProjectEntities
-        .addDataset(datasetEntities(provenanceInternal))
-        .generateOne
-        .bimap(_.to[entities.Dataset[entities.Dataset.Provenance.Internal]], _.to[entities.Project])
+    "prepare queries that removes all additional dateCreated triples on the DS" in projectsDSConfig.use {
+      implicit pcc =>
+        val (ds, project) = anyRenkuProjectEntities
+          .addDataset(datasetEntities(provenanceInternal))
+          .generateOne
+          .bimap(_.to[entities.Dataset[entities.Dataset.Provenance.Internal]], _.to[entities.Project])
 
-      upload(to = projectsDataset, project)
+        for {
+          _ <- uploadToProjects(project)
 
-      val existingDateCreated1 = datasetCreatedDates(min = ds.provenance.date.instant).generateOne
-      insert(
-        to = projectsDataset,
-        Quad(GraphClass.Project.id(project.resourceId),
-             ds.resourceId.asEntityId,
-             schema / "dateCreated",
-             existingDateCreated1.asObject
-        )
-      )
-      val existingDateCreated2 = datasetCreatedDates(min = ds.provenance.date.instant).generateOne
-      insert(
-        to = projectsDataset,
-        Quad(GraphClass.Project.id(project.resourceId),
-             ds.resourceId.asEntityId,
-             schema / "dateCreated",
-             existingDateCreated2.asObject
-        )
-      )
+          existingDateCreated1 = datasetCreatedDates(min = ds.provenance.date.instant).generateOne
+          _ <- insert(
+                 Quad(GraphClass.Project.id(project.resourceId),
+                      ds.resourceId.asEntityId,
+                      schema / "dateCreated",
+                      existingDateCreated1.asObject
+                 )
+               )
+          existingDateCreated2 = datasetCreatedDates(min = ds.provenance.date.instant).generateOne
+          _ <- insert(
+                 Quad(GraphClass.Project.id(project.resourceId),
+                      ds.resourceId.asEntityId,
+                      schema / "dateCreated",
+                      existingDateCreated2.asObject
+                 )
+               )
 
-      findDateCreated(project.resourceId, ds.identification.identifier) shouldBe Set(ds.provenance.date,
-                                                                                     existingDateCreated1,
-                                                                                     existingDateCreated2
-      )
+          _ <- findDateCreated(project.resourceId, ds.identification.identifier)
+                 .asserting(_ shouldBe Set(ds.provenance.date, existingDateCreated1, existingDateCreated2))
 
-      UpdatesCreator
-        .removeOtherDateCreated(project.resourceId, ds, Set(existingDateCreated1, existingDateCreated2))
-        .runAll(on = projectsDataset)
-        .unsafeRunSync()
+          _ <- runUpdates {
+                 UpdatesCreator.removeOtherDateCreated(project.resourceId,
+                                                       ds,
+                                                       Set(existingDateCreated1, existingDateCreated2)
+                 )
+               }
 
-      findDateCreated(project.resourceId, ds.identification.identifier) shouldBe Set(ds.provenance.date)
+          _ <- findDateCreated(project.resourceId, ds.identification.identifier)
+                 .asserting(_ shouldBe Set(ds.provenance.date))
+        } yield Succeeded
     }
 
     "prepare no queries if there's only the correct dateCreated for the DS in KG" in {
@@ -619,71 +695,76 @@ class UpdatesCreatorSpec
 
   "removeOtherDescriptions" should {
 
-    "prepare queries that removes all additional description triples on the DS" in {
-      val description1 = datasetDescriptions.generateOne
-      val (ds, project) = anyRenkuProjectEntities
-        .addDataset(datasetEntities(provenanceNonModified).modify(replaceDSDesc(description1.some)))
-        .generateOne
-        .bimap(_.to[entities.Dataset[entities.Dataset.Provenance]], _.to[entities.Project])
+    "prepare queries that removes all additional description triples on the DS" in projectsDSConfig.use {
+      implicit pcc =>
+        val description1 = datasetDescriptions.generateOne
+        val (ds, project) = anyRenkuProjectEntities
+          .addDataset(datasetEntities(provenanceNonModified).modify(replaceDSDesc(description1.some)))
+          .generateOne
+          .bimap(_.to[entities.Dataset[entities.Dataset.Provenance]], _.to[entities.Project])
 
-      upload(to = projectsDataset, project)
+        for {
+          _ <- uploadToProjects(project)
 
-      val description2 = datasetDescriptions.generateOne
-      insert(to = projectsDataset,
-             Quad(GraphClass.Project.id(project.resourceId),
-                  ds.resourceId.asEntityId,
-                  schema / "description",
-                  description2.asObject
-             )
-      )
-      val description3 = datasetDescriptions.generateOne
-      insert(to = projectsDataset,
-             Quad(GraphClass.Project.id(project.resourceId),
-                  ds.resourceId.asEntityId,
-                  schema / "description",
-                  description3.asObject
-             )
-      )
+          description2 = datasetDescriptions.generateOne
+          _ <- insert(
+                 Quad(GraphClass.Project.id(project.resourceId),
+                      ds.resourceId.asEntityId,
+                      schema / "description",
+                      description2.asObject
+                 )
+               )
+          description3 = datasetDescriptions.generateOne
+          _ <- insert(
+                 Quad(GraphClass.Project.id(project.resourceId),
+                      ds.resourceId.asEntityId,
+                      schema / "description",
+                      description3.asObject
+                 )
+               )
 
-      findDescriptions(project.resourceId, ds.identification.identifier) shouldBe Set(description1,
-                                                                                      description3,
-                                                                                      description2
-      )
+          _ <- findDescriptions(project.resourceId, ds.identification.identifier)
+                 .asserting(_ shouldBe Set(description1, description3, description2))
 
-      UpdatesCreator
-        .removeOtherDescriptions(project.resourceId, ds, Set(description2, description3))
-        .runAll(on = projectsDataset)
-        .unsafeRunSync()
+          _ <- runUpdates {
+                 UpdatesCreator.removeOtherDescriptions(project.resourceId, ds, Set(description2, description3))
+               }
 
-      findDescriptions(project.resourceId, ds.identification.identifier) shouldBe Set(description1)
+          _ <- findDescriptions(project.resourceId, ds.identification.identifier)
+                 .asserting(_ shouldBe Set(description1))
+        } yield Succeeded
     }
 
-    "prepare queries that removes all description triples on the DS if there's no description on DS but some in KG" in {
-      val (ds, project) = anyRenkuProjectEntities
-        .addDataset(datasetEntities(provenanceNonModified).modify(replaceDSDesc(None)))
-        .generateOne
-        .bimap(_.to[entities.Dataset[entities.Dataset.Provenance]], _.to[entities.Project])
+    "prepare queries that removes all description triples on the DS if there's no description on DS but some in KG" in projectsDSConfig
+      .use { implicit pcc =>
+        val (ds, project) = anyRenkuProjectEntities
+          .addDataset(datasetEntities(provenanceNonModified).modify(replaceDSDesc(None)))
+          .generateOne
+          .bimap(_.to[entities.Dataset[entities.Dataset.Provenance]], _.to[entities.Project])
 
-      upload(to = projectsDataset, project)
+        for {
+          _ <- uploadToProjects(project)
 
-      val description = datasetDescriptions.generateOne
-      insert(to = projectsDataset,
-             Quad(GraphClass.Project.id(project.resourceId),
-                  ds.resourceId.asEntityId,
-                  schema / "description",
-                  description.asObject
-             )
-      )
+          description = datasetDescriptions.generateOne
+          _ <- insert(
+                 Quad(GraphClass.Project.id(project.resourceId),
+                      ds.resourceId.asEntityId,
+                      schema / "description",
+                      description.asObject
+                 )
+               )
 
-      findDescriptions(project.resourceId, ds.identification.identifier) shouldBe Set(description)
+          _ <- findDescriptions(project.resourceId, ds.identification.identifier)
+                 .asserting(_ shouldBe Set(description))
 
-      UpdatesCreator
-        .removeOtherDescriptions(project.resourceId, ds, Set(description))
-        .runAll(on = projectsDataset)
-        .unsafeRunSync()
+          _ <- runUpdates {
+                 UpdatesCreator.removeOtherDescriptions(project.resourceId, ds, Set(description))
+               }
 
-      findDescriptions(project.resourceId, ds.identification.identifier) shouldBe Set.empty
-    }
+          _ <- findDescriptions(project.resourceId, ds.identification.identifier)
+                 .asserting(_ shouldBe Set.empty)
+        } yield Succeeded
+      }
 
     "prepare no queries if there's no description on DS and in KG" in {
       val (ds, project) = anyRenkuProjectEntities
@@ -716,65 +797,71 @@ class UpdatesCreatorSpec
 
   "removeOtherDSSameAs" should {
 
-    "prepare queries that removes all additional Internal SameAs triples on the DS" in {
+    "prepare queries that removes all additional Internal SameAs triples on the DS" in projectsDSConfig.use {
+      implicit pcc =>
+        val (originalDS, originalDSProject) =
+          anyRenkuProjectEntities
+            .addDataset(datasetEntities(provenanceInternal))
+            .generateOne
+            .map(_.to[entities.Project])
+        val (importedDS, importedDSProject) = anyRenkuProjectEntities
+          .addDataset(datasetEntities(provenanceImportedInternalAncestorInternal(fixed(SameAs(originalDS.entityId)))))
+          .generateOne
+          .bimap(_.to[entities.Dataset[entities.Dataset.Provenance.ImportedInternalAncestorInternal]],
+                 _.to[entities.Project]
+          )
 
-      val (originalDS, originalDSProject) =
-        anyRenkuProjectEntities.addDataset(datasetEntities(provenanceInternal)).generateOne.map(_.to[entities.Project])
-      val (importedDS, importedDSProject) = anyRenkuProjectEntities
-        .addDataset(datasetEntities(provenanceImportedInternalAncestorInternal(fixed(SameAs(originalDS.entityId)))))
-        .generateOne
-        .bimap(_.to[entities.Dataset[entities.Dataset.Provenance.ImportedInternalAncestorInternal]],
-               _.to[entities.Project]
-        )
+        for {
+          _ <- uploadToProjects(originalDSProject, importedDSProject)
 
-      upload(to = projectsDataset, originalDSProject, importedDSProject)
+          otherSameAs = datasetSameAs.generateOne.entityId
+          _ <- insert(
+                 Quad(GraphClass.Project.id(importedDSProject.resourceId),
+                      importedDS.resourceId.asEntityId,
+                      schema / "sameAs",
+                      otherSameAs
+                 )
+               )
 
-      val otherSameAs = datasetSameAs.generateOne.entityId
-      insert(to = projectsDataset,
-             Quad(GraphClass.Project.id(importedDSProject.resourceId),
-                  importedDS.resourceId.asEntityId,
-                  schema / "sameAs",
-                  otherSameAs
-             )
-      )
+          _ <- findSameAs(importedDSProject.resourceId, importedDS.identification.identifier).asserting {
+                 _.map(_.show) shouldBe Set(importedDS.provenance.sameAs.entityId, otherSameAs).map(_.show)
+               }
 
-      findSameAs(importedDSProject.resourceId, importedDS.identification.identifier)
-        .map(_.show) shouldBe Set(importedDS.provenance.sameAs.entityId, otherSameAs).map(_.show)
+          _ <- runUpdates {
+                 UpdatesCreator.removeOtherSameAs(importedDSProject.resourceId, importedDS, Set(SameAs(otherSameAs)))
+               }
 
-      UpdatesCreator
-        .removeOtherSameAs(importedDSProject.resourceId, importedDS, Set(SameAs(otherSameAs)))
-        .runAll(on = projectsDataset)
-        .unsafeRunSync()
-
-      findSameAs(importedDSProject.resourceId, importedDS.identification.identifier).map(_.show) shouldBe Set(
-        importedDS.provenance.sameAs.entityId.show
-      )
+          _ <- findSameAs(importedDSProject.resourceId, importedDS.identification.identifier)
+                 .asserting(_.map(_.show) shouldBe Set(importedDS.provenance.sameAs.entityId.show))
+        } yield Succeeded
     }
 
-    "prepare queries that removes all additional External SameAs triples on the DS" in {
+    "prepare queries that removes all additional External SameAs triples on the DS" in projectsDSConfig.use {
+      implicit pcc =>
+        val (ds, project) = anyRenkuProjectEntities
+          .addDataset(datasetEntities(provenanceImportedExternal))
+          .generateOne
+          .bimap(_.to[entities.Dataset[entities.Dataset.Provenance.ImportedExternal]], _.to[entities.Project])
 
-      val (ds, project) = anyRenkuProjectEntities
-        .addDataset(datasetEntities(provenanceImportedExternal))
-        .generateOne
-        .bimap(_.to[entities.Dataset[entities.Dataset.Provenance.ImportedExternal]], _.to[entities.Project])
+        for {
+          _ <- uploadToProjects(project)
 
-      upload(to = projectsDataset, project)
+          otherSameAs = datasetSameAs.generateOne.entityId
+          _ <-
+            insert(
+              Quad(GraphClass.Project.id(project.resourceId), ds.resourceId.asEntityId, schema / "sameAs", otherSameAs)
+            )
 
-      val otherSameAs = datasetSameAs.generateOne.entityId
-      insert(to = projectsDataset,
-             Quad(GraphClass.Project.id(project.resourceId), ds.resourceId.asEntityId, schema / "sameAs", otherSameAs)
-      )
+          _ <- findSameAs(project.resourceId, ds.identification.identifier)
+                 .asserting(_.map(_.show) shouldBe Set(ds.provenance.sameAs.entityId, otherSameAs).map(_.show))
 
-      findSameAs(project.resourceId, ds.identification.identifier).map(_.show) shouldBe
-        Set(ds.provenance.sameAs.entityId, otherSameAs).map(_.show)
+          _ <- runUpdates {
+                 UpdatesCreator.removeOtherSameAs(project.resourceId, ds, Set(SameAs(otherSameAs)))
+               }
 
-      UpdatesCreator
-        .removeOtherSameAs(project.resourceId, ds, Set(SameAs(otherSameAs)))
-        .runAll(on = projectsDataset)
-        .unsafeRunSync()
-
-      findSameAs(project.resourceId, ds.identification.identifier).map(_.show) shouldBe
-        Set(ds.provenance.sameAs.entityId.show)
+          _ <- findSameAs(project.resourceId, ds.identification.identifier)
+                 .asserting(_.map(_.show) shouldBe Set(ds.provenance.sameAs.entityId.show))
+        } yield Succeeded
     }
 
     "prepare no queries if there's only the correct sameAs for the DS in KG" in {
@@ -802,109 +889,111 @@ class UpdatesCreatorSpec
 
   "deleteOtherDerivedFrom" should {
 
-    "prepare queries that removes other wasDerivedFrom from the given DS" in {
+    "prepare queries that removes other wasDerivedFrom from the given DS" in projectsDSConfig.use { implicit pcc =>
       val (_ -> modification, project) = anyRenkuProjectEntities
         .addDatasetAndModification(datasetEntities(provenanceNonModified))
         .generateOne
         .bimap(_.bimap(identity, _.to[entities.Dataset[entities.Dataset.Provenance.Modified]]), _.to[entities.Project])
 
-      upload(to = projectsDataset, project)
+      for {
+        _ <- uploadToProjects(project)
 
-      val otherDerivedFrom       = datasetDerivedFroms.generateOne
-      val otherDerivedFromJsonLD = otherDerivedFrom.asJsonLD
-      upload(to = projectsDataset,
-             NamedGraph.fromJsonLDsUnsafe(GraphClass.Project.id(project.resourceId), otherDerivedFromJsonLD)
-      )
-
-      val derivedFromId = otherDerivedFromJsonLD.entityId.getOrElse(fail(" Cannot obtain EntityId for DerivedFrom"))
-      insert(to = projectsDataset,
-             Quad(GraphClass.Project.id(project.resourceId),
-                  modification.resourceId.asEntityId,
-                  prov / "wasDerivedFrom",
-                  derivedFromId
+        otherDerivedFrom       = datasetDerivedFroms.generateOne
+        otherDerivedFromJsonLD = otherDerivedFrom.asJsonLD
+        _ <- uploadToProjects(
+               NamedGraph.fromJsonLDsUnsafe(GraphClass.Project.id(project.resourceId), otherDerivedFromJsonLD)
              )
-      )
 
-      findDerivedFrom(project.resourceId, modification.identification.identifier) shouldBe Set(
-        modification.provenance.derivedFrom,
-        otherDerivedFrom
-      )
+        derivedFromId = otherDerivedFromJsonLD.entityId.getOrElse(fail(" Cannot obtain EntityId for DerivedFrom"))
+        _ <- insert(
+               Quad(GraphClass.Project.id(project.resourceId),
+                    modification.resourceId.asEntityId,
+                    prov / "wasDerivedFrom",
+                    derivedFromId
+               )
+             )
 
-      UpdatesCreator
-        .deleteOtherDerivedFrom(project.resourceId, modification)
-        .runAll(on = projectsDataset)
-        .unsafeRunSync()
+        _ <- findDerivedFrom(project.resourceId, modification.identification.identifier)
+               .asserting(_ shouldBe Set(modification.provenance.derivedFrom, otherDerivedFrom))
 
-      findDerivedFrom(project.resourceId, modification.identification.identifier) shouldBe Set(
-        modification.provenance.derivedFrom
-      )
+        _ <- runUpdates {
+               UpdatesCreator.deleteOtherDerivedFrom(project.resourceId, modification)
+             }
+
+        _ <- findDerivedFrom(project.resourceId, modification.identification.identifier)
+               .asserting(_ shouldBe Set(modification.provenance.derivedFrom))
+      } yield Succeeded
     }
   }
 
   "deleteOtherTopmostDerivedFrom" should {
 
-    "prepare queries that removes other topmostDerivedFrom from the given DS" in {
+    "prepare queries that removes other topmostDerivedFrom from the given DS" in projectsDSConfig.use { implicit pcc =>
       val (_ -> modification, project) = anyRenkuProjectEntities
         .addDatasetAndModification(datasetEntities(provenanceNonModified))
         .generateOne
         .bimap(_.bimap(identity, _.to[entities.Dataset[entities.Dataset.Provenance.Modified]]), _.to[entities.Project])
 
-      upload(to = projectsDataset, project)
+      for {
+        _ <- uploadToProjects(project)
 
-      val otherTopmostDerivedFrom = datasetTopmostDerivedFroms.generateOne
-      insert(
-        to = projectsDataset,
-        Quad(GraphClass.Project.id(project.resourceId),
-             modification.resourceId.asEntityId,
-             renku / "topmostDerivedFrom",
-             otherTopmostDerivedFrom.asEntityId
-        )
-      )
+        otherTopmostDerivedFrom = datasetTopmostDerivedFroms.generateOne
+        _ <- insert(
+               Quad(GraphClass.Project.id(project.resourceId),
+                    modification.resourceId.asEntityId,
+                    renku / "topmostDerivedFrom",
+                    otherTopmostDerivedFrom.asEntityId
+               )
+             )
 
-      findTopmostDerivedFrom(project.resourceId, modification.identification.identifier) shouldBe Set(
-        modification.provenance.topmostDerivedFrom,
-        otherTopmostDerivedFrom
-      )
+        _ <- findTopmostDerivedFrom(project.resourceId, modification.identification.identifier)
+               .asserting(_ shouldBe Set(modification.provenance.topmostDerivedFrom, otherTopmostDerivedFrom))
 
-      UpdatesCreator
-        .deleteOtherTopmostDerivedFrom(project.resourceId, modification)
-        .runAll(on = projectsDataset)
-        .unsafeRunSync()
+        _ <- runUpdates {
+               UpdatesCreator.deleteOtherTopmostDerivedFrom(project.resourceId, modification)
+             }
 
-      findTopmostDerivedFrom(project.resourceId, modification.identification.identifier) shouldBe
-        Set(modification.provenance.topmostDerivedFrom)
+        _ <- findTopmostDerivedFrom(project.resourceId, modification.identification.identifier)
+               .asserting(_ shouldBe Set(modification.provenance.topmostDerivedFrom))
+      } yield Succeeded
     }
   }
 
   "deletePublicationEvents" should {
 
-    "prepare deletion queries that removes publication events linked to the given DS" in {
+    "prepare deletion queries that removes publication events linked to the given DS" in projectsDSConfig.use {
+      implicit pcc =>
+        val project = anyRenkuProjectEntities
+          .withDatasets(datasetEntities(provenanceNonModified), datasetEntities(provenanceNonModified))
+          .generateOne
+          .to[entities.Project]
 
-      val project = anyRenkuProjectEntities
-        .withDatasets(datasetEntities(provenanceNonModified), datasetEntities(provenanceNonModified))
-        .generateOne
-        .to[entities.Project]
+        for {
+          _ <- uploadToProjects(project)
 
-      upload(to = projectsDataset, project)
+          dsToClean :: dsToStay :: Nil = project.datasets
 
-      val dsToClean :: dsToStay :: Nil = project.datasets
+          _ <- findPublicationEvents(project.resourceId, dsToClean.resourceId)
+                 .asserting(_ shouldBe dsToClean.publicationEvents.toSet)
+          _ <- findPublicationEvents(project.resourceId, dsToStay.resourceId)
+                 .asserting(_ shouldBe dsToStay.publicationEvents.toSet)
 
-      findPublicationEvents(project.resourceId, dsToClean.resourceId) shouldBe dsToClean.publicationEvents.toSet
-      findPublicationEvents(project.resourceId, dsToStay.resourceId)  shouldBe dsToStay.publicationEvents.toSet
+          _ <- runUpdates {
+                 UpdatesCreator.deletePublicationEvents(project.resourceId, dsToClean)
+               }
 
-      UpdatesCreator
-        .deletePublicationEvents(project.resourceId, dsToClean)
-        .runAll(on = projectsDataset)
-        .unsafeRunSync()
-
-      findPublicationEvents(project.resourceId, dsToClean.resourceId) shouldBe Set.empty
-      findPublicationEvents(project.resourceId, dsToStay.resourceId)  shouldBe dsToStay.publicationEvents.toSet
+          _ <- findPublicationEvents(project.resourceId, dsToClean.resourceId)
+                 .asserting(_ shouldBe Set.empty)
+          _ <- findPublicationEvents(project.resourceId, dsToStay.resourceId)
+                 .asserting(_ shouldBe dsToStay.publicationEvents.toSet)
+        } yield Succeeded
     }
   }
 
-  private def findDatasets: Set[(String, Option[String], Option[String], Option[String], Option[String])] =
+  private def findDatasets(implicit
+      pcc: ProjectsConnectionConfig
+  ): IO[Set[(String, Option[String], Option[String], Option[String], Option[String])]] =
     runSelect(
-      on = projectsDataset,
       SparqlQuery.of(
         "fetch ds data",
         Prefixes of (prov -> "prov", renku -> "renku", schema -> "schema"),
@@ -920,16 +1009,16 @@ class UpdatesCreatorSpec
             |}
             |""".stripMargin
       )
-    ).unsafeRunSync()
-      .map(row =>
+    ).map(
+      _.map(row =>
         (row("id"),
          row.get("maybeSameAs"),
          row.get("maybeTopmostSameAs"),
          row.get("maybeDerivedFrom"),
          row.get("maybeTopmostDerivedFrom")
         )
-      )
-      .toSet
+      ).toSet
+    )
 
   private lazy val onlyTopmostSameAs
       : ((String, Option[String], Option[String], Option[String], Option[String])) => (String, Option[String]) = {
@@ -942,9 +1031,10 @@ class UpdatesCreatorSpec
     (resourceId, sameAs, maybeTopmostSameAs)
   }
 
-  private def findCreators(projectId: projects.ResourceId, resourceId: datasets.ResourceId): Set[persons.ResourceId] =
+  private def findCreators(projectId: projects.ResourceId, resourceId: datasets.ResourceId)(implicit
+      pcc: ProjectsConnectionConfig
+  ): IO[Set[persons.ResourceId]] =
     runSelect(
-      on = projectsDataset,
       SparqlQuery.of(
         "fetch ds creator",
         Prefixes of schema -> "schema",
@@ -957,17 +1047,16 @@ class UpdatesCreatorSpec
             |}
             |""".stripMargin
       )
-    ).unsafeRunSync()
-      .map(row => persons.ResourceId.from(row("personId")))
-      .sequence
-      .fold(throw _, identity)
-      .toSet
+    ).map(
+      _.map(row => persons.ResourceId.from(row("personId"))).sequence
+        .fold(throw _, identity)
+        .toSet
+    )
 
-  private def findOriginalIdentifiers(projectId: projects.ResourceId,
-                                      id:        datasets.Identifier
-  ): Set[datasets.OriginalIdentifier] =
+  private def findOriginalIdentifiers(projectId: projects.ResourceId, id: datasets.Identifier)(implicit
+      pcc: ProjectsConnectionConfig
+  ): IO[Set[datasets.OriginalIdentifier]] =
     runSelect(
-      on = projectsDataset,
       SparqlQuery.of(
         "fetch ds originalIdentifier",
         Prefixes.of(renku -> "renku", schema -> "schema"),
@@ -980,13 +1069,12 @@ class UpdatesCreatorSpec
             |  }
             |}""".stripMargin
       )
-    ).unsafeRunSync()
-      .map(row => datasets.OriginalIdentifier(row("originalId")))
-      .toSet
+    ).map(_.map(row => datasets.OriginalIdentifier(row("originalId"))).toSet)
 
-  private def findDateCreated(projectId: projects.ResourceId, id: datasets.Identifier): Set[datasets.DateCreated] =
+  private def findDateCreated(projectId: projects.ResourceId, id: datasets.Identifier)(implicit
+      pcc: ProjectsConnectionConfig
+  ): IO[Set[datasets.DateCreated]] =
     runSelect(
-      on = projectsDataset,
       SparqlQuery.of(
         "fetch ds date",
         Prefixes of schema -> "schema",
@@ -999,13 +1087,12 @@ class UpdatesCreatorSpec
             |  }
             |}""".stripMargin
       )
-    ).unsafeRunSync()
-      .map(row => datasets.DateCreated(Instant.parse(row("date"))))
-      .toSet
+    ).map(_.map(row => datasets.DateCreated(Instant.parse(row("date")))).toSet)
 
-  private def findDescriptions(projectId: projects.ResourceId, id: datasets.Identifier): Set[datasets.Description] =
+  private def findDescriptions(projectId: projects.ResourceId, id: datasets.Identifier)(implicit
+      pcc: ProjectsConnectionConfig
+  ): IO[Set[datasets.Description]] =
     runSelect(
-      on = projectsDataset,
       SparqlQuery.of(
         "fetch ds description",
         Prefixes of schema -> "schema",
@@ -1018,13 +1105,12 @@ class UpdatesCreatorSpec
             |  }
             |}""".stripMargin
       )
-    ).unsafeRunSync()
-      .map(row => datasets.Description(row("desc")))
-      .toSet
+    ).map(_.map(row => datasets.Description(row("desc"))).toSet)
 
-  private def findSameAs(projectId: projects.ResourceId, id: datasets.Identifier): Set[datasets.SameAs] =
+  private def findSameAs(projectId: projects.ResourceId, id: datasets.Identifier)(implicit
+      pcc: ProjectsConnectionConfig
+  ): IO[Set[datasets.SameAs]] =
     runSelect(
-      on = projectsDataset,
       SparqlQuery.of(
         "fetch sameAs",
         Prefixes of schema -> "schema",
@@ -1037,15 +1123,12 @@ class UpdatesCreatorSpec
             |  }
             |}""".stripMargin
       )
-    ).unsafeRunSync()
-      .map(row => datasets.SameAs(row("sameAs")))
-      .toSet
+    ).map(_.map(row => datasets.SameAs(row("sameAs"))).toSet)
 
-  private def findTopmostDerivedFrom(projectId: projects.ResourceId,
-                                     id:        datasets.Identifier
-  ): Set[datasets.TopmostDerivedFrom] =
+  private def findTopmostDerivedFrom(projectId: projects.ResourceId, id: datasets.Identifier)(implicit
+      pcc: ProjectsConnectionConfig
+  ): IO[Set[datasets.TopmostDerivedFrom]] =
     runSelect(
-      on = projectsDataset,
       SparqlQuery.of(
         "fetch topmostDerivedFrom",
         Prefixes.of(renku -> "renku", schema -> "schema"),
@@ -1058,13 +1141,12 @@ class UpdatesCreatorSpec
             |   }
             |}""".stripMargin
       )
-    ).unsafeRunSync()
-      .map(row => datasets.TopmostDerivedFrom(row("topmostDerivedFrom")))
-      .toSet
+    ).map(_.map(row => datasets.TopmostDerivedFrom(row("topmostDerivedFrom"))).toSet)
 
-  private def findDerivedFrom(projectId: projects.ResourceId, id: datasets.Identifier): Set[datasets.DerivedFrom] =
+  private def findDerivedFrom(projectId: projects.ResourceId, id: datasets.Identifier)(implicit
+      pcc: ProjectsConnectionConfig
+  ): IO[Set[datasets.DerivedFrom]] =
     runSelect(
-      on = projectsDataset,
       SparqlQuery.of(
         "fetch derivedFrom",
         Prefixes.of(prov -> "prov", schema -> "schema"),
@@ -1077,15 +1159,12 @@ class UpdatesCreatorSpec
             |  }
             |}""".stripMargin
       )
-    ).unsafeRunSync()
-      .map(row => datasets.DerivedFrom(row("derivedFrom")))
-      .toSet
+    ).map(_.map(row => datasets.DerivedFrom(row("derivedFrom"))).toSet)
 
-  private def findPublicationEvents(projectId: projects.ResourceId,
-                                    dsId:      datasets.ResourceId
-  ): Set[entities.PublicationEvent] =
+  private def findPublicationEvents(projectId: projects.ResourceId, dsId: datasets.ResourceId)(implicit
+      pcc: ProjectsConnectionConfig
+  ): IO[Set[entities.PublicationEvent]] =
     runSelect(
-      on = projectsDataset,
       SparqlQuery.of(
         "fetch PublicationEvents",
         Prefixes of schema -> "schema",
@@ -1102,8 +1181,8 @@ class UpdatesCreatorSpec
                  |  }
                  |}""".stripMargin
       )
-    ).unsafeRunSync()
-      .map(row =>
+    ).map(
+      _.map(row =>
         entities.PublicationEvent(
           publicationEvents.ResourceId(row("id")),
           publicationEvents.About(row("about")),
@@ -1112,10 +1191,12 @@ class UpdatesCreatorSpec
           publicationEvents.Name(row("name")),
           publicationEvents.StartDate(Instant.parse(row("date")))
         )
-      )
-      .toSet
+      ).toSet
+    )
 
   private implicit class SameAsOps(sameAs: SameAs) {
     lazy val entityId: EntityId = sameAs.asJsonLD.entityId.getOrElse(fail("Cannot obtain sameAs @id"))
   }
+
+  implicit lazy val ioLogger: Logger[IO] = TestLogger()
 }

@@ -1,5 +1,5 @@
 /*
- * Copyright 2023 Swiss Data Science Center (SDSC)
+ * Copyright 2024 Swiss Data Science Center (SDSC)
  * A partnership between École Polytechnique Fédérale de Lausanne (EPFL) and
  * Eidgenössische Technische Hochschule Zürich (ETHZ).
  *
@@ -18,37 +18,49 @@
 
 package io.renku.eventlog.events.producers
 
-import cats.Id
 import cats.effect.IO
+import cats.effect.testing.scalatest.AsyncIOSpec
+import io.renku.eventlog.EventLogPostgresSpec
+import io.renku.eventlog.metrics.{QueriesExecutionTimes, TestQueriesExecutionTimes}
 import io.renku.generators.Generators.Implicits._
 import io.renku.graph.model.events.EventStatus
 import org.scalacheck.Gen
+import org.scalamock.scalatest.AsyncMockFactory
+import org.scalatest.Succeeded
 import org.scalatest.matchers.should
-import org.scalatest.wordspec.AnyWordSpec
+import org.scalatest.wordspec.AsyncWordSpec
 
-class CapacityFinderSpec extends AnyWordSpec with should.Matchers with CapacityFindingQuerySpec {
+class CapacityFinderSpec
+    extends AsyncWordSpec
+    with AsyncIOSpec
+    with EventLogPostgresSpec
+    with AsyncMockFactory
+    with should.Matchers {
 
   "noOpCapacityFinder" should {
 
-    "always return Capacity.zero" in {
-      CapacityFinder.noOpCapacityFinder[Id].findUsedCapacity shouldBe UsedCapacity.zero
+    "always return Capacity.zero" in testDBResource.use { implicit cfg =>
+      CapacityFinder.noOpCapacityFinder[IO].findUsedCapacity.asserting(_ shouldBe UsedCapacity.zero)
     }
   }
 
   "QueryBasedCapacityFinder" should {
 
-    "return used capacity using the given query" in {
+    "return used capacity using the given query" in testDBResource.use { implicit cfg =>
+      for {
+        _ <- storeGeneratedEvent(status = EventStatus.GeneratingTriples)
+        _ <- storeGeneratedEvent(status = Gen.oneOf(EventStatus.all - EventStatus.GeneratingTriples).generateOne)
 
-      createEvent(EventStatus.GeneratingTriples)
-      createEvent(Gen.oneOf(EventStatus.all - EventStatus.GeneratingTriples).generateOne)
+        finder = CapacityFinder.ofStatus[IO](EventStatus.GeneratingTriples)
 
-      val finder = CapacityFinder.ofStatus[IO](EventStatus.GeneratingTriples)
+        _ <- finder.findUsedCapacity.asserting(_ shouldBe UsedCapacity(1))
 
-      finder.findUsedCapacity.unsafeRunSync() shouldBe UsedCapacity(1)
+        _ <- storeGeneratedEvent(status = EventStatus.GeneratingTriples)
 
-      createEvent(EventStatus.GeneratingTriples)
-
-      finder.findUsedCapacity.unsafeRunSync() shouldBe UsedCapacity(2)
+        _ <- finder.findUsedCapacity.asserting(_ shouldBe UsedCapacity(2))
+      } yield Succeeded
     }
   }
+
+  private implicit lazy val qet: QueriesExecutionTimes[IO] = TestQueriesExecutionTimes[IO]
 }

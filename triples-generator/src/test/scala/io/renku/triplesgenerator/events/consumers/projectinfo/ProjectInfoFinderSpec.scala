@@ -1,5 +1,5 @@
 /*
- * Copyright 2023 Swiss Data Science Center (SDSC)
+ * Copyright 2024 Swiss Data Science Center (SDSC)
  * A partnership between École Polytechnique Fédérale de Lausanne (EPFL) and
  * Eidgenössische Technische Hochschule Zürich (ETHZ).
  *
@@ -57,25 +57,25 @@ class ProjectInfoFinderSpec
         (info: GitLabProjectInfo, creator: GitLabMember, members: Set[GitLabMember]) =>
           val infoWithCreator = info.copy(maybeCreator = creator.user.some, members = Set.empty)
           (projectFinder
-            .findProject(_: projects.Slug)(_: Option[AccessToken]))
-            .expects(infoWithCreator.slug, maybeAccessToken)
+            .findProject(_: projects.Slug)(_: AccessToken))
+            .expects(infoWithCreator.slug, accessToken)
             .returning(rightT[IO, ProcessingRecoverableError](infoWithCreator.some))
           (membersFinder
-            .findProjectMembers(_: projects.Slug)(_: Option[AccessToken]))
-            .expects(infoWithCreator.slug, maybeAccessToken)
+            .findProjectMembers(_: projects.Slug)(_: AccessToken))
+            .expects(infoWithCreator.slug, accessToken)
             .returning(rightT[IO, ProcessingRecoverableError](members))
           val updatedMembers = members map { member =>
             val updatedMember = memberGitLabEmailLens.replace(Some(personEmails.generateOne))(member)
             (memberEmailFinder
-              .findMemberEmail(_: GitLabMember, _: Project)(_: Option[AccessToken]))
-              .expects(member, Project(infoWithCreator.id, infoWithCreator.slug), maybeAccessToken)
+              .findMemberEmail(_: GitLabMember, _: Project)(_: AccessToken))
+              .expects(member, Project(infoWithCreator.id, infoWithCreator.slug), accessToken)
               .returning(rightT[IO, ProcessingRecoverableError](updatedMember))
             updatedMember
           }
           val updatedCreator = memberGitLabEmailLens.replace(Some(personEmails.generateOne))(creator)
           (memberEmailFinder
-            .findMemberEmail(_: GitLabMember, _: Project)(_: Option[AccessToken]))
-            .expects(creator.withOwnerLevel, Project(infoWithCreator.id, infoWithCreator.slug), maybeAccessToken)
+            .findMemberEmail(_: GitLabMember, _: Project)(_: AccessToken))
+            .expects(creator.withOwnerLevel, Project(infoWithCreator.id, infoWithCreator.slug), accessToken)
             .returning(rightT[IO, ProcessingRecoverableError](updatedCreator))
 
           finder
@@ -92,8 +92,8 @@ class ProjectInfoFinderSpec
       val slug = projectSlugs.generateOne
 
       (projectFinder
-        .findProject(_: projects.Slug)(_: Option[AccessToken]))
-        .expects(slug, maybeAccessToken)
+        .findProject(_: projects.Slug)(_: AccessToken))
+        .expects(slug, accessToken)
         .returning(rightT[IO, ProcessingRecoverableError](None))
 
       finder.findProjectInfo(slug).value.unsafeRunSync() shouldBe None.asRight
@@ -104,18 +104,18 @@ class ProjectInfoFinderSpec
       val projectInfo = gitLabProjectInfos.generateOne.copy(maybeCreator = Some(creator.user), members = Set.empty)
 
       (projectFinder
-        .findProject(_: projects.Slug)(_: Option[AccessToken]))
-        .expects(projectInfo.slug, maybeAccessToken)
+        .findProject(_: projects.Slug)(_: AccessToken))
+        .expects(projectInfo.slug, accessToken)
         .returning(rightT[IO, ProcessingRecoverableError](projectInfo.some))
       (membersFinder
-        .findProjectMembers(_: projects.Slug)(_: Option[AccessToken]))
-        .expects(projectInfo.slug, maybeAccessToken)
+        .findProjectMembers(_: projects.Slug)(_: AccessToken))
+        .expects(projectInfo.slug, accessToken)
         .returning(rightT[IO, ProcessingRecoverableError](Set.empty))
       val updatedCreator =
         gitLabProjectMembers.map(memberGitLabIdLens.modify(_ => creator.user.gitLabId)).generateOne
       (memberEmailFinder
-        .findMemberEmail(_: GitLabMember, _: Project)(_: Option[AccessToken]))
-        .expects(creator.withOwnerLevel, Project(projectInfo.id, projectInfo.slug), maybeAccessToken)
+        .findMemberEmail(_: GitLabMember, _: Project)(_: AccessToken))
+        .expects(creator.withOwnerLevel, Project(projectInfo.id, projectInfo.slug), accessToken)
         .returning(rightT[IO, ProcessingRecoverableError](updatedCreator))
 
       finder.findProjectInfo(projectInfo.slug).value.unsafeRunSync() shouldBe projectInfo
@@ -128,20 +128,20 @@ class ProjectInfoFinderSpec
       val projectInfo = gitLabProjectInfos.generateOne.copy(maybeCreator = None, members = Set.empty)
 
       (projectFinder
-        .findProject(_: projects.Slug)(_: Option[AccessToken]))
-        .expects(projectInfo.slug, maybeAccessToken)
+        .findProject(_: projects.Slug)(_: AccessToken))
+        .expects(projectInfo.slug, accessToken)
         .returning(rightT[IO, ProcessingRecoverableError](projectInfo.some))
       val members: Set[GitLabMember] = projectMembersNoEmail.generateNonEmptyList().toList.toSet
       (membersFinder
-        .findProjectMembers(_: projects.Slug)(_: Option[AccessToken]))
-        .expects(projectInfo.slug, maybeAccessToken)
+        .findProjectMembers(_: projects.Slug)(_: AccessToken))
+        .expects(projectInfo.slug, accessToken)
         .returning(rightT[IO, ProcessingRecoverableError](members))
       val updatedMembers = members map { member =>
         val updatedMember =
           gitLabProjectMembers.map(memberGitLabIdLens.modify(_ => member.user.gitLabId)).generateOne
         (memberEmailFinder
-          .findMemberEmail(_: GitLabMember, _: Project)(_: Option[AccessToken]))
-          .expects(member, Project(projectInfo.id, projectInfo.slug), maybeAccessToken)
+          .findMemberEmail(_: GitLabMember, _: Project)(_: AccessToken))
+          .expects(member, Project(projectInfo.id, projectInfo.slug), accessToken)
           .returning(rightT[IO, ProcessingRecoverableError](updatedMember))
         updatedMember
       }
@@ -156,12 +156,12 @@ class ProjectInfoFinderSpec
       val projectInfo = gitLabProjectInfos.generateOne.copy(maybeCreator = None, members = Set.empty)
 
       (projectFinder
-        .findProject(_: projects.Slug)(_: Option[AccessToken]))
-        .expects(projectInfo.slug, maybeAccessToken)
+        .findProject(_: projects.Slug)(_: AccessToken))
+        .expects(projectInfo.slug, accessToken)
         .returning(rightT[IO, ProcessingRecoverableError](projectInfo.some))
       (membersFinder
-        .findProjectMembers(_: projects.Slug)(_: Option[AccessToken]))
-        .expects(projectInfo.slug, maybeAccessToken)
+        .findProjectMembers(_: projects.Slug)(_: AccessToken))
+        .expects(projectInfo.slug, accessToken)
         .returning(rightT[IO, ProcessingRecoverableError](Set.empty))
 
       finder.findProjectInfo(projectInfo.slug).value.unsafeRunSync() shouldBe projectInfo.some.asRight
@@ -172,8 +172,8 @@ class ProjectInfoFinderSpec
 
       val error = processingRecoverableErrors.generateOne
       (projectFinder
-        .findProject(_: projects.Slug)(_: Option[AccessToken]))
-        .expects(slug, maybeAccessToken)
+        .findProject(_: projects.Slug)(_: AccessToken))
+        .expects(slug, accessToken)
         .returning(EitherT.leftT[IO, Option[GitLabProjectInfo]](error))
 
       finder.findProjectInfo(slug).value.unsafeRunSync() shouldBe error.asLeft
@@ -183,14 +183,14 @@ class ProjectInfoFinderSpec
       val projectInfo = gitLabProjectInfos.generateOne
 
       (projectFinder
-        .findProject(_: projects.Slug)(_: Option[AccessToken]))
-        .expects(projectInfo.slug, maybeAccessToken)
+        .findProject(_: projects.Slug)(_: AccessToken))
+        .expects(projectInfo.slug, accessToken)
         .returning(rightT[IO, ProcessingRecoverableError](projectInfo.some))
 
       val error = processingRecoverableErrors.generateOne
       (membersFinder
-        .findProjectMembers(_: projects.Slug)(_: Option[AccessToken]))
-        .expects(projectInfo.slug, maybeAccessToken)
+        .findProjectMembers(_: projects.Slug)(_: AccessToken))
+        .expects(projectInfo.slug, accessToken)
         .returning(EitherT.leftT[IO, Set[GitLabMember]](error))
 
       finder.findProjectInfo(projectInfo.slug).value.unsafeRunSync() shouldBe error.asLeft
@@ -200,19 +200,19 @@ class ProjectInfoFinderSpec
       val projectInfo = gitLabProjectInfos.generateOne.copy(maybeCreator = None, members = Set.empty)
 
       (projectFinder
-        .findProject(_: projects.Slug)(_: Option[AccessToken]))
-        .expects(projectInfo.slug, maybeAccessToken)
+        .findProject(_: projects.Slug)(_: AccessToken))
+        .expects(projectInfo.slug, accessToken)
         .returning(rightT[IO, ProcessingRecoverableError](projectInfo.some))
       val members: Set[GitLabMember] = projectMembersNoEmail.generateNonEmptyList().toList.toSet
       (membersFinder
-        .findProjectMembers(_: projects.Slug)(_: Option[AccessToken]))
-        .expects(projectInfo.slug, maybeAccessToken)
+        .findProjectMembers(_: projects.Slug)(_: AccessToken))
+        .expects(projectInfo.slug, accessToken)
         .returning(rightT[IO, ProcessingRecoverableError](members))
       val error = processingRecoverableErrors.generateOne
       members foreach { member =>
         (memberEmailFinder
-          .findMemberEmail(_: GitLabMember, _: Project)(_: Option[AccessToken]))
-          .expects(member, Project(projectInfo.id, projectInfo.slug), maybeAccessToken)
+          .findMemberEmail(_: GitLabMember, _: Project)(_: AccessToken))
+          .expects(member, Project(projectInfo.id, projectInfo.slug), accessToken)
           .returning(EitherT.leftT[IO, GitLabMember](error))
       }
 
@@ -224,8 +224,8 @@ class ProjectInfoFinderSpec
 
       val exception = exceptions.generateOne
       (projectFinder
-        .findProject(_: projects.Slug)(_: Option[AccessToken]))
-        .expects(slug, maybeAccessToken)
+        .findProject(_: projects.Slug)(_: AccessToken))
+        .expects(slug, accessToken)
         .returning(EitherT(exception.raiseError[IO, Either[ProcessingRecoverableError, Option[GitLabProjectInfo]]]))
 
       intercept[Exception](finder.findProjectInfo(slug).value.unsafeRunSync()) shouldBe exception
@@ -235,14 +235,14 @@ class ProjectInfoFinderSpec
       val projectInfo = gitLabProjectInfos.generateOne
 
       (projectFinder
-        .findProject(_: projects.Slug)(_: Option[AccessToken]))
-        .expects(projectInfo.slug, maybeAccessToken)
+        .findProject(_: projects.Slug)(_: AccessToken))
+        .expects(projectInfo.slug, accessToken)
         .returning(rightT[IO, ProcessingRecoverableError](projectInfo.some))
 
       val exception = exceptions.generateOne
       (membersFinder
-        .findProjectMembers(_: projects.Slug)(_: Option[AccessToken]))
-        .expects(projectInfo.slug, maybeAccessToken)
+        .findProjectMembers(_: projects.Slug)(_: AccessToken))
+        .expects(projectInfo.slug, accessToken)
         .returning(EitherT(exception.raiseError[IO, Either[ProcessingRecoverableError, Set[GitLabMember]]]))
 
       intercept[Exception](finder.findProjectInfo(projectInfo.slug).value.unsafeRunSync()) shouldBe exception
@@ -252,19 +252,19 @@ class ProjectInfoFinderSpec
       val projectInfo = gitLabProjectInfos.generateOne.copy(maybeCreator = None, members = Set.empty)
 
       (projectFinder
-        .findProject(_: projects.Slug)(_: Option[AccessToken]))
-        .expects(projectInfo.slug, maybeAccessToken)
+        .findProject(_: projects.Slug)(_: AccessToken))
+        .expects(projectInfo.slug, accessToken)
         .returning(rightT[IO, ProcessingRecoverableError](projectInfo.some))
       val members: Set[GitLabMember] = projectMembersNoEmail.generateNonEmptyList().toList.toSet
       (membersFinder
-        .findProjectMembers(_: projects.Slug)(_: Option[AccessToken]))
-        .expects(projectInfo.slug, maybeAccessToken)
+        .findProjectMembers(_: projects.Slug)(_: AccessToken))
+        .expects(projectInfo.slug, accessToken)
         .returning(rightT[IO, ProcessingRecoverableError](members))
       val exception = exceptions.generateOne
       members foreach { member =>
         (memberEmailFinder
-          .findMemberEmail(_: GitLabMember, _: Project)(_: Option[AccessToken]))
-          .expects(member, Project(projectInfo.id, projectInfo.slug), maybeAccessToken)
+          .findMemberEmail(_: GitLabMember, _: Project)(_: AccessToken))
+          .expects(member, Project(projectInfo.id, projectInfo.slug), accessToken)
           .returning(EitherT(exception.raiseError[IO, Either[ProcessingRecoverableError, GitLabMember]]))
       }
 
@@ -294,21 +294,21 @@ class ProjectInfoFinderSpec
         val projectInfo = gitLabProjectInfos.generateOne.copy(maybeCreator = None, members = members)
 
         (projectFinder
-          .findProject(_: projects.Slug)(_: Option[AccessToken]))
-          .expects(projectInfo.slug, maybeAccessToken)
+          .findProject(_: projects.Slug)(_: AccessToken))
+          .expects(projectInfo.slug, accessToken)
           .returning(rightT[IO, ProcessingRecoverableError](projectInfo.some))
         (membersFinder
-          .findProjectMembers(_: projects.Slug)(_: Option[AccessToken]))
-          .expects(projectInfo.slug, maybeAccessToken)
+          .findProjectMembers(_: projects.Slug)(_: AccessToken))
+          .expects(projectInfo.slug, accessToken)
           .returning(rightT[IO, ProcessingRecoverableError](members))
 
         (memberEmailFinder
-          .findMemberEmail(_: GitLabMember, _: Project)(_: Option[AccessToken]))
-          .expects(sameNameMember1, Project(projectInfo.id, projectInfo.slug), maybeAccessToken)
+          .findMemberEmail(_: GitLabMember, _: Project)(_: AccessToken))
+          .expects(sameNameMember1, Project(projectInfo.id, projectInfo.slug), accessToken)
           .returning(rightT[IO, ProcessingRecoverableError](member1AfterEmailFinding))
         (memberEmailFinder
-          .findMemberEmail(_: GitLabMember, _: Project)(_: Option[AccessToken]))
-          .expects(sameNameMember2, Project(projectInfo.id, projectInfo.slug), maybeAccessToken)
+          .findMemberEmail(_: GitLabMember, _: Project)(_: AccessToken))
+          .expects(sameNameMember2, Project(projectInfo.id, projectInfo.slug), accessToken)
           .returning(rightT[IO, ProcessingRecoverableError](member2AfterEmailFinding))
 
         finder.findProjectInfo(projectInfo.slug).value.unsafeRunSync() shouldBe projectInfo
@@ -320,7 +320,7 @@ class ProjectInfoFinderSpec
   }
 
   private class TestCase {
-    implicit val maybeAccessToken: Option[AccessToken] = accessTokens.generateOption
+    implicit val accessToken: AccessToken = accessTokens.generateOne
 
     private implicit val logger: TestLogger[IO] = TestLogger[IO]()
     val projectFinder     = mock[ProjectFinder[IO]]

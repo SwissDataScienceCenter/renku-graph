@@ -1,5 +1,5 @@
 /*
- * Copyright 2023 Swiss Data Science Center (SDSC)
+ * Copyright 2024 Swiss Data Science Center (SDSC)
  * A partnership between École Polytechnique Fédérale de Lausanne (EPFL) and
  * Eidgenössische Technische Hochschule Zürich (ETHZ).
  *
@@ -21,49 +21,51 @@ package projectsync
 
 import Generators.sendingResults
 import cats.effect.IO
-import io.renku.eventlog.InMemoryEventLogDbSpec
-import io.renku.eventlog.metrics.QueriesExecutionTimes
+import cats.effect.testing.scalatest.AsyncIOSpec
+import io.renku.db.DBConfigProvider.DBConfig
+import io.renku.eventlog.metrics.{QueriesExecutionTimes, TestQueriesExecutionTimes}
+import io.renku.eventlog.{EventLogDB, EventLogPostgresSpec}
 import io.renku.events.Generators.subscriberUrls
-import io.renku.generators.Generators._
+import io.renku.events.consumers.ConsumersModelGenerators.consumerProjects
 import io.renku.generators.Generators.Implicits._
-import io.renku.graph.model.EventContentGenerators.eventDates
-import io.renku.graph.model.GraphModelGenerators.{projectIds, projectSlugs}
-import io.renku.graph.model.events.LastSyncedDate
-import io.renku.interpreters.TestLogger
-import io.renku.metrics.TestMetricsRegistry
-import io.renku.testtools.IOSpec
+import io.renku.generators.Generators._
+import org.scalamock.scalatest.AsyncMockFactory
+import org.scalatest.Succeeded
 import org.scalatest.matchers.should
-import org.scalatest.wordspec.AnyWordSpec
+import org.scalatest.wordspec.AsyncWordSpec
 
 class DispatchRecoverySpec
-    extends AnyWordSpec
-    with IOSpec
-    with InMemoryEventLogDbSpec
-    with should.Matchers
-    with SubscriptionDataProvisioning {
+    extends AsyncWordSpec
+    with AsyncIOSpec
+    with EventLogPostgresSpec
+    with AsyncMockFactory
+    with SubscriptionProvisioning
+    with should.Matchers {
 
   "returnToQueue" should {
 
-    s"delete the row from the subscription_category_sync_times table for the $categoryName and project" in new TestCase {
+    s"delete the row from the subscription_category_sync_times table for the $categoryName and project" in testDBResource
+      .use { implicit cfg =>
+        for {
+          _ <- upsertProject(project)
+          _ <- upsertCategorySyncTime(event.projectId, categoryName)
 
-      upsertProject(event.projectId, event.projectSlug, eventDates.generateOne)
-      upsertCategorySyncTime(event.projectId, categoryName, timestampsNotInTheFuture.generateAs(LastSyncedDate))
+          _ <- findCategorySyncTimes(event.projectId).asserting(_.map(_.name) shouldBe List(categoryName))
 
-      findProjectCategorySyncTimes(event.projectId).map(_._1) shouldBe List(categoryName)
+          _ <- recovery.returnToQueue(event, sendingResults.generateOne).assertNoException
 
-      recovery.returnToQueue(event, sendingResults.generateOne).unsafeRunSync() shouldBe ()
+          _ <- findCategorySyncTimes(event.projectId).asserting(_ shouldBe Nil)
+        } yield Succeeded
+      }
 
-      findProjectCategorySyncTimes(event.projectId) shouldBe Nil
-    }
-
-    s"do nothing if there's no row in the subscription_category_sync_times table for the $categoryName and project" in new TestCase {
-
-      findProjectCategorySyncTimes(event.projectId) shouldBe Nil
-
-      recovery.returnToQueue(event, sendingResults.generateOne).unsafeRunSync() shouldBe ()
-
-      findProjectCategorySyncTimes(event.projectId) shouldBe Nil
-    }
+    s"do nothing if there's no row in the subscription_category_sync_times table for the $categoryName and project" in testDBResource
+      .use { implicit cfg =>
+        for {
+          _ <- findCategorySyncTimes(event.projectId).asserting(_ shouldBe Nil)
+          _ <- recovery.returnToQueue(event, sendingResults.generateOne).assertNoException
+          _ <- findCategorySyncTimes(event.projectId).asserting(_ shouldBe Nil)
+        } yield Succeeded
+      }
   }
 
   "recover" should {
@@ -71,34 +73,33 @@ class DispatchRecoverySpec
     val exception  = exceptions.generateOne
     val subscriber = subscriberUrls.generateOne
 
-    s"delete the row from the subscription_category_sync_times table for the $categoryName and project" in new TestCase {
+    s"delete the row from the subscription_category_sync_times table for the $categoryName and project" in testDBResource
+      .use { implicit cfg =>
+        for {
+          _ <- upsertProject(project)
+          _ <- upsertCategorySyncTime(event.projectId, categoryName)
 
-      upsertProject(event.projectId, event.projectSlug, eventDates.generateOne)
-      upsertCategorySyncTime(event.projectId, categoryName, timestampsNotInTheFuture.generateAs(LastSyncedDate))
+          _ <- findCategorySyncTimes(event.projectId).asserting(_.map(_.name) shouldBe List(categoryName))
 
-      findProjectCategorySyncTimes(event.projectId).map(_._1) shouldBe List(categoryName)
+          _ <- recovery.recover(subscriber, event)(exception).assertNoException
 
-      recovery.recover(subscriber, event)(exception).unsafeRunSync() shouldBe ()
+          _ <- findCategorySyncTimes(event.projectId).asserting(_ shouldBe Nil)
+        } yield Succeeded
+      }
 
-      findProjectCategorySyncTimes(event.projectId) shouldBe Nil
-    }
-
-    s"do nothing if there's no row in the subscription_category_sync_times table for the $categoryName and project" in new TestCase {
-
-      findProjectCategorySyncTimes(event.projectId) shouldBe Nil
-
-      recovery.recover(subscriber, event)(exception).unsafeRunSync() shouldBe ()
-
-      findProjectCategorySyncTimes(event.projectId) shouldBe Nil
-    }
+    s"do nothing if there's no row in the subscription_category_sync_times table for the $categoryName and project" in testDBResource
+      .use { implicit cfg =>
+        findCategorySyncTimes(event.projectId).asserting(_ shouldBe Nil) >>
+          recovery.recover(subscriber, event)(exception).assertNoException >>
+          findCategorySyncTimes(event.projectId).asserting(_ shouldBe Nil)
+      }
   }
 
-  private trait TestCase {
-    val event = ProjectSyncEvent(projectIds.generateOne, projectSlugs.generateOne)
+  private val project = consumerProjects.generateOne
+  private val event   = ProjectSyncEvent(project.id, project.slug)
 
-    private implicit val logger:           TestLogger[IO]            = TestLogger[IO]()
-    private implicit val metricsRegistry:  TestMetricsRegistry[IO]   = TestMetricsRegistry[IO]
-    private implicit val queriesExecTimes: QueriesExecutionTimes[IO] = QueriesExecutionTimes[IO]().unsafeRunSync()
-    val recovery = new DispatchRecoveryImpl[IO]
+  private def recovery(implicit cfg: DBConfig[EventLogDB]) = {
+    implicit val qet: QueriesExecutionTimes[IO] = TestQueriesExecutionTimes[IO]
+    new DispatchRecoveryImpl[IO]
   }
 }

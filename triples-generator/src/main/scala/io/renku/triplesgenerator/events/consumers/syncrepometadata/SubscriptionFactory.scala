@@ -1,5 +1,5 @@
 /*
- * Copyright 2023 Swiss Data Science Center (SDSC)
+ * Copyright 2024 Swiss Data Science Center (SDSC)
  * A partnership between École Polytechnique Fédérale de Lausanne (EPFL) and
  * Eidgenössische Technische Hochschule Zürich (ETHZ).
  *
@@ -24,7 +24,6 @@ import cats.syntax.all._
 import com.typesafe.config.Config
 import io.renku.events.consumers
 import io.renku.events.consumers.subscriptions.SubscriptionMechanism
-import io.renku.graph.tokenrepository.AccessTokenFinder
 import io.renku.http.client.GitLabClient
 import io.renku.metrics.MetricsRegistry
 import io.renku.triplesgenerator.TgDB.TsWriteLock
@@ -36,7 +35,7 @@ object SubscriptionFactory {
 
   def apply[F[
       _
-  ]: Async: NonEmptyParallel: GitLabClient: AccessTokenFinder: Logger: ReProvisioningStatus: SparqlQueryTimeRecorder: MetricsRegistry](
+  ]: Async: NonEmptyParallel: GitLabClient: Logger: ReProvisioningStatus: SparqlQueryTimeRecorder: MetricsRegistry](
       config:      Config,
       tsWriteLock: TsWriteLock[F]
   ): F[(consumers.EventHandler[F], SubscriptionMechanism[F])] =

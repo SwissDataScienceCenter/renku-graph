@@ -1,5 +1,5 @@
 /*
- * Copyright 2023 Swiss Data Science Center (SDSC)
+ * Copyright 2024 Swiss Data Science Center (SDSC)
  * A partnership between École Polytechnique Fédérale de Lausanne (EPFL) and
  * Eidgenössische Technische Hochschule Zürich (ETHZ).
  *
@@ -23,22 +23,17 @@ import io.renku.triplesstore.{DatasetConfigFile, DatasetConfigFileFactory, Datas
 
 object DatasetTTLs {
 
-  final class ProjectsTTL private (val value: String) extends DatasetConfigFile
+  final case class ProjectsTTL(datasetName: DatasetName, value: String) extends DatasetConfigFile
   object ProjectsTTL
-      extends DatasetConfigFileFactory[ProjectsTTL](DatasetName("projects"),
-                                                    new ProjectsTTL(_),
-                                                    ttlFileName = "projects-ds.ttl"
-      )
+      extends DatasetConfigFileFactory[ProjectsTTL](new ProjectsTTL(_, _), ttlFileName = "projects-ds.ttl")
 
-  final class MigrationsTTL private (val value: String) extends DatasetConfigFile
+  final case class MigrationsTTL(datasetName: DatasetName, value: String) extends DatasetConfigFile
   object MigrationsTTL
-      extends DatasetConfigFileFactory[MigrationsTTL](DatasetName("migrations"),
-                                                      new MigrationsTTL(_),
-                                                      ttlFileName = "migrations-ds.ttl"
-      )
+      extends DatasetConfigFileFactory[MigrationsTTL](new MigrationsTTL(_, _), ttlFileName = "migrations-ds.ttl")
 
-  val allFactories: List[DatasetConfigFileFactory[_ <: DatasetConfigFile]] = List(ProjectsTTL, MigrationsTTL)
+  val allFactories: List[DatasetConfigFileFactory[_ <: DatasetConfigFile]] =
+    List(ProjectsTTL, MigrationsTTL)
 
-  val allNamesAndConfigs: Either[Exception, List[(DatasetName, DatasetConfigFile)]] =
-    allFactories.map(factory => factory.fromTtlFile().map(factory.datasetName -> _)).sequence
+  val allConfigs: Either[Exception, List[DatasetConfigFile]] =
+    allFactories.map(factory => factory.fromTtlFile()).sequence
 }

@@ -1,5 +1,5 @@
 /*
- * Copyright 2023 Swiss Data Science Center (SDSC)
+ * Copyright 2024 Swiss Data Science Center (SDSC)
  * A partnership between École Polytechnique Fédérale de Lausanne (EPFL) and
  * Eidgenössische Technische Hochschule Zürich (ETHZ).
  *
@@ -20,91 +20,83 @@ package io.renku.eventlog.events.producers
 package minprojectinfo
 
 import cats.effect.IO
-import io.renku.eventlog.InMemoryEventLogDbSpec
-import io.renku.eventlog.metrics.QueriesExecutionTimes
+import cats.effect.testing.scalatest.AsyncIOSpec
+import cats.syntax.all._
+import io.renku.db.DBConfigProvider.DBConfig
+import io.renku.eventlog.metrics.{QueriesExecutionTimes, TestQueriesExecutionTimes}
+import io.renku.eventlog.{EventLogDB, EventLogPostgresSpec}
+import io.renku.events.consumers.ConsumersModelGenerators.consumerProjects
 import io.renku.generators.Generators.Implicits._
-import io.renku.graph.model.EventContentGenerators._
-import io.renku.graph.model.GraphModelGenerators.{projectIds, projectSlugs}
 import io.renku.graph.model.events.EventStatus.TriplesStore
 import io.renku.graph.model.events.{EventStatus, LastSyncedDate}
-import io.renku.metrics.TestMetricsRegistry
-import io.renku.testtools.IOSpec
-import org.scalamock.scalatest.MockFactory
+import org.scalamock.scalatest.AsyncMockFactory
+import org.scalatest.Succeeded
 import org.scalatest.matchers.should
-import org.scalatest.wordspec.AnyWordSpec
+import org.scalatest.wordspec.AsyncWordSpec
 
 import java.time.Instant
 import java.time.temporal.ChronoUnit.MICROS
 
 class EventFinderSpec
-    extends AnyWordSpec
-    with IOSpec
-    with InMemoryEventLogDbSpec
-    with SubscriptionDataProvisioning
-    with MockFactory
+    extends AsyncWordSpec
+    with AsyncIOSpec
+    with EventLogPostgresSpec
+    with AsyncMockFactory
+    with SubscriptionProvisioning
     with should.Matchers {
 
   "popEvent" should {
 
     "return an event for the project with no events " +
-      s"and no rows in the subscription_category_sync_times table for the $categoryName" in new TestCase {
+      s"and no rows in the subscription_category_sync_times table for the $categoryName" in testDBResource.use {
+        implicit cfg =>
+          for {
+            _ <- finder.popEvent().asserting(_ shouldBe None)
 
-        finder.popEvent().unsafeRunSync() shouldBe None
+            project = consumerProjects.generateOne
+            _ <- upsertProject(project)
 
-        val projectId   = projectIds.generateOne
-        val projectSlug = projectSlugs.generateOne
-        upsertProject(projectId, projectSlug, eventDates.generateOne)
+            _ <- finder.popEvent().asserting(_ shouldBe Some(MinProjectInfoEvent(project.id, project.slug)))
 
-        finder.popEvent().unsafeRunSync() shouldBe Some(MinProjectInfoEvent(projectId, projectSlug))
+            _ <- findCategorySyncTimes(project.id)
+                   .asserting(_ shouldBe List(CategorySync(categoryName, LastSyncedDate(now))))
 
-        findProjectCategorySyncTimes(projectId) shouldBe List(
-          categoryName -> LastSyncedDate(currentTime.truncatedTo(MICROS))
-        )
-
-        finder.popEvent().unsafeRunSync() shouldBe None
+            _ <- finder.popEvent().asserting(_ shouldBe None)
+          } yield Succeeded
       }
 
     "return an event for the project with no events in TRIPLES_STORE " +
-      s"and no rows in the subscription_category_sync_times table for the $categoryName" in new TestCase {
+      s"and no rows in the subscription_category_sync_times table for the $categoryName" in testDBResource.use {
+        implicit cfg =>
+          val project = consumerProjects.generateOne
+          for {
+            _ <- upsertProject(project)
+            _ <- (EventStatus.all - TriplesStore).toList.traverse_(storeGeneratedEvent(_, project = project))
 
-        val projectId   = projectIds.generateOne
-        val projectSlug = projectSlugs.generateOne
-        upsertProject(projectId, projectSlug, eventDates.generateOne)
+            _ <- finder.popEvent().asserting(_ shouldBe Some(MinProjectInfoEvent(project.id, project.slug)))
 
-        EventStatus.all - TriplesStore foreach {
-          storeGeneratedEvent(_, eventDates.generateOne, projectId, projectSlug)
-        }
+            _ <- findCategorySyncTimes(project.id)
+                   .asserting(_ shouldBe List(CategorySync(categoryName, LastSyncedDate(now.truncatedTo(MICROS)))))
 
-        finder.popEvent().unsafeRunSync() shouldBe Some(MinProjectInfoEvent(projectId, projectSlug))
-
-        findProjectCategorySyncTimes(projectId) shouldBe List(
-          categoryName -> LastSyncedDate(currentTime.truncatedTo(MICROS))
-        )
-
-        finder.popEvent().unsafeRunSync() shouldBe None
+            _ <- finder.popEvent().asserting(_ shouldBe None)
+          } yield Succeeded
       }
 
     "return no event for the project having at least on event in TRIPLES_STORE " +
-      s"even there's no rows in the subscription_category_sync_times table for the $categoryName" in new TestCase {
-
-        val projectId   = projectIds.generateOne
-        val projectSlug = projectSlugs.generateOne
-        upsertProject(projectId, projectSlug, eventDates.generateOne)
-
-        EventStatus.all foreach {
-          storeGeneratedEvent(_, eventDates.generateOne, projectId, projectSlug)
+      s"even there's no rows in the subscription_category_sync_times table for the $categoryName" in testDBResource
+        .use { implicit cfg =>
+          val project = consumerProjects.generateOne
+          for {
+            _ <- upsertProject(project)
+            _ <- EventStatus.all.toList.traverse_(storeGeneratedEvent(_, project = project))
+            _ <- finder.popEvent().asserting(_ shouldBe None)
+          } yield Succeeded
         }
-
-        finder.popEvent().unsafeRunSync() shouldBe None
-      }
   }
 
-  private trait TestCase {
-    val currentTime = Instant.now()
-    val now         = mockFunction[Instant]
-    now.expects().returning(currentTime).anyNumberOfTimes()
-    private implicit val metricsRegistry:  TestMetricsRegistry[IO]   = TestMetricsRegistry[IO]
-    private implicit val queriesExecTimes: QueriesExecutionTimes[IO] = QueriesExecutionTimes[IO]().unsafeRunSync()
-    val finder = new EventFinderImpl[IO](now)
+  private lazy val now = Instant.now().truncatedTo(MICROS)
+  private def finder(implicit cfg: DBConfig[EventLogDB]) = {
+    implicit val qet: QueriesExecutionTimes[IO] = TestQueriesExecutionTimes[IO]
+    new EventFinderImpl[IO](() => now)
   }
 }

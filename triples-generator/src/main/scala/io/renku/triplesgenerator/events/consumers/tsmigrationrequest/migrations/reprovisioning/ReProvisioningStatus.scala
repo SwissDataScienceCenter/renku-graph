@@ -1,5 +1,5 @@
 /*
- * Copyright 2023 Swiss Data Science Center (SDSC)
+ * Copyright 2024 Swiss Data Science Center (SDSC)
  * A partnership between École Polytechnique Fédérale de Lausanne (EPFL) and
  * Eidgenössische Technische Hochschule Zürich (ETHZ).
  *
@@ -61,15 +61,16 @@ private class ReProvisioningStatusImpl[F[_]: Async: Parallel: Logger: SparqlQuer
   override def underReProvisioning(): F[Boolean] = isCacheExpired >>= {
     case true =>
       fetchStatus >>= {
-        case Some(ReProvisioningInfo.Status.Running) => triggerPeriodicStatusCheck() map (_ => true)
-        case _                                       => updateCacheCheckTime() map (_ => false)
+        case Some(ReProvisioningInfo.Status.Running) => triggerPeriodicStatusCheck().as(true)
+        case _                                       => updateCacheCheckTime().as(false)
       }
     case false => false.pure[F]
   }
 
-  override def setRunning(on: MicroserviceBaseUrl): F[Unit] = upload(
-    ReProvisioningInfo(ReProvisioningInfo.Status.Running, on).asJsonLD
-  )
+  override def setRunning(on: MicroserviceBaseUrl): F[Unit] =
+    upload(
+      ReProvisioningInfo(ReProvisioningInfo.Status.Running, on).asJsonLD
+    )
 
   override def clear(): F[Unit] = deleteFromDb() >> renewSubscriptions()
 
@@ -161,7 +162,7 @@ object ReProvisioningStatus {
   def apply[F[_]](implicit ev: ReProvisioningStatus[F]): ReProvisioningStatus[F] = ev
 
   def apply[F[_]: Async: Parallel: Logger: SparqlQueryTimeRecorder](): F[ReProvisioningStatus[F]] = for {
-    storeConfig                   <- MigrationsConnectionConfig[F]()
+    storeConfig                   <- MigrationsConnectionConfig.fromConfig[F]()
     implicit0(renkuUrl: RenkuUrl) <- RenkuUrlLoader[F]()
     subscriptionsRegistry         <- Ref.of(List.empty[SubscriptionMechanism[F]])
     lastCacheCheckTimeRef         <- Ref.of[F, Long](0)

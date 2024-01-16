@@ -1,5 +1,5 @@
 /*
- * Copyright 2023 Swiss Data Science Center (SDSC)
+ * Copyright 2024 Swiss Data Science Center (SDSC)
  * A partnership between École Polytechnique Fédérale de Lausanne (EPFL) and
  * Eidgenössische Technische Hochschule Zürich (ETHZ).
  *
@@ -22,6 +22,7 @@ import cats.effect.Async
 import cats.syntax.all._
 import io.renku.data.Message
 import io.renku.graph.model.projects.GitLabId
+import io.renku.http.RenkuEntityCodec
 import io.renku.http.client.{AccessToken, GitLabClient}
 import io.renku.tokenrepository.repository.ProjectsTokensDB.SessionResource
 import io.renku.tokenrepository.repository.metrics.QueriesExecutionTimes
@@ -37,7 +38,8 @@ trait DeleteTokenEndpoint[F[_]] {
 
 class DeleteTokenEndpointImpl[F[_]: Async: Logger](tokenRemover: TokenRemover[F])
     extends Http4sDsl[F]
-    with DeleteTokenEndpoint[F] {
+    with DeleteTokenEndpoint[F]
+    with RenkuEntityCodec {
 
   override def deleteToken(projectId: GitLabId, maybeAccessToken: Option[AccessToken]): F[Response[F]] =
     (tokenRemover.delete(projectId, maybeAccessToken).flatMap(logSuccess(projectId)) >> NoContent())

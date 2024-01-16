@@ -1,5 +1,5 @@
 /*
- * Copyright 2023 Swiss Data Science Center (SDSC)
+ * Copyright 2024 Swiss Data Science Center (SDSC)
  * A partnership between École Polytechnique Fédérale de Lausanne (EPFL) and
  * Eidgenössische Technische Hochschule Zürich (ETHZ).
  *
@@ -81,7 +81,7 @@ private[statuschange] class DbUpdater[F[_]: Async: Logger: QueriesExecutionTimes
                """.command)
         .arguments(
           event.newStatus *:
-            ExecutionDate(now().plusMillis(event.executionDelay.getOrElse(Duration.ofMillis(0)).toMillis)) *:
+            ExecutionDate(now().plus(event.executionDelay getOrElse Duration.ofMillis(0))) *:
             event.message *:
             event.eventId.id *:
             event.eventId.projectId *:

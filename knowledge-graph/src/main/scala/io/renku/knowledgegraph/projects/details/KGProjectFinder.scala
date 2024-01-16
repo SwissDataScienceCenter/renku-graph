@@ -1,5 +1,5 @@
 /*
- * Copyright 2023 Swiss Data Science Center (SDSC)
+ * Copyright 2024 Swiss Data Science Center (SDSC)
  * A partnership between École Polytechnique Fédérale de Lausanne (EPFL) and
  * Eidgenössische Technische Hochschule Zürich (ETHZ).
  *
@@ -223,6 +223,6 @@ private object KGProjectFinder {
 
   def apply[F[_]: Async: Logger: SparqlQueryTimeRecorder]: F[KGProjectFinder[F]] = for {
     implicit0(renkuUrl: RenkuUrl) <- RenkuUrlLoader[F]()
-    storeConfig                   <- ProjectsConnectionConfig[F]()
+    storeConfig                   <- ProjectsConnectionConfig.fromConfig[F]()
   } yield new KGProjectFinderImpl(storeConfig)
 }

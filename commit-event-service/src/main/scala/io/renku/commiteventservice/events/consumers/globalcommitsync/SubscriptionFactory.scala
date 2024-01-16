@@ -1,5 +1,5 @@
 /*
- * Copyright 2023 Swiss Data Science Center (SDSC)
+ * Copyright 2024 Swiss Data Science Center (SDSC)
  * A partnership between École Polytechnique Fédérale de Lausanne (EPFL) and
  * Eidgenössische Technische Hochschule Zürich (ETHZ).
  *
@@ -25,7 +25,6 @@ import io.renku.commiteventservice.Microservice
 import io.renku.events.consumers
 import io.renku.events.consumers.subscriptions.SubscriptionMechanism
 import io.renku.events.consumers.subscriptions.SubscriptionPayloadComposer.defaultSubscriptionPayloadComposerFactory
-import io.renku.graph.tokenrepository.AccessTokenFinder
 import io.renku.http.client.GitLabClient
 import io.renku.logging.ExecutionTimeRecorder
 import io.renku.metrics.MetricsRegistry
@@ -35,7 +34,7 @@ object SubscriptionFactory {
 
   def apply[F[
       _
-  ]: Async: NonEmptyParallel: GitLabClient: AccessTokenFinder: Logger: MetricsRegistry: ExecutionTimeRecorder]
+  ]: Async: NonEmptyParallel: GitLabClient: Logger: MetricsRegistry: ExecutionTimeRecorder]
       : F[(consumers.EventHandler[F], SubscriptionMechanism[F])] = for {
     subscriptionMechanism <-
       SubscriptionMechanism(

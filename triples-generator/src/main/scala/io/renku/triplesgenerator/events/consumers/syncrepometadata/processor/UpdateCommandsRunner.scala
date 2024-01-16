@@ -1,5 +1,5 @@
 /*
- * Copyright 2023 Swiss Data Science Center (SDSC)
+ * Copyright 2024 Swiss Data Science Center (SDSC)
  * A partnership between École Polytechnique Fédérale de Lausanne (EPFL) and
  * Eidgenössische Technische Hochschule Zürich (ETHZ).
  *
@@ -35,7 +35,7 @@ private trait UpdateCommandsRunner[F[_]] {
 
 private object UpdateCommandsRunner {
   def apply[F[_]: Async: Logger: SparqlQueryTimeRecorder: MetricsRegistry](config: Config): F[UpdateCommandsRunner[F]] =
-    (ProjectsConnectionConfig[F](config).map(TSClient[F](_)), eventlog.api.events.Client[F](config))
+    (ProjectsConnectionConfig.fromConfig[F](config).map(TSClient[F](_)), eventlog.api.events.Client[F](config))
       .mapN(new UpdateCommandsRunnerImpl(_, _))
 }
 

@@ -1,5 +1,5 @@
 /*
- * Copyright 2023 Swiss Data Science Center (SDSC)
+ * Copyright 2024 Swiss Data Science Center (SDSC)
  * A partnership between École Polytechnique Fédérale de Lausanne (EPFL) and
  * Eidgenössische Technische Hochschule Zürich (ETHZ).
  *
@@ -20,57 +20,56 @@ package io.renku.entities.search
 
 import Criteria._
 import EntityConverters._
+import cats.effect.testing.scalatest.AsyncIOSpec
 import cats.syntax.all._
 import io.renku.entities.search.model.Entity.Workflow.WorkflowType
-import io.renku.entities.searchgraphs.SearchInfoDatasets
+import io.renku.entities.searchgraphs.TestSearchInfoDatasets
 import io.renku.generators.Generators.Implicits._
 import io.renku.generators.Generators._
 import io.renku.graph.model._
 import io.renku.graph.model.testentities.RenkuProject.CreateCompositePlan
 import io.renku.graph.model.testentities.generators.EntitiesGenerators
-import io.renku.testtools.IOSpec
-import io.renku.triplesstore.{InMemoryJenaForSpec, ProjectsDataset}
+import io.renku.triplesstore.GraphJenaSpec
+import org.scalatest.Succeeded
 import org.scalatest.matchers.should
-import org.scalatest.wordspec.AnyWordSpec
+import org.scalatest.wordspec.AsyncWordSpec
 
-//noinspection TypeAnnotation
 class WorkflowsEntitiesFinderSpec
-    extends AnyWordSpec
-    with should.Matchers
+    extends AsyncWordSpec
+    with AsyncIOSpec
     with EntitiesGenerators
-    with FinderSpecOps
-    with InMemoryJenaForSpec
-    with ProjectsDataset
-    with SearchInfoDatasets
-    with IOSpec {
+    with FinderSpec
+    with GraphJenaSpec
+    with TestSearchInfoDatasets
+    with should.Matchers {
 
   "findEntities - in case of a forks with workflows" should {
 
-    "de-duplicate workflows when on forked projects" in new TestCase {
+    "de-duplicate workflows when on forked projects" in projectsDSConfig.use { implicit pcc =>
       val original -> fork = renkuProjectEntities(visibilityPublic)
         .withActivities(activityEntities(stepPlanEntities()))
         .generateOne
         .forkOnce()
       val plan :: Nil = fork.plans
 
-      provisionTestProjects(original, fork).unsafeRunSync()
+      for {
+        _ <- provisionTestProjects(original, fork)
 
-      val results = finder
-        .findEntities(Criteria(Filters(entityTypes = Set(Filters.EntityType.Workflow))))
-        .unsafeRunSync()
-        .results
+        results <- entitiesFinder
+                     .findEntities(Criteria(Filters(entityTypes = Set(Filters.EntityType.Workflow))))
+                     .map(_.results)
 
-      results should {
-        be(List((plan -> original).to[model.Entity.Workflow])) or
-          be(List((plan -> fork).to[model.Entity.Workflow]))
-      }
+        _ = results should {
+              be(List((plan -> original).to[model.Entity.Workflow])) or
+                be(List((plan -> fork).to[model.Entity.Workflow]))
+            }
+      } yield Succeeded
     }
   }
 
   "findEntities - in case of a workflows on forks with different visibility" should {
 
-    "favour workflows on public projects if exist" in new TestCase {
-
+    "favour workflows on public projects if exist" in projectsDSConfig.use { implicit pcc =>
       val publicProject = renkuProjectEntities(visibilityPublic)
         .withActivities(activityEntities(stepPlanEntities()))
         .generateOne
@@ -82,20 +81,19 @@ class WorkflowsEntitiesFinderSpec
       }
       val plan :: Nil = publicProject.plans
 
-      provisionTestProjects(original, fork).unsafeRunSync()
-
-      finder
-        .findEntities(
-          Criteria(filters = Filters(entityTypes = Set(Filters.EntityType.Workflow)),
-                   maybeUser = member.person.toAuthUser.some
-          )
-        )
-        .unsafeRunSync()
-        .results shouldBe List((plan -> publicProject).to[model.Entity.Workflow])
+      for {
+        _ <- provisionTestProjects(original, fork)
+        _ <- entitiesFinder
+               .findEntities(
+                 Criteria(filters = Filters(entityTypes = Set(Filters.EntityType.Workflow)),
+                          maybeUser = member.person.toAuthUser.some
+                 )
+               )
+               .asserting(_.results shouldBe List((plan -> publicProject).to[model.Entity.Workflow]))
+      } yield Succeeded
     }
 
-    "favour workflows on internal projects over private projects if exist" in new TestCase {
-
+    "favour workflows on internal projects over private projects if exist" in projectsDSConfig.use { implicit pcc =>
       val member = projectMemberEntities(personGitLabIds.toGeneratorOfSomes).generateOne
       val internalProject = renkuProjectEntities(fixed(projects.Visibility.Internal))
         .modify(replaceMembers(to = Set(member)))
@@ -108,44 +106,45 @@ class WorkflowsEntitiesFinderSpec
       }
       val plan :: Nil = internalProject.plans
 
-      provisionTestProjects(original, fork).unsafeRunSync()
+      for {
+        _ <- provisionTestProjects(original, fork)
+        _ <- entitiesFinder
+               .findEntities(
+                 Criteria(filters = Filters(entityTypes = Set(Filters.EntityType.Workflow)),
+                          maybeUser = member.person.toAuthUser.some
+                 )
+               )
+               .asserting(_.results shouldBe List((plan -> internalProject).to[model.Entity.Workflow]))
+      } yield Succeeded
 
-      finder
-        .findEntities(
-          Criteria(filters = Filters(entityTypes = Set(Filters.EntityType.Workflow)),
-                   maybeUser = member.person.toAuthUser.some
-          )
-        )
-        .unsafeRunSync()
-        .results shouldBe List((plan -> internalProject).to[model.Entity.Workflow])
     }
 
-    "select workflows on private projects if there are no projects with broader visibility" in new TestCase {
+    "select workflows on private projects if there are no projects with broader visibility" in projectsDSConfig.use {
+      implicit pcc =>
+        val member = projectMemberEntities(personGitLabIds.toGeneratorOfSomes).generateOne
+        val privateProject = renkuProjectEntities(fixed(projects.Visibility.Private))
+          .modify(replaceMembers(to = Set(member)))
+          .withActivities(activityEntities(stepPlanEntities()))
+          .generateOne
+        val plan :: Nil = privateProject.plans
 
-      val member = projectMemberEntities(personGitLabIds.toGeneratorOfSomes).generateOne
-      val privateProject = renkuProjectEntities(fixed(projects.Visibility.Private))
-        .modify(replaceMembers(to = Set(member)))
-        .withActivities(activityEntities(stepPlanEntities()))
-        .generateOne
-      val plan :: Nil = privateProject.plans
+        for {
+          _ <- provisionTestProjects(privateProject)
+          _ <- entitiesFinder
+                 .findEntities(
+                   Criteria(filters = Filters(entityTypes = Set(Filters.EntityType.Workflow)),
+                            maybeUser = member.person.toAuthUser.some
+                   )
+                 )
+                 .asserting(_.results shouldBe List((plan -> privateProject).to[model.Entity.Workflow]))
+        } yield Succeeded
 
-      provisionTestProjects(privateProject).unsafeRunSync()
-
-      finder
-        .findEntities(
-          Criteria(filters = Filters(entityTypes = Set(Filters.EntityType.Workflow)),
-                   maybeUser = member.person.toAuthUser.some
-          )
-        )
-        .unsafeRunSync()
-        .results shouldBe List((plan -> privateProject).to[model.Entity.Workflow])
     }
   }
 
   "findEntities - in case of invalidated Plans" should {
 
-    "not return workflows that have been invalidated" in new TestCase {
-
+    "not return workflows that have been invalidated" in projectsDSConfig.use { implicit pcc =>
       val project = {
         val p = renkuProjectEntities(visibilityPublic)
           .withActivities(activityEntities(stepPlanEntities()))
@@ -154,36 +153,37 @@ class WorkflowsEntitiesFinderSpec
         p.addUnlinkedStepPlan(p.stepPlans.head.invalidate())
       }
 
-      provisionTestProjects(project).unsafeRunSync()
-
-      finder
-        .findEntities(Criteria(filters = Filters(entityTypes = Set(Filters.EntityType.Workflow))))
-        .unsafeRunSync()
-        .results shouldBe List.empty
+      for {
+        _ <- provisionTestProjects(project)
+        _ <- entitiesFinder
+               .findEntities(Criteria(filters = Filters(entityTypes = Set(Filters.EntityType.Workflow))))
+               .asserting(_.results shouldBe List.empty)
+      } yield Succeeded
     }
   }
 
   "findEntities - composite plans" should {
 
-    "return the type of plan" in new TestCase {
+    "return the type of plan" in projectsDSConfig.use { implicit pcc =>
       val project =
         renkuProjectEntities(visibilityPublic)
           .withActivities(activityEntities(stepPlanEntities()))
           .generateOne
           .addCompositePlan(CreateCompositePlan(compositePlanEntities(personEntities, _)))
 
-      provisionTestProjects(project).unsafeRunSync()
+      for {
+        _ <- provisionTestProjects(project)
 
-      val results = finder
-        .findEntities(Criteria(filters = Filters(entityTypes = Set(Filters.EntityType.Workflow))))
-        .unsafeRunSync()
+        results <- entitiesFinder
+                     .findEntities(Criteria(filters = Filters(entityTypes = Set(Filters.EntityType.Workflow))))
 
-      results.pagingInfo.total.value shouldBe project.plans.size
+        _ = results.pagingInfo.total.value shouldBe project.plans.size
 
-      val wfs = results.results.collect { case e: model.Entity.Workflow => e }
-      wfs should have size project.plans.size
+        wfs = results.results.collect { case e: model.Entity.Workflow => e }
+        _   = wfs should have size project.plans.size
 
-      wfs.map(_.workflowType) should contain theSameElementsAs List(WorkflowType.Step, WorkflowType.Composite)
+        _ = wfs.map(_.workflowType) should contain theSameElementsAs List(WorkflowType.Step, WorkflowType.Composite)
+      } yield Succeeded
     }
   }
 }

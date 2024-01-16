@@ -1,5 +1,5 @@
 /*
- * Copyright 2023 Swiss Data Science Center (SDSC)
+ * Copyright 2024 Swiss Data Science Center (SDSC)
  * A partnership between École Polytechnique Fédérale de Lausanne (EPFL) and
  * Eidgenössische Technische Hochschule Zürich (ETHZ).
  *
@@ -39,7 +39,7 @@ import java.time.Instant
 
 private trait ProjectFinder[F[_]] {
   def findProject(slug: projects.Slug)(implicit
-      maybeAccessToken: Option[AccessToken]
+      at: AccessToken
   ): EitherT[F, ProcessingRecoverableError, Option[GitLabProjectInfo]]
 }
 
@@ -61,7 +61,7 @@ private class ProjectFinderImpl[F[_]: Async: GitLabClient: Logger](
 
   override def findProject(
       slug: projects.Slug
-  )(implicit mat: Option[AccessToken]): EitherT[F, ProcessingRecoverableError, Option[GitLabProjectInfo]] = EitherT {
+  )(implicit at: AccessToken): EitherT[F, ProcessingRecoverableError, Option[GitLabProjectInfo]] = EitherT {
     {
       for {
         (project, maybeCreatorId) <- fetchProject(slug)
@@ -70,8 +70,8 @@ private class ProjectFinderImpl[F[_]: Async: GitLabClient: Logger](
     }.value.map(_.asRight[ProcessingRecoverableError]).recoverWith(recoveryStrategy.maybeRecoverableError)
   }
 
-  private def fetchProject(slug: projects.Slug)(implicit maybeAccessToken: Option[AccessToken]) = OptionT {
-    GitLabClient[F].get(uri"projects" / slug, "single-project")(mapTo[ProjectAndCreator])
+  private def fetchProject(slug: projects.Slug)(implicit at: AccessToken) = OptionT {
+    GitLabClient[F].get(uri"projects" / slug, "single-project")(mapTo[ProjectAndCreator])(at.some)
   }
 
   private def mapTo[OUT](implicit
@@ -121,12 +121,12 @@ private class ProjectFinderImpl[F[_]: Async: GitLabClient: Logger](
 
   private def fetchCreator(
       maybeCreatorId: Option[persons.GitLabId]
-  )(implicit maybeAccessToken: Option[AccessToken]): OptionT[F, Option[GitLabUser]] =
+  )(implicit at: AccessToken): OptionT[F, Option[GitLabUser]] =
     maybeCreatorId match {
       case None => OptionT.some[F](Option.empty[GitLabUser])
       case Some(creatorId) =>
         OptionT.liftF {
-          GitLabClient[F].get(uri"users" / creatorId, "single-user")(mapTo[GitLabUser])
+          GitLabClient[F].get(uri"users" / creatorId, "single-user")(mapTo[GitLabUser])(at.some)
         }
     }
 }

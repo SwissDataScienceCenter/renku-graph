@@ -1,5 +1,5 @@
 /*
- * Copyright 2023 Swiss Data Science Center (SDSC)
+ * Copyright 2024 Swiss Data Science Center (SDSC)
  * A partnership between École Polytechnique Fédérale de Lausanne (EPFL) and
  * Eidgenössische Technische Hochschule Zürich (ETHZ).
  *
@@ -38,7 +38,7 @@ class MetricsRegistrySpec extends AnyWordSpec with IOSpec with should.Matchers {
   "apply" should {
 
     "return a disabled Metrics Registry if the 'metrics.enabled' flag is set to false" in {
-      val registry = MetricsRegistry[IO](
+      val registry = MetricsRegistryLoader[IO](
         ConfigFactory.parseMap(Map("metrics" -> Map("enabled" -> false).asJava).asJava)
       ).unsafeRunSync()
 
@@ -46,7 +46,7 @@ class MetricsRegistrySpec extends AnyWordSpec with IOSpec with should.Matchers {
     }
 
     "return an enabled Metrics Registry if the 'metrics.enabled' flag is set to true" in {
-      val registry = MetricsRegistry[IO](
+      val registry = MetricsRegistryLoader[IO](
         ConfigFactory.parseMap(Map("metrics" -> Map("enabled" -> true).asJava).asJava)
       ).unsafeRunSync()
 
@@ -54,7 +54,7 @@ class MetricsRegistrySpec extends AnyWordSpec with IOSpec with should.Matchers {
     }
 
     "return an enabled Metrics Registry if there is no value for the 'metrics.enabled' flag" in {
-      val registry = MetricsRegistry[IO](ConfigFactory.empty()).unsafeRunSync()
+      val registry = MetricsRegistryLoader[IO](ConfigFactory.empty()).unsafeRunSync()
       registry.getClass shouldBe classOf[EnabledMetricsRegistry[Try]]
     }
   }

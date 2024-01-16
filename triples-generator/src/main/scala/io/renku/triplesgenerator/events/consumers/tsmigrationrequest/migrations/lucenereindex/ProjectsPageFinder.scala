@@ -1,5 +1,5 @@
 /*
- * Copyright 2023 Swiss Data Science Center (SDSC)
+ * Copyright 2024 Swiss Data Science Center (SDSC)
  * A partnership between École Polytechnique Fédérale de Lausanne (EPFL) and
  * Eidgenössische Technische Hochschule Zürich (ETHZ).
  *
@@ -40,7 +40,7 @@ private object ProjectsPageFinder {
   def apply[F[_]: Async: Logger: SparqlQueryTimeRecorder](migrationName: Migration.Name): F[ProjectsPageFinder[F]] =
     for {
       implicit0(ru: RenkuUrl) <- RenkuUrlLoader[F]()
-      recordsFinder           <- MigrationsConnectionConfig[F]().map(RecordsFinder[F](_))
+      recordsFinder           <- MigrationsConnectionConfig.fromConfig[F]().map(RecordsFinder[F](_))
     } yield new ProjectsPageFinderImpl(migrationName, recordsFinder)
 }
 

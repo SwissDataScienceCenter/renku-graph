@@ -1,5 +1,5 @@
 /*
- * Copyright 2023 Swiss Data Science Center (SDSC)
+ * Copyright 2024 Swiss Data Science Center (SDSC)
  * A partnership between École Polytechnique Fédérale de Lausanne (EPFL) and
  * Eidgenössische Technische Hochschule Zürich (ETHZ).
  *
@@ -18,6 +18,7 @@
 
 package io.renku.generators
 
+import cats.syntax.all._
 import eu.timepit.refined.api.Refined
 import eu.timepit.refined.auto._
 import eu.timepit.refined.collection.NonEmpty
@@ -26,12 +27,12 @@ import io.renku.config.certificates.Certificate
 import io.renku.config.sentry.SentryConfig
 import io.renku.config.sentry.SentryConfig.{Dsn, Environment}
 import io.renku.control.{RateLimit, RateLimitUnit}
-import io.renku.crypto.AesCrypto.Secret
+import io.renku.crypto.Secret
 import io.renku.data.Message
 import io.renku.generators.Generators.Implicits._
 import io.renku.generators.Generators._
 import io.renku.graph.http.server.security.Authorizer.AuthContext
-import io.renku.graph.model.GraphModelGenerators.{personGitLabIds, projectSlugs}
+import io.renku.graph.model.GraphModelGenerators.personGitLabIds
 import io.renku.graph.model.Schemas
 import io.renku.http.client.AccessToken._
 import io.renku.http.client.RestClientError._
@@ -104,11 +105,13 @@ object CommonGraphGenerators {
     unit  <- Gen.oneOf(RateLimitUnit.Second, RateLimitUnit.Minute, RateLimitUnit.Hour, RateLimitUnit.Day)
   } yield RateLimit[Target](items, per = unit)
 
-  val datasetConfigFiles: Gen[DatasetConfigFile] = nonEmptyStrings().map { v =>
-    new DatasetConfigFile {
-      override lazy val value: String = v
+  val datasetConfigFiles: Gen[DatasetConfigFile] =
+    (nonEmptyStrings(), nonEmptyStrings()).mapN { case (dsName, body) =>
+      new DatasetConfigFile {
+        override val datasetName: DatasetName = DatasetName(dsName)
+        override val value:       String      = body
+      }
     }
-  }
 
   implicit val adminConnectionConfigs: Gen[AdminConnectionConfig] = for {
     url         <- httpUrls() map FusekiUrl.apply
@@ -303,10 +306,9 @@ object CommonGraphGenerators {
   } yield AuthUser(gitLabId, accessToken)
 
   implicit def authContexts[Key](implicit keysGen: Gen[Key]): Gen[AuthContext[Key]] = for {
-    maybeAuthUser   <- authUsers.toGeneratorOfOptions
-    key             <- keysGen
-    allowedProjects <- projectSlugs.toGeneratorOfSet(min = 0)
-  } yield AuthContext(maybeAuthUser, key, allowedProjects)
+    maybeAuthUser <- authUsers.toGeneratorOfOptions
+    key           <- keysGen
+  } yield AuthContext(maybeAuthUser, key)
 
   val errorMessages: Gen[Message] = Gen.oneOf(
     nonBlankStrings().map(Message.Error(_)),

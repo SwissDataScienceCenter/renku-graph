@@ -1,5 +1,5 @@
 /*
- * Copyright 2023 Swiss Data Science Center (SDSC)
+ * Copyright 2024 Swiss Data Science Center (SDSC)
  * A partnership between École Polytechnique Fédérale de Lausanne (EPFL) and
  * Eidgenössische Technische Hochschule Zürich (ETHZ).
  *
@@ -28,7 +28,7 @@ import io.renku.events.EventRequestContent.WithPayload
 import io.renku.events.consumers.EventSchedulingResult.SchedulingError
 import io.renku.events.consumers.{EventConsumersRegistry, EventSchedulingResult}
 import io.renku.graph.model.events.ZippedEventPayload
-import org.http4s.circe._
+import io.renku.http.RenkuEntityCodec
 import org.http4s.dsl.Http4sDsl
 import org.http4s.headers.`Content-Type`
 import org.http4s.multipart.{Multipart, Part}
@@ -43,7 +43,8 @@ trait EventEndpoint[F[_]] {
 
 class EventEndpointImpl[F[_]: Async: Logger](eventConsumersRegistry: EventConsumersRegistry[F])
     extends Http4sDsl[F]
-    with EventEndpoint[F] {
+    with EventEndpoint[F]
+    with RenkuEntityCodec {
 
   import cats.syntax.all._
   import eu.timepit.refined.auto._

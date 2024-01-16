@@ -1,5 +1,5 @@
 /*
- * Copyright 2023 Swiss Data Science Center (SDSC)
+ * Copyright 2024 Swiss Data Science Center (SDSC)
  * A partnership between École Polytechnique Fédérale de Lausanne (EPFL) and
  * Eidgenössische Technische Hochschule Zürich (ETHZ).
  *
@@ -22,6 +22,7 @@ import EndpointSecurityException.{AuthenticationFailure, AuthorizationFailure}
 import cats.effect.IO
 import eu.timepit.refined.auto._
 import io.renku.data.Message
+import io.renku.http.RenkuEntityCodec
 import io.renku.testtools.IOSpec
 import org.http4s.MediaType._
 import org.http4s.Status.{NotFound, Unauthorized}
@@ -29,7 +30,7 @@ import org.http4s.headers.`Content-Type`
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
 
-class EndpointSecurityExceptionSpec extends AnyWordSpec with IOSpec with should.Matchers {
+class EndpointSecurityExceptionSpec extends AnyWordSpec with IOSpec with should.Matchers with RenkuEntityCodec {
 
   "AuthenticationFailure.toHttpResponse" should {
 

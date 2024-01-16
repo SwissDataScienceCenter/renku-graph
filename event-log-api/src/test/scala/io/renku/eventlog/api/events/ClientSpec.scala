@@ -1,5 +1,5 @@
 /*
- * Copyright 2023 Swiss Data Science Center (SDSC)
+ * Copyright 2024 Swiss Data Science Center (SDSC)
  * A partnership between École Polytechnique Fédérale de Lausanne (EPFL) and
  * Eidgenössische Technische Hochschule Zürich (ETHZ).
  *
@@ -35,9 +35,18 @@ import scala.util.Try
 
 class ClientSpec extends AnyWordSpec with should.Matchers with MockFactory with TryValues {
 
-  "send CommitSyncRequest" should {
+  "send be able to send" should {
 
-    "send the given event through the EventSender" in new TestCase {
+    "a CleanUpRequest event through the EventSender" in new TestCase {
+
+      val event = cleanUpRequests.generateOne
+
+      givenSending(event, CleanUpRequest.categoryName, returning = ().pure[Try])
+
+      client.send(event).success.value shouldBe ()
+    }
+
+    "a CommitSyncRequest event through the EventSender" in new TestCase {
 
       val event = commitSyncRequests.generateOne
 
@@ -45,11 +54,8 @@ class ClientSpec extends AnyWordSpec with should.Matchers with MockFactory with 
 
       client.send(event).success.value shouldBe ()
     }
-  }
 
-  "send GlobalCommitSyncRequest" should {
-
-    "send the given event through the EventSender" in new TestCase {
+    "a GlobalCommitSyncRequest event through the EventSender" in new TestCase {
 
       val event = globalCommitSyncRequests.generateOne
 
@@ -57,11 +63,8 @@ class ClientSpec extends AnyWordSpec with should.Matchers with MockFactory with 
 
       client.send(event).success.value shouldBe ()
     }
-  }
 
-  "send StatusChangeEvent.RedoProjectTransformation" should {
-
-    "send the given event through the EventSender" in new TestCase {
+    "a StatusChangeEvent.RedoProjectTransformation event through the EventSender" in new TestCase {
 
       val event = redoProjectTransformationEvents.generateOne
 

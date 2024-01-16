@@ -1,5 +1,5 @@
 /*
- * Copyright 2023 Swiss Data Science Center (SDSC)
+ * Copyright 2024 Swiss Data Science Center (SDSC)
  * A partnership between École Polytechnique Fédérale de Lausanne (EPFL) and
  * Eidgenössische Technische Hochschule Zürich (ETHZ).
  *
@@ -192,8 +192,8 @@ class TSAdminClientSpec
   }
 
   private trait TestCase {
-    val fusekiUrl             = FusekiUrl(externalServiceBaseUrl)
-    val adminConnectionConfig = adminConnectionConfigs.generateOne.copy(fusekiUrl = fusekiUrl)
+    private val fusekiUrl             = FusekiUrl(externalServiceBaseUrl)
+    private val adminConnectionConfig = adminConnectionConfigs.generateOne.copy(fusekiUrl = fusekiUrl)
     implicit val logger: Logger[IO] = TestLogger[IO]()
     val client = new TSAdminClientImpl[IO](adminConnectionConfig)
 

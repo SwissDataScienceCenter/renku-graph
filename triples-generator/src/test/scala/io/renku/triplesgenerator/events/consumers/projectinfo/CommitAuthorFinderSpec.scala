@@ -1,5 +1,5 @@
 /*
- * Copyright 2023 Swiss Data Science Center (SDSC)
+ * Copyright 2024 Swiss Data Science Center (SDSC)
  * A partnership between École Polytechnique Fédérale de Lausanne (EPFL) and
  * Eidgenössische Technische Hochschule Zürich (ETHZ).
  *
@@ -33,9 +33,9 @@ import io.renku.generators.Generators.nonBlankStrings
 import io.renku.graph.model.EventsGenerators.commitIds
 import io.renku.graph.model.GraphModelGenerators._
 import io.renku.graph.model.persons
+import io.renku.http.RenkuEntityCodec
 import io.renku.http.client.RestClient.ResponseMappingF
 import io.renku.http.client.{AccessToken, GitLabClient}
-import io.renku.http.server.EndpointTester._
 import io.renku.interpreters.TestLogger
 import io.renku.testtools.{GitLabClientTools, IOSpec}
 import io.renku.triplesgenerator.errors.ProcessingRecoverableError
@@ -54,6 +54,7 @@ class CommitAuthorFinderSpec
     with should.Matchers
     with MockFactory
     with ScalaCheckPropertyChecks
+    with RenkuEntityCodec
     with GitLabClientTools[IO] {
 
   "findCommitAuthor" should {
@@ -70,7 +71,7 @@ class CommitAuthorFinderSpec
           .expects(uri"projects" / projectSlug.show / "repository" / "commits" / commitId.show,
                    endpointName,
                    *,
-                   maybeAccessToken
+                   accessToken.some
           )
           .returning(expectation.pure[IO])
 
@@ -103,7 +104,7 @@ class CommitAuthorFinderSpec
           .expects(uri"projects" / projectSlug.show / "repository" / "commits" / commitId.show,
                    endpointName,
                    *,
-                   maybeAccessToken
+                   accessToken.some
           )
           .returning(error.raiseError[IO, Option[(persons.Name, persons.Email)]])
 
@@ -144,7 +145,7 @@ class CommitAuthorFinderSpec
   }
 
   private trait TestCase {
-    implicit val maybeAccessToken: Option[AccessToken] = accessTokens.generateOption
+    implicit val accessToken: AccessToken = accessTokens.generateOne
     val projectSlug = projectSlugs.generateOne
     val commitId    = commitIds.generateOne
 

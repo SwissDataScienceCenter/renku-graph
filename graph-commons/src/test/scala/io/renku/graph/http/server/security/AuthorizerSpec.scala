@@ -1,5 +1,5 @@
 /*
- * Copyright 2023 Swiss Data Science Center (SDSC)
+ * Copyright 2024 Swiss Data Science Center (SDSC)
  * A partnership between École Polytechnique Fédérale de Lausanne (EPFL) and
  * Eidgenössische Technische Hochschule Zürich (ETHZ).
  *
@@ -47,7 +47,7 @@ class AuthorizerSpec extends AnyWordSpec with MockFactory with should.Matchers {
         .returning(List(SecurityRecord(Visibility.Public, projectSlug, Set.empty[GitLabId])).pure[Try])
 
       authorizer.authorize(key, maybeAuthUser = None) shouldBe rightT[Try, EndpointSecurityException](
-        AuthContext[Key](None, key, Set(projectSlug))
+        AuthContext[Key](None, key)
       )
     }
 
@@ -63,7 +63,7 @@ class AuthorizerSpec extends AnyWordSpec with MockFactory with should.Matchers {
         )
 
       authorizer.authorize(key, authUser.some) shouldBe rightT[Try, EndpointSecurityException](
-        AuthContext[Key](authUser.some, key, Set(projectSlug))
+        AuthContext[Key](authUser.some, key)
       )
     }
 
@@ -77,7 +77,7 @@ class AuthorizerSpec extends AnyWordSpec with MockFactory with should.Matchers {
         .returning(List(SecurityRecord(Visibility.Public, projectSlug, personGitLabIds.generateSet())).pure[Try])
 
       authorizer.authorize(key, authUser) shouldBe rightT[Try, EndpointSecurityException](
-        AuthContext[Key](authUser, key, Set(projectSlug))
+        AuthContext[Key](authUser, key)
       )
     }
   }
@@ -109,7 +109,7 @@ class AuthorizerSpec extends AnyWordSpec with MockFactory with should.Matchers {
           )
 
         authorizer.authorize(key, authUser.some) shouldBe rightT[Try, EndpointSecurityException](
-          AuthContext[Key](authUser.some, key, Set(projectSlug))
+          AuthContext[Key](authUser.some, key)
         )
       }
     }
@@ -124,7 +124,7 @@ class AuthorizerSpec extends AnyWordSpec with MockFactory with should.Matchers {
         .returning(List(SecurityRecord(Visibility.Internal, projectSlug, personGitLabIds.generateSet())).pure[Try])
 
       authorizer.authorize(key, authUser) shouldBe rightT[Try, EndpointSecurityException](
-        AuthContext[Key](authUser, key, Set(projectSlug))
+        AuthContext[Key](authUser, key)
       )
     }
 
@@ -167,7 +167,7 @@ class AuthorizerSpec extends AnyWordSpec with MockFactory with should.Matchers {
         )
 
       authorizer.authorize(key, maybeAuthUser = None) shouldBe rightT[Try, EndpointSecurityException](
-        AuthContext[Key](maybeAuthUser = None, key, Set(publicProject))
+        AuthContext[Key](maybeAuthUser = None, key)
       )
     }
 
@@ -188,7 +188,7 @@ class AuthorizerSpec extends AnyWordSpec with MockFactory with should.Matchers {
         )
 
       authorizer.authorize(key, authUser.some) shouldBe rightT[Try, EndpointSecurityException](
-        AuthContext[Key](authUser.some, key, Set(publicProject, internalProject))
+        AuthContext[Key](authUser.some, key)
       )
     }
 
@@ -210,7 +210,7 @@ class AuthorizerSpec extends AnyWordSpec with MockFactory with should.Matchers {
         )
 
       authorizer.authorize(key, authUser.some) shouldBe rightT[Try, EndpointSecurityException](
-        AuthContext[Key](authUser.some, key, Set(publicProject, internalProject, privateProject))
+        AuthContext[Key](authUser.some, key)
       )
     }
   }

@@ -1,5 +1,5 @@
 /*
- * Copyright 2023 Swiss Data Science Center (SDSC)
+ * Copyright 2024 Swiss Data Science Center (SDSC)
  * A partnership between École Polytechnique Fédérale de Lausanne (EPFL) and
  * Eidgenössische Technische Hochschule Zürich (ETHZ).
  *
@@ -32,8 +32,8 @@ import io.renku.generators.Generators._
 import io.renku.graph.model.EventsGenerators.commitIds
 import io.renku.graph.model.GraphModelGenerators.projectIds
 import io.renku.graph.model.events.CommitId
+import io.renku.http.RenkuEntityCodec
 import io.renku.http.client.RestClientError.UnauthorizedException
-import io.renku.http.server.EndpointTester._
 import io.renku.interpreters.TestLogger
 import io.renku.interpreters.TestLogger.Level.Info
 import io.renku.testtools.IOSpec
@@ -48,20 +48,15 @@ import org.scalamock.scalatest.MockFactory
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
 
-class EndpointSpec extends AnyWordSpec with MockFactory with should.Matchers with IOSpec {
+class EndpointSpec extends AnyWordSpec with MockFactory with should.Matchers with IOSpec with RenkuEntityCodec {
 
   "processPushEvent" should {
 
     "return ACCEPTED for valid push event payload which are accepted" in new TestCase {
 
-      (elClient
-        .send(_: CommitSyncRequest))
-        .expects(syncRequest)
-        .returning(().pure[IO])
-
       expectDecryptionOf(serializedHookToken, returning = HookToken(syncRequest.project.id))
 
-      val request = Request(Method.POST, uri"/webhooks" / "events")
+      val request = Request[IO](Method.POST, uri"/webhooks" / "events")
         .withHeaders(Headers("X-Gitlab-Token" -> serializedHookToken.toString))
         .withEntity(pushEventPayloadFrom(commitId, syncRequest))
 
@@ -70,6 +65,8 @@ class EndpointSpec extends AnyWordSpec with MockFactory with should.Matchers wit
       response.status                      shouldBe Accepted
       response.contentType                 shouldBe Some(`Content-Type`(MediaType.application.json))
       response.as[Message].unsafeRunSync() shouldBe Message.Info("Event accepted")
+
+      elClient.waitForArrival(syncRequest).unsafeRunSync()
 
       logger.loggedOnly(
         Info(
@@ -80,7 +77,7 @@ class EndpointSpec extends AnyWordSpec with MockFactory with should.Matchers wit
 
     "return BAD_REQUEST for invalid push event payload" in new TestCase {
 
-      val request = Request(Method.POST, uri"/webhooks" / "events")
+      val request = Request[IO](Method.POST, uri"/webhooks" / "events")
         .withHeaders(Headers("X-Gitlab-Token" -> serializedHookToken.toString))
         .withEntity(Json.obj())
 
@@ -95,7 +92,7 @@ class EndpointSpec extends AnyWordSpec with MockFactory with should.Matchers wit
 
     "return UNAUTHORIZED if X-Gitlab-Token token is not present in the header" in new TestCase {
 
-      val request = Request(Method.POST, uri"/webhooks" / "events")
+      val request = Request[IO](Method.POST, uri"/webhooks" / "events")
         .withEntity(pushEventPayloadFrom(commitId, syncRequest))
 
       val response = endpoint.processPushEvent(request).unsafeRunSync()
@@ -112,7 +109,7 @@ class EndpointSpec extends AnyWordSpec with MockFactory with should.Matchers wit
         .expects(serializedHookToken)
         .returning(HookToken(projectIds.generateOne).pure[IO])
 
-      val request = Request(Method.POST, uri"/webhooks" / "events")
+      val request = Request[IO](Method.POST, uri"/webhooks" / "events")
         .withHeaders(Headers("X-Gitlab-Token" -> serializedHookToken.toString))
         .withEntity(pushEventPayloadFrom(commitId, syncRequest))
 
@@ -131,7 +128,7 @@ class EndpointSpec extends AnyWordSpec with MockFactory with should.Matchers wit
         .expects(serializedHookToken)
         .returning(exception.raiseError[IO, HookToken])
 
-      val request = Request(Method.POST, uri"/webhooks" / "events")
+      val request = Request[IO](Method.POST, uri"/webhooks" / "events")
         .withHeaders(Headers(("X-Gitlab-Token", serializedHookToken.toString)))
         .withEntity(pushEventPayloadFrom(commitId, syncRequest))
 
@@ -154,7 +151,7 @@ class EndpointSpec extends AnyWordSpec with MockFactory with should.Matchers wit
     }.generateOne
 
     implicit val logger: TestLogger[IO] = TestLogger[IO]()
-    val elClient        = mock[eventlog.api.events.Client[IO]]
+    val elClient        = eventlog.api.events.TestClient.collectingMode[IO]
     val hookTokenCrypto = mock[HookTokenCrypto[IO]]
     val endpoint        = new EndpointImpl[IO](hookTokenCrypto, elClient)
 

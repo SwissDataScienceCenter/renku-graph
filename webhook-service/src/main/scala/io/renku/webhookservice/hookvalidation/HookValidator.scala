@@ -1,5 +1,5 @@
 /*
- * Copyright 2023 Swiss Data Science Center (SDSC)
+ * Copyright 2024 Swiss Data Science Center (SDSC)
  * A partnership between École Polytechnique Fédérale de Lausanne (EPFL) and
  * Eidgenössische Technische Hochschule Zürich (ETHZ).
  *
@@ -26,13 +26,13 @@ import com.typesafe.config.ConfigFactory
 import eu.timepit.refined.auto._
 import io.renku.cache.{Cache, CacheBuilder, CacheConfigLoader}
 import io.renku.graph.model.projects.GitLabId
-import io.renku.graph.tokenrepository.{AccessTokenFinder, AccessTokenFinderImpl, TokenRepositoryUrl}
 import io.renku.http.client.{AccessToken, GitLabClient}
 import io.renku.metrics.MetricsRegistry
+import io.renku.tokenrepository.api.TokenRepositoryClient
 import io.renku.webhookservice.hookvalidation.HookValidator.HookValidationResult
 import io.renku.webhookservice.model.{HookIdentifier, ProjectHookUrl}
-import io.renku.webhookservice.tokenrepository._
 import org.typelevel.log4cats.Logger
+import io.renku.metrics.syntax.all._
 
 trait HookValidator[F[_]] {
   def validateHook(projectId: GitLabId, maybeAccessToken: Option[AccessToken]): F[Option[HookValidationResult]]
@@ -48,37 +48,28 @@ object HookValidator {
 
   def apply[F[_]: Async: GitLabClient: Logger: MetricsRegistry](projectHookUrl: ProjectHookUrl): F[HookValidator[F]] =
     for {
-      tokenRepositoryUrl    <- TokenRepositoryUrl[F]()
+      tokenRepositoryClient <- TokenRepositoryClient[F]
       projectHookVerifier   <- ProjectHookVerifier[F]
-      accessTokenAssociator <- AccessTokenAssociator[F]
       cacheConfig           <- CacheConfigLoader.load[F]("services.self.hook-validation-cache", ConfigFactory.load())
       validationCache <- CacheBuilder
                            .default[F, GitLabId, HookValidationResult]
                            .withConfig(cacheConfig)
                            .withCacheStats("hook_validator_cache")
                            .build
-    } yield new HookValidatorImpl[F](
-      projectHookUrl,
-      projectHookVerifier,
-      new AccessTokenFinderImpl(tokenRepositoryUrl),
-      accessTokenAssociator,
-      validationCache
-    )
+    } yield new HookValidatorImpl[F](projectHookUrl, projectHookVerifier, tokenRepositoryClient, validationCache)
 }
 
 private class HookValidatorImpl[F[_]: MonadThrow: Logger](
     projectHookUrl:        ProjectHookUrl,
     projectHookVerifier:   ProjectHookVerifier[F],
-    accessTokenFinder:     AccessTokenFinder[F],
-    accessTokenAssociator: AccessTokenAssociator[F],
+    tokenRepositoryClient: TokenRepositoryClient[F],
     validationCache:       Cache[F, GitLabId, HookValidationResult]
 ) extends HookValidator[F] {
 
   import HookValidator.HookValidationResult._
   import HookValidator._
-  import accessTokenAssociator._
-  import accessTokenFinder._
   import projectHookVerifier._
+  import tokenRepositoryClient._
 
   def validateHook(projectId: GitLabId, maybeAccessToken: Option[AccessToken]): F[Option[HookValidationResult]] =
     validationCache.withCache(pId => validateHook0(pId, maybeAccessToken))(projectId)
@@ -89,7 +80,7 @@ private class HookValidatorImpl[F[_]: MonadThrow: Logger](
 
   private def persistGivenToken(projectId: GitLabId, maybeAccessToken: Option[AccessToken]): F[Unit] =
     maybeAccessToken
-      .map(associate(projectId, _))
+      .map(storeAccessToken(projectId, _))
       .getOrElse(().pure[F])
 
   private def validateHookExistence(projectId: GitLabId): F[Option[HookValidationResult]] =

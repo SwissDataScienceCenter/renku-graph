@@ -1,5 +1,5 @@
 /*
- * Copyright 2023 Swiss Data Science Center (SDSC)
+ * Copyright 2024 Swiss Data Science Center (SDSC)
  * A partnership between École Polytechnique Fédérale de Lausanne (EPFL) and
  * Eidgenössische Technische Hochschule Zürich (ETHZ).
  *
@@ -19,54 +19,47 @@
 package io.renku.eventlog.init
 
 import cats.effect.IO
-import io.renku.interpreters.TestLogger
+import cats.effect.testing.scalatest.AsyncIOSpec
+import io.renku.db.DBConfigProvider.DBConfig
+import io.renku.eventlog.EventLogDB
 import io.renku.interpreters.TestLogger.Level.Info
-import io.renku.testtools.IOSpec
+import org.scalatest.Succeeded
+import org.scalatest.flatspec.AsyncFlatSpec
 import org.scalatest.matchers.should
-import org.scalatest.wordspec.AnyWordSpec
-import skunk.implicits._
 
-class EventDeliveryTableCreatorSpec extends AnyWordSpec with IOSpec with DbInitSpec with should.Matchers {
+class EventDeliveryTableCreatorSpec extends AsyncFlatSpec with AsyncIOSpec with DbInitSpec with should.Matchers {
 
-  protected[init] override lazy val migrationsToRun: List[DbMigrator[IO]] = allMigrations.takeWhile {
-    case _: EventDeliveryTableCreatorImpl[IO] => false
-    case _ => true
+  protected[init] override val runMigrationsUpTo: Class[_ <: DbMigrator[IO]] = classOf[EventDeliveryTableCreator[IO]]
+
+  it should "do nothing if the 'event_delivery' table already exists" in testDBResource.use { implicit cfg =>
+    for {
+      _ <- tableExists("event_delivery").asserting(_ shouldBe false)
+
+      _ <- tableCreator.run.assertNoException
+
+      _ <- tableExists("event_delivery").asserting(_ shouldBe true)
+
+      _ <- logger.loggedOnlyF(Info("'event_delivery' table created"))
+
+      _ <- logger.resetF()
+
+      _ <- tableCreator.run.assertNoException
+
+      _ <- logger.loggedOnlyF(Info("'event_delivery' table exists"))
+    } yield Succeeded
   }
 
-  "run" should {
+  it should "create indices for all the columns" in testDBResource.use { implicit cfg =>
+    for {
+      _ <- tableCreator.run.assertNoException
 
-    "do nothing if the 'event_delivery' table already exists" in new TestCase {
+      _ <- tableExists("event_delivery").asserting(_ shouldBe true)
 
-      tableExists("event_delivery") shouldBe false
-
-      tableCreator.run.unsafeRunSync() shouldBe ((): Unit)
-
-      tableExists("event_delivery") shouldBe true
-
-      logger.loggedOnly(Info("'event_delivery' table created"))
-
-      logger.reset()
-
-      tableCreator.run.unsafeRunSync() shouldBe ((): Unit)
-
-      logger.loggedOnly(Info("'event_delivery' table exists"))
-    }
-
-    "create indices for all the columns" in new TestCase {
-
-      tableCreator.run.unsafeRunSync() shouldBe ((): Unit)
-
-      tableExists("event_delivery") shouldBe true
-
-      verifyTrue(sql"DROP INDEX idx_event_id;".command)
-      verifyTrue(sql"DROP INDEX idx_project_id;".command)
-      verifyTrue(sql"DROP INDEX idx_delivery_url;".command)
-    }
-
+      _ <- verifyIndexExists("event_delivery", "idx_event_delivery_event_id").asserting(_ shouldBe true)
+      _ <- verifyIndexExists("event_delivery", "idx_event_delivery_project_id").asserting(_ shouldBe true)
+      _ <- verifyIndexExists("event_delivery", "idx_event_delivery_delivery_id").asserting(_ shouldBe true)
+    } yield Succeeded
   }
 
-  private trait TestCase {
-    implicit val logger: TestLogger[IO] = TestLogger[IO]()
-    val tableCreator = new EventDeliveryTableCreatorImpl[IO]
-  }
+  private def tableCreator(implicit cfg: DBConfig[EventLogDB]) = new EventDeliveryTableCreatorImpl[IO]
 }

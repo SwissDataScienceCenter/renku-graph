@@ -1,5 +1,5 @@
 /*
- * Copyright 2023 Swiss Data Science Center (SDSC)
+ * Copyright 2024 Swiss Data Science Center (SDSC)
  * A partnership between École Polytechnique Fédérale de Lausanne (EPFL) and
  * Eidgenössische Technische Hochschule Zürich (ETHZ).
  *
@@ -29,7 +29,7 @@ import io.renku.tokenrepository.repository.creation.TokenDates.ExpiryDate
 import io.renku.tokenrepository.repository.metrics.{QueriesExecutionTimes, TestQueriesExecutionTimes}
 import io.renku.tokenrepository.repository.{ProjectsTokensDB, TokenRepositoryPostgresSpec}
 import org.scalamock.scalatest.AsyncMockFactory
-import org.scalatest.{BeforeAndAfter, Suite}
+import org.scalatest.Suite
 import skunk._
 import skunk.codec.all._
 import skunk.data.Completion
@@ -37,13 +37,10 @@ import skunk.implicits._
 
 import java.time.LocalDate
 
-trait DbInitSpec extends TokenRepositoryPostgresSpec with BeforeAndAfter {
+trait DbInitSpec extends TokenRepositoryPostgresSpec {
   self: Suite with AsyncMockFactory =>
 
   implicit lazy val logger: TestLogger[IO] = TestLogger()
-  before {
-    logger.reset()
-  }
 
   protected val runMigrationsUpTo: Class[_ <: DBMigration[IO]]
 
@@ -54,11 +51,9 @@ trait DbInitSpec extends TokenRepositoryPostgresSpec with BeforeAndAfter {
     DbInitializer
       .migrations[IO]
       .flatMap {
-        _.takeWhile(_.getClass != runMigrationsUpTo)
-          .map(_.run)
-          .sequence
-      }
-      .void
+        _.takeWhile(m => !runMigrationsUpTo.isAssignableFrom(m.getClass))
+          .traverse_(_.run)
+      } >> logger.resetF()
   }
 
   protected def findToken(projectSlug: Slug)(implicit cfg: DBConfig[ProjectsTokensDB]): IO[Option[String]] =

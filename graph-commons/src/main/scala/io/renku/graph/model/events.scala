@@ -1,5 +1,5 @@
 /*
- * Copyright 2023 Swiss Data Science Center (SDSC)
+ * Copyright 2024 Swiss Data Science Center (SDSC)
  * A partnership between École Polytechnique Fédérale de Lausanne (EPFL) and
  * Eidgenössische Technische Hochschule Zürich (ETHZ).
  *
@@ -82,17 +82,17 @@ object events {
 
       import io.circe.parser.parse
       import io.circe.{Decoder, DecodingFailure, Json}
-      import io.renku.tinytypes.json.TinyTypeDecoders._
+      import io.renku.tinytypes.json.TinyTypeDecoders.blankStringToNoneDecoder
 
       lazy val maybeAuthorEmail: Option[persons.Email] =
         bodyAsJson
-          .flatMap(_.hcursor.downField("author").downField("email").as[Option[persons.Email]])
+          .flatMap(_.hcursor.downField("author").downField("email").as(blankStringToNoneDecoder(persons.Email)))
           .toOption
           .flatten
 
       lazy val maybeCommitterEmail: Option[persons.Email] =
         bodyAsJson
-          .flatMap(_.hcursor.downField("committer").downField("email").as[Option[persons.Email]])
+          .flatMap(_.hcursor.downField("committer").downField("email").as(blankStringToNoneDecoder(persons.Email)))
           .toOption
           .flatten
 
@@ -115,7 +115,7 @@ object events {
 
   final class BatchDate private (val value: Instant) extends AnyVal with InstantTinyType
 
-  implicit object BatchDate extends TinyTypeFactory[BatchDate](new BatchDate(_)) with InstantNotInTheFuture[BatchDate] {
+  implicit object BatchDate extends TinyTypeFactory[BatchDate](new BatchDate(_)) {
     def apply(clock: Clock): BatchDate = apply(clock.instant())
   }
 
@@ -396,9 +396,7 @@ object events {
   }
 
   final class LastSyncedDate private (val value: Instant) extends AnyVal with InstantTinyType
-  object LastSyncedDate
-      extends TinyTypeFactory[LastSyncedDate](new LastSyncedDate(_))
-      with InstantNotInTheFuture[LastSyncedDate] {
+  object LastSyncedDate extends TinyTypeFactory[LastSyncedDate](new LastSyncedDate(_)) {
     implicit val decoder: Decoder[LastSyncedDate] = instantDecoder(LastSyncedDate)
   }
 }

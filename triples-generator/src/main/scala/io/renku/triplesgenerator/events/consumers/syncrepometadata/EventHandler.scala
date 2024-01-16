@@ -1,5 +1,5 @@
 /*
- * Copyright 2023 Swiss Data Science Center (SDSC)
+ * Copyright 2024 Swiss Data Science Center (SDSC)
  * A partnership between École Polytechnique Fédérale de Lausanne (EPFL) and
  * Eidgenössische Technische Hochschule Zürich (ETHZ).
  *
@@ -26,7 +26,6 @@ import eu.timepit.refined.auto._
 import io.renku.events.consumers.EventDecodingTools._
 import io.renku.events.consumers.ProcessExecutor
 import io.renku.events.{CategoryName, consumers}
-import io.renku.graph.tokenrepository.AccessTokenFinder
 import io.renku.http.client.GitLabClient
 import io.renku.lock.syntax._
 import io.renku.metrics.MetricsRegistry
@@ -59,7 +58,7 @@ private[syncrepometadata] class EventHandler[F[_]: MonadCancelThrow: Logger](
 private object EventHandler {
   def apply[F[
       _
-  ]: Async: NonEmptyParallel: GitLabClient: AccessTokenFinder: Logger: ReProvisioningStatus: SparqlQueryTimeRecorder: MetricsRegistry](
+  ]: Async: NonEmptyParallel: GitLabClient: Logger: ReProvisioningStatus: SparqlQueryTimeRecorder: MetricsRegistry](
       config:      Config,
       tsWriteLock: TsWriteLock[F]
   ): F[consumers.EventHandler[F]] = for {

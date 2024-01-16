@@ -1,5 +1,5 @@
 /*
- * Copyright 2023 Swiss Data Science Center (SDSC)
+ * Copyright 2024 Swiss Data Science Center (SDSC)
  * A partnership between École Polytechnique Fédérale de Lausanne (EPFL) and
  * Eidgenössische Technische Hochschule Zürich (ETHZ).
  *
@@ -19,71 +19,67 @@
 package io.renku.eventlog.init
 
 import cats.effect.IO
-import io.renku.interpreters.TestLogger
+import cats.effect.testing.scalatest.AsyncIOSpec
+import cats.syntax.all._
+import io.renku.db.DBConfigProvider.DBConfig
+import io.renku.eventlog.EventLogDB
 import io.renku.interpreters.TestLogger.Level.Info
-import io.renku.testtools.IOSpec
+import org.scalatest.Succeeded
+import org.scalatest.flatspec.AsyncFlatSpec
 import org.scalatest.matchers.should
-import org.scalatest.wordspec.AnyWordSpec
 
-class TimestampZoneAdderSpec extends AnyWordSpec with IOSpec with DbInitSpec with should.Matchers {
+class TimestampZoneAdderSpec extends AsyncFlatSpec with AsyncIOSpec with DbInitSpec with should.Matchers {
 
-  protected[init] override lazy val migrationsToRun: List[DbMigrator[IO]] = allMigrations.takeWhile {
-    case _: TimestampZoneAdderImpl[IO] => false
-    case _ => true
+  protected[init] override val runMigrationsUpTo: Class[_ <: DbMigrator[IO]] = classOf[TimestampZoneAdder[IO]]
+
+  it should "modify the type of the timestamp columns" in testDBResource.use { implicit cfg =>
+    for {
+      _ <- tableExists("event").asserting(_ shouldBe true)
+
+      _ <- columnsToMigrate.traverse_ { case (table, column) =>
+             verifyExists(table, column, timestampType).asserting(_ shouldBe true)
+           }
+
+      _ <- tableRefactor.run.assertNoException
+
+      _ <- columnsToMigrate.traverse_ { case (table, column) =>
+             verifyExists(table, column, timestamptzType).asserting(_ shouldBe true)
+           }
+
+      expectedLogs = columnsToMigrate map { case (table, column) =>
+                       Info(s"$table.$column in 'timestamp without time zone', migrating")
+                     }
+      _ <- logger.loggedOnlyF(expectedLogs: _*)
+    } yield Succeeded
   }
 
-  "run" should {
+  it should "do nothing if the timestamps are already timestampz" in testDBResource.use { implicit cfg =>
+    for {
+      _ <- tableExists("event").asserting(_ shouldBe true)
 
-    "modify the type of the timestamp columns" in new TestCase {
+      _ <- tableRefactor.run.assertNoException
 
-      tableExists("event") shouldBe true
+      _ <- columnsToMigrate.traverse_ { case (table, column) =>
+             verifyExists(table, column, timestamptzType).asserting(_ shouldBe true)
+           }
 
-      columnsToMigrate foreach { case (table, column) =>
-        verify(table, column, timestampType)
-      }
+      _ <- tableRefactor.run.assertNoException
 
-      tableRefactor.run.unsafeRunSync() shouldBe ((): Unit)
+      _ <- columnsToMigrate.traverse_ { case (table, column) =>
+             verifyExists(table, column, timestamptzType).asserting(_ shouldBe true)
+           }
 
-      columnsToMigrate foreach { case (table, column) =>
-        verify(table, column, timestamptzType)
-      }
-
-      val expectedLogs = columnsToMigrate map { case (table, column) =>
-        Info(s"$table.$column in 'timestamp without time zone', migrating")
-      }
-      logger.loggedOnly(expectedLogs: _*)
-    }
-
-    "do nothing if the timestamps are already timestampz" in new TestCase {
-
-      tableExists("event") shouldBe true
-
-      tableRefactor.run.unsafeRunSync() shouldBe ()
-
-      columnsToMigrate foreach { case (table, column) =>
-        verify(table, column, timestamptzType)
-      }
-
-      tableRefactor.run.unsafeRunSync() shouldBe ()
-
-      columnsToMigrate foreach { case (table, column) =>
-        verify(table, column, timestamptzType)
-      }
-
-      val migrationLogs = columnsToMigrate map { case (table, column) =>
-        Info(s"$table.$column in 'timestamp without time zone', migrating")
-      }
-      val secondMigrationLogs = columnsToMigrate map { case (table, column) =>
-        Info(s"$table.$column already migrated to 'timestamp with time zone'")
-      }
-      logger.loggedOnly(migrationLogs ::: secondMigrationLogs: _*)
-    }
+      migrationLogs = columnsToMigrate map { case (table, column) =>
+                        Info(s"$table.$column in 'timestamp without time zone', migrating")
+                      }
+      secondMigrationLogs = columnsToMigrate map { case (table, column) =>
+                              Info(s"$table.$column already migrated to 'timestamp with time zone'")
+                            }
+      _ <- logger.loggedOnlyF(migrationLogs ::: secondMigrationLogs: _*)
+    } yield Succeeded
   }
 
-  private trait TestCase {
-    implicit val logger: TestLogger[IO] = TestLogger[IO]()
-    val tableRefactor = new TimestampZoneAdderImpl[IO]
-  }
+  private def tableRefactor(implicit cfg: DBConfig[EventLogDB]) = new TimestampZoneAdderImpl[IO]
 
   private lazy val timestampType   = "timestamp without time zone"
   private lazy val timestamptzType = "timestamp with time zone"

@@ -1,5 +1,5 @@
 /*
- * Copyright 2023 Swiss Data Science Center (SDSC)
+ * Copyright 2024 Swiss Data Science Center (SDSC)
  * A partnership between École Polytechnique Fédérale de Lausanne (EPFL) and
  * Eidgenössische Technische Hochschule Zürich (ETHZ).
  *
@@ -49,13 +49,9 @@ object TSStateChecker {
   def apply[F[_]: Async: ReProvisioningStatus: Logger: MetricsRegistry: SparqlQueryTimeRecorder](
       config: Config
   ): F[TSStateChecker[F]] =
-    (TSAdminClient[F], MigrationStatusChecker[F](config))
-      .mapN((tsClient, statusChecker) =>
-        new TSStateCheckerImpl(DatasetTTLs.allFactories.map(_.datasetName),
-                               tsClient,
-                               ReProvisioningStatus[F],
-                               statusChecker
-        )
+    (TSAdminClient[F], MigrationStatusChecker[F](config), MonadThrow[F].fromEither(DatasetTTLs.allConfigs))
+      .mapN((tsClient, statusChecker, dsConfigs) =>
+        new TSStateCheckerImpl(dsConfigs.map(_.datasetName), tsClient, ReProvisioningStatus[F], statusChecker)
       )
 
   implicit val show: Show[TSState] = Show.show {

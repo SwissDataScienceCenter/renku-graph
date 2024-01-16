@@ -1,5 +1,5 @@
 /*
- * Copyright 2023 Swiss Data Science Center (SDSC)
+ * Copyright 2024 Swiss Data Science Center (SDSC)
  * A partnership between École Polytechnique Fédérale de Lausanne (EPFL) and
  * Eidgenössische Technische Hochschule Zürich (ETHZ).
  *
@@ -29,6 +29,7 @@ import io.renku.generators.Generators.Implicits._
 import io.renku.generators.Generators.exceptions
 import io.renku.graph.model.RenkuTinyTypeGenerators.projectSlugs
 import io.renku.graph.model.projects
+import io.renku.http.RenkuEntityCodec
 import io.renku.http.server.security.model.AuthUser
 import io.renku.interpreters.TestLogger
 import io.renku.knowledgegraph
@@ -38,7 +39,12 @@ import org.scalamock.scalatest.AsyncMockFactory
 import org.scalatest.flatspec.AsyncFlatSpec
 import org.scalatest.matchers.should
 
-class EndpointSpec extends AsyncFlatSpec with CustomAsyncIOSpec with should.Matchers with AsyncMockFactory {
+class EndpointSpec
+    extends AsyncFlatSpec
+    with CustomAsyncIOSpec
+    with should.Matchers
+    with AsyncMockFactory
+    with RenkuEntityCodec {
 
   it should "decode the Multipart payload, create the project and return Accepted on success" in {
 
@@ -51,14 +57,12 @@ class EndpointSpec extends AsyncFlatSpec with CustomAsyncIOSpec with should.Matc
     MultipartRequestEncoder[IO].encode(newProject).map(mp => Request[IO]().withEntity(mp).putHeaders(mp.headers)) >>=
       (req => endpoint.`POST /projects`(req, authUser)) >>= { response =>
       response.pure[IO].asserting(_.status shouldBe Status.Created) >>
-        response
-          .as[Message]
-          .asserting {
-            _ shouldBe Message.Info.fromJsonUnsafe(json"""{
+        response.as[Message].asserting {
+          _ shouldBe Message.Info.fromJsonUnsafe(json"""{
               "message": "Project created",
               "slug":     $slug
             }""")
-          }
+        }
     }
   }
 

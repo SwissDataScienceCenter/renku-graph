@@ -1,5 +1,5 @@
 /*
- * Copyright 2023 Swiss Data Science Center (SDSC)
+ * Copyright 2024 Swiss Data Science Center (SDSC)
  * A partnership between École Polytechnique Fédérale de Lausanne (EPFL) and
  * Eidgenössische Technische Hochschule Zürich (ETHZ).
  *
@@ -99,7 +99,7 @@ private[migrations] object AddProjectDateModified {
     projectsFinder       <- ProjectsPageFinder[F]
     progressFinder       <- ProgressFinder[F]
     projectFetcher       <- ProjectFetcher[F]
-    datePersister        <- ProjectsConnectionConfig[F]().map(DatePersister[F](_))
+    datePersister        <- ProjectsConnectionConfig.fromConfig[F]().map(DatePersister[F](_))
     projectDonePersister <- ProjectDonePersister[F]
     executionRegister    <- MigrationExecutionRegister[F]
   } yield new AddProjectDateModified(checkMigrationNeeded,

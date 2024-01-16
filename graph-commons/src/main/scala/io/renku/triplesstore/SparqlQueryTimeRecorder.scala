@@ -1,5 +1,5 @@
 /*
- * Copyright 2023 Swiss Data Science Center (SDSC)
+ * Copyright 2024 Swiss Data Science Center (SDSC)
  * A partnership between École Polytechnique Fédérale de Lausanne (EPFL) and
  * Eidgenössische Technische Hochschule Zürich (ETHZ).
  *
@@ -24,7 +24,7 @@ import cats.syntax.all._
 import eu.timepit.refined.api.Refined
 import eu.timepit.refined.auto._
 import eu.timepit.refined.collection.NonEmpty
-import io.renku.logging.ExecutionTimeRecorder
+import io.renku.logging.{ExecutionTimeRecorder, ExecutionTimeRecorderLoader}
 import io.renku.metrics.Histogram
 import org.typelevel.log4cats.Logger
 
@@ -46,7 +46,7 @@ object SparqlQueryTimeRecorder {
       labelName = "query_id",
       buckets = Seq(.05, .1, .5, 1, 2.5, 5, 10, 25, 50, 100),
       maybeThreshold = (50 millis).some
-    ).flatMap(histogram => ExecutionTimeRecorder[F](maybeHistogram = Some(histogram)))
+    ).flatMap(histogram => ExecutionTimeRecorderLoader[F](maybeHistogram = Some(histogram)))
       .map(new SparqlQueryTimeRecorder(_))
 
   def apply[F[_]](implicit ev: SparqlQueryTimeRecorder[F]): SparqlQueryTimeRecorder[F] = ev

@@ -1,5 +1,5 @@
 /*
- * Copyright 2023 Swiss Data Science Center (SDSC)
+ * Copyright 2024 Swiss Data Science Center (SDSC)
  * A partnership between École Polytechnique Fédérale de Lausanne (EPFL) and
  * Eidgenössische Technische Hochschule Zürich (ETHZ).
  *
@@ -29,14 +29,13 @@ import io.renku.http.rest.paging.model.{Page, PerPage}
 import io.renku.http.rest.paging.{Paging, PagingRequest, PagingResponse}
 import io.renku.triplesstore.client.sparql.Fragment
 import io.renku.triplesstore.client.syntax._
-import io.renku.triplesstore.{ProjectsConnectionConfig, SparqlQuery, SparqlQueryTimeRecorder, TSClient}
+import io.renku.triplesstore.{SparqlQuery, TSClient}
 import org.typelevel.log4cats.Logger
 
-private[search] class RecentEntitiesFinderImpl[F[_]: Async: NonEmptyParallel: Logger: SparqlQueryTimeRecorder](
-    storeConfig: ProjectsConnectionConfig
+private[search] class RecentEntitiesFinderImpl[F[_]: Async: NonEmptyParallel: Logger](
+    client: TSClient[F]
 ) extends RecentEntitiesFinder[F]
     with Paging[SearchEntity] /* why is this using subtyping? */ {
-  private[this] val client = TSClient(storeConfig)
 
   def findRecentlyViewedEntities(criteria: Criteria): F[PagingResponse[SearchEntity]] = {
     implicit val resultsFinder: Paging.PagedResultsFinder[F, SearchEntity] =

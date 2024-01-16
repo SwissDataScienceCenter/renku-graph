@@ -1,5 +1,5 @@
 /*
- * Copyright 2023 Swiss Data Science Center (SDSC)
+ * Copyright 2024 Swiss Data Science Center (SDSC)
  * A partnership between École Polytechnique Fédérale de Lausanne (EPFL) and
  * Eidgenössische Technische Hochschule Zürich (ETHZ).
  *
@@ -26,9 +26,10 @@ import io.renku.config.sentry.SentryInitializer
 import io.renku.http.server.HttpServer
 import io.renku.knowledgegraph.metrics.KGMetrics
 import io.renku.logging.ApplicationLogger
-import io.renku.metrics.MetricsRegistry
-import io.renku.microservices.{IOMicroservice, ResourceUse}
+import io.renku.metrics.{MetricsRegistry, MetricsRegistryLoader}
+import io.renku.microservices.IOMicroservice
 import io.renku.triplesstore.{ProjectSparqlClient, ProjectsConnectionConfig, SparqlQueryTimeRecorder}
+import io.renku.utils.common.ResourceUse
 import org.http4s.server.Server
 import org.typelevel.log4cats.Logger
 
@@ -64,9 +65,9 @@ object Microservice extends IOMicroservice {
 
   private object Setup {
     val resource: Resource[IO, Setup] = for {
-      pcc <- Resource.eval(ProjectsConnectionConfig[IO]())
+      pcc <- Resource.eval(ProjectsConnectionConfig.fromConfig[IO]())
 
-      implicit0(mr: MetricsRegistry[IO])           <- Resource.eval(MetricsRegistry[IO]())
+      implicit0(mr: MetricsRegistry[IO])           <- Resource.eval(MetricsRegistryLoader[IO]())
       implicit0(sqtr: SparqlQueryTimeRecorder[IO]) <- Resource.eval(SparqlQueryTimeRecorder.create[IO]())
       psc                                          <- ProjectSparqlClient[IO](pcc)
     } yield Setup(pcc, mr, sqtr, psc)

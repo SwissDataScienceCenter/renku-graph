@@ -1,5 +1,5 @@
 /*
- * Copyright 2023 Swiss Data Science Center (SDSC)
+ * Copyright 2024 Swiss Data Science Center (SDSC)
  * A partnership between École Polytechnique Fédérale de Lausanne (EPFL) and
  * Eidgenössische Technische Hochschule Zürich (ETHZ).
  *
@@ -23,7 +23,7 @@ import io.circe.Json
 import io.renku.generators.CommonGraphGenerators.serviceVersions
 import io.renku.generators.Generators.Implicits._
 import io.renku.generators.Generators._
-import io.renku.http.server.EndpointTester._
+import io.renku.http.RenkuEntityCodec
 import io.renku.knowledgegraph.docs.OpenApiTester._
 import io.renku.knowledgegraph.docs.model.Operation.{DELETE, GET}
 import io.renku.knowledgegraph.docs.model.Path.OpMapping
@@ -34,7 +34,7 @@ import org.scalamock.scalatest.MockFactory
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
 
-class EndpointSpec extends AnyWordSpec with should.Matchers with IOSpec with MockFactory {
+class EndpointSpec extends AnyWordSpec with should.Matchers with IOSpec with MockFactory with RenkuEntityCodec {
 
   "GET /spec.json" should {
 

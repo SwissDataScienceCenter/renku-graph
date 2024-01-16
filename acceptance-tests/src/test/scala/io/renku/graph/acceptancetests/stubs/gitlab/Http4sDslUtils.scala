@@ -1,5 +1,5 @@
 /*
- * Copyright 2023 Swiss Data Science Center (SDSC)
+ * Copyright 2024 Swiss Data Science Center (SDSC)
  * A partnership between École Polytechnique Fédérale de Lausanne (EPFL) and
  * Eidgenössische Technische Hochschule Zürich (ETHZ).
  *
@@ -23,14 +23,15 @@ import cats.data.OptionT
 import cats.effect._
 import cats.syntax.all._
 import io.circe.Encoder
+import io.circe.syntax._
 import io.renku.graph.acceptancetests.data.Project.Permissions.AccessLevel
 import io.renku.graph.acceptancetests.stubs.gitlab.GitLabApiStub.State
 import io.renku.graph.model.{persons, projects}
 import io.renku.graph.model.events.CommitId
+import io.renku.http.RenkuEntityCodec._
 import io.renku.http.rest.paging.{PagingRequest, PagingResponse}
 import io.renku.http.rest.paging.PagingRequest.Decoders.{page, perPage}
 import org.http4s.{EntityEncoder, Header, HttpApp, HttpRoutes, QueryParamDecoder, Request, Response, Status}
-import org.http4s.circe.CirceEntityCodec._
 import org.http4s.dsl.Http4sDsl
 import org.http4s.dsl.impl.{OptionalQueryParamDecoderMatcher, QueryParamDecoderMatcher}
 import org.http4s.server.middleware.{Logger => LoggerMiddleware}
@@ -107,6 +108,7 @@ private[gitlab] trait Http4sDslUtils {
       .leftMap(err => BadRequest(err.map(_.message).intercalate("; ")))
       .map(pagingRequest =>
         pageResults(pagingRequest)
+          .map(_.asJson)
           .flatMap(Ok(_).map(withTotalHeader(pagingRequest)))
       )
       .merge
