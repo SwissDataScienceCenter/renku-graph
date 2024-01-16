@@ -20,7 +20,7 @@ package io.renku.graph.acceptancetests.stubs.gitlab
 
 import com.typesafe.config.ConfigFactory
 import io.renku.config.ConfigLoader.find
-import io.renku.generators.CommonGraphGenerators.projectAccessTokens
+import io.renku.http.client.GitLabGenerators.projectAccessTokens
 import io.renku.generators.Generators
 import io.renku.generators.Generators._
 import io.renku.graph.acceptancetests.stubs.gitlab.GitLabApiStub.{CommitData, ProjectAccessTokenInfo}

@@ -24,6 +24,7 @@ import cats.syntax.all._
 import io.renku.graph.model._
 import io.renku.graph.model.entities.EntityFunctions
 import io.renku.graph.triplesstore.DatasetTTLs.ProjectsTTL
+import io.renku.http.client.GitLabApiUrl
 import io.renku.jsonld.JsonLD.{JsonLDArray, JsonLDEntityLike}
 import io.renku.jsonld.{EntityId, Graph, JsonLDEncoder}
 import io.renku.triplesstore.client.http.SparqlClient

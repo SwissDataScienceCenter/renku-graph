@@ -24,7 +24,7 @@ import com.github.tomakehurst.wiremock.client.WireMock._
 import eu.timepit.refined.auto._
 import io.circe.syntax._
 import io.renku.data.Message
-import io.renku.generators.CommonGraphGenerators.{accessTokens, personalAccessTokens, projectAccessTokens, userOAuthAccessTokens}
+import io.renku.http.client.GitLabGenerators.{accessTokens, personalAccessTokens, projectAccessTokens, userOAuthAccessTokens}
 import io.renku.generators.Generators.Implicits._
 import io.renku.graph.model.RenkuTinyTypeGenerators.{projectIds, projectSlugs}
 import io.renku.http.client.{AccessToken, GitLabClientMappings, UrlEncoder}

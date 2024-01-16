@@ -21,9 +21,11 @@ package io.renku.http.rest.paging
 import cats.syntax.all._
 import eu.timepit.refined.api.Refined
 import io.circe.{Decoder, Json}
-import io.renku.generators.CommonGraphGenerators._
+import io.circe.syntax._
 import io.renku.generators.Generators._
 import io.renku.generators.Generators.Implicits._
+import io.renku.http.RenkuEntityCodec
+import io.renku.http.client.HttpClientGenerators
 import io.renku.http.rest.paging.model.{Page, PerPage, Total}
 import io.renku.testtools.IOSpec
 import io.renku.tinytypes.TestTinyTypes.UrlTestType
@@ -40,7 +42,9 @@ class PagingResponseSpec
     with IOSpec
     with ScalaCheckPropertyChecks
     with should.Matchers
-    with TryValues {
+    with TryValues
+    with HttpClientGenerators
+    with RenkuEntityCodec {
 
   "from" should {
 
@@ -181,11 +185,9 @@ class PagingResponseSpec
   "toHttpResponse" should {
 
     import cats.effect.IO
-    import io.circe.syntax._
     import org.http4s.MediaType.application
     import org.http4s.Status._
     import org.http4s.headers.`Content-Type`
-    import io.renku.http.RenkuEntityCodec._
 
     "return Ok with response results in Json body and paging headers" in {
 

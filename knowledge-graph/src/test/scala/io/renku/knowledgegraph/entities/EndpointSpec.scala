@@ -28,12 +28,14 @@ import io.renku.data.Message
 import io.renku.entities.search.Criteria.Filters
 import io.renku.entities.search.Generators.modelEntities
 import io.renku.entities.search.{Criteria, EntitiesFinder, model}
-import io.renku.generators.CommonGraphGenerators.{authUsers, pagingRequests, pagingResponses, sortBys}
+import io.renku.http.client.GitLabGenerators._
+import io.renku.generators.CommonGraphGenerators.{authUsers, sortBys}
 import io.renku.generators.Generators.Implicits._
 import io.renku.generators.Generators._
-import io.renku.graph.model.GraphModelGenerators.{gitLabUrls, renkuUrls}
+import io.renku.graph.model.GraphModelGenerators.renkuUrls
 import io.renku.graph.model._
 import io.renku.http.RenkuEntityCodec
+import io.renku.http.client.GitLabUrl
 import io.renku.http.rest.paging.{PagingHeaders, PagingResponse}
 import io.renku.interpreters.TestLogger
 import io.renku.interpreters.TestLogger.Level.Error

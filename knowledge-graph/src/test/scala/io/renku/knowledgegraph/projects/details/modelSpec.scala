@@ -21,6 +21,7 @@ package io.renku.knowledgegraph.projects.details
 import io.renku.generators.Generators.Implicits._
 import io.renku.generators.Generators._
 import io.renku.graph.model.GraphModelGenerators._
+import io.renku.http.client.GitLabGenerators.gitLabUrls
 import model.Permissions.AccessLevel
 import model.Permissions.AccessLevel._
 import model.Urls.SshUrl

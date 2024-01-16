@@ -30,6 +30,7 @@ import io.renku.graph.model.projects._
 import io.renku.graph.model.testentities.RenkuProject.CreateCompositePlan
 import io.renku.graph.model.testentities.generators.EntitiesGenerators.{CompositePlanGenFactory, DatasetGenFactory, ProjectBasedGenFactory}
 import io.renku.graph.model.versions.{CliVersion, SchemaVersion}
+import io.renku.http.client.GitLabApiUrl
 
 sealed trait RenkuProject extends Project with RenkuProject.RenkuProjectAlg with Product with Serializable {
   val slug:                 Slug

@@ -19,9 +19,9 @@
 package io.renku.http.rest.paging
 
 import cats.syntax.all._
-import io.renku.generators.CommonGraphGenerators._
 import io.renku.generators.Generators.Implicits._
 import io.renku.generators.Generators._
+import io.renku.http.client.HttpClientGenerators
 import io.renku.http.rest.paging.PagingRequest.Decoders.page.{parameterName => pageParamName}
 import io.renku.http.rest.paging.PagingRequest.Decoders.perPage.{parameterName => perPageParamName}
 import io.renku.http.rest.paging.PagingResponse.PagingInfo
@@ -36,7 +36,11 @@ import org.typelevel.ci._
 
 import scala.util.Try
 
-class PagingHeadersSpec extends AnyWordSpec with ScalaCheckPropertyChecks with should.Matchers {
+class PagingHeadersSpec
+    extends AnyWordSpec
+    with ScalaCheckPropertyChecks
+    with should.Matchers
+    with HttpClientGenerators {
 
   import PagingHeaders._
 

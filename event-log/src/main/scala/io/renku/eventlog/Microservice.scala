@@ -33,7 +33,7 @@ import io.renku.eventlog.metrics._
 import io.renku.events.consumers
 import io.renku.events.consumers.EventConsumersRegistry
 import io.renku.graph.model.projects
-import io.renku.http.client.GitLabClient
+import io.renku.http.client.{GitLabClient, GitLabClientLoader}
 import io.renku.http.server.HttpServer
 import io.renku.logging.ApplicationLogger
 import io.renku.metrics._
@@ -61,7 +61,7 @@ object Microservice extends IOMicroservice {
     sessionPoolResource.use { implicit sessionResource =>
       for {
         implicit0(mr: MetricsRegistry[IO])                  <- MetricsRegistryLoader[IO]()
-        implicit0(gc: GitLabClient[IO])                     <- GitLabClient[IO]()
+        implicit0(gc: GitLabClient[IO])                     <- GitLabClientLoader[IO]()
         implicit0(qet: QueriesExecutionTimes[IO])           <- QueriesExecutionTimes[IO]()
         certificateLoader                                   <- CertificateLoader[IO]
         sentryInitializer                                   <- SentryInitializer[IO]

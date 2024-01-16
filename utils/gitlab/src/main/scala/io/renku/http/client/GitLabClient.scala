@@ -25,10 +25,11 @@ import eu.timepit.refined.api.Refined
 import eu.timepit.refined.collection.NonEmpty
 import eu.timepit.refined.numeric.NonNegative
 import io.circe.Json
-import io.renku.control.{RateLimit, Throttler}
 import io.renku.http.client.HttpRequest.NamedRequest
 import io.renku.http.client.RestClient.ResponseMappingF
-import io.renku.metrics.{GitLabApiCallRecorder, MetricsRegistry}
+import io.renku.http.rest.paging.model.{Page, Total}
+import io.renku.logging.ExecutionTimeRecorder
+import io.renku.metrics.{GitLabApiCallRecorder, Histogram, MetricsRegistry}
 import org.http4s.Method.{DELETE, GET, HEAD, POST, PUT}
 import org.http4s.circe.{jsonEncoder, jsonEncoderOf}
 import org.http4s.multipart.Multipart
@@ -68,7 +69,7 @@ trait GitLabClient[F[_]] {
 final class GitLabClientImpl[F[_]: Async: Logger](
     gitLabApiUrl:           GitLabApiUrl,
     apiCallRecorder:        GitLabApiCallRecorder[F],
-    gitLabThrottler:        Throttler[F, GitLab],
+    gitLabThrottler:        GitLabThrottle[F],
     retryInterval:          FiniteDuration = RestClient.SleepAfterConnectionIssue,
     maxRetries:             Int Refined NonNegative = RestClient.MaxRetriesAfterConnectionTimeout,
     requestTimeoutOverride: Option[Duration] = None
@@ -163,24 +164,22 @@ object GitLabClient {
 
   def apply[F[_]](implicit ev: GitLabClient[F]): GitLabClient[F] = ev
 
-  def apply[F[_]: Async: Logger: MetricsRegistry](
-      rateLimit:              RateLimit[F, GitLab],
-      throttle:               Throttler[F, GitLab],
-      gitLabUrl:              GitLabUrl,
-      retryInterval:          FiniteDuration = RestClient.SleepAfterConnectionIssue,
-      maxRetries:             Int Refined NonNegative = RestClient.MaxRetriesAfterConnectionTimeout,
-      requestTimeoutOverride: Option[Duration] = None
+  def create[F[_]: Async: Logger: MetricsRegistry](
+      throttle:                  GitLabThrottle[F],
+      gitLabUrl:                 GitLabUrl,
+      makeExecutionTimeRecorder: Histogram[F] => F[ExecutionTimeRecorder[F]],
+      retryInterval:             FiniteDuration = RestClient.SleepAfterConnectionIssue,
+      maxRetries:                Int Refined NonNegative = RestClient.MaxRetriesAfterConnectionTimeout,
+      requestTimeoutOverride:    Option[Duration] = None
   ): F[GitLabClientImpl[F]] = for {
-    // gitLabRateLimit <- RateLimitLoader.fromConfig[F, GitLab]("services.gitlab.rate-limit")
-    // gitLabThrottler <- Throttler[F, GitLab](gitLabRateLimit)
-    // gitLabUrl       <- GitLabUrlLoader[F]()
-    apiCallRecorder <- GitLabApiCallRecorder[F](hg => ExecutionTimeRecorderLoader[F](maybeHistogram = Some(hg)))
-  } yield new GitLabClientImpl[F](gitLabUrl.apiV4,
-                                  apiCallRecorder,
-                                  throttle,
-                                  retryInterval,
-                                  maxRetries,
-                                  requestTimeoutOverride
+    apiCallRecorder <- GitLabApiCallRecorder[F](makeExecutionTimeRecorder)
+  } yield new GitLabClientImpl[F](
+    gitLabUrl.apiV4,
+    apiCallRecorder,
+    throttle,
+    retryInterval,
+    maxRetries,
+    requestTimeoutOverride
   )
 
   def maybeNextPage[F[_]: MonadThrow](response: Response[F]): F[Option[Page]] =
@@ -219,5 +218,4 @@ object GitLabClient {
           uri = uri
         )
     }
-
 }

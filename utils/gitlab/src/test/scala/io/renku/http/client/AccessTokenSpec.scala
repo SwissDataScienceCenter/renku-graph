@@ -21,7 +21,6 @@ package io.renku.http.client
 import io.circe.DecodingFailure
 import io.circe.literal._
 import io.circe.syntax._
-import io.renku.generators.CommonGraphGenerators._
 import io.renku.generators.Generators.Implicits._
 import io.renku.generators.Generators._
 import io.renku.http.client.AccessToken._
@@ -33,7 +32,7 @@ import org.scalatestplus.scalacheck.ScalaCheckPropertyChecks
 import java.nio.charset.StandardCharsets.UTF_8
 import java.util.Base64
 
-class AccessTokenSpec extends AnyWordSpec with ScalaCheckPropertyChecks with should.Matchers {
+class AccessTokenSpec extends AnyWordSpec with ScalaCheckPropertyChecks with should.Matchers with GitLabGenerators {
 
   private val base64Encoder = Base64.getEncoder
 

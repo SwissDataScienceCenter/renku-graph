@@ -27,7 +27,7 @@ import eu.timepit.refined.auto._
 import eu.timepit.refined.collection.NonEmpty
 import io.circe.Json
 import io.circe.literal._
-import io.renku.generators.CommonGraphGenerators.accessTokens
+import io.renku.http.client.GitLabGenerators._
 import io.renku.generators.Generators.Implicits._
 import io.renku.generators.Generators.{durations, nonEmptyStrings}
 import io.renku.graph.model.GraphModelGenerators.projectIds

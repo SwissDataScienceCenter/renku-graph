@@ -33,10 +33,12 @@ import io.renku.generators.CommonGraphGenerators.authUsers
 import io.renku.generators.Generators
 import io.renku.generators.Generators.Implicits._
 import io.renku.generators.Generators._
-import io.renku.graph.model.GraphModelGenerators.{gitLabUrls, renkuUrls}
+import io.renku.graph.model.GraphModelGenerators.renkuUrls
+import io.renku.http.client.GitLabGenerators.gitLabUrls
 import io.renku.graph.model.tools.AdditionalMatchers
-import io.renku.graph.model.{GitLabUrl, RenkuUrl}
+import io.renku.graph.model.RenkuUrl
 import io.renku.http.RenkuEntityCodec
+import io.renku.http.client.GitLabUrl
 import io.renku.http.rest.paging.model.{Page, PerPage}
 import io.renku.http.rest.paging.{PagingHeaders, PagingRequest, PagingResponse}
 import io.renku.interpreters.TestLogger

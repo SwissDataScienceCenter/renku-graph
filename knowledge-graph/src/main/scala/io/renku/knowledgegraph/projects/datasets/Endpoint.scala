@@ -22,13 +22,15 @@ import Endpoint.Criteria
 import cats.NonEmptyParallel
 import cats.effect._
 import cats.syntax.all._
+import com.typesafe.config.ConfigFactory
 import io.circe.Encoder
 import io.circe.syntax._
 import io.renku.config.renku
 import io.renku.data.Message
-import io.renku.graph.config.{GitLabUrlLoader, RenkuUrlLoader}
-import io.renku.graph.model.{GitLabUrl, RenkuUrl, projects}
+import io.renku.graph.config.RenkuUrlLoader
+import io.renku.graph.model.{RenkuUrl, projects}
 import io.renku.http.RenkuEntityCodec
+import io.renku.http.client.{GitLabClientLoader, GitLabUrl}
 import io.renku.http.rest.Links._
 import io.renku.http.rest.SortBy.Direction
 import io.renku.http.rest.Sorting
@@ -111,11 +113,12 @@ object Endpoint {
   }
 
   def apply[F[_]: Async: NonEmptyParallel: Logger: SparqlQueryTimeRecorder]: F[Endpoint[F]] = for {
-    implicit0(renkuUrl: RenkuUrl)        <- RenkuUrlLoader()
-    implicit0(gitLabUrl: GitLabUrl)      <- GitLabUrlLoader[F]()
-    implicit0(renkuApiUrl: renku.ApiUrl) <- renku.ApiUrl[F]()
-    renkuConnectionConfig                <- ProjectsConnectionConfig.fromConfig[F]()
-    executionTimeRecorder                <- ExecutionTimeRecorderLoader[F]()
+    config                               <- Async[F].blocking(ConfigFactory.load())
+    implicit0(renkuUrl: RenkuUrl)        <- RenkuUrlLoader(config)
+    implicit0(gitLabUrl: GitLabUrl)      <- GitLabClientLoader.gitLabUrl[F](config)
+    implicit0(renkuApiUrl: renku.ApiUrl) <- renku.ApiUrl[F](config)
+    renkuConnectionConfig                <- ProjectsConnectionConfig.fromConfig[F](config)
+    executionTimeRecorder                <- ExecutionTimeRecorderLoader[F](config)
   } yield new EndpointImpl[F](ProjectDatasetsFinder(renkuConnectionConfig), executionTimeRecorder)
 
   def href(renkuApiUrl: renku.ApiUrl, projectSlug: projects.Slug): Href =

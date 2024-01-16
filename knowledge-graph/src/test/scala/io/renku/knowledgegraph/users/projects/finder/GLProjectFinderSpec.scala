@@ -27,7 +27,7 @@ import eu.timepit.refined.collection.NonEmpty
 import io.circe.{Encoder, Json}
 import io.circe.literal._
 import io.circe.syntax._
-import io.renku.generators.CommonGraphGenerators.totals
+import io.renku.http.client.GitLabGenerators.totals
 import io.renku.generators.Generators.Implicits._
 import io.renku.generators.Generators.fixed
 import io.renku.graph.model.GraphModelGenerators.personGitLabIds

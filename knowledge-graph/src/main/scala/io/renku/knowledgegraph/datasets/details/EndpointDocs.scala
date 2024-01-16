@@ -23,14 +23,16 @@ package details
 import Dataset._
 import cats.MonadThrow
 import cats.syntax.all._
+import com.typesafe.config.ConfigFactory
 import eu.timepit.refined.auto._
 import io.circe.syntax._
 import io.renku.config.renku
 import io.renku.data.Message
-import io.renku.graph.config.{GitLabUrlLoader, RenkuUrlLoader}
+import io.renku.graph.config.RenkuUrlLoader
 import io.renku.graph.model._
 import io.renku.graph.model.images.ImageUri
 import io.renku.graph.model.projects.Visibility
+import io.renku.http.client.{GitLabClientLoader, GitLabUrl}
 import io.renku.knowledgegraph.docs.model.Operation.GET
 import io.renku.knowledgegraph.docs.model._
 
@@ -38,7 +40,7 @@ import java.time.Instant
 
 object EndpointDocs {
   def apply[F[_]: MonadThrow]: F[docs.EndpointDocs] = for {
-    implicit0(gitLabUrl: GitLabUrl) <- GitLabUrlLoader[F]()
+    implicit0(gitLabUrl: GitLabUrl) <- GitLabClientLoader.gitLabUrl[F](ConfigFactory.load())
     implicit0(apiUrl: renku.ApiUrl) <- renku.ApiUrl[F]()
     implicit0(renkuUrl: RenkuUrl)   <- RenkuUrlLoader[F]()
   } yield new EndpointDocsImpl

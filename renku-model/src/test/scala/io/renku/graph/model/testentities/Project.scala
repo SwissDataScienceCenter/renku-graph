@@ -26,7 +26,8 @@ import io.renku.graph.model.images.ImageUri
 import io.renku.graph.model.projects.{DateCreated, DateModified, Description, ForksCount, Keyword, Name, Role, Slug, Visibility}
 import io.renku.graph.model.testentities.NonRenkuProject._
 import io.renku.graph.model.testentities.RenkuProject._
-import io.renku.graph.model.{GitLabApiUrl, GraphClass, RenkuUrl, entities}
+import io.renku.graph.model.{GraphClass, RenkuUrl, entities}
+import io.renku.http.client.GitLabApiUrl
 import io.renku.jsonld.{EntityId, EntityIdEncoder, JsonLDEncoder}
 
 trait Project extends Product with Serializable {

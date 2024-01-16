@@ -28,7 +28,7 @@ import eu.timepit.refined.collection.NonEmpty
 import io.circe.Encoder
 import io.circe.literal._
 import io.circe.syntax._
-import io.renku.generators.CommonGraphGenerators.accessTokens
+import io.renku.http.client.GitLabGenerators.accessTokens
 import io.renku.generators.Generators.Implicits._
 import io.renku.http.RenkuEntityCodec
 import io.renku.http.client.RestClient.ResponseMappingF

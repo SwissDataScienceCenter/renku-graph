@@ -18,12 +18,10 @@
 
 package io.renku.triplesgenerator.events.consumers.triplesgenerated
 
-import CategoryGenerators._
 import cats.data.EitherT
 import cats.data.EitherT.leftT
 import cats.effect.IO
 import cats.syntax.all._
-import io.renku.generators.CommonGraphGenerators._
 import io.renku.generators.Generators.Implicits._
 import io.renku.generators.Generators._
 import io.renku.graph.model.entities.Project
@@ -33,6 +31,7 @@ import io.renku.graph.model.projects.Slug
 import io.renku.graph.model.testentities._
 import io.renku.graph.model.{entities, projects}
 import io.renku.http.client.AccessToken
+import io.renku.http.client.GitLabGenerators._
 import io.renku.interpreters.TestLogger
 import io.renku.interpreters.TestLogger.Level.{Error, Info}
 import io.renku.interpreters.TestLogger.Matcher.NotRefEqual
@@ -44,6 +43,7 @@ import io.renku.triplesgenerator.errors.ProcessingRecoverableError
 import io.renku.triplesgenerator.errors.ProcessingRecoverableError.{LogWorthyRecoverableError, SilentRecoverableError}
 import io.renku.triplesgenerator.events.consumers.EventStatusUpdater
 import io.renku.triplesgenerator.events.consumers.EventStatusUpdater.{ExecutionDelay, RollbackStatus}
+import io.renku.triplesgenerator.events.consumers.triplesgenerated.CategoryGenerators._
 import io.renku.triplesgenerator.tsprovisioning.TSProvisioner
 import io.renku.triplesgenerator.tsprovisioning.triplesuploading.TriplesUploadResult
 import io.renku.triplesgenerator.tsprovisioning.triplesuploading.TriplesUploadResult._

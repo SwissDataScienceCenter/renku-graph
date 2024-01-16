@@ -25,7 +25,7 @@ import cats.syntax.all._
 import com.github.tomakehurst.wiremock.client.WireMock._
 import io.circe.literal._
 import io.circe.syntax._
-import io.renku.generators.CommonGraphGenerators.userAccessTokens
+import io.renku.http.client.GitLabGenerators.userAccessTokens
 import io.renku.generators.Generators.Implicits._
 import io.renku.graph.model.GraphModelGenerators.{cliVersions, projectSchemaVersions}
 import io.renku.graph.model.RenkuTinyTypeGenerators.projectGitHttpUrls

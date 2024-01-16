@@ -16,21 +16,19 @@
  * limitations under the License.
  */
 
-package io.renku.graph.config
+package io.renku.http.client
 
 import com.typesafe.config.ConfigFactory
 import io.renku.config.ConfigLoader.ConfigLoadingException
 import io.renku.generators.Generators.Implicits._
 import io.renku.generators.Generators.httpUrls
-import io.renku.graph.model.GraphModelGenerators._
-import io.renku.graph.model.{GitLabApiUrl, GitLabUrl}
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
 
 import scala.jdk.CollectionConverters._
 import scala.util.{Failure, Success, Try}
 
-class GitLabUrlLoaderSpec extends AnyWordSpec with should.Matchers {
+class GitLabClientLoaderSpec extends AnyWordSpec with should.Matchers with GitLabGenerators {
 
   "apply" should {
 
@@ -46,11 +44,11 @@ class GitLabUrlLoaderSpec extends AnyWordSpec with should.Matchers {
         ).asJava
       )
 
-      GitLabUrlLoader[Try](config) shouldBe Success(GitLabUrl(url))
+      GitLabClientLoader.gitLabUrl[Try](config) shouldBe Success(GitLabUrl(url))
     }
 
     "fail if there's no 'services.gitlab.url' entry" in {
-      val Failure(exception) = GitLabUrlLoader[Try](ConfigFactory.empty())
+      val Failure(exception) = GitLabClientLoader.gitLabUrl[Try](ConfigFactory.empty())
 
       exception shouldBe an[ConfigLoadingException]
     }

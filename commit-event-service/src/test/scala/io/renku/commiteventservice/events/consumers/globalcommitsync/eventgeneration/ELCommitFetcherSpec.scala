@@ -26,7 +26,7 @@ import io.circe.Encoder._
 import io.circe.literal._
 import io.circe.syntax._
 import io.renku.commiteventservice.events.consumers.globalcommitsync.Generators.{dateConditions, untilDateConditions}
-import io.renku.generators.CommonGraphGenerators.{pages, pagingRequests}
+import io.renku.http.client.HttpClientGenerators.{pages, pagingRequests}
 import io.renku.generators.Generators.Implicits._
 import io.renku.generators.Generators._
 import io.renku.graph.config.EventLogUrl

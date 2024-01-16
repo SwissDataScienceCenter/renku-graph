@@ -24,6 +24,7 @@ import io.renku.graph.model._
 import io.renku.graph.model.cli.CliConverters
 import io.renku.graph.model.entities.EntityFunctions
 import io.renku.graph.model.persons.{Affiliation, Email, GitLabId, Name, OrcidId}
+import io.renku.http.client.GitLabApiUrl
 
 final case class Person(
     name:             Name,

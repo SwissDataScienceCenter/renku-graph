@@ -29,7 +29,7 @@ import io.renku.commiteventservice.events.consumers.common.CommitInfo
 import io.renku.commiteventservice.events.consumers.common.Generators.commitInfos
 import io.renku.commiteventservice.events.consumers.globalcommitsync.Generators._
 import io.renku.commiteventservice.events.consumers.globalcommitsync.eventgeneration.{DateCondition, PageResult}
-import io.renku.generators.CommonGraphGenerators.{accessTokens, pages, pagingRequests}
+import io.renku.http.client.GitLabGenerators.{accessTokens, pages, pagingRequests}
 import io.renku.generators.Generators.Implicits._
 import io.renku.graph.model.EventsGenerators._
 import io.renku.graph.model.GraphModelGenerators.projectIds

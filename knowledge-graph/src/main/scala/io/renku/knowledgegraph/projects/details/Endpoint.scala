@@ -21,12 +21,12 @@ package io.renku.knowledgegraph.projects.details
 import cats.effect._
 import cats.syntax.all._
 import cats.{MonadThrow, Parallel}
+import com.typesafe.config.ConfigFactory
 import io.renku.config.renku
 import io.renku.data.Message
 import io.renku.data.MessageJsonLDEncoder._
-import io.renku.graph.config.GitLabUrlLoader
-import io.renku.graph.model.{GitLabUrl, projects}
-import io.renku.http.client.GitLabClient
+import io.renku.graph.model.projects
+import io.renku.http.client.{GitLabClient, GitLabClientLoader, GitLabUrl}
 import io.renku.http.rest.Links.Href
 import io.renku.http.server.security.model.AuthUser
 import io.renku.jsonld.syntax._
@@ -121,11 +121,12 @@ object Endpoint {
 
   def apply[F[_]: Parallel: Async: GitLabClient: Logger: SparqlQueryTimeRecorder: MetricsRegistry]: F[Endpoint[F]] =
     for {
+      config                <- Async[F].blocking(ConfigFactory.load())
       projectFinder         <- ProjectFinder[F]
       jsonEncoder           <- ProjectJsonEncoder[F]
       tgClient              <- triplesgenerator.api.events.Client[F]
-      executionTimeRecorder <- ExecutionTimeRecorderLoader[F]()
-      gitLabUrl             <- GitLabUrlLoader[F]()
+      executionTimeRecorder <- ExecutionTimeRecorderLoader[F](config)
+      gitLabUrl             <- GitLabClientLoader.gitLabUrl[F](config)
     } yield new EndpointImpl[F](projectFinder,
                                 jsonEncoder,
                                 ProjectJsonLDEncoder,

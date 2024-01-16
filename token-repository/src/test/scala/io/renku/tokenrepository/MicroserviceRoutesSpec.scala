@@ -21,7 +21,8 @@ package io.renku.tokenrepository
 import cats.data.OptionT
 import cats.effect.{IO, Ref}
 import cats.syntax.all._
-import io.renku.generators.CommonGraphGenerators.{httpStatuses, userAccessTokens}
+import io.renku.generators.CommonGraphGenerators.httpStatuses
+import io.renku.http.client.GitLabGenerators._
 import io.renku.generators.Generators.Implicits._
 import io.renku.graph.model.GraphModelGenerators._
 import io.renku.graph.model.projects

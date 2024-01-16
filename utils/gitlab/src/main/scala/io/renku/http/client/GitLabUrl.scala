@@ -16,10 +16,9 @@
  * limitations under the License.
  */
 
-package io.renku.graph.model
+package io.renku.http.client
 
 import cats.syntax.all._
-import io.renku.graph.model.views.UrlResourceRenderer
 import io.renku.tinytypes.constraints.{Url, UrlOps}
 import io.renku.tinytypes.{TinyTypeFactory, UrlTinyType}
 
@@ -31,13 +30,4 @@ object GitLabUrl extends TinyTypeFactory[GitLabUrl](new GitLabUrl(_)) with Url[G
     case v if v.endsWith("/") => v.substring(0, v.length - 1).asRight
     case v                    => v.asRight
   }
-}
-
-final class GitLabApiUrl private (val value: String) extends AnyVal with UrlTinyType
-object GitLabApiUrl
-    extends TinyTypeFactory[GitLabApiUrl](new GitLabApiUrl(_))
-    with Url[GitLabApiUrl]
-    with UrlOps[GitLabApiUrl]
-    with UrlResourceRenderer[GitLabApiUrl] {
-  def apply(gitLabUrl: GitLabUrl): GitLabApiUrl = new GitLabApiUrl((gitLabUrl / "api" / "v4").value)
 }

@@ -34,13 +34,10 @@ import io.renku.generators.Generators._
 import io.renku.graph.http.server.security.Authorizer.AuthContext
 import io.renku.graph.model.GraphModelGenerators.personGitLabIds
 import io.renku.graph.model.Schemas
-import io.renku.http.client.AccessToken._
 import io.renku.http.client.RestClientError._
 import io.renku.http.client._
 import io.renku.http.rest.Links.{Href, Link, Rel}
-import io.renku.http.rest.paging.model.Total
-import io.renku.http.rest.paging.{PagingRequest, PagingResponse}
-import io.renku.http.rest.{Links, SortBy, Sorting, paging}
+import io.renku.http.rest.{Links, SortBy, Sorting}
 import io.renku.http.server.security.EndpointSecurityException
 import io.renku.http.server.security.EndpointSecurityException.{AuthenticationFailure, AuthorizationFailure}
 import io.renku.http.server.security.model.AuthUser
@@ -55,7 +52,6 @@ import org.scalacheck.{Arbitrary, Gen}
 import scodec.bits.ByteVector
 
 import scala.language.implicitConversions
-import scala.util.Try
 
 object CommonGraphGenerators {
 
@@ -71,27 +67,8 @@ object CommonGraphGenerators {
           .map(Secret.unsafe)
       }
 
-  implicit val personalAccessTokens: Gen[PersonalAccessToken] = for {
-    length <- Gen.choose(5, 40)
-    chars  <- Gen.listOfN(length, Gen.oneOf((0 to 9).map(_.toString) ++ ('a' to 'z').map(_.toString)))
-  } yield PersonalAccessToken(chars.mkString(""))
-
-  implicit val userOAuthAccessTokens: Gen[UserOAuthAccessToken] = for {
-    length <- Gen.choose(5, 40)
-    chars  <- Gen.listOfN(length, Gen.oneOf((0 to 9).map(_.toString) ++ ('a' to 'z').map(_.toString)))
-  } yield UserOAuthAccessToken(chars.mkString(""))
-
-  implicit val projectAccessTokens: Gen[ProjectAccessToken] = for {
-    chars <- Gen.listOfN(20, Gen.oneOf(('A' to 'Z').map(_.toString) ++ ('a' to 'z').map(_.toString)))
-  } yield ProjectAccessToken(s"$ProjectAccessTokenDefaultPrefix${chars.mkString("")}")
-
   implicit val securityExceptions: Gen[EndpointSecurityException] =
     Gen.oneOf(AuthenticationFailure, AuthorizationFailure)
-
-  implicit val userAccessTokens: Gen[UserAccessToken] = Gen.oneOf(userOAuthAccessTokens, personalAccessTokens)
-
-  implicit val accessTokens: Gen[AccessToken] =
-    Gen.oneOf(projectAccessTokens, userOAuthAccessTokens, personalAccessTokens)
 
   implicit val basicAuthUsernames: Gen[BasicAuthUsername] = nonEmptyStrings() map BasicAuthUsername.apply
   implicit val basicAuthPasswords: Gen[BasicAuthPassword] = nonEmptyStrings() map BasicAuthPassword.apply
@@ -214,24 +191,6 @@ object CommonGraphGenerators {
 
   def testSortBys: Gen[Sorting[TestSort.type]] = sortBys(TestSort)
 
-  implicit val pages: Gen[paging.model.Page] = positiveInts(max = 100) map (_.value) map paging.model.Page.apply
-  implicit val perPages: Gen[paging.model.PerPage] =
-    positiveInts(max = paging.model.PerPage.max.value).map(v => paging.model.PerPage(v.value))
-  implicit val pagingRequests: Gen[PagingRequest] = for {
-    page    <- pages
-    perPage <- perPages
-  } yield PagingRequest(page, perPage)
-  implicit val totals: Gen[paging.model.Total] = nonNegativeInts() map (_.value) map paging.model.Total.apply
-
-  def pagingResponses[Result](resultsGen: Gen[Result]): Gen[PagingResponse[Result]] = for {
-    page    <- pages
-    perPage <- perPages
-    results <- listOf(resultsGen, max = perPage.value)
-    total = Total((page.value - 1) * perPage.value + results.size)
-  } yield PagingResponse
-    .from[Try, Result](results, PagingRequest(page, perPage), total)
-    .fold(throw _, identity)
-
   implicit val fusekiUrls: Gen[FusekiUrl] = httpUrls() map FusekiUrl.apply
 
   implicit lazy val certificates: Gen[Certificate] =
@@ -302,7 +261,7 @@ object CommonGraphGenerators {
 
   implicit val authUsers: Gen[AuthUser] = for {
     gitLabId    <- personGitLabIds
-    accessToken <- userAccessTokens
+    accessToken <- GitLabGenerators.userAccessTokens
   } yield AuthUser(gitLabId, accessToken)
 
   implicit def authContexts[Key](implicit keysGen: Gen[Key]): Gen[AuthContext[Key]] = for {

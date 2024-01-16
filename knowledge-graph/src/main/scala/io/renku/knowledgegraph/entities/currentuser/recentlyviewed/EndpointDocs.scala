@@ -20,6 +20,7 @@ package io.renku.knowledgegraph.entities.currentuser.recentlyviewed
 
 import cats.MonadThrow
 import cats.implicits._
+import com.typesafe.config.ConfigFactory
 import eu.timepit.refined.auto._
 import io.circe.Json
 import io.circe.syntax._
@@ -27,9 +28,9 @@ import io.renku.config.renku
 import io.renku.data.Message
 import io.renku.entities.search.model.Entity._
 import io.renku.entities.search.model.MatchingScore
-import io.renku.graph.config.GitLabUrlLoader
 import io.renku.graph.model._
 import io.renku.graph.model.images.ImageUri
+import io.renku.http.client.{GitLabClientLoader, GitLabUrl}
 import io.renku.knowledgegraph.docs
 import io.renku.knowledgegraph.docs.model.Operation.GET
 import io.renku.knowledgegraph.docs.model._
@@ -105,7 +106,7 @@ final class EndpointDocsImpl()(implicit gitLabUrl: GitLabUrl, renkuApiUrl: renku
 
 object EndpointDocs {
   def apply[F[_]: MonadThrow]: F[docs.EndpointDocs] = for {
-    gitLabUrl <- GitLabUrlLoader[F]()
+    gitLabUrl <- GitLabClientLoader.gitLabUrl[F](ConfigFactory.load())
     apiUrl    <- renku.ApiUrl[F]()
   } yield new EndpointDocsImpl()(gitLabUrl, apiUrl)
 }

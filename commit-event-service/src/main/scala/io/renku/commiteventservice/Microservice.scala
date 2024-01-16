@@ -23,7 +23,7 @@ import cats.syntax.all._
 import io.renku.config.certificates.CertificateLoader
 import io.renku.events.consumers
 import io.renku.events.consumers.EventConsumersRegistry
-import io.renku.http.client.GitLabClient
+import io.renku.http.client.{GitLabClient, GitLabClientLoader}
 import io.renku.http.server.HttpServer
 import io.renku.logging.{ApplicationLogger, ExecutionTimeRecorder, ExecutionTimeRecorderLoader}
 import io.renku.metrics.{MetricsRegistry, MetricsRegistryLoader, RoutesMetrics}
@@ -43,7 +43,7 @@ object Microservice extends IOMicroservice {
   override def run(args: List[String]): IO[ExitCode] = for {
     implicit0(mr: MetricsRegistry[IO])        <- MetricsRegistryLoader[IO]()
     implicit0(etr: ExecutionTimeRecorder[IO]) <- ExecutionTimeRecorderLoader[IO]()
-    implicit0(gc: GitLabClient[IO])           <- GitLabClient[IO]()
+    implicit0(gc: GitLabClient[IO])           <- GitLabClientLoader[IO]()
     certificateLoader                         <- CertificateLoader[IO]
     sentryInitializer                         <- SentryInitializer[IO]
     commitSyncCategory                        <- events.consumers.commitsync.SubscriptionFactory[IO]

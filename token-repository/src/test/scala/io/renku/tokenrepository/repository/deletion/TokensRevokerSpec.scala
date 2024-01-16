@@ -21,7 +21,7 @@ package io.renku.tokenrepository.repository.deletion
 import cats.effect.IO
 import cats.syntax.all._
 import fs2.Stream
-import io.renku.generators.CommonGraphGenerators.accessTokens
+import io.renku.http.client.GitLabGenerators._
 import io.renku.generators.Generators.Implicits._
 import io.renku.generators.Generators.exceptions
 import io.renku.graph.model.RenkuTinyTypeGenerators.projectIds

@@ -29,7 +29,7 @@ import io.circe.literal._
 import io.circe.syntax._
 import io.renku.core.client.Generators.userInfos
 import io.renku.core.client.UserInfo
-import io.renku.generators.CommonGraphGenerators.userAccessTokens
+import io.renku.http.client.GitLabGenerators.userAccessTokens
 import io.renku.generators.Generators.Implicits._
 import io.renku.http.RenkuEntityCodec
 import io.renku.http.client.RestClient.ResponseMappingF

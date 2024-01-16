@@ -22,7 +22,8 @@ import cats.effect.IO
 import cats.syntax.all._
 import io.renku.data.Message
 import io.renku.eventlog.events.EventsEndpoint._
-import io.renku.generators.CommonGraphGenerators.{pagingRequests, pagingResponses, sortBys}
+import io.renku.generators.CommonGraphGenerators.sortBys
+import io.renku.http.client.GitLabGenerators._
 import io.renku.generators.Generators.Implicits._
 import io.renku.generators.Generators._
 import io.renku.graph.config.EventLogUrl

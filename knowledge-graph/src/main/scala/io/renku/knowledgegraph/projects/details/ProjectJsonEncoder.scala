@@ -24,7 +24,7 @@ import io.circe.literal._
 import io.circe.syntax._
 import io.circe.{Encoder, Json}
 import io.renku.config.renku
-import io.renku.graph.model.GitLabUrl
+import io.renku.http.client.GitLabUrl
 import io.renku.http.rest.Links.{Link, Rel, _links}
 import io.renku.json.JsonOps._
 import io.renku.knowledgegraph

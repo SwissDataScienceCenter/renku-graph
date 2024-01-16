@@ -20,9 +20,9 @@ package io.renku.http.rest.paging
 
 import cats.data.{NonEmptyList, Validated}
 import cats.syntax.all._
-import io.renku.generators.CommonGraphGenerators._
 import io.renku.generators.Generators.Implicits._
 import io.renku.generators.Generators._
+import io.renku.http.client.HttpClientGenerators
 import io.renku.http.rest.paging.model.{Page, PerPage}
 import org.http4s.ParseFailure
 import org.scalacheck.Gen
@@ -30,7 +30,11 @@ import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
 import org.scalatestplus.scalacheck.ScalaCheckPropertyChecks
 
-class PagingRequestSpec extends AnyWordSpec with ScalaCheckPropertyChecks with should.Matchers {
+class PagingRequestSpec
+    extends AnyWordSpec
+    with ScalaCheckPropertyChecks
+    with should.Matchers
+    with HttpClientGenerators {
 
   "page" should {
 

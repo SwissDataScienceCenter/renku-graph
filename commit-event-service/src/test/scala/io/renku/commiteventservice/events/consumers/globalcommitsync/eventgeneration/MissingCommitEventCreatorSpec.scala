@@ -24,7 +24,7 @@ import io.renku.commiteventservice.events.consumers.common.UpdateResult.{Created
 import io.renku.commiteventservice.events.consumers.common._
 import io.renku.commiteventservice.events.consumers.globalcommitsync.Generators._
 import io.renku.events.consumers.Project
-import io.renku.generators.CommonGraphGenerators.personalAccessTokens
+import io.renku.http.client.GitLabGenerators.personalAccessTokens
 import io.renku.generators.Generators.Implicits._
 import io.renku.generators.Generators.exceptions
 import io.renku.graph.model.EventsGenerators.{batchDates, commitIds}

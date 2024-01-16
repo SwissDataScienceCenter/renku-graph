@@ -98,7 +98,7 @@ lazy val jsonldUtils = project
       Dependencies.jsonld4s
   )
   .dependsOn(
-    tinyTypes % "compile->compile;test->test",
+    tinyTypes   % "compile->compile;test->test",
     commonUtils % "compile->compile;test->test"
   )
 
@@ -175,9 +175,11 @@ lazy val configUtils = project
         Dependencies.log4Cats
   )
   .dependsOn(
-    tinyTypes   % "compile->compile;test->test",
-    commonUtils % "compile->compile;test->test",
-    metricUtils % "compile->compile;test->test"
+    tinyTypes         % "compile->compile;test->test",
+    commonUtils       % "compile->compile;test->test",
+    metricUtils       % "compile->compile;test->test",
+    http4sClientUtils % "compile->compile;test->test",
+    gitlabUtils       % "compile->compile;test->test"
   )
 
 lazy val utils = project
@@ -228,8 +230,8 @@ lazy val triplesStoreClient = project
         Dependencies.http4sCirce
   )
   .dependsOn(
-    generators % "test->test",
-    tinyTypes  % "compile->compile; test->test",
+    generators        % "test->test",
+    tinyTypes         % "compile->compile; test->test",
     http4sClientUtils % "compile->compile;test->test"
   )
   .enablePlugins(AutomateHeaderPlugin)
@@ -290,7 +292,8 @@ lazy val renkuModel = project
   .dependsOn(
     tinyTypes           % "compile->compile; test->test",
     renkuModelTinyTypes % "compile->compile; test->test",
-    renkuCliModel       % "compile->compile; test->test"
+    renkuCliModel       % "compile->compile; test->test",
+    gitlabUtils         % "compile->compile; test->test"
   )
   .enablePlugins(AutomateHeaderPlugin)
 

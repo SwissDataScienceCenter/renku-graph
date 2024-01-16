@@ -25,8 +25,8 @@ import cats.effect.kernel.Async
 import cats.syntax.all._
 import io.renku.config.ServiceUrl
 import io.renku.graph.model.events.CommitId
-import io.renku.graph.model.{GitLabUrl, projects}
-import io.renku.http.client.AccessToken
+import io.renku.graph.model.projects
+import io.renku.http.client.{AccessToken, GitLabUrl}
 import io.renku.http.client.AccessToken._
 import io.renku.jsonld.JsonLD
 import io.renku.jsonld.parser._
