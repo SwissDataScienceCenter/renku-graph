@@ -44,9 +44,6 @@ trait SortBy {
 
   case class By(property: PropertyType, direction: Direction)
 
-//  implicit val queryParamConverter: By => QueryParamValue =
-//    v => QueryParamValue(UrlEncoder.urlEncode(s"${v.property}:${v.direction}"))
-
   def properties: Set[PropertyType]
 
   private val `property:direction` = "^(\\w+)\\:(\\w+)$".r

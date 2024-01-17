@@ -86,16 +86,5 @@ class SortBySpec extends AnyWordSpec with ScalaCheckPropertyChecks with should.M
     }
   }
 
-//  "by" should {
-//
-//    "be convertable to QueryParamValue which value is serialized with direction and url encoded" in {
-//      val convert = implicitly[TestSort.By => renku.ResourceUrl.QueryParamValue]
-//
-//      val sort = testSortBys.generateOne
-//
-//      convert(sort.sortBy.head).value shouldBe urlEncode(serialize(sort.sortBy.head))
-//    }
-//  }
-
   private def serialize(sort: TestSort.By): String = s"${sort.property}:${sort.direction}"
 }
