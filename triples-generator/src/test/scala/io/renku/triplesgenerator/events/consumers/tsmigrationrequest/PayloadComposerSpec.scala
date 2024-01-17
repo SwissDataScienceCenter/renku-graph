@@ -20,7 +20,7 @@ package io.renku.triplesgenerator.events.consumers.tsmigrationrequest
 
 import io.renku.events.Generators.subscriberUrls
 import io.renku.events.Subscription.SubscriberId
-import io.renku.generators.CommonGraphGenerators.serviceVersions
+import io.renku.config.ConfigGenerators.serviceVersions
 import io.renku.generators.Generators.Implicits._
 import io.renku.microservices.MicroserviceIdentifier
 import org.scalamock.scalatest.MockFactory

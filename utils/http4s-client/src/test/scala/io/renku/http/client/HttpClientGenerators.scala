@@ -19,9 +19,11 @@
 package io.renku.http.client
 
 import io.renku.generators.Generators
+import io.renku.http.client.RestClientError.{ClientException, ConnectivityException, UnexpectedResponseException}
 import io.renku.http.rest.{SortBy, Sorting, paging}
 import io.renku.http.rest.paging.model.Total
 import io.renku.http.rest.paging.{PagingRequest, PagingResponse}
+import org.http4s.Status
 import org.scalacheck.Gen
 
 import scala.util.Try
@@ -65,6 +67,49 @@ trait HttpClientGenerators {
 
   def testSortBys: Gen[Sorting[TestSort.type]] = sortBys(TestSort)
 
+  implicit val basicAuthUsernames: Gen[BasicAuthUsername] = Generators.nonEmptyStrings() map BasicAuthUsername.apply
+  implicit val basicAuthPasswords: Gen[BasicAuthPassword] = Generators.nonEmptyStrings() map BasicAuthPassword.apply
+  implicit val basicAuthCredentials: Gen[BasicAuthCredentials] = for {
+    username <- basicAuthUsernames
+    password <- basicAuthPasswords
+  } yield BasicAuthCredentials(username, password)
+
+  lazy val httpStatuses: Gen[Status] = Gen.oneOf(successHttpStatuses, clientErrorHttpStatuses, serverErrorHttpStatuses)
+
+  lazy val successHttpStatuses: Gen[Status] = Gen.oneOf(Status.Ok, Status.Created, Status.Accepted)
+
+  lazy val clientErrorHttpStatuses: Gen[Status] = Gen.oneOf(
+    Status.Unauthorized,
+    Status.PaymentRequired,
+    Status.Forbidden,
+    Status.NotFound,
+    Status.Conflict
+  )
+  lazy val serverErrorHttpStatuses: Gen[Status] = Gen.oneOf(
+    Status.InternalServerError,
+    Status.NotImplemented,
+    Status.BadGateway,
+    Status.ServiceUnavailable,
+    Status.GatewayTimeout
+  )
+
+  implicit val unexpectedResponseExceptions: Gen[UnexpectedResponseException] =
+    unexpectedResponseExceptions(serverErrorHttpStatuses)
+
+  def unexpectedResponseExceptions(statusesGen: Gen[Status]): Gen[UnexpectedResponseException] = for {
+    status  <- statusesGen
+    message <- Generators.nonBlankStrings()
+  } yield UnexpectedResponseException(status, message.value)
+
+  implicit val clientExceptions: Gen[ClientException] = for {
+    message   <- Generators.nonBlankStrings()
+    exception <- Generators.exceptions
+  } yield ClientException(message.value, exception)
+
+  implicit val connectivityExceptions: Gen[ConnectivityException] = for {
+    message   <- Generators.nonBlankStrings()
+    exception <- Generators.exceptions
+  } yield ConnectivityException(message.value, exception)
 }
 
 object HttpClientGenerators extends HttpClientGenerators

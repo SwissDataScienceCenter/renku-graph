@@ -18,7 +18,7 @@
 
 package io.renku.triplesgenerator.config.certificates
 
-import io.renku.generators.CommonGraphGenerators.certificates
+import io.renku.config.ConfigGenerators.certificates
 import io.renku.generators.Generators.Implicits._
 import org.scalatest.TryValues
 import org.scalatest.matchers.should

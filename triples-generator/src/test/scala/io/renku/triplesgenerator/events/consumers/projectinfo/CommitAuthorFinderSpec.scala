@@ -28,7 +28,7 @@ import io.circe.Encoder
 import io.circe.literal._
 import io.circe.syntax._
 import io.renku.http.client.GitLabGenerators.accessTokens
-import io.renku.generators.CommonGraphGenerators.{clientExceptions, connectivityExceptions, unexpectedResponseExceptions}
+import io.renku.http.client.HttpClientGenerators.{clientExceptions, connectivityExceptions, unexpectedResponseExceptions}
 import io.renku.generators.Generators.Implicits._
 import io.renku.generators.Generators.nonBlankStrings
 import io.renku.graph.model.EventsGenerators.commitIds

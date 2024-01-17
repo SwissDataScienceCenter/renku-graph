@@ -22,7 +22,7 @@ import Encoders._
 import cats.syntax.all._
 import io.circe.Json
 import io.circe.syntax._
-import io.renku.generators.CommonGraphGenerators.serviceVersions
+import io.renku.config.ConfigGenerators.serviceVersions
 import io.renku.generators.Generators.Implicits._
 import io.renku.generators.Generators._
 import io.renku.knowledgegraph.docs.model._

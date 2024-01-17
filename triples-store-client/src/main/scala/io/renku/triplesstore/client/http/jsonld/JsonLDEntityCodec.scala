@@ -16,7 +16,7 @@
  * limitations under the License.
  */
 
-package io.renku.http.jsonld4s
+package io.renku.triplesstore.client.http.jsonld
 
 import fs2.Chunk
 import io.circe.Printer
@@ -24,14 +24,14 @@ import io.renku.jsonld.JsonLD
 import org.http4s.headers.`Content-Type`
 import org.http4s.{EntityEncoder, MediaType}
 
-trait JsonLD4sInstances {
+trait JsonLDEntityCodec {
 
-  protected def defaultPrinter: Printer = Printer.noSpaces
+  private val defaultPrinter: Printer = Printer.noSpaces
 
   implicit def jsonLDEncoder[F[_]]: EntityEncoder[F, JsonLD] =
     jsonEncoderWithPrinter(defaultPrinter)
 
-  def jsonEncoderWithPrinter[F[_]](printer: Printer): EntityEncoder[F, JsonLD] =
+  private def jsonEncoderWithPrinter[F[_]](printer: Printer): EntityEncoder[F, JsonLD] =
     EntityEncoder[F, Chunk[Byte]]
       .contramap[JsonLD](fromJsonToChunk(printer))
       .withContentType(`Content-Type`(MediaType.application.`ld+json`))
@@ -39,3 +39,5 @@ trait JsonLD4sInstances {
   private def fromJsonToChunk(printer: Printer)(jsonLD: JsonLD): Chunk[Byte] =
     Chunk.ByteBuffer.view(printer.printToByteBuffer(jsonLD.toJson))
 }
+
+object JsonLDEntityCodec extends JsonLDEntityCodec

@@ -23,7 +23,7 @@ import cats.syntax.all._
 import com.typesafe.config.ConfigFactory
 import eu.timepit.refined.auto._
 import io.renku.data.Message
-import io.renku.generators.CommonGraphGenerators.httpStatuses
+import io.renku.http.client.HttpClientGenerators.httpStatuses
 import io.renku.generators.Generators.Implicits._
 import io.renku.graph.model
 import io.renku.graph.model.RenkuTinyTypeGenerators.projectSlugs

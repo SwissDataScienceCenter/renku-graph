@@ -16,15 +16,13 @@
  * limitations under the License.
  */
 
-package io.renku.webhookservice.api
+package io.renku.jsonld
 
+import io.renku.util.jsonld.Schemas
 import org.scalacheck.Gen
 
-object Generators {
-
-  val successfulHookCreationResults: Gen[HookCreationResult] =
-    Gen.oneOf(HookCreationResult.Created, HookCreationResult.Existed)
-
-  implicit val hookCreationResults: Gen[HookCreationResult] =
-    Gen.oneOf(successfulHookCreationResults, Gen.const(HookCreationResult.NotFound))
+trait JsonLDGenerators {
+  val schemas: Gen[Schema] = Gen.oneOf(Schemas.all)
 }
+
+object JsonLDGenerators extends JsonLDGenerators

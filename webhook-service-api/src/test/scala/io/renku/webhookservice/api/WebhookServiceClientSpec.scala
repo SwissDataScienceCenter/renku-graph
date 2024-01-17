@@ -21,8 +21,6 @@ package io.renku.webhookservice.api
 import cats.effect.IO
 import com.github.tomakehurst.wiremock.client.WireMock._
 import io.circe.syntax._
-import io.renku.generators.CommonGraphGenerators.errorMessages
-import io.renku.http.client.GitLabGenerators.userAccessTokens
 import io.renku.generators.Generators.Implicits._
 import io.renku.graph.model.RenkuTinyTypeGenerators.projectIds
 import io.renku.interpreters.TestLogger
@@ -40,7 +38,8 @@ class WebhookServiceClientSpec
     with CustomAsyncIOSpec
     with should.Matchers
     with TableDrivenPropertyChecks
-    with ExternalServiceStubbing {
+    with ExternalServiceStubbing
+    with WebhookGenerators {
 
   "createHook" should {
 

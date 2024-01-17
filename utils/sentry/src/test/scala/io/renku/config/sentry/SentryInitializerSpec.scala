@@ -20,7 +20,6 @@ package io.renku.config.sentry
 
 import cats.MonadThrow
 import cats.syntax.all._
-import io.renku.generators.CommonGraphGenerators._
 import io.renku.generators.Generators.Implicits._
 import io.renku.generators.Generators._
 import io.sentry.SentryOptions
@@ -31,7 +30,7 @@ import org.scalatest.wordspec.AnyWordSpec
 
 import scala.util.Try
 
-class SentryInitializerSpec extends AnyWordSpec with MockFactory with should.Matchers {
+class SentryInitializerSpec extends AnyWordSpec with MockFactory with should.Matchers with SentryGenerators {
 
   "run" should {
 

@@ -22,6 +22,7 @@ import com.typesafe.config.ConfigFactory
 import io.renku.cache.CacheConfig.ClearConfig.Periodic
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
+
 import scala.concurrent.duration._
 
 class CacheConfigLoaderSpec extends AnyWordSpec with should.Matchers {

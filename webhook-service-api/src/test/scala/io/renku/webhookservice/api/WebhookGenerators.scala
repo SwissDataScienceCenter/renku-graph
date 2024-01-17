@@ -16,6 +16,19 @@
  * limitations under the License.
  */
 
-package io.renku.http
+package io.renku.webhookservice.api
 
-package object jsonld4s extends JsonLD4sInstances
+import io.renku.CommonGenerators
+import io.renku.http.client.GitLabGenerators
+import org.scalacheck.Gen
+
+trait WebhookGenerators extends CommonGenerators with GitLabGenerators {
+
+  val successfulHookCreationResults: Gen[HookCreationResult] =
+    Gen.oneOf(HookCreationResult.Created, HookCreationResult.Existed)
+
+  implicit val hookCreationResults: Gen[HookCreationResult] =
+    Gen.oneOf(successfulHookCreationResults, Gen.const(HookCreationResult.NotFound))
+}
+
+object WebhookGenerators extends WebhookGenerators

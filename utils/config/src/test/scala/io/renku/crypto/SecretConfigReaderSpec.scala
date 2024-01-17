@@ -19,8 +19,8 @@
 package io.renku.crypto
 
 import com.typesafe.config.ConfigFactory
+import io.renku.config.ConfigGenerators
 import io.renku.crypto.SecretConfigReader._
-import io.renku.generators.CommonGraphGenerators.aesCryptoSecrets
 import io.renku.generators.Generators.Implicits._
 import org.scalacheck.Gen
 import org.scalacheck.Gen.hexChar
@@ -34,7 +34,12 @@ import scodec.bits.ByteVector
 
 import scala.jdk.CollectionConverters._
 
-class SecretConfigReaderSpec extends AnyWordSpec with should.Matchers with EitherValues with ScalaCheckPropertyChecks {
+class SecretConfigReaderSpec
+    extends AnyWordSpec
+    with should.Matchers
+    with EitherValues
+    with ScalaCheckPropertyChecks
+    with ConfigGenerators {
 
   "secretReader" should {
 

@@ -16,7 +16,7 @@
  * limitations under the License.
  */
 
-package io.renku.http.jsonld4s
+package io.renku.triplesstore.client.http.jsonld
 
 import cats.effect.IO
 import fs2.text
@@ -28,7 +28,7 @@ import org.http4s.{Headers, MediaType}
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
 
-class JsonLD4sInstancesSpec extends AnyWordSpec with should.Matchers with IOSpec {
+class JsonLDEntityCodecSpec extends AnyWordSpec with should.Matchers with IOSpec with JsonLDEntityCodec {
 
   "jsonLDEncoder.toEntity" should {
 

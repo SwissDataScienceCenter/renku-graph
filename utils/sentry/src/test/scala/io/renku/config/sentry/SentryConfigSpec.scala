@@ -20,8 +20,8 @@ package io.renku.config.sentry
 
 import cats.syntax.all._
 import com.typesafe.config.ConfigFactory
+import io.renku.config.ConfigGenerators._
 import io.renku.config.ConfigLoader.ConfigLoadingException
-import io.renku.generators.CommonGraphGenerators._
 import io.renku.generators.Generators.Implicits._
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
@@ -30,7 +30,7 @@ import org.scalatestplus.scalacheck.ScalaCheckPropertyChecks
 import scala.jdk.CollectionConverters._
 import scala.util.{Failure, Try}
 
-class SentryConfigSpec extends AnyWordSpec with ScalaCheckPropertyChecks with should.Matchers {
+class SentryConfigSpec extends AnyWordSpec with ScalaCheckPropertyChecks with should.Matchers with SentryGenerators {
 
   "apply" should {
 
@@ -53,7 +53,7 @@ class SentryConfigSpec extends AnyWordSpec with ScalaCheckPropertyChecks with sh
 
     "return a SentryConfig if 'services.sentry.enabled' is 'true' and all " +
       "'services.sentry.url', 'services.sentry.environment', 'service-name' and 'version' are set" in {
-        forAll { sentryConfig: SentryConfig =>
+        forAll(sentryConfigs) { sentryConfig: SentryConfig =>
           val config = ConfigFactory.parseMap(
             Map[String, AnyRef](
               "service-name" -> sentryConfig.serviceName.value,

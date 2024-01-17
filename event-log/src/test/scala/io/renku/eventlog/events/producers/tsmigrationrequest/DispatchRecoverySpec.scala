@@ -31,7 +31,7 @@ import io.renku.eventlog.events.producers.EventsSender.SendingResult.Temporarily
 import io.renku.eventlog.events.producers.Generators.sendingResults
 import io.renku.eventlog.metrics.{QueriesExecutionTimes, TestQueriesExecutionTimes}
 import io.renku.events.Generators.subscriberUrls
-import io.renku.generators.CommonGraphGenerators.serviceVersions
+import io.renku.config.ConfigGenerators.serviceVersions
 import io.renku.generators.Generators.Implicits._
 import io.renku.generators.Generators.exceptions
 import io.renku.interpreters.TestLogger.Level.Info
