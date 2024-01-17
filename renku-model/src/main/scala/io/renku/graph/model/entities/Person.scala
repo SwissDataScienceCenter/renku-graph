@@ -23,6 +23,7 @@ import cats.syntax.all._
 import io.renku.cli.model.CliPerson
 import io.renku.graph.model._
 import io.renku.graph.model.persons.{Affiliation, Email, GitLabId, Name, OrcidId, ResourceId}
+import io.renku.http.client.GitLabApiUrl
 import io.renku.jsonld.{EntityId, EntityTypes, JsonLD, JsonLDEncoder, Property}
 import io.renku.jsonld.ontology._
 

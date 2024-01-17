@@ -24,7 +24,7 @@ import cats.syntax.all._
 import io.renku.generators.CommonGraphGenerators._
 import io.renku.generators.Generators.Implicits._
 import io.renku.generators.Generators._
-import io.renku.http.client.RestClientError
+import io.renku.http.client.{HttpClientGenerators, RestClientError}
 import io.renku.http.client.RestClientError.UnexpectedResponseException
 import io.renku.triplesgenerator.errors.ErrorGenerators.processingRecoverableErrors
 import io.renku.triplesgenerator.tsprovisioning.TransformationStep.Queries
@@ -49,8 +49,8 @@ object Generators {
 
   lazy val recoverableClientErrors: Gen[RestClientError] =
     Gen.oneOf(
-      clientExceptions,
-      connectivityExceptions,
+      HttpClientGenerators.clientExceptions,
+      HttpClientGenerators.connectivityExceptions,
       for {
         status  <- Gen.oneOf(BadGateway, ServiceUnavailable, GatewayTimeout)
         message <- nonBlankStrings()

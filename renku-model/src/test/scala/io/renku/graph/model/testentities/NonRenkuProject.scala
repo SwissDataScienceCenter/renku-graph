@@ -23,6 +23,7 @@ import io.renku.graph.model._
 import io.renku.graph.model.cli.CliConverters
 import io.renku.graph.model.images.ImageUri
 import io.renku.graph.model.projects.{DateCreated, DateModified, Description, ForksCount, Keyword, Name, Slug, Visibility}
+import io.renku.http.client.GitLabApiUrl
 import io.renku.jsonld.JsonLDEncoder
 import io.renku.jsonld.syntax._
 

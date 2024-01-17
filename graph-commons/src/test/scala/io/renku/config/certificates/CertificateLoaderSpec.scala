@@ -21,7 +21,7 @@ package io.renku.config.certificates
 import cats.MonadThrow
 import cats.effect._
 import cats.syntax.all._
-import io.renku.generators.CommonGraphGenerators.certificates
+import io.renku.config.ConfigGenerators.certificates
 import io.renku.generators.Generators.Implicits._
 import io.renku.generators.Generators.exceptions
 import io.renku.interpreters.TestLogger

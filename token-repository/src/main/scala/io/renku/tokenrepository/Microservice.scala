@@ -24,7 +24,7 @@ import fs2.concurrent.{Signal, SignallingRef}
 import io.renku.config.certificates.CertificateLoader
 import io.renku.config.sentry.SentryInitializer
 import io.renku.db.{SessionPoolResource, SessionResource}
-import io.renku.http.client.GitLabClient
+import io.renku.http.client.{GitLabClient, GitLabClientLoader}
 import io.renku.http.server.HttpServer
 import io.renku.logging.ApplicationLogger
 import io.renku.metrics.{MetricsRegistry, MetricsRegistryLoader}
@@ -54,7 +54,7 @@ object Microservice extends IOMicroservice {
       for {
         implicit0(mr: MetricsRegistry[IO])        <- MetricsRegistryLoader[IO]()
         implicit0(qet: QueriesExecutionTimes[IO]) <- QueriesExecutionTimes[IO]()
-        implicit0(gc: GitLabClient[IO])           <- GitLabClient[IO]()
+        implicit0(gc: GitLabClient[IO])           <- GitLabClientLoader[IO]()
         certificateLoader                         <- CertificateLoader[IO]
         sentryInitializer                         <- SentryInitializer[IO]
         dbInitializer                             <- DbInitializer[IO]

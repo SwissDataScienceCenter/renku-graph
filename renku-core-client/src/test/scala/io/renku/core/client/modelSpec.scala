@@ -19,7 +19,7 @@
 package io.renku.core.client
 
 import io.renku.generators.Generators.Implicits._
-import io.renku.graph.model.GraphModelGenerators.gitLabUrls
+import io.renku.http.client.GitLabGenerators.gitLabUrls
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
 

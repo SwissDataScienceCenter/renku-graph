@@ -23,7 +23,8 @@ import cats.effect.testing.scalatest.AsyncIOSpec
 import io.renku.entities.searchgraphs.TestSearchInfoDatasets
 import io.renku.graph.http.server.security.Authorizer
 import io.renku.graph.model.testentities.generators.EntitiesGenerators
-import io.renku.graph.model.{GitLabApiUrl, RenkuUrl, testentities}
+import io.renku.graph.model.{RenkuUrl, testentities}
+import io.renku.http.client.GitLabApiUrl
 import io.renku.interpreters.TestLogger
 import io.renku.knowledgegraph.DatasetProvision
 import io.renku.logging.TestSparqlQueryTimeRecorder

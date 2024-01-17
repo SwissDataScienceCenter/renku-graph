@@ -26,6 +26,7 @@ import cats.syntax.all._
 import io.renku.cli.model.{CliCompositePlan, CliPlan, CliStepPlan}
 import io.renku.graph.model.entities.Plan.Derivation
 import io.renku.graph.model.plans._
+import io.renku.http.client.GitLabApiUrl
 import io.renku.jsonld.{EntityTypes, JsonLD, JsonLDEncoder}
 import io.renku.jsonld.ontology._
 import io.renku.jsonld.syntax._

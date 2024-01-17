@@ -23,7 +23,7 @@ import cats.MonadThrow
 import cats.effect.IO
 import cats.syntax.all._
 import com.typesafe.config.Config
-import io.renku.generators.CommonGraphGenerators.{accessTokens, userAccessTokens}
+import io.renku.http.client.GitLabGenerators.{accessTokens, userAccessTokens}
 import io.renku.generators.Generators.Implicits._
 import io.renku.generators.Generators.exceptions
 import io.renku.graph.model.GraphModelGenerators.{projectGitHttpUrls, projectSchemaVersions}

@@ -23,8 +23,9 @@ import cats.syntax.all._
 import io.renku.cli.model.CliCompositePlan
 import io.renku.generators.Generators.Implicits._
 import io.renku.graph.model.cli.CliConverters
-import io.renku.graph.model.{GitLabApiUrl, GraphClass, InvalidationTime, RenkuUrl, entities, plans}
+import io.renku.graph.model.{GraphClass, InvalidationTime, RenkuUrl, entities, plans}
 import io.renku.graph.model.plans.{Command, DateCreated, DerivedFrom, Description, Identifier, Keyword, Name}
+import io.renku.http.client.GitLabApiUrl
 import io.renku.jsonld.JsonLDEncoder
 import io.renku.jsonld.syntax._
 import monocle.Lens

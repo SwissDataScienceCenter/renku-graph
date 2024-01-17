@@ -21,14 +21,14 @@ package io.renku.knowledgegraph.entities.currentuser.recentlyviewed
 import cats.NonEmptyParallel
 import cats.effect.kernel.Async
 import cats.syntax.all._
+import com.typesafe.config.ConfigFactory
 import eu.timepit.refined.auto._
 import io.circe.syntax._
 import io.renku.config.renku
 import io.renku.data.Message
 import io.renku.entities.viewings.search.RecentEntitiesFinder
-import io.renku.graph.config.GitLabUrlLoader
-import io.renku.graph.model.GitLabUrl
 import io.renku.http.RenkuEntityCodec
+import io.renku.http.client.{GitLabClientLoader, GitLabUrl}
 import io.renku.knowledgegraph.entities.ModelEncoders._
 import io.renku.triplesstore.{ProjectsConnectionConfig, SparqlQueryTimeRecorder}
 import org.http4s.Response
@@ -50,8 +50,9 @@ object Endpoint {
   def apply[F[_]: Async: Logger: SparqlQueryTimeRecorder](
       finder: RecentEntitiesFinder[F]
   ): F[Endpoint[F]] = for {
-    implicit0(renkuApiUrl: renku.ApiUrl) <- renku.ApiUrl()
-    implicit0(gitLabUrl: GitLabUrl)      <- GitLabUrlLoader[F]()
+    config                               <- Async[F].blocking(ConfigFactory.load())
+    implicit0(renkuApiUrl: renku.ApiUrl) <- renku.ApiUrl(config)
+    implicit0(gitLabUrl: GitLabUrl)      <- GitLabClientLoader.gitLabUrl[F](config)
   } yield new Impl[F](finder)
 
   def apply[F[_]: Async: NonEmptyParallel: Logger: SparqlQueryTimeRecorder](

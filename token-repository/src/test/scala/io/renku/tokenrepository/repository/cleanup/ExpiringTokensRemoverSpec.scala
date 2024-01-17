@@ -25,7 +25,7 @@ import fs2.Stream
 import io.renku.eventlog
 import io.renku.eventlog.api.events.GlobalCommitSyncRequest
 import io.renku.events.consumers.ConsumersModelGenerators.consumerProjects
-import io.renku.generators.CommonGraphGenerators.accessTokens
+import io.renku.http.client.GitLabGenerators._
 import io.renku.generators.Generators.Implicits._
 import io.renku.generators.Generators.exceptions
 import io.renku.interpreters.TestLogger

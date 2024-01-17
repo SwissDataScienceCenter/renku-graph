@@ -29,7 +29,7 @@ import creation.TokenDates.{CreatedAt, ExpiryDate}
 import creation._
 import deletion.PersistedTokenRemover
 import io.renku.db.DBConfigProvider.DBConfig
-import io.renku.generators.CommonGraphGenerators.{accessTokens, projectAccessTokens}
+import io.renku.http.client.GitLabGenerators._
 import io.renku.generators.Generators.Implicits._
 import io.renku.generators.Generators.{exceptions, localDates, timestampsNotInTheFuture}
 import io.renku.graph.model.GraphModelGenerators.{projectIds, projectSlugs}

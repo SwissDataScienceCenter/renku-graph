@@ -22,7 +22,7 @@ import cats.data.EitherT
 import cats.data.EitherT.{leftT, rightT}
 import cats.effect.IO
 import cats.syntax.all._
-import io.renku.generators.CommonGraphGenerators._
+import io.renku.http.client.GitLabGenerators._
 import io.renku.generators.Generators.Implicits._
 import io.renku.generators.Generators._
 import io.renku.generators.jsonld.JsonLDGenerators.jsonLDEntities

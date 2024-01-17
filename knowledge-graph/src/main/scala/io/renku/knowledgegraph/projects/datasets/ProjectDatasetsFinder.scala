@@ -116,7 +116,7 @@ private class ProjectDatasetsFinderImpl[F[_]: Async: NonEmptyParallel: Logger](
       case Criteria.Sort.ByDateModified => OrderBy.Property("?modifiedCreatedOrPublished")
     }
 
-    encoder(sorting.toOrderBy(mapPropertyName))
+    encoder(OrderBy.fromSorting[Criteria.Sort.type](mapPropertyName)(sorting))
   }
 
   private implicit val recordDecoder: Decoder[ProjectDataset] = { implicit cur =>

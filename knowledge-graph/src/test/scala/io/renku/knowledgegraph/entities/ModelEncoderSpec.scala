@@ -30,7 +30,8 @@ import io.renku.graph.model.entities.DiffInstances
 import io.renku.graph.model.images.ImageUri
 import io.renku.graph.model.projects.Visibility
 import io.renku.graph.model.tools.AdditionalMatchers
-import io.renku.graph.model.{GitLabUrl, datasets, persons, plans, projects}
+import io.renku.graph.model.{datasets, persons, plans, projects}
+import io.renku.http.client.GitLabUrl
 import io.renku.knowledgegraph.datasets.details.RequestedDataset
 import io.renku.knowledgegraph.entities.ModelEncoderSpec._
 import org.http4s.Uri
