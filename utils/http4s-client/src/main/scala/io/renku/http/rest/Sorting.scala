@@ -20,15 +20,9 @@ package io.renku.http.rest
 
 import cats.Semigroup
 import cats.data.NonEmptyList
-import io.renku.triplesstore.client.model.OrderBy
 
 /** Combines multiple [[SortBy.By]]s. */
 final case class Sorting[S <: SortBy](sortBy: NonEmptyList[S#By]) {
-
-  def toOrderBy(pm: S#PropertyType => OrderBy.Property): OrderBy =
-    OrderBy(sortBy.map(e => OrderBy.Sort(pm(e.property), e.direction.toOrderByDirection)))
-
-  lazy val asOrderBy: OrderBy = toOrderBy(p => OrderBy.Property(p.name))
 
   def :+(next: S#By): Sorting[S] =
     new Sorting(sortBy.append(next))

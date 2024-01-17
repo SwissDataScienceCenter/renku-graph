@@ -81,7 +81,7 @@ private class EntitiesFinderImpl[F[_]: Async: NonEmptyParallel: Logger: SparqlQu
       case Criteria.Sort.ByMatchingScore => OrderBy.Property("?matchingScore")
     }
 
-    encoder(sorting.toOrderBy(mapPropertyName)).sparql
+    encoder(OrderBy.fromSorting[Criteria.Sort.type](mapPropertyName)(sorting)).sparql
   }
 
   private implicit def recordDecoder: Decoder[Entity] = { implicit cursor =>

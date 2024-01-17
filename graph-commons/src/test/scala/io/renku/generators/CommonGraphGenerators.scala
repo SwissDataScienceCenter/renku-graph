@@ -36,8 +36,8 @@ import io.renku.graph.model.GraphModelGenerators.personGitLabIds
 import io.renku.graph.model.Schemas
 import io.renku.http.client.RestClientError._
 import io.renku.http.client._
+import io.renku.http.rest.Links
 import io.renku.http.rest.Links.{Href, Link, Rel}
-import io.renku.http.rest.{Links, SortBy, Sorting}
 import io.renku.http.server.security.EndpointSecurityException
 import io.renku.http.server.security.EndpointSecurityException.{AuthenticationFailure, AuthorizationFailure}
 import io.renku.http.server.security.model.AuthUser
@@ -172,24 +172,6 @@ object CommonGraphGenerators {
     method <- linkMethods
   } yield Link(rel, href, method)
   implicit val linksObjects: Gen[Links] = nonEmptyList(linkObjects) map Links.apply
-
-  implicit lazy val sortingDirections: Gen[SortBy.Direction] = Gen.oneOf(SortBy.Direction.Asc, SortBy.Direction.Desc)
-
-  def sortBys[T <: SortBy](sortBy: T): Gen[Sorting[T]] = for {
-    property  <- Gen.oneOf(sortBy.properties.toList)
-    direction <- sortingDirections
-  } yield Sorting(sortBy.By(property, direction))
-
-  object TestSort extends SortBy {
-    type PropertyType = TestProperty
-    sealed trait TestProperty extends Property
-    case object Name          extends Property(name = "name") with TestProperty
-    case object Email         extends Property(name = "email") with TestProperty
-
-    override val properties: Set[TestProperty] = Set(Name, Email)
-  }
-
-  def testSortBys: Gen[Sorting[TestSort.type]] = sortBys(TestSort)
 
   implicit val fusekiUrls: Gen[FusekiUrl] = httpUrls() map FusekiUrl.apply
 

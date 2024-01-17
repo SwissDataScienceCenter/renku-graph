@@ -19,7 +19,7 @@
 package io.renku.http.client
 
 import io.renku.generators.Generators
-import io.renku.http.rest.paging
+import io.renku.http.rest.{SortBy, Sorting, paging}
 import io.renku.http.rest.paging.model.Total
 import io.renku.http.rest.paging.{PagingRequest, PagingResponse}
 import org.scalacheck.Gen
@@ -46,6 +46,24 @@ trait HttpClientGenerators {
   } yield PagingResponse
     .from[Try, Result](results, PagingRequest(page, perPage), total)
     .fold(throw _, identity)
+
+  implicit lazy val sortingDirections: Gen[SortBy.Direction] = Gen.oneOf(SortBy.Direction.Asc, SortBy.Direction.Desc)
+
+  def sortBys[T <: SortBy](sortBy: T): Gen[Sorting[T]] = for {
+    property  <- Gen.oneOf(sortBy.properties.toList)
+    direction <- sortingDirections
+  } yield Sorting(sortBy.By(property, direction))
+
+  object TestSort extends SortBy {
+    type PropertyType = TestProperty
+    sealed trait TestProperty extends Property
+    case object Name          extends Property(name = "name") with TestProperty
+    case object Email         extends Property(name = "email") with TestProperty
+
+    override val properties: Set[TestProperty] = Set(Name, Email)
+  }
+
+  def testSortBys: Gen[Sorting[TestSort.type]] = sortBys(TestSort)
 
 }
 

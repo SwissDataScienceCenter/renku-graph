@@ -21,7 +21,6 @@ package io.renku.http.rest
 import cats.Show
 import cats.data.ValidatedNel
 import cats.syntax.all._
-import io.renku.triplesstore.client.model.OrderBy
 import org.http4s.dsl.impl.OptionalMultiQueryParamDecoderMatcher
 import org.http4s.{ParseFailure, Query, QueryParamDecoder}
 
@@ -45,11 +44,8 @@ trait SortBy {
 
   case class By(property: PropertyType, direction: Direction)
 
-  import io.renku.config.renku.ResourceUrl._
-  import io.renku.http.client.UrlEncoder.urlEncode
-
-  implicit val queryParamConverter: By => QueryParamValue =
-    v => QueryParamValue(urlEncode(s"${v.property}:${v.direction}"))
+//  implicit val queryParamConverter: By => QueryParamValue =
+//    v => QueryParamValue(UrlEncoder.urlEncode(s"${v.property}:${v.direction}"))
 
   def properties: Set[PropertyType]
 
@@ -75,20 +71,17 @@ object SortBy {
 
   sealed abstract class Direction(val name: String) extends Product with Serializable {
     override lazy val toString: String = name
-    def toOrderByDirection:     OrderBy.Direction
   }
 
   object Direction {
 
     final case object Asc extends Direction("ASC") {
-      implicit lazy val ascShow: Show[Asc]         = Show.show(asc => show"${asc.name}")
-      val toOrderByDirection:    OrderBy.Direction = OrderBy.Direction.Asc
+      implicit lazy val ascShow: Show[Asc] = Show.show(asc => show"${asc.name}")
     }
     type Asc = Asc.type
 
     final case object Desc extends Direction("DESC") {
-      implicit lazy val descShow: Show[Desc]        = Show.show(desc => show"${desc.name}")
-      val toOrderByDirection:     OrderBy.Direction = OrderBy.Direction.Desc
+      implicit lazy val descShow: Show[Desc] = Show.show(desc => show"${desc.name}")
     }
     type Desc = Desc.type
 

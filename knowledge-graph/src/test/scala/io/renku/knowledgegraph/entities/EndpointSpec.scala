@@ -29,7 +29,7 @@ import io.renku.entities.search.Criteria.Filters
 import io.renku.entities.search.Generators.modelEntities
 import io.renku.entities.search.{Criteria, EntitiesFinder, model}
 import io.renku.http.client.GitLabGenerators._
-import io.renku.generators.CommonGraphGenerators.{authUsers, sortBys}
+import io.renku.generators.CommonGraphGenerators.authUsers
 import io.renku.generators.Generators.Implicits._
 import io.renku.generators.Generators._
 import io.renku.graph.model.GraphModelGenerators.renkuUrls
