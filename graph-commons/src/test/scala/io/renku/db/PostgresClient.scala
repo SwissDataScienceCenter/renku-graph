@@ -30,6 +30,9 @@ import skunk.exception.EofException
 import skunk.implicits._
 import skunk.{Session, SqlState}
 
+import java.io.IOException
+import scala.concurrent.duration._
+
 class PostgresClient[DB](server: PostgresServer, migrations: SessionResource[IO, DB] => IO[Unit]) {
 
   private[this] implicit val logger: Logger[IO] = Slf4jLogger.getLoggerFromClass[IO](getClass)
@@ -41,9 +44,10 @@ class PostgresClient[DB](server: PostgresServer, migrations: SessionResource[IO,
       .map(differentiator => s"${prefix}_$differentiator")
       .toResource >>= dbResource
   }.recoverWith {
-    case SqlState.DuplicateDatabase(_)  => randomizedDBResource(prefix)
-    case SqlState.InvalidCatalogName(_) => randomizedDBResource(prefix)
-    case _: EofException => randomizedDBResource(prefix)
+    case SqlState.DuplicateDatabase(_)    => randomizedDBResource(prefix)
+    case SqlState.InvalidCatalogName(_)   => randomizedDBResource(prefix)
+    case SqlState.CannotConnectNow(_)     => Temporal[IO].sleep(1 second); randomizedDBResource(prefix)
+    case _: EofException | _: IOException => randomizedDBResource(prefix)
   }
 
   def dbResource(dbName: String): Resource[IO, DBConfig[DB]] =
