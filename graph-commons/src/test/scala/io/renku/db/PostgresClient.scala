@@ -26,8 +26,9 @@ import io.renku.db.DBConfigProvider.DBConfig
 import natchez.Trace.Implicits.noop
 import org.typelevel.log4cats.Logger
 import org.typelevel.log4cats.slf4j.Slf4jLogger
-import skunk.{Session, SqlState}
+import skunk.exception.EofException
 import skunk.implicits._
+import skunk.{Session, SqlState}
 
 class PostgresClient[DB](server: PostgresServer, migrations: SessionResource[IO, DB] => IO[Unit]) {
 
@@ -42,6 +43,7 @@ class PostgresClient[DB](server: PostgresServer, migrations: SessionResource[IO,
   }.recoverWith {
     case SqlState.DuplicateDatabase(_)  => randomizedDBResource(prefix)
     case SqlState.InvalidCatalogName(_) => randomizedDBResource(prefix)
+    case _: EofException => randomizedDBResource(prefix)
   }
 
   def dbResource(dbName: String): Resource[IO, DBConfig[DB]] =
