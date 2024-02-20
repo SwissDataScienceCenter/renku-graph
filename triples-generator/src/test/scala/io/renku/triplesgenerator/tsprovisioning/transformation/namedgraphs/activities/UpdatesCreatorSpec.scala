@@ -66,12 +66,10 @@ class UpdatesCreatorSpec
 
           modelActivity = activity.copy(author = personEntities.generateOne.to[entities.Person])
 
-          _ <- runUpdates {
-                 UpdatesCreator.queriesUnlinkingAuthors(project.resourceId,
-                                                        modelActivity,
-                                                        Set(activity.author.resourceId)
-                 )
-               }
+          _ <-
+            runUpdates {
+              UpdatesCreator.queriesUnlinkingAuthors(project.resourceId, modelActivity, Set(activity.author.resourceId))
+            }
 
           _ <- findAuthors(project.resourceId, activity.resourceId).asserting(_ shouldBe Set.empty)
         } yield Succeeded
