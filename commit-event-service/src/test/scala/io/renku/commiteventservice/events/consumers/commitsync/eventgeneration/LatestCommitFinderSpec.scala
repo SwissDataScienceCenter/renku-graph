@@ -19,7 +19,6 @@
 package io.renku.commiteventservice.events.consumers.commitsync.eventgeneration
 
 import cats.effect.IO
-import cats.implicits.toShow
 import cats.syntax.all._
 import eu.timepit.refined.api.Refined
 import eu.timepit.refined.auto._

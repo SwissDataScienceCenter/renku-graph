@@ -20,7 +20,6 @@ package io.renku.triplesgenerator.api
 
 import cats.Show
 import cats.syntax.all._
-import io.circe.literal._
 import io.circe.syntax._
 import io.circe.{Decoder, DecodingFailure, Encoder, Json}
 import io.renku.graph.model.images.ImageUri

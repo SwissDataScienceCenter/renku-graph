@@ -24,7 +24,6 @@ import cats.syntax.all._
 import eu.timepit.refined.api.Refined
 import eu.timepit.refined.auto._
 import eu.timepit.refined.collection.NonEmpty
-import io.circe.literal._
 import io.circe.syntax._
 import io.circe.{Encoder, Json}
 import io.renku.http.client.GitLabGenerators.userAccessTokens

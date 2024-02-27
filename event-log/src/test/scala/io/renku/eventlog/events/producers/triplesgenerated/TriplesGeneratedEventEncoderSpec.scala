@@ -19,7 +19,6 @@
 package io.renku.eventlog.events.producers.triplesgenerated
 
 import io.circe.Json
-import io.circe.literal._
 import io.circe.syntax._
 import io.renku.generators.Generators.Implicits._
 import org.scalatest.EitherValues

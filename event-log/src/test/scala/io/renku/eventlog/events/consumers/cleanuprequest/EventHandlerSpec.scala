@@ -21,7 +21,6 @@ package io.renku.eventlog.events.consumers.cleanuprequest
 import cats.effect.IO
 import cats.syntax.all._
 import io.circe.Json
-import io.circe.literal._
 import io.circe.syntax._
 import io.renku.eventlog.api.events.CleanUpRequest
 import io.renku.events.EventRequestContent
