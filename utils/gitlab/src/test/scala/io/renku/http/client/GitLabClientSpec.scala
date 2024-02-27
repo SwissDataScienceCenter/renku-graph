@@ -19,7 +19,6 @@
 package io.renku.http.client
 
 import cats.effect.IO
-import cats.implicits.catsSyntaxApplicativeErrorId
 import cats.syntax.all._
 import com.github.tomakehurst.wiremock.client.MappingBuilder
 import com.github.tomakehurst.wiremock.client.WireMock._

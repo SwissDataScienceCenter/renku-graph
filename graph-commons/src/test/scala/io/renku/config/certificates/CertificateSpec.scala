@@ -20,7 +20,6 @@ package io.renku.config.certificates
 
 import cats.syntax.all._
 import com.typesafe.config.ConfigFactory
-import eu.timepit.refined.auto._
 import io.renku.generators.Generators.Implicits._
 import io.renku.generators.Generators._
 import org.scalatest.matchers.should
