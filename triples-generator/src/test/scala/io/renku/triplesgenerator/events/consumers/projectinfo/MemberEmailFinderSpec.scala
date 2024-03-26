@@ -21,7 +21,7 @@ package io.renku.triplesgenerator.events.consumers.projectinfo
 import cats.data.EitherT
 import cats.effect.IO
 import cats.syntax.all._
-import io.renku.generators.CommonGraphGenerators.accessTokens
+import io.renku.http.client.GitLabGenerators.accessTokens
 import io.renku.generators.Generators.Implicits._
 import io.renku.generators.Generators.ints
 import io.renku.graph.model.EventsGenerators._

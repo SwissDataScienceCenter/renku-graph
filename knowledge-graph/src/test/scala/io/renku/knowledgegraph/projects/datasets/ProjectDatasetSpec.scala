@@ -25,8 +25,8 @@ import io.circe.syntax._
 import io.renku.config.renku
 import io.renku.generators.CommonGraphGenerators._
 import io.renku.generators.Generators.Implicits._
-import io.renku.graph.model.GitLabUrl
 import io.renku.graph.model.GraphModelGenerators._
+import io.renku.http.client.{GitLabGenerators, GitLabUrl}
 import io.renku.knowledgegraph.projects.images.ImageUrisEncoder
 import org.scalatest.flatspec.AnyFlatSpec
 import org.scalatest.matchers.should
@@ -101,5 +101,5 @@ class ProjectDatasetSpec extends AnyFlatSpec with should.Matchers with ScalaChec
 
   private lazy val projectSlug = projectSlugs.generateOne
   private implicit lazy val renkuApiUrl: renku.ApiUrl = renkuApiUrls.generateOne
-  private implicit lazy val gitLabUrl:   GitLabUrl    = gitLabUrls.generateOne
+  private implicit lazy val gitLabUrl:   GitLabUrl    = GitLabGenerators.gitLabUrls.generateOne
 }

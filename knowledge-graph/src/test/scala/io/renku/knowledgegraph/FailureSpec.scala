@@ -22,7 +22,7 @@ import cats.effect.IO
 import cats.syntax.all._
 import io.renku.core.client.Generators.{resultFailures => coreResultFailures}
 import io.renku.data.Message
-import io.renku.generators.CommonGraphGenerators.serverErrorHttpStatuses
+import io.renku.http.client.HttpClientGenerators.serverErrorHttpStatuses
 import io.renku.generators.Generators.Implicits._
 import io.renku.generators.Generators.exceptions
 import io.renku.http.RenkuEntityCodec

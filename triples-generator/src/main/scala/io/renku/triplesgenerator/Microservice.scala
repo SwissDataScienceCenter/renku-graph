@@ -31,7 +31,7 @@ import io.renku.events.consumers.EventConsumersRegistry
 import io.renku.events.{CategoryName, consumers}
 import io.renku.graph.config.RenkuUrlLoader
 import io.renku.graph.model.{RenkuUrl, datasets, projects}
-import io.renku.http.client.GitLabClient
+import io.renku.http.client.{GitLabClient, GitLabClientLoader}
 import io.renku.http.server.HttpServer
 import io.renku.logging.ApplicationLogger
 import io.renku.metrics.{MetricsRegistry, MetricsRegistryLoader}
@@ -86,7 +86,7 @@ object Microservice extends IOMicroservice {
       projectSparqlClient: ProjectSparqlClient[IO]
   )(implicit mr: MetricsRegistry[IO], sqtr: SparqlQueryTimeRecorder[IO]): IO[ExitCode] = for {
 
-    implicit0(gc: GitLabClient[IO])         <- GitLabClient[IO]()
+    implicit0(gc: GitLabClient[IO])         <- GitLabClientLoader[IO]()
     implicit0(rp: ReProvisioningStatus[IO]) <- ReProvisioningStatus[IO]()
     implicit0(rurl: RenkuUrl)               <- RenkuUrlLoader[IO](config)
 

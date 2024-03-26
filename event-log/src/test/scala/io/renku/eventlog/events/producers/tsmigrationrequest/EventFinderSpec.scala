@@ -29,7 +29,7 @@ import io.renku.eventlog.metrics.{QueriesExecutionTimes, TestQueriesExecutionTim
 import io.renku.eventlog.{ChangeDate, EventLogDB, EventLogPostgresSpec, MigrationStatus}
 import io.renku.events.Generators.subscriberUrls
 import io.renku.events.Subscription.SubscriberUrl
-import io.renku.generators.CommonGraphGenerators.serviceVersions
+import io.renku.config.ConfigGenerators.serviceVersions
 import io.renku.generators.Generators.Implicits._
 import io.renku.generators.Generators.{timestamps, timestampsNotInTheFuture}
 import org.scalamock.scalatest.AsyncMockFactory

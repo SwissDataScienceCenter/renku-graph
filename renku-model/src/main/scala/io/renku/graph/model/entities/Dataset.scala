@@ -27,6 +27,7 @@ import io.renku.graph.model.entities.Dataset.Provenance._
 import io.renku.graph.model.entities.Dataset._
 import io.renku.graph.model.images.Image
 import io.renku.graph.model.Schemas.{prov, renku, schema}
+import io.renku.http.client.GitLabApiUrl
 import io.renku.jsonld.{EntityTypes, JsonLD, JsonLDEncoder, Property}
 import io.renku.jsonld.JsonLDEncoder._
 import io.renku.jsonld.ontology._

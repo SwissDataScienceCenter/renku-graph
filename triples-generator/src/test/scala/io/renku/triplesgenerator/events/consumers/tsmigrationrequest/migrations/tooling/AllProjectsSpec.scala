@@ -23,7 +23,8 @@ import cats.effect.testing.scalatest.AsyncIOSpec
 import io.renku.generators.Generators.Implicits._
 import io.renku.graph.model.testentities.Project
 import io.renku.graph.model.testentities.generators.EntitiesGenerators
-import io.renku.graph.model.{GitLabApiUrl, RenkuUrl}
+import io.renku.graph.model.RenkuUrl
+import io.renku.http.client.GitLabApiUrl
 import io.renku.interpreters.TestLogger
 import io.renku.logging.TestExecutionTimeRecorder
 import io.renku.triplesgenerator.events.consumers.tsmigrationrequest.migrations.tooling.AllProjects.ProjectMetadata

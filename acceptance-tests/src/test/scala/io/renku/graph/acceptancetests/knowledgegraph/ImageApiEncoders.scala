@@ -21,7 +21,8 @@ package io.renku.graph.acceptancetests.knowledgegraph
 import io.circe.{Encoder, Json}
 import io.circe.literal._
 import io.renku.graph.model.images.ImageUri
-import io.renku.graph.model.{GitLabUrl, projects}
+import io.renku.graph.model.projects
+import io.renku.http.client.GitLabUrl
 
 trait ImageApiEncoders {
   def gitLabUrl: GitLabUrl

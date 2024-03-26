@@ -30,7 +30,8 @@ import io.renku.entities.search.Generators._
 import io.renku.entities.search.diff.SearchDiffInstances
 import io.renku.entities.search.model.Entity
 import io.renku.entities.searchgraphs.TestSearchInfoDatasets
-import io.renku.generators.CommonGraphGenerators.{authUsers, sortingDirections}
+import io.renku.http.client.HttpClientGenerators.sortingDirections
+import io.renku.generators.CommonGraphGenerators.authUsers
 import io.renku.generators.Generators.Implicits._
 import io.renku.generators.Generators._
 import io.renku.graph.model._

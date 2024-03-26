@@ -25,7 +25,7 @@ import cats.effect.{IO, Temporal}
 import cats.syntax.all._
 import eu.timepit.refined.auto._
 import io.renku.events.consumers.subscriptions.SubscriptionMechanism
-import io.renku.generators.CommonGraphGenerators.microserviceBaseUrls
+import io.renku.CommonGenerators.microserviceBaseUrls
 import io.renku.generators.Generators.Implicits._
 import io.renku.graph.model.GraphModelGenerators.renkuUrls
 import io.renku.graph.model.RenkuUrl

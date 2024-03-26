@@ -23,7 +23,7 @@ import eu.timepit.refined.auto._
 import io.renku.events.{DefaultSubscription, Subscription}
 import io.renku.events.DefaultSubscription.DefaultSubscriber
 import io.renku.events.Generators._
-import io.renku.generators.CommonGraphGenerators.microserviceBaseUrls
+import io.renku.CommonGenerators.microserviceBaseUrls
 import io.renku.generators.Generators.exceptions
 import io.renku.generators.Generators.Implicits._
 import io.renku.microservices.{MicroserviceBaseUrl, MicroserviceIdentifier, MicroserviceUrlFinder}

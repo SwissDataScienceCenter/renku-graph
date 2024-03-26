@@ -22,10 +22,12 @@ import cats.MonadThrow
 import cats.data.EitherT
 import cats.effect.Async
 import cats.syntax.all._
+import com.typesafe.config.ConfigFactory
 import eu.timepit.refined.auto._
-import io.renku.graph.config.{GitLabUrlLoader, RenkuUrlLoader}
+import io.renku.graph.config.RenkuUrlLoader
 import io.renku.graph.model.entities.{EntityFunctions, Person, Project}
-import io.renku.graph.model.{GitLabApiUrl, RenkuUrl}
+import io.renku.graph.model.RenkuUrl
+import io.renku.http.client.{GitLabApiUrl, GitLabClientLoader}
 import io.renku.triplesgenerator.errors.{ProcessingRecoverableError, RecoverableErrorsRecovery}
 import io.renku.triplesgenerator.tsprovisioning.TransformationStep.{Queries, Transformation}
 import io.renku.triplesgenerator.tsprovisioning.{ProjectFunctions, TransformationStep}
@@ -84,8 +86,9 @@ private class PersonTransformerImpl[F[_]: MonadThrow](
 private[transformation] object PersonTransformer {
 
   def apply[F[_]: Async: Logger: SparqlQueryTimeRecorder]: F[PersonTransformer[F]] = for {
+    config                            <- Async[F].blocking(ConfigFactory.load())
     kgPersonFinder                    <- KGPersonFinder[F]
     implicit0(renkuUrl: RenkuUrl)     <- RenkuUrlLoader[F]()
-    implicit0(glApiUrl: GitLabApiUrl) <- GitLabUrlLoader[F]().map(_.apiV4)
+    implicit0(glApiUrl: GitLabApiUrl) <- GitLabClientLoader.gitLabUrl[F](config).map(_.apiV4)
   } yield new PersonTransformerImpl[F](kgPersonFinder, PersonMerger, UpdatesCreator, ProjectFunctions)
 }

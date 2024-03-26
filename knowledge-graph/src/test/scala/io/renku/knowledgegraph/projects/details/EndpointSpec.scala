@@ -26,9 +26,10 @@ import io.renku.generators.CommonGraphGenerators.authUsers
 import io.renku.generators.Generators._
 import io.renku.generators.Generators.Implicits._
 import io.renku.generators.jsonld.JsonLDGenerators.jsonLDEntities
-import io.renku.graph.model.{GitLabUrl, projects}
+import io.renku.graph.model.projects
 import io.renku.graph.model.testentities.generators.EntitiesGenerators
 import io.renku.http.RenkuEntityCodec
+import io.renku.http.client.GitLabUrl
 import io.renku.interpreters.TestLogger
 import io.renku.interpreters.TestLogger.Level.{Error, Warn}
 import io.renku.knowledgegraph.projects.details.model.Project

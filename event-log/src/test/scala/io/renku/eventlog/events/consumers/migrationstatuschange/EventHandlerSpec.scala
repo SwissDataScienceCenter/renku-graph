@@ -26,7 +26,8 @@ import io.renku.eventlog.MigrationStatus._
 import io.renku.eventlog.{MigrationMessage, MigrationStatus}
 import io.renku.events.EventRequestContent
 import io.renku.events.Generators.subscriberUrls
-import io.renku.generators.CommonGraphGenerators.{microserviceIdentifiers, serviceVersions}
+import io.renku.CommonGenerators.microserviceIdentifiers
+import io.renku.config.ConfigGenerators.serviceVersions
 import io.renku.generators.Generators.Implicits._
 import io.renku.generators.Generators._
 import io.renku.interpreters.TestLogger

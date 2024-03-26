@@ -18,17 +18,9 @@
 
 package io.renku.graph.model
 
-import io.renku.generators.Generators._
 import org.scalacheck.Gen
 
 trait GraphModelGenerators extends RenkuTinyTypeGenerators {
-
-  implicit val gitLabUrls: Gen[GitLabUrl] = for {
-    url  <- httpUrls()
-    path <- relativePaths(maxSegments = 2)
-  } yield GitLabUrl(s"$url/$path")
-
-  implicit val gitLabApiUrls: Gen[GitLabApiUrl] = gitLabUrls.map(_.apiV4)
 
   implicit val graphClasses: Gen[GraphClass] = Gen.oneOf(GraphClass.all)
 }

@@ -21,14 +21,15 @@ package projects.datasets
 
 import cats.MonadThrow
 import cats.syntax.all._
+import com.typesafe.config.ConfigFactory
 import eu.timepit.refined.auto._
 import io.circe.syntax._
 import io.circe.{Encoder, Json}
 import io.renku.config.renku
 import io.renku.data.Message
-import io.renku.graph.config.GitLabUrlLoader
 import io.renku.graph.model.images.ImageUri
-import io.renku.graph.model.{GitLabUrl, datasets, projects}
+import io.renku.graph.model.{datasets, projects}
+import io.renku.http.client.{GitLabClientLoader, GitLabUrl}
 import io.renku.knowledgegraph.docs.model.Operation.GET
 import io.renku.knowledgegraph.docs.model._
 
@@ -36,7 +37,7 @@ import java.time.{Duration, Instant, LocalDate}
 
 object EndpointDocs {
   def apply[F[_]: MonadThrow]: F[docs.EndpointDocs] = for {
-    gitLabUrl <- GitLabUrlLoader[F]()
+    gitLabUrl <- GitLabClientLoader.gitLabUrl[F](ConfigFactory.load())
     apiUrl    <- renku.ApiUrl[F]()
   } yield new EndpointDocsImpl()(gitLabUrl, apiUrl)
 }

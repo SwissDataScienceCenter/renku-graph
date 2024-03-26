@@ -23,7 +23,7 @@ import cats.syntax.all._
 import eu.timepit.refined.auto._
 import eu.timepit.refined.types.string.NonEmptyString
 import io.circe.literal._
-import io.renku.generators.CommonGraphGenerators.userAccessTokens
+import io.renku.http.client.GitLabGenerators._
 import io.renku.generators.Generators.Implicits._
 import io.renku.graph.model.GraphModelGenerators.personGitLabIds
 import io.renku.http.client.RestClient.ResponseMappingF

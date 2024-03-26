@@ -23,7 +23,7 @@ import RepositoryGenerators.deletionResults
 import cats.effect.IO
 import cats.syntax.all._
 import io.renku.data.Message
-import io.renku.generators.CommonGraphGenerators.accessTokens
+import io.renku.http.client.GitLabGenerators._
 import io.renku.generators.Generators.Implicits._
 import io.renku.generators.Generators._
 import io.renku.graph.model.GraphModelGenerators._

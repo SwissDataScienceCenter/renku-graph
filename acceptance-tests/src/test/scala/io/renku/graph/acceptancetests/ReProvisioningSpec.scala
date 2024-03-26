@@ -22,7 +22,8 @@ import data._
 import flows.TSProvisioning
 import io.circe.Json
 import io.renku.config.ServiceVersion
-import io.renku.generators.CommonGraphGenerators.{authUsers, serviceVersions}
+import io.renku.config.ConfigGenerators.serviceVersions
+import io.renku.generators.CommonGraphGenerators.authUsers
 import io.renku.generators.Generators.Implicits._
 import io.renku.generators.Generators.nonEmptyStrings
 import io.renku.graph.model.EventsGenerators.commitIds

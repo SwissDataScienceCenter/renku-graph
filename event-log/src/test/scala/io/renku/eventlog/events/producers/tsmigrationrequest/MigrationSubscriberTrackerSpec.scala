@@ -30,7 +30,7 @@ import io.renku.eventlog._
 import io.renku.eventlog.metrics.{QueriesExecutionTimes, TestQueriesExecutionTimes}
 import io.renku.events.Generators.{subscriberIds, subscriberUrls}
 import io.renku.events.Subscription.SubscriberUrl
-import io.renku.generators.CommonGraphGenerators.serviceVersions
+import io.renku.config.ConfigGenerators.serviceVersions
 import io.renku.generators.Generators.Implicits._
 import org.scalamock.scalatest.AsyncMockFactory
 import org.scalatest.Succeeded

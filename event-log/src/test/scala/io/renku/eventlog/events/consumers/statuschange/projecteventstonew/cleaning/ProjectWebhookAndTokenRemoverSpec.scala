@@ -23,7 +23,7 @@ import cats.syntax.all._
 import com.github.tomakehurst.wiremock.client.WireMock._
 import io.renku.eventlog.events.consumers.statuschange.categoryName
 import io.renku.events.consumers.ConsumersModelGenerators._
-import io.renku.generators.CommonGraphGenerators.accessTokens
+import io.renku.http.client.GitLabGenerators.accessTokens
 import io.renku.generators.Generators.Implicits._
 import io.renku.generators.Generators.exceptions
 import io.renku.graph.model.projects

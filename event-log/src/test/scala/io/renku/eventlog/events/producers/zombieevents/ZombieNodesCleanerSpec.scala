@@ -26,7 +26,7 @@ import io.renku.eventlog.metrics.{QueriesExecutionTimes, TestQueriesExecutionTim
 import io.renku.eventlog.{EventLogDB, EventLogPostgresSpec}
 import io.renku.events.Generators._
 import io.renku.events.Subscription.{SubscriberId, SubscriberUrl}
-import io.renku.generators.CommonGraphGenerators.microserviceBaseUrls
+import io.renku.CommonGenerators.microserviceBaseUrls
 import io.renku.generators.Generators.Implicits._
 import io.renku.http.client.ServiceHealthChecker
 import io.renku.microservices.MicroserviceBaseUrl

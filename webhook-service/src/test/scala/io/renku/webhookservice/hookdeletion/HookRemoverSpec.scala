@@ -20,7 +20,7 @@ package io.renku.webhookservice.hookdeletion
 
 import cats.effect.IO
 import cats.syntax.all._
-import io.renku.generators.CommonGraphGenerators.accessTokens
+import io.renku.http.client.GitLabGenerators._
 import io.renku.generators.Generators.Implicits.GenOps
 import io.renku.generators.Generators.exceptions
 import io.renku.graph.model.projects.GitLabId

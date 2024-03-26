@@ -22,9 +22,9 @@ import io.circe.literal._
 import io.circe.syntax._
 import io.circe.{Encoder, Json}
 import io.renku.generators.Generators.Implicits._
-import io.renku.graph.model.GitLabUrl
 import io.renku.graph.model.GraphModelGenerators._
 import io.renku.graph.model.images.ImageUri
+import io.renku.http.client.{GitLabGenerators, GitLabUrl}
 import org.scalatest.flatspec.AnyFlatSpec
 import org.scalatest.matchers.should
 import org.scalatestplus.scalacheck.ScalaCheckPropertyChecks
@@ -63,5 +63,5 @@ class ImageUrisEncoderSpec
   }
 
   private lazy val projectSlug = projectSlugs.generateOne
-  private implicit lazy val gitLabUrl: GitLabUrl = gitLabUrls.generateOne
+  private implicit lazy val gitLabUrl: GitLabUrl = GitLabGenerators.gitLabUrls.generateOne
 }

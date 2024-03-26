@@ -22,11 +22,11 @@ package generators
 import cats.data.Kleisli
 import io.renku.generators.Generators.Implicits._
 import io.renku.generators.Generators._
-import io.renku.graph.model.GraphModelGenerators._
 import io.renku.graph.model._
 import io.renku.graph.model.gitlab.{GitLabMember, GitLabUser}
 import io.renku.graph.model.persons.{Email, GitLabId}
 import io.renku.graph.model.projects.Role
+import io.renku.http.client.{GitLabApiUrl, GitLabGenerators, GitLabUrl}
 import org.scalacheck.Gen
 
 object EntitiesGenerators extends EntitiesGenerators {
@@ -55,7 +55,7 @@ object EntitiesGenerators extends EntitiesGenerators {
 
 private object Instances {
   implicit val renkuUrl:     RenkuUrl     = RenkuTinyTypeGenerators.renkuUrls.generateOne
-  implicit val gitLabUrl:    GitLabUrl    = gitLabUrls.generateOne
+  implicit val gitLabUrl:    GitLabUrl    = GitLabGenerators.gitLabUrls.generateOne
   implicit val gitLabApiUrl: GitLabApiUrl = gitLabUrl.apiV4
 }
 

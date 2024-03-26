@@ -20,12 +20,13 @@ package io.renku.knowledgegraph.projects.details
 
 import cats.MonadThrow
 import cats.syntax.all._
+import com.typesafe.config.ConfigFactory
 import eu.timepit.refined.auto._
 import io.renku.data.Message
-import io.renku.graph.config.GitLabUrlLoader
 import io.renku.graph.model.images.ImageUri
 import io.renku.graph.model.versions.SchemaVersion
-import io.renku.graph.model.{GitLabUrl, persons, projects}
+import io.renku.graph.model.{persons, projects}
+import io.renku.http.client.{GitLabClientLoader, GitLabUrl}
 import io.renku.knowledgegraph.docs
 import io.renku.knowledgegraph.docs.model.Operation.GET
 import io.renku.knowledgegraph.docs.model._
@@ -40,9 +41,9 @@ import java.time.Instant
 
 object EndpointDocs {
   def apply[F[_]: MonadThrow]: F[docs.EndpointDocs] =
-    GitLabUrlLoader[F]().flatMap(gitLabUrl =>
-      ProjectJsonEncoder[F].map(new EndpointDocsImpl(_, ProjectJsonLDEncoder)(gitLabUrl))
-    )
+    GitLabClientLoader
+      .gitLabUrl[F](ConfigFactory.load())
+      .flatMap(gitLabUrl => ProjectJsonEncoder[F].map(new EndpointDocsImpl(_, ProjectJsonLDEncoder)(gitLabUrl)))
 }
 
 private class EndpointDocsImpl(projectJsonEncoder: ProjectJsonEncoder, projectJsonLDEncoder: ProjectJsonLDEncoder)(

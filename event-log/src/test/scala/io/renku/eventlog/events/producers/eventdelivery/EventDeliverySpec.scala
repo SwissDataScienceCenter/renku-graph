@@ -26,7 +26,7 @@ import io.renku.db.DBConfigProvider.DBConfig
 import io.renku.eventlog.metrics.{QueriesExecutionTimes, TestQueriesExecutionTimes}
 import io.renku.eventlog.{EventLogDB, EventLogPostgresSpec}
 import io.renku.events.Generators._
-import io.renku.generators.CommonGraphGenerators.microserviceBaseUrls
+import io.renku.CommonGenerators.microserviceBaseUrls
 import io.renku.generators.Generators.Implicits._
 import io.renku.graph.model.EventContentGenerators._
 import io.renku.graph.model.EventsGenerators._

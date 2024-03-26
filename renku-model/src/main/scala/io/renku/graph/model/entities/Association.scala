@@ -24,6 +24,7 @@ import io.renku.cli.model.CliAssociation
 import io.renku.graph.model.Schemas.prov
 import io.renku.graph.model.associations.ResourceId
 import io.renku.graph.model._
+import io.renku.http.client.GitLabApiUrl
 import io.renku.jsonld.{EntityTypes, JsonLD, JsonLDEncoder}
 import io.renku.jsonld.ontology._
 import io.renku.jsonld.syntax._

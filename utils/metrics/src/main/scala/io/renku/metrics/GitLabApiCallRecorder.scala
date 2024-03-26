@@ -39,6 +39,5 @@ object GitLabApiCallRecorder {
                    maybeThreshold = None
                  )
     executionTimeRecorder <- makeExecutionTimeRecorder(histogram)
-    // ExecutionTimeRecorderLoader[F](maybeHistogram = Some(histogram))
   } yield new GitLabApiCallRecorder(executionTimeRecorder)
 }

@@ -22,7 +22,7 @@ import cats.data.OptionT
 import cats.effect.IO
 import cats.syntax.all._
 import eu.timepit.refined.types.numeric
-import io.renku.generators.CommonGraphGenerators._
+import io.renku.http.client.GitLabGenerators._
 import io.renku.generators.Generators.Implicits._
 import io.renku.generators.Generators._
 import io.renku.graph.model.GraphModelGenerators._

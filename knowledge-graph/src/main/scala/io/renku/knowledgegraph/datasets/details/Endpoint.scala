@@ -22,13 +22,15 @@ package details
 import cats.MonadThrow
 import cats.effect._
 import cats.syntax.all._
+import com.typesafe.config.ConfigFactory
 import io.circe.syntax._
 import io.renku.config.renku
 import io.renku.data.Message
-import io.renku.graph.config.{GitLabUrlLoader, RenkuUrlLoader}
+import io.renku.graph.config.RenkuUrlLoader
 import io.renku.graph.http.server.security.Authorizer.AuthContext
-import io.renku.graph.model.{GitLabUrl, RenkuUrl}
+import io.renku.graph.model.RenkuUrl
 import io.renku.http.RenkuEntityCodec
+import io.renku.http.client.{GitLabClientLoader, GitLabUrl}
 import io.renku.http.rest.Links.Href
 import io.renku.logging.{ExecutionTimeRecorder, ExecutionTimeRecorderLoader}
 import io.renku.metrics.MetricsRegistry
@@ -96,12 +98,13 @@ class EndpointImpl[F[_]: MonadThrow: Logger](
 object Endpoint {
 
   def apply[F[_]: Async: Logger: SparqlQueryTimeRecorder: MetricsRegistry]: F[Endpoint[F]] = for {
+    config                               <- Async[F].blocking(ConfigFactory.load())
     datasetFinder                        <- DatasetFinder[F]
     tgClient                             <- triplesgenerator.api.events.Client[F]
-    executionTimeRecorder                <- ExecutionTimeRecorderLoader[F]()
-    implicit0(renkuApiUrl: renku.ApiUrl) <- renku.ApiUrl[F]()
-    implicit0(renkuUrl: RenkuUrl)        <- RenkuUrlLoader[F]()
-    implicit0(gitLabUrl: GitLabUrl)      <- GitLabUrlLoader[F]()
+    executionTimeRecorder                <- ExecutionTimeRecorderLoader[F](config)
+    implicit0(renkuApiUrl: renku.ApiUrl) <- renku.ApiUrl[F](config)
+    implicit0(renkuUrl: RenkuUrl)        <- RenkuUrlLoader[F](config)
+    implicit0(gitLabUrl: GitLabUrl)      <- GitLabClientLoader.gitLabUrl[F](config)
   } yield new EndpointImpl[F](datasetFinder, tgClient, executionTimeRecorder)
 
   def href(renkuApiUrl: renku.ApiUrl, identifier: RequestedDataset): Href =

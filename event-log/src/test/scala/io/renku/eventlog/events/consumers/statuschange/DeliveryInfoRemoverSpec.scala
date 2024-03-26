@@ -24,7 +24,7 @@ import io.renku.eventlog.EventLogPostgresSpec
 import io.renku.eventlog.metrics.{QueriesExecutionTimes, TestQueriesExecutionTimes}
 import io.renku.events.Generators.{subscriberIds, subscriberUrls}
 import io.renku.events.consumers.ConsumersModelGenerators.consumerProjects
-import io.renku.generators.CommonGraphGenerators.microserviceBaseUrls
+import io.renku.CommonGenerators.microserviceBaseUrls
 import io.renku.generators.Generators.Implicits._
 import io.renku.graph.model.EventContentGenerators._
 import io.renku.graph.model.EventsGenerators._

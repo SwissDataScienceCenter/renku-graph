@@ -22,7 +22,6 @@ import CategoryGenerators._
 import cats.data.EitherT
 import cats.syntax.all._
 import io.renku.events.consumers
-import io.renku.generators.CommonGraphGenerators.accessTokens
 import io.renku.generators.Generators.Implicits._
 import io.renku.generators.Generators._
 import io.renku.graph.model._
@@ -31,6 +30,7 @@ import io.renku.graph.model.gitlab.{GitLabMember, GitLabProjectInfo, GitLabUser}
 import io.renku.graph.model.testentities.ModelOps
 import io.renku.graph.model.testentities.generators.EntitiesGenerators
 import io.renku.http.client.AccessToken
+import io.renku.http.client.GitLabGenerators.accessTokens
 import io.renku.jsonld.syntax._
 import io.renku.triplesgenerator.errors.{ProcessingNonRecoverableError, ProcessingRecoverableError}
 import io.renku.triplesgenerator.events.consumers.projectinfo.ProjectInfoFinder

@@ -22,12 +22,11 @@ import cats.MonadThrow
 import com.typesafe.config.{Config, ConfigFactory}
 import io.renku.tinytypes.constraints.NonBlank
 import io.renku.tinytypes.{StringTinyType, TinyTypeFactory}
-import pureconfig.ConfigReader
+import io.renku.config.RenkuConfigReader._
 
 final class ServiceName private (val value: String) extends AnyVal with StringTinyType
 object ServiceName extends TinyTypeFactory[ServiceName](new ServiceName(_)) with NonBlank[ServiceName] {
   import ConfigLoader._
-  implicit val reader: ConfigReader[ServiceName] = stringTinyTypeReader(ServiceName)
 
   def readFromConfig[F[_]: MonadThrow](versionConfig: Config = ConfigFactory.load()): F[ServiceName] =
     find[F, ServiceName]("service-name", versionConfig)
@@ -40,8 +39,7 @@ object ServiceVersion extends TinyTypeFactory[ServiceVersion](new ServiceVersion
   import io.circe.Decoder
   import io.renku.tinytypes.json.TinyTypeDecoders.stringDecoder
 
-  implicit val reader:  ConfigReader[ServiceVersion] = stringTinyTypeReader(ServiceVersion)
-  implicit val decoder: Decoder[ServiceVersion]      = stringDecoder(ServiceVersion)
+  implicit val decoder: Decoder[ServiceVersion] = stringDecoder(ServiceVersion)
 
   def readFromConfig[F[_]: MonadThrow](versionConfig: Config = ConfigFactory.load("version.conf")): F[ServiceVersion] =
     find[F, ServiceVersion]("version", versionConfig)

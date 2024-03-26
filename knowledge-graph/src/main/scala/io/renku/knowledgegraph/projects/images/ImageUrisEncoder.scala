@@ -21,8 +21,9 @@ package io.renku.knowledgegraph.projects.images
 import cats.syntax.all._
 import io.circe.{Encoder, Json}
 import io.circe.literal._
-import io.renku.graph.model.{GitLabUrl, projects}
+import io.renku.graph.model.projects
 import io.renku.graph.model.images.ImageUri
+import io.renku.http.client.GitLabUrl
 import io.renku.http.rest.Links.{Href, Link, Rel, _links}
 
 trait ImageUrisEncoder {

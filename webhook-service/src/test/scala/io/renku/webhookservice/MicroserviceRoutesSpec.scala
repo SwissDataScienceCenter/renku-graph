@@ -20,10 +20,11 @@ package io.renku.webhookservice
 
 import cats.effect.IO
 import cats.syntax.all._
-import io.renku.generators.CommonGraphGenerators.{authUsers, httpStatuses}
+import io.renku.generators.CommonGraphGenerators.authUsers
 import io.renku.generators.Generators.Implicits._
 import io.renku.graph.model.GraphModelGenerators._
 import io.renku.graph.model.projects
+import io.renku.http.client.HttpClientGenerators
 import io.renku.http.server.EndpointTester._
 import io.renku.http.server.security.model.{AuthUser, MaybeAuthUser}
 import io.renku.http.server.version
@@ -224,7 +225,7 @@ class MicroserviceRoutesSpec
       versionRoutes
     ).routes.map(_.or(notAvailableResponse))
 
-    val versionEndpointResponse = Response[IO](httpStatuses.generateOne)
+    val versionEndpointResponse = Response[IO](HttpClientGenerators.httpStatuses.generateOne)
     (versionRoutes.apply _)
       .expects()
       .returning {

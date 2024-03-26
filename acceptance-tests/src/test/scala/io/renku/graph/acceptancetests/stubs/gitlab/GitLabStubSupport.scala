@@ -20,10 +20,10 @@ package io.renku.graph.acceptancetests.stubs.gitlab
 
 import cats.effect.IO
 import cats.effect.unsafe.IORuntime
+import com.typesafe.config.ConfigFactory
 import io.renku.graph.acceptancetests.stubs.gitlab.GitLabStubSupport.GitLabStubStarter
 import io.renku.graph.acceptancetests.tooling.AcceptanceSpec
-import io.renku.graph.config.GitLabUrlLoader
-import io.renku.graph.model.{GitLabApiUrl, GitLabUrl}
+import io.renku.http.client.{GitLabApiUrl, GitLabClientLoader, GitLabUrl}
 import org.http4s.Uri
 import org.scalatest._
 import org.typelevel.log4cats.Logger
@@ -33,7 +33,7 @@ import scala.util.Try
 /** Mixin for tests that starts a [[GitLabApiStub]] for the whole suite and clears its state before each test. */
 trait GitLabStubSupport extends BeforeAndAfterAll with BeforeAndAfter with GitLabStubIOSyntax { self: AcceptanceSpec =>
 
-  implicit val gitLabUrl:    GitLabUrl    = GitLabUrlLoader[Try]().fold(throw _, identity)
+  implicit val gitLabUrl: GitLabUrl = GitLabClientLoader.gitLabUrl[Try](ConfigFactory.load()).fold(throw _, identity)
   implicit val gitLabApiUrl: GitLabApiUrl = gitLabUrl.apiV4
 
   private lazy val gitLabStubStarter = GitLabStubStarter(gitLabUrl)

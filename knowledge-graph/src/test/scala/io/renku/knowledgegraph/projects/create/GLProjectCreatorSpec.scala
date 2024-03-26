@@ -30,7 +30,7 @@ import io.circe.syntax._
 import io.circe.{Encoder, Json}
 import io.renku.core.client.Branch
 import io.renku.data.Message
-import io.renku.generators.CommonGraphGenerators.accessTokens
+import io.renku.http.client.GitLabGenerators.accessTokens
 import io.renku.generators.Generators.Implicits._
 import io.renku.generators.Generators.{jsons, nonEmptyStrings}
 import io.renku.graph.model.projects

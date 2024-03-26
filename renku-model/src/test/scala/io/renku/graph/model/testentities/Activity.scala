@@ -26,6 +26,7 @@ import io.renku.graph.model.cli.CliConverters
 import io.renku.graph.model.entityModel._
 import io.renku.graph.model.testentities.Activity._
 import io.renku.graph.model.testentities.Entity.OutputEntity
+import io.renku.http.client.GitLabApiUrl
 import io.renku.tinytypes._
 import io.renku.tinytypes.constraints.UUID
 import monocle.Lens

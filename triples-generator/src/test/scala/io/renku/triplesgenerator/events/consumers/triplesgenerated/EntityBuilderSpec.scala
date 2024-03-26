@@ -27,7 +27,7 @@ import io.renku.cli.model.tools.JsonLDTools.{flattenedJsonLD, flattenedJsonLDFro
 import io.renku.cli.model.{CliDataset, CliProject}
 import io.renku.events.consumers
 import io.renku.events.consumers.ConsumersModelGenerators.consumerProjects
-import io.renku.generators.CommonGraphGenerators.accessTokens
+import io.renku.http.client.GitLabGenerators.accessTokens
 import io.renku.generators.Generators.Implicits._
 import io.renku.generators.Generators._
 import io.renku.graph.model._

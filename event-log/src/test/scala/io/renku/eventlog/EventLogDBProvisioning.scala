@@ -26,7 +26,7 @@ import io.renku.events.Generators.{subscriberIds, subscriberUrls}
 import io.renku.events.Subscription.{SubscriberId, SubscriberUrl}
 import io.renku.events.consumers.ConsumersModelGenerators.consumerProjects
 import io.renku.events.consumers.Project
-import io.renku.generators.CommonGraphGenerators.microserviceBaseUrls
+import io.renku.CommonGenerators.microserviceBaseUrls
 import io.renku.generators.Generators.Implicits._
 import io.renku.generators.Generators.timestampsNotInTheFuture
 import io.renku.graph.model.EventContentGenerators.{eventDates, eventMessages}

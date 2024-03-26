@@ -28,6 +28,7 @@ import io.renku.graph.model.datasets._
 import io.renku.graph.model.entities.EntityFunctions
 import io.renku.graph.model.images._
 import io.renku.graph.model.testentities.Dataset.Provenance._
+import io.renku.http.client.GitLabApiUrl
 import io.renku.jsonld._
 import io.renku.jsonld.syntax._
 import io.renku.tinytypes.InstantTinyType

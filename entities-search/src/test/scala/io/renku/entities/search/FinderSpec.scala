@@ -21,7 +21,7 @@ package io.renku.entities.search
 import cats.effect.IO
 import cats.effect.testing.scalatest.AsyncIOSpec
 import io.renku.entities.search.EntityConverters._
-import io.renku.generators.CommonGraphGenerators.userAccessTokens
+import io.renku.http.client.GitLabGenerators.userAccessTokens
 import io.renku.generators.Generators.Implicits._
 import io.renku.graph.model.testentities.{Entity => _, _}
 import io.renku.http.rest.SortBy
