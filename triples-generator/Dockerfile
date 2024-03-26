@@ -27,10 +27,7 @@ ENV LANG=C.UTF-8 LC_ALL=C.UTF-8
 ENV TZ UTC
 
 # Installing Renku dependencies other tools
-RUN apk update && apk add --no-cache tzdata git git-lfs curl bash python3-dev py3-pip py3-wheel openssl-dev libffi-dev linux-headers gcc g++ make libxml2-dev libxslt-dev libc-dev yaml-dev 'rust>1.41.0' cargo tini && \
-    python3 -m pip install --ignore-installed 'packaging==21.3 '&& \
-    python3 -m pip install --upgrade 'pip==23.1.2' && \
-    python3 -m pip install jinja2 && \
+RUN apk update && apk add --no-cache tzdata git git-lfs curl bash python3-dev py3-pip py3-wheel pipx openssl-dev libffi-dev linux-headers gcc g++ make libxml2-dev libxslt-dev libc-dev yaml-dev tini && \
     chown -R daemon:daemon .
 
 COPY triples-generator/entrypoint.sh /entrypoint.sh
@@ -45,7 +42,8 @@ USER tguser
 ENV PATH=$PATH:/home/tguser/.local/bin
 
 # Installing Renku
-RUN python3 -m pip install 'renku==2.9.1rc1' 'sentry-sdk==1.5.11'
+RUN pipx install 'renku==2.9.2' && \
+    pipx inject renku sentry-sdk==1.43.0
 
 RUN git config --global user.name 'renku'  && \
     git config --global user.email 'renku@renkulab.io'  && \
