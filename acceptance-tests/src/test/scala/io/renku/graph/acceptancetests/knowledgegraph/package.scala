@@ -18,8 +18,8 @@
 
 package io.renku.graph.acceptancetests
 
-import io.renku.graph.model.GitLabUrl
 import io.renku.graph.model.cli.CliConverters
+import io.renku.http.client.GitLabUrl
 
 package object knowledgegraph {
 

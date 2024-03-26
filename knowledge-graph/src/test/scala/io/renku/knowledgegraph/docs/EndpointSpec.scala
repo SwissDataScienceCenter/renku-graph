@@ -20,7 +20,7 @@ package io.renku.knowledgegraph.docs
 
 import cats.effect.IO
 import io.circe.Json
-import io.renku.generators.CommonGraphGenerators.serviceVersions
+import io.renku.config.ConfigGenerators.serviceVersions
 import io.renku.generators.Generators.Implicits._
 import io.renku.generators.Generators._
 import io.renku.http.RenkuEntityCodec

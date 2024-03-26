@@ -24,7 +24,7 @@ import eu.timepit.refined.numeric.Positive
 import io.renku.commiteventservice.events.consumers.globalcommitsync.GlobalCommitSyncEvent.CommitsInfo
 import io.renku.commiteventservice.events.consumers.globalcommitsync.eventgeneration.{DateCondition, PageResult, ProjectCommitStats}
 import io.renku.events.consumers.Project
-import io.renku.generators.CommonGraphGenerators.pages
+import io.renku.http.client.HttpClientGenerators.pages
 import io.renku.generators.Generators.Implicits._
 import io.renku.generators.Generators._
 import io.renku.graph.model.EventsGenerators.commitIds

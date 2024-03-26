@@ -24,7 +24,7 @@ import Generators._
 import cats.effect.IO
 import cats.effect.testing.scalatest.AsyncIOSpec
 import cats.syntax.all._
-import io.renku.generators.CommonGraphGenerators.serviceVersions
+import io.renku.config.ConfigGenerators.serviceVersions
 import io.renku.generators.Generators.Implicits._
 import io.renku.graph.model.GraphModelGenerators.renkuUrls
 import io.renku.graph.model.RenkuUrl

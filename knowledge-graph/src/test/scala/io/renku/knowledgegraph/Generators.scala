@@ -19,9 +19,10 @@
 package io.renku.knowledgegraph
 
 import cats.syntax.all._
-import io.renku.generators.CommonGraphGenerators.{clientErrorHttpStatuses, messages, serverErrorHttpStatuses}
+import io.renku.CommonGenerators.messages
 import io.renku.generators.Generators.Implicits._
 import io.renku.generators.Generators.exceptions
+import io.renku.http.client.HttpClientGenerators.{clientErrorHttpStatuses, serverErrorHttpStatuses}
 import org.scalacheck.Gen
 
 private object Generators {

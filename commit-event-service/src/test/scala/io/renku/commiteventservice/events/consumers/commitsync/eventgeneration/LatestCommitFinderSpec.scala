@@ -19,7 +19,6 @@
 package io.renku.commiteventservice.events.consumers.commitsync.eventgeneration
 
 import cats.effect.IO
-import cats.implicits.toShow
 import cats.syntax.all._
 import eu.timepit.refined.api.Refined
 import eu.timepit.refined.auto._
@@ -27,7 +26,7 @@ import eu.timepit.refined.collection.NonEmpty
 import io.circe.literal._
 import io.renku.commiteventservice.events.consumers.common.CommitInfo
 import io.renku.commiteventservice.events.consumers.common.Generators._
-import io.renku.generators.CommonGraphGenerators.accessTokens
+import io.renku.http.client.GitLabGenerators.accessTokens
 import io.renku.generators.Generators.Implicits._
 import io.renku.graph.model.GraphModelGenerators._
 import io.renku.http.RenkuEntityCodec

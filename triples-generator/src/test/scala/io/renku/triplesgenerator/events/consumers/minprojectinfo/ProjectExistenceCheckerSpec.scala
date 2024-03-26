@@ -28,11 +28,7 @@ import org.scalatest.Succeeded
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AsyncWordSpec
 
-class ProjectExistenceCheckerSpec
-    extends AsyncWordSpec
-    with AsyncIOSpec
-    with GraphJenaSpec
-    with should.Matchers {
+class ProjectExistenceCheckerSpec extends AsyncWordSpec with AsyncIOSpec with GraphJenaSpec with should.Matchers {
 
   "checkProjectExists" should {
 

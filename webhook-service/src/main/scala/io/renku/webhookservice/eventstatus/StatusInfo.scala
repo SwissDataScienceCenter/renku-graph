@@ -19,7 +19,6 @@
 package io.renku.webhookservice.eventstatus
 
 import cats.syntax.all._
-import io.circe.literal._
 import io.circe.syntax.EncoderOps
 import io.circe.{Encoder, Json}
 import io.renku.graph.model.events.EventStatus._

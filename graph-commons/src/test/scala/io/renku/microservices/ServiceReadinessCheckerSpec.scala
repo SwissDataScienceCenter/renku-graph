@@ -20,7 +20,7 @@ package io.renku.microservices
 
 import cats.effect.IO
 import cats.syntax.all._
-import io.renku.generators.CommonGraphGenerators.microserviceBaseUrls
+import io.renku.CommonGenerators.microserviceBaseUrls
 import io.renku.generators.Generators.Implicits._
 import io.renku.http.client.ServiceHealthChecker
 import io.renku.interpreters.TestLogger

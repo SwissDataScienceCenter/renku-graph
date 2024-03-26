@@ -21,8 +21,8 @@ package io.renku.knowledgegraph.projects.datasets
 import io.renku.config.renku
 import io.renku.generators.CommonGraphGenerators.renkuApiUrls
 import io.renku.generators.Generators.Implicits._
-import io.renku.graph.model.GitLabUrl
-import io.renku.graph.model.GraphModelGenerators.gitLabUrls
+import io.renku.http.client.GitLabGenerators.gitLabUrls
+import io.renku.http.client.GitLabUrl
 import io.renku.knowledgegraph.docs.OpenApiTester._
 import org.scalatest.wordspec.AnyWordSpec
 

@@ -26,7 +26,8 @@ import io.renku.config.renku
 import io.renku.entities.search.{Criteria, model}
 import io.renku.graph.model.datasets.{DateCreated, DatePublished, SameAs}
 import io.renku.graph.model.images.ImageUri
-import io.renku.graph.model.{GitLabUrl, projects}
+import io.renku.graph.model.projects
+import io.renku.http.client.GitLabUrl
 import io.renku.http.rest.Links.{Href, Link, Rel, _links}
 import io.renku.json.JsonOps._
 import io.renku.knowledgegraph

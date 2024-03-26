@@ -22,7 +22,7 @@ package creation
 import RepositoryGenerators._
 import TokenDates._
 import cats.syntax.all._
-import io.renku.generators.CommonGraphGenerators.projectAccessTokens
+import io.renku.http.client.GitLabGenerators._
 import io.renku.generators.Generators.Implicits._
 import io.renku.generators.Generators.{localDates, timestampsNotInTheFuture}
 import io.renku.graph.model.GraphModelGenerators.{projectIds, projectSlugs}

@@ -23,7 +23,8 @@ import cats.effect.IO
 import cats.effect.testing.scalatest.AsyncIOSpec
 import cats.syntax.all._
 import io.renku.entities.searchgraphs.TestSearchInfoDatasets
-import io.renku.generators.CommonGraphGenerators.{authUsers, userAccessTokens}
+import io.renku.generators.CommonGraphGenerators.authUsers
+import io.renku.http.client.GitLabGenerators.userAccessTokens
 import io.renku.generators.Generators.Implicits._
 import io.renku.graph.model.projects
 import io.renku.graph.model.testentities._

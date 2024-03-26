@@ -28,7 +28,7 @@ import events.{EventEndpoint, EventsEndpoint}
 import io.circe.Json
 import io.circe.literal._
 import io.renku.eventlog.status.StatusEndpoint
-import io.renku.generators.CommonGraphGenerators.{httpStatuses, pages, perPages, sortingDirections}
+import io.renku.http.client.HttpClientGenerators._
 import io.renku.generators.Generators.Implicits._
 import io.renku.generators.Generators.{jsons, nonEmptyStrings}
 import io.renku.graph.model.EventContentGenerators._

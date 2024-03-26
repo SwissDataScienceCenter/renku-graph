@@ -30,7 +30,8 @@ import io.renku.graph.model
 import io.renku.graph.model.datasets._
 import io.renku.graph.model.images.ImageUri
 import io.renku.graph.model.projects.Visibility
-import io.renku.graph.model.{GitLabUrl, RenkuUrl}
+import io.renku.graph.model.RenkuUrl
+import io.renku.http.client.GitLabUrl
 import io.renku.http.rest.Links.{Href, Link, Rel, _links}
 import io.renku.json.JsonOps._
 

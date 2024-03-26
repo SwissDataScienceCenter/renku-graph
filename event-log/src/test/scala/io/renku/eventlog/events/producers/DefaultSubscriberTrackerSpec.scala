@@ -26,7 +26,7 @@ import io.renku.eventlog.{EventLogDB, EventLogPostgresSpec}
 import io.renku.events.Generators._
 import io.renku.events.Subscription
 import io.renku.events.Subscription._
-import io.renku.generators.CommonGraphGenerators.microserviceBaseUrls
+import io.renku.CommonGenerators.microserviceBaseUrls
 import io.renku.generators.Generators.Implicits._
 import io.renku.microservices.MicroserviceBaseUrl
 import org.scalamock.scalatest.AsyncMockFactory

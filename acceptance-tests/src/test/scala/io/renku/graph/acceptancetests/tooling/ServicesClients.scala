@@ -26,7 +26,6 @@ import eu.timepit.refined.api.Refined
 import eu.timepit.refined.auto._
 import eu.timepit.refined.string.Url
 import io.circe.generic.semiauto.deriveDecoder
-import io.circe.literal._
 import io.circe.{Decoder, Json}
 import io.renku.control.Throttler
 import io.renku.graph.acceptancetests.tooling.ServiceClient.ClientResponse

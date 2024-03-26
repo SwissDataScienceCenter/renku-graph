@@ -34,7 +34,7 @@ import io.renku.graph.http.server.security._
 import io.renku.graph.model
 import io.renku.graph.model.{RenkuUrl, persons}
 import io.renku.http.RenkuEntityCodec
-import io.renku.http.client.GitLabClient
+import io.renku.http.client.{GitLabClient, GitLabClientLoader}
 import io.renku.http.rest.Sorting
 import io.renku.http.rest.paging.PagingRequest
 import io.renku.http.rest.paging.PagingRequest.Decoders._
@@ -340,7 +340,7 @@ private object MicroserviceRoutes {
       projectSparqlClient: ProjectSparqlClient[F]
   ): F[MicroserviceRoutes[F]] = for {
     config                         <- MonadThrow[F].catchNonFatal(ConfigFactory.load())
-    implicit0(gv: GitLabClient[F]) <- GitLabClient[F]()
+    implicit0(gv: GitLabClient[F]) <- GitLabClientLoader[F]()
     implicit0(ru: RenkuUrl)        <- RenkuUrlLoader[F]()
 
     datasetDetailsEndpoint     <- datasets.details.Endpoint[F]

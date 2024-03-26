@@ -27,6 +27,7 @@ import io.renku.graph.model._
 import io.renku.graph.model.cli.CliConverters
 import io.renku.graph.model.commandParameters.Position
 import io.renku.graph.model.plans._
+import io.renku.http.client.GitLabApiUrl
 import monocle.Lens
 
 trait Plan extends PlanAlg {

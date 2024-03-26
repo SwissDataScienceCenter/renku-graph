@@ -24,7 +24,8 @@ import io.circe.{Encoder, Json}
 import io.renku.config.renku
 import io.renku.graph.model.datasets._
 import io.renku.graph.model.images.ImageUri
-import io.renku.graph.model.{GitLabUrl, projects}
+import io.renku.graph.model.projects
+import io.renku.http.client.GitLabUrl
 import io.renku.http.rest.Links.{Rel, _links}
 import io.renku.knowledgegraph
 import io.renku.knowledgegraph.datasets.details.RequestedDataset

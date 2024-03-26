@@ -26,7 +26,7 @@ import cats.data.EitherT
 import cats.effect.IO
 import cats.syntax.all._
 import io.renku.config.ServiceVersion
-import io.renku.generators.CommonGraphGenerators.serviceVersions
+import io.renku.config.ConfigGenerators.serviceVersions
 import io.renku.generators.Generators.Implicits._
 import io.renku.generators.Generators.exceptions
 import io.renku.interpreters.TestLogger

@@ -20,6 +20,7 @@ package io.renku.triplesstore.client.model
 
 import cats.Semigroup
 import cats.data.NonEmptyList
+import io.renku.http.rest.{SortBy, Sorting}
 import io.renku.triplesstore.client.model.OrderBy.Sort
 import io.renku.triplesstore.client.sparql.{Fragment, SparqlEncoder}
 
@@ -56,6 +57,15 @@ object OrderBy {
 
   def apply(p: Sort, more: Sort*): OrderBy =
     OrderBy(NonEmptyList(p, more.toList))
+
+  def fromSorting[T <: SortBy](fm: T#PropertyType => Property)(sorting: Sorting[T]): OrderBy =
+    OrderBy(sorting.sortBy.map(e => OrderBy.Sort(fm(e.property), fromDir(e.direction))))
+
+  private def fromDir(dir: SortBy.Direction): Direction =
+    dir match {
+      case SortBy.Direction.Asc  => Direction.Asc
+      case SortBy.Direction.Desc => Direction.Desc
+    }
 
   implicit val orderBySemigroup: Semigroup[OrderBy] =
     Semigroup.instance(_ ++ _)

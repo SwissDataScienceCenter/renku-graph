@@ -18,7 +18,7 @@
 
 organization := "io.renku"
 name := "renku-graph"
-ThisBuild / scalaVersion := "2.13.12"
+ThisBuild / scalaVersion := "2.13.13"
 
 // This project contains nothing to package, like pure POM maven project
 packagedArtifacts := Map.empty
@@ -98,7 +98,7 @@ lazy val jsonldUtils = project
       Dependencies.jsonld4s
   )
   .dependsOn(
-    tinyTypes % "compile->compile;test->test",
+    tinyTypes   % "compile->compile;test->test",
     commonUtils % "compile->compile;test->test"
   )
 
@@ -175,9 +175,11 @@ lazy val configUtils = project
         Dependencies.log4Cats
   )
   .dependsOn(
-    tinyTypes   % "compile->compile;test->test",
-    commonUtils % "compile->compile;test->test",
-    metricUtils % "compile->compile;test->test"
+    tinyTypes         % "compile->compile;test->test",
+    commonUtils       % "compile->compile;test->test",
+    metricUtils       % "compile->compile;test->test",
+    http4sClientUtils % "compile->compile;test->test",
+    gitlabUtils       % "compile->compile;test->test"
   )
 
 lazy val utils = project
@@ -228,8 +230,9 @@ lazy val triplesStoreClient = project
         Dependencies.http4sCirce
   )
   .dependsOn(
-    generators % "test->test",
-    tinyTypes  % "compile->compile; test->test",
+    generators        % "test->test",
+    tinyTypes         % "compile->compile; test->test",
+    jsonldUtils       % "compile->compile;test->test",
     http4sClientUtils % "compile->compile;test->test"
   )
   .enablePlugins(AutomateHeaderPlugin)
@@ -290,7 +293,8 @@ lazy val renkuModel = project
   .dependsOn(
     tinyTypes           % "compile->compile; test->test",
     renkuModelTinyTypes % "compile->compile; test->test",
-    renkuCliModel       % "compile->compile; test->test"
+    renkuCliModel       % "compile->compile; test->test",
+    gitlabUtils         % "compile->compile; test->test"
   )
   .enablePlugins(AutomateHeaderPlugin)
 
@@ -623,7 +627,7 @@ lazy val commonSettings = Seq(
   Compile / packageDoc / publishArtifact := false,
   Compile / packageSrc / publishArtifact := false,
   addCompilerPlugin("com.olegpy"    %% "better-monadic-for" % "0.3.1"),
-  addCompilerPlugin("org.typelevel" %% "kind-projector"     % "0.13.2" cross CrossVersion.full),
+  addCompilerPlugin("org.typelevel" %% "kind-projector"     % "0.13.3" cross CrossVersion.full),
   // format: off
   scalacOptions ++= Seq(
     "-language:postfixOps", // enabling postfixes

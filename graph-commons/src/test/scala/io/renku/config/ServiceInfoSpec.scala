@@ -20,7 +20,7 @@ package io.renku.config
 
 import cats.syntax.all._
 import com.typesafe.config.ConfigFactory
-import io.renku.generators.CommonGraphGenerators.{serviceNames, serviceVersions}
+import io.renku.config.ConfigGenerators.{serviceNames, serviceVersions}
 import io.renku.generators.Generators.Implicits._
 import io.renku.testtools.IOSpec
 import org.scalatest.matchers.should

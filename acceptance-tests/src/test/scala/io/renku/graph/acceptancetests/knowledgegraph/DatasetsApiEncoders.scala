@@ -25,7 +25,8 @@ import io.circe.{Encoder, Json}
 import io.renku.graph.acceptancetests.data._
 import io.renku.graph.acceptancetests.tooling.AcceptanceSpec
 import io.renku.graph.model.testentities.{Dataset, Person}
-import io.renku.graph.model.{GitLabUrl, datasets, projects}
+import io.renku.graph.model.{datasets, projects}
+import io.renku.http.client.GitLabUrl
 import io.renku.http.rest.Links.{Href, Rel, _links}
 import io.renku.tinytypes.json.TinyTypeDecoders._
 import org.scalatest.matchers.should

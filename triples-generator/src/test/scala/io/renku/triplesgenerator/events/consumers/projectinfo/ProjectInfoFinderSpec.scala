@@ -22,7 +22,7 @@ import cats.data.EitherT
 import cats.data.EitherT.rightT
 import cats.effect.IO
 import cats.syntax.all._
-import io.renku.generators.CommonGraphGenerators.accessTokens
+import io.renku.http.client.GitLabGenerators.accessTokens
 import io.renku.generators.Generators.Implicits._
 import io.renku.generators.Generators.exceptions
 import io.renku.graph.model.GraphModelGenerators.{personEmails, personNames, projectSlugs}

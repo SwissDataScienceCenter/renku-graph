@@ -19,30 +19,15 @@
 package io.renku.control
 
 import cats.MonadThrow
-import cats.syntax.all._
 import com.typesafe.config.{Config, ConfigFactory}
 import io.renku.config.ConfigLoader
-
-import scala.util.Try
+import io.renku.config.RenkuConfigReader._
 
 object RateLimitLoader {
 
   def fromConfig[F[_]: MonadThrow, Target](
       key:    String,
       config: Config = ConfigFactory.load()
-  ): F[RateLimit[Target]] = {
-    import ConfigLoader._
-    import pureconfig.ConfigReader
-    import pureconfig.error.CannotConvert
-
-    implicit val rateLimitReader: ConfigReader[RateLimit[Target]] =
-      ConfigReader.fromString[RateLimit[Target]] { value =>
-        RateLimit
-          .from[Try, Target](value)
-          .toEither
-          .leftMap(exception => CannotConvert(value, RateLimit.getClass.toString, exception.getMessage))
-      }
-
+  ): F[RateLimit[Target]] =
     ConfigLoader.find[F, RateLimit[Target]](key, config)
-  }
 }

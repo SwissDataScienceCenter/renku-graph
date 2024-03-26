@@ -31,7 +31,7 @@ import io.renku.generators.CommonGraphGenerators.{authContexts, renkuApiUrls}
 import io.renku.generators.Generators.Implicits._
 import io.renku.generators.Generators._
 import io.renku.graph.http.server.security.Authorizer.AuthContext
-import io.renku.graph.model.GraphModelGenerators._
+import io.renku.http.client.GitLabGenerators._
 import io.renku.graph.model._
 import io.renku.graph.model.datasets._
 import io.renku.graph.model.images.ImageUri
@@ -39,6 +39,7 @@ import io.renku.graph.model.persons.{Affiliation, Email, Name => UserName}
 import io.renku.graph.model.projects.Slug
 import io.renku.graph.model.testentities.generators.EntitiesGenerators
 import io.renku.http.RenkuEntityCodec
+import io.renku.http.client.GitLabUrl
 import io.renku.http.rest.Links
 import io.renku.http.rest.Links.Rel.Self
 import io.renku.http.rest.Links.{Href, Rel}

@@ -24,9 +24,10 @@ import cats.data.EitherT._
 import cats.effect.Async
 import cats.effect.implicits._
 import cats.syntax.all._
-import io.renku.graph.config.{GitLabUrlLoader, RenkuUrlLoader}
+import com.typesafe.config.ConfigFactory
+import io.renku.graph.config.RenkuUrlLoader
 import io.renku.graph.model.{RenkuUrl, entities, projects}
-import io.renku.http.client.AccessToken
+import io.renku.http.client.{AccessToken, GitLabClientLoader}
 import io.renku.jsonld.{JsonLD, Property}
 import io.renku.triplesgenerator.errors.{ProcessingNonRecoverableError, ProcessingRecoverableError}
 import io.renku.triplesgenerator.events.consumers.awaitinggeneration.triplesgeneration.TriplesGenerator
@@ -163,7 +164,8 @@ private[awaitinggeneration] class RenkuLogTriplesGenerator[F[_]: Async] private[
 private[events] object RenkuLogTriplesGenerator {
 
   def apply[F[_]: Async: Logger](): F[TriplesGenerator[F]] = for {
-    gitLabUrl <- GitLabUrlLoader[F]()
+    config    <- Async[F].blocking(ConfigFactory.load())
+    gitLabUrl <- GitLabClientLoader.gitLabUrl[F](config)
     renkuUrl  <- RenkuUrlLoader[F]()
   } yield {
     implicit val baseUrl: RenkuUrl = renkuUrl

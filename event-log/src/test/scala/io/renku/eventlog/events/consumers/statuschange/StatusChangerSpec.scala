@@ -33,7 +33,7 @@ import io.renku.eventlog.events.consumers.statuschange.DBUpdater.{RollbackOp, Up
 import io.renku.events.Generators.{subscriberIds, subscriberUrls}
 import io.renku.events.consumers.ConsumersModelGenerators.consumerProjects
 import io.renku.events.consumers.Project
-import io.renku.generators.CommonGraphGenerators.microserviceBaseUrls
+import io.renku.CommonGenerators.microserviceBaseUrls
 import io.renku.generators.Generators
 import io.renku.generators.Generators.Implicits._
 import io.renku.generators.Generators.{exceptions, nonNegativeInts}

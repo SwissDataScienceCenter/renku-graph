@@ -22,9 +22,11 @@ import cats.syntax.all._
 import eu.timepit.refined.api.Refined
 import eu.timepit.refined.auto._
 import eu.timepit.refined.collection.NonEmpty
+import io.renku.http.client.HttpClientGenerators._
 import io.renku.generators.CommonGraphGenerators._
 import io.renku.generators.Generators.Implicits._
 import io.renku.generators.Generators._
+import io.renku.jsonld.JsonLDGenerators
 import io.renku.triplesstore.SparqlQuery.{Prefix, Prefixes}
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
@@ -52,9 +54,9 @@ class SparqlQuerySpec extends AnyWordSpec with should.Matchers {
       val name              = nonBlankStrings().generateOne
       val body              = sentences().generateOne.value
       val prefixName        = nonBlankStrings().generateOne
-      val prefixSchema      = schemas.generateOne
+      val prefixSchema      = JsonLDGenerators.schemas.generateOne
       val otherPrefixName   = nonBlankStrings().generateOne
-      val otherPrefixSchema = schemas.generateDifferentThan(prefixSchema)
+      val otherPrefixSchema = JsonLDGenerators.schemas.generateDifferentThan(prefixSchema)
 
       val sparql = SparqlQuery.of(
         name,

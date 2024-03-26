@@ -21,14 +21,16 @@ package io.renku.knowledgegraph.entities
 import cats.NonEmptyParallel
 import cats.effect.Async
 import cats.syntax.all._
+import com.typesafe.config.ConfigFactory
 import eu.timepit.refined.auto._
 import io.circe.syntax._
 import io.renku.config.renku
 import io.renku.config.renku.ResourceUrl
 import io.renku.data.Message
 import io.renku.entities.search.{Criteria, EntitiesFinder, model}
-import io.renku.graph.config.{GitLabUrlLoader, RenkuUrlLoader}
+import io.renku.graph.config.RenkuUrlLoader
 import io.renku.graph.model._
+import io.renku.http.client.{GitLabClientLoader, GitLabUrl}
 import io.renku.http.rest.paging.{PagingHeaders, PagingResponse}
 import io.renku.triplesstore.SparqlQueryTimeRecorder
 import org.http4s.circe.CirceEntityEncoder._
@@ -45,10 +47,11 @@ trait Endpoint[F[_]] {
 object Endpoint {
 
   def apply[F[_]: Async: NonEmptyParallel: Logger: SparqlQueryTimeRecorder]: F[Endpoint[F]] = for {
+    config         <- Async[F].blocking(ConfigFactory.load())
     entitiesFinder <- EntitiesFinder[F]
     renkuUrl       <- RenkuUrlLoader()
     renkuApiUrl    <- renku.ApiUrl()
-    gitLabUrl      <- GitLabUrlLoader[F]()
+    gitLabUrl      <- GitLabClientLoader.gitLabUrl[F](config)
   } yield new EndpointImpl(entitiesFinder, renkuUrl, renkuApiUrl, gitLabUrl)
 }
 

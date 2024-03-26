@@ -26,7 +26,7 @@ import eu.timepit.refined.collection.NonEmpty
 import io.circe.literal._
 import io.renku.events.consumers.ConsumersModelGenerators.consumerProjects
 import io.renku.events.consumers.Project
-import io.renku.generators.CommonGraphGenerators.accessTokens
+import io.renku.http.client.GitLabGenerators.accessTokens
 import io.renku.generators.Generators.Implicits._
 import io.renku.graph.model.projects
 import io.renku.graph.model.RenkuTinyTypeGenerators.projectSlugs

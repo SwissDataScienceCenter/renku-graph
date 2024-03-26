@@ -19,7 +19,6 @@
 package io.renku.graph.acceptancetests.knowledgegraph
 
 import cats.syntax.all._
-import eu.timepit.refined.auto._
 import io.circe.Json
 import io.renku.generators.CommonGraphGenerators.authUsers
 import io.renku.generators.Generators.Implicits._

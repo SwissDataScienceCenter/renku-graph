@@ -25,6 +25,7 @@ import io.renku.graph.model.activities.{EndTime, ResourceId, StartTime}
 import io.renku.graph.model.entities.ParameterValue.{CommandInputValue, CommandOutputValue}
 import io.renku.graph.model.{GraphClass, RenkuUrl}
 import io.renku.graph.model.Schemas.{prov, renku}
+import io.renku.http.client.GitLabApiUrl
 import io.renku.jsonld.ontology._
 import io.renku.jsonld.syntax._
 import io.renku.jsonld.{EntityTypes, JsonLD, JsonLDEncoder, Reverse}
@@ -41,7 +42,6 @@ final case class Activity(resourceId:  ResourceId,
 )
 
 object Activity {
-  import io.renku.graph.model.GitLabApiUrl
 
   implicit def functions(implicit renkuUrl: RenkuUrl, gitLabApiUrl: GitLabApiUrl): EntityFunctions[Activity] =
     new EntityFunctions[Activity] {

@@ -23,9 +23,11 @@ import cats.MonadThrow
 import cats.data.EitherT
 import cats.effect.Async
 import cats.syntax.all._
-import io.renku.graph.config.{GitLabUrlLoader, RenkuUrlLoader}
+import com.typesafe.config.ConfigFactory
+import io.renku.graph.config.RenkuUrlLoader
 import io.renku.graph.model._
 import io.renku.graph.model.entities.{EntityFunctions, Person, Project}
+import io.renku.http.client.{GitLabApiUrl, GitLabClientLoader}
 import io.renku.jsonld.syntax._
 import io.renku.triplesgenerator.errors.ProcessingRecoverableError
 import io.renku.triplesstore._
@@ -39,9 +41,10 @@ private trait TransformationResultsUploader[F[_]] {
 private object TransformationResultsUploader {
 
   def apply[F[_]: Async: SparqlQueryTimeRecorder: Logger]: F[TransformationResultsUploader[F]] = for {
-    implicit0(renkuUrl: RenkuUrl)     <- RenkuUrlLoader[F]()
-    implicit0(glApiUrl: GitLabApiUrl) <- GitLabUrlLoader[F]().map(_.apiV4)
-    projectsConnectionConfig          <- ProjectsConnectionConfig.fromConfig[F]()
+    config                            <- Async[F].blocking(ConfigFactory.load())
+    implicit0(renkuUrl: RenkuUrl)     <- RenkuUrlLoader[F](config)
+    implicit0(glApiUrl: GitLabApiUrl) <- GitLabClientLoader.gitLabUrl[F](config).map(_.apiV4)
+    projectsConnectionConfig          <- ProjectsConnectionConfig.fromConfig[F](config)
   } yield new TransformationResultsUploaderImpl[F](new JsonLDUploaderImpl[F](projectsConnectionConfig),
                                                    new UpdateQueryRunnerImpl(projectsConnectionConfig)
   )

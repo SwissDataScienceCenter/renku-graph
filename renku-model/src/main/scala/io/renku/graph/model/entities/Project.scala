@@ -30,6 +30,7 @@ import io.renku.graph.model.gitlab.GitLabProjectInfo
 import io.renku.graph.model.images.Image
 import io.renku.graph.model.projects._
 import io.renku.graph.model.versions.{CliVersion, SchemaVersion}
+import io.renku.http.client.GitLabApiUrl
 import io.renku.jsonld.Property
 import io.renku.jsonld.ontology._
 import io.renku.tinytypes.InstantTinyType

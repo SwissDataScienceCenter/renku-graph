@@ -25,7 +25,7 @@ import io.circe.literal._
 import io.renku.events.producers.EventSender
 import io.renku.events.producers.EventSender.EventContext
 import io.renku.events.{CategoryName, EventRequestContent}
-import io.renku.generators.CommonGraphGenerators.microserviceBaseUrls
+import io.renku.CommonGenerators.microserviceBaseUrls
 import io.renku.generators.Generators.Implicits._
 import io.renku.generators.Generators._
 import io.renku.interpreters.TestLogger

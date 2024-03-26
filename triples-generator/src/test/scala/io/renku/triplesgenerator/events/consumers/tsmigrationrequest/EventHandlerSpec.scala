@@ -32,7 +32,8 @@ import io.renku.events.consumers.subscriptions.SubscriptionMechanism
 import io.renku.events.producers.EventSender
 import io.renku.events.producers.EventSender.EventContext
 import io.renku.events.{CategoryName, EventRequestContent}
-import io.renku.generators.CommonGraphGenerators.{microserviceIdentifiers, serviceVersions}
+import io.renku.CommonGenerators.microserviceIdentifiers
+import io.renku.config.ConfigGenerators.serviceVersions
 import io.renku.generators.Generators.Implicits._
 import io.renku.generators.Generators.exceptions
 import io.renku.interpreters.TestLogger

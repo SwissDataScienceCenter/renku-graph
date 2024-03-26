@@ -27,7 +27,7 @@ import io.renku.core.client.{ProjectRepository, UserInfo, NewProject => CoreNewP
 import io.renku.generators.CommonGraphGenerators.authUsers
 import io.renku.generators.Generators.Implicits._
 import io.renku.generators.Generators.exceptions
-import io.renku.graph.model.GraphModelGenerators.gitLabUrls
+import io.renku.http.client.GitLabGenerators.gitLabUrls
 import io.renku.http.client.UserAccessToken
 import io.renku.knowledgegraph.gitlab.UserInfoFinder
 import org.scalamock.scalatest.AsyncMockFactory

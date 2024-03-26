@@ -21,12 +21,14 @@ package io.renku.knowledgegraph.projects.details
 import cats.effect._
 import cats.syntax.all._
 import cats.{MonadThrow, Parallel}
+import com.typesafe.config.ConfigFactory
+import io.circe.syntax._
 import io.renku.config.renku
 import io.renku.data.Message
 import io.renku.data.MessageJsonLDEncoder._
-import io.renku.graph.config.GitLabUrlLoader
-import io.renku.graph.model.{GitLabUrl, projects}
-import io.renku.http.client.GitLabClient
+import io.renku.graph.model.projects
+import io.renku.http.RenkuEntityCodec
+import io.renku.http.client.{GitLabClient, GitLabClientLoader, GitLabUrl}
 import io.renku.http.rest.Links.Href
 import io.renku.http.server.security.model.AuthUser
 import io.renku.jsonld.syntax._
@@ -35,6 +37,8 @@ import io.renku.metrics.MetricsRegistry
 import io.renku.triplesgenerator
 import io.renku.triplesgenerator.api.events.ProjectViewedEvent
 import io.renku.triplesstore.SparqlQueryTimeRecorder
+import io.renku.http.server.endpoint._
+import io.renku.triplesstore.client.http.jsonld.JsonLDEntityCodec
 import model._
 import org.http4s.MediaType.application
 import org.http4s.dsl.Http4sDsl
@@ -59,13 +63,11 @@ class EndpointImpl[F[_]: MonadThrow: Logger](
     gitLabUrl:             GitLabUrl,
     now:                   () => Instant = () => Instant.now()
 ) extends Http4sDsl[F]
-    with Endpoint[F] {
+    with Endpoint[F]
+    with RenkuEntityCodec
+    with JsonLDEntityCodec {
 
   import executionTimeRecorder._
-  import io.circe.syntax._
-  import io.renku.http.jsonld4s._
-  import io.renku.http.server.endpoint._
-  import org.http4s.circe.jsonEncoder
 
   private implicit lazy val glUrl: GitLabUrl = gitLabUrl
 
@@ -121,11 +123,12 @@ object Endpoint {
 
   def apply[F[_]: Parallel: Async: GitLabClient: Logger: SparqlQueryTimeRecorder: MetricsRegistry]: F[Endpoint[F]] =
     for {
+      config                <- Async[F].blocking(ConfigFactory.load())
       projectFinder         <- ProjectFinder[F]
       jsonEncoder           <- ProjectJsonEncoder[F]
       tgClient              <- triplesgenerator.api.events.Client[F]
-      executionTimeRecorder <- ExecutionTimeRecorderLoader[F]()
-      gitLabUrl             <- GitLabUrlLoader[F]()
+      executionTimeRecorder <- ExecutionTimeRecorderLoader[F](config)
+      gitLabUrl             <- GitLabClientLoader.gitLabUrl[F](config)
     } yield new EndpointImpl[F](projectFinder,
                                 jsonEncoder,
                                 ProjectJsonLDEncoder,

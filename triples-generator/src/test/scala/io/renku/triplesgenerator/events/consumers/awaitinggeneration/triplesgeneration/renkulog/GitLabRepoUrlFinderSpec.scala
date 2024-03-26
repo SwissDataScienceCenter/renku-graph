@@ -21,12 +21,11 @@ package io.renku.triplesgenerator.events.consumers.awaitinggeneration.triplesgen
 import Commands.{GitLabRepoUrlFinder, GitLabRepoUrlFinderImpl}
 import cats.syntax.all._
 import io.renku.config.ServiceUrl
-import io.renku.generators.CommonGraphGenerators._
+import io.renku.http.client.GitLabGenerators._
 import io.renku.generators.Generators.Implicits._
 import io.renku.generators.Generators._
-import io.renku.graph.model.GitLabUrl
 import io.renku.graph.model.GraphModelGenerators._
-import io.renku.http.client.AccessToken
+import io.renku.http.client.{AccessToken, GitLabUrl}
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.matchers.should
 import org.scalatest.prop.TableDrivenPropertyChecks

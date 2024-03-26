@@ -36,7 +36,7 @@ import io.renku.knowledgegraph.Generators.failures
 import io.renku.knowledgegraph.projects.delete.ProjectRemover
 import io.renku.triplesgenerator.api.TriplesGeneratorClient.{Result => TGResult}
 import io.renku.triplesgenerator.api.{TriplesGeneratorClient, NewProject => TGNewProject}
-import io.renku.webhookservice.api.Generators.successfulHookCreationResults
+import io.renku.webhookservice.api.WebhookGenerators.successfulHookCreationResults
 import io.renku.webhookservice.api.WebhookServiceClient.{Result => WSResult}
 import io.renku.webhookservice.api.{HookCreationResult, WebhookServiceClient}
 import org.scalamock.scalatest.AsyncMockFactory

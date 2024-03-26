@@ -26,12 +26,14 @@ import io.circe.{Decoder, Encoder, Json}
 import io.renku.config.renku
 import io.renku.config.renku.ResourceUrl
 import io.renku.data.Message
+import io.renku.http.client.GitLabGenerators._
 import io.renku.generators.CommonGraphGenerators._
 import io.renku.generators.Generators.Implicits._
 import io.renku.generators.Generators._
 import io.renku.graph.model.GraphModelGenerators._
-import io.renku.graph.model.{GitLabUrl, RenkuUrl}
+import io.renku.graph.model.RenkuUrl
 import io.renku.http.RenkuEntityCodec
+import io.renku.http.client.GitLabUrl
 import io.renku.http.rest.paging.{PagingHeaders, PagingResponse}
 import io.renku.interpreters.TestLogger
 import io.renku.interpreters.TestLogger.Level.{Error, Warn}

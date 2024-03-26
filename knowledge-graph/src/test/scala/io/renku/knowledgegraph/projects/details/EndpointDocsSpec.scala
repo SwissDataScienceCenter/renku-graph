@@ -20,8 +20,8 @@ package io.renku.knowledgegraph.projects.details
 
 import io.renku.generators.CommonGraphGenerators.renkuApiUrls
 import io.renku.generators.Generators.Implicits._
-import io.renku.graph.model.GitLabUrl
 import io.renku.graph.model.testentities.generators.EntitiesGenerators
+import io.renku.http.client.GitLabUrl
 import io.renku.knowledgegraph.docs.OpenApiTester._
 import org.scalatest.wordspec.AnyWordSpec
 

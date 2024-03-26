@@ -21,9 +21,13 @@ package io.renku.knowledgegraph.ontology
 import cats.effect.Async
 import cats.syntax.all._
 import fs2.io.file.Files
+import fs2.io.file.Path.fromNioPath
+import io.renku.http.server.endpoint._
+import io.renku.triplesstore.client.http.jsonld.JsonLDEntityCodec
 import org.http4s.dsl.Http4sDsl
 import org.http4s.headers.{Accept, Location}
 import org.http4s.{Headers, Request, Response, StaticFile, Uri}
+import org.http4s.MediaType.{application, text}
 import org.typelevel.log4cats.Logger
 
 trait Endpoint[F[_]] {
@@ -37,12 +41,8 @@ object Endpoint {
 
 private class EndpointImpl[F[_]: Async: Logger](ontologyGenerator: OntologyGenerator, htmlGenerator: HtmlGenerator[F])
     extends Http4sDsl[F]
-    with Endpoint[F] {
-
-  import fs2.io.file.Path.fromNioPath
-  import io.renku.http.jsonld4s._
-  import io.renku.http.server.endpoint._
-  import org.http4s.MediaType.{application, text}
+    with Endpoint[F]
+    with JsonLDEntityCodec {
 
   override def `GET /ontology`(path: Uri.Path)(implicit request: Request[F]): F[Response[F]] =
     whenAccept(

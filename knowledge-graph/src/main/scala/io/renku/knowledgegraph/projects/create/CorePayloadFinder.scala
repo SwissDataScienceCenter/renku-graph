@@ -23,9 +23,7 @@ import cats.effect.Async
 import cats.syntax.all._
 import com.typesafe.config.Config
 import io.renku.core.client.{ProjectRepository, UserInfo, NewProject => CoreNewProject}
-import io.renku.graph.config.GitLabUrlLoader
-import io.renku.graph.model.GitLabUrl
-import io.renku.http.client.{GitLabClient, UserAccessToken}
+import io.renku.http.client.{GitLabClient, GitLabClientLoader, GitLabUrl, UserAccessToken}
 import io.renku.http.server.security.model.AuthUser
 import io.renku.knowledgegraph.gitlab.UserInfoFinder
 
@@ -35,9 +33,11 @@ private trait CorePayloadFinder[F[_]] {
 
 private object CorePayloadFinder {
   def apply[F[_]: Async: NonEmptyParallel: GitLabClient](config: Config): F[CorePayloadFinder[F]] =
-    GitLabUrlLoader[F](config).map(
-      new CorePayloadFinderImpl[F](NamespaceFinder[F], UserInfoFinder[F], _)
-    )
+    GitLabClientLoader
+      .gitLabUrl[F](config)
+      .map(
+        new CorePayloadFinderImpl[F](NamespaceFinder[F], UserInfoFinder[F], _)
+      )
 }
 
 private class CorePayloadFinderImpl[F[_]: Async: NonEmptyParallel](namespaceFinder: NamespaceFinder[F],

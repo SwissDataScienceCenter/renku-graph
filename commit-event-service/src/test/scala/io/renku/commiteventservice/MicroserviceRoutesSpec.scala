@@ -21,7 +21,7 @@ package io.renku.commiteventservice
 import cats.effect.IO
 import cats.syntax.all._
 import io.renku.commiteventservice.events.EventEndpoint
-import io.renku.generators.CommonGraphGenerators.httpStatuses
+import io.renku.http.client.HttpClientGenerators.httpStatuses
 import io.renku.generators.Generators.Implicits._
 import io.renku.http.server.EndpointTester._
 import io.renku.http.server.version

@@ -19,7 +19,7 @@
 package io.renku.core.client
 
 import io.circe.Decoder
-import io.renku.graph.model.GitLabUrl
+import io.renku.http.client.GitLabUrl
 import io.renku.tinytypes.constraints.{NonBlank, Url}
 import io.renku.tinytypes.json.TinyTypeDecoders
 import io.renku.tinytypes.{BooleanTinyType, StringTinyType, TinyTypeFactory, UrlTinyType}

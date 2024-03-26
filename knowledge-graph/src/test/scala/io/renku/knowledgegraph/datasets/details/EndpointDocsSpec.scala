@@ -21,8 +21,10 @@ package io.renku.knowledgegraph.datasets.details
 import io.renku.config.renku
 import io.renku.generators.CommonGraphGenerators.renkuApiUrls
 import io.renku.generators.Generators.Implicits._
-import io.renku.graph.model.GraphModelGenerators.{gitLabUrls, renkuUrls}
-import io.renku.graph.model.{GitLabUrl, RenkuUrl}
+import io.renku.http.client.GitLabGenerators.gitLabUrls
+import io.renku.graph.model.GraphModelGenerators.renkuUrls
+import io.renku.graph.model.RenkuUrl
+import io.renku.http.client.GitLabUrl
 import io.renku.knowledgegraph.docs.OpenApiTester._
 import org.scalatest.wordspec.AnyWordSpec
 
