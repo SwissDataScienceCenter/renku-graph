@@ -67,7 +67,7 @@ object ProjectAuthService {
 
     override def remove(slugs: NonEmptyList[Slug]): F[Unit] =
       sparqlClient.update(sparql"""${"schema" -> Schemas.schema}
-                                  |${"renku"   -> Schemas.renku}
+                                  |${"renku" -> Schemas.renku}
                                   |
                                   |DELETE { Graph $graph {?s ?p ?o} }
                                   |WHERE {
