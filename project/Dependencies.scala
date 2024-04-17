@@ -31,7 +31,7 @@ object Dependencies {
     val rdf4jQueryParserSparql = "4.3.11"
     val refined                = "0.11.1"
     val refinedPureconfig      = "0.11.1"
-    val scalacheck             = "1.17.0"
+    val scalacheck             = "1.17.1"
     val scalamock              = "6.0.0"
     val scalatest              = "3.2.18"
     val scalatestScalacheck    = "3.2.14.0"
