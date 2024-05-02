@@ -38,7 +38,7 @@ object Dependencies {
     val sentryLogback          = "7.8.0"
     val skunk                  = "0.6.3"
     val swaggerParser          = "2.1.22"
-    val widoco                 = "1.4.23"
+    val widoco                 = "1.4.24"
     val wiremock               = "3.5.4"
   }
 
