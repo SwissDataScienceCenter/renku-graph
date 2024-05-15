@@ -20,7 +20,7 @@ object Dependencies {
     val http4sPrometheus       = "0.24.6"
     val ip4s                   = "3.5.0"
     val jsonld4s               = "0.15.0"
-    val log4cats               = "2.6.0"
+    val log4cats               = "2.7.0"
     val log4jCore              = "2.23.1"
     val logback                = "1.5.6"
     val luceneQueryParser      = "9.10.0"
