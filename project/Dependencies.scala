@@ -8,7 +8,7 @@ object Dependencies {
     val catsCore               = "2.10.0"
     val catsEffect             = "3.5.4"
     val catsEffectScalaTest    = "1.5.0"
-    val catsEffectMunit        = "1.0.7"
+    val catsEffectMunit        = "2.0.0"
     val scalacheckEffectMunit  = "1.0.4"
     val circeCore              = "0.14.7"
     val circeGenericExtras     = "0.14.3"
@@ -140,7 +140,7 @@ object Dependencies {
   )
 
   val catsEffectMunit = Seq(
-    "org.typelevel" %% "munit-cats-effect-3" % V.catsEffectMunit
+    "org.typelevel" %% "munit-cats-effect" % V.catsEffectMunit
   )
 
   val scalacheckEffectMunit = Seq(
