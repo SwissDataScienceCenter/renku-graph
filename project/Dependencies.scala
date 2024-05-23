@@ -9,7 +9,7 @@ object Dependencies {
     val catsEffect             = "3.5.4"
     val catsEffectScalaTest    = "1.5.0"
     val catsEffectMunit        = "2.0.0"
-    val scalacheckEffectMunit  = "1.0.4"
+    val scalacheckEffectMunit  = "2.0.0-M2"
     val circeCore              = "0.14.7"
     val circeGenericExtras     = "0.14.3"
     val circeOptics            = "0.15.0"
