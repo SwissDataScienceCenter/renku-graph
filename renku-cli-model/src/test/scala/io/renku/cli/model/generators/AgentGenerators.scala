@@ -26,8 +26,8 @@ import org.scalacheck.Gen
 
 trait AgentGenerators {
 
-  val agentSoftwareGenerator: Gen[CliAgent.Software] = softwareAgentGen.map(CliAgent.apply)
-  def agentPersonGenerator(implicit renkuUrl: RenkuUrl): Gen[CliAgent.Person] = cliPersonGen.map(CliAgent.apply)
+  val agentSoftwareGenerator:                            Gen[CliAgent.Software] = softwareAgentGen.map(CliAgent.apply)
+  def agentPersonGenerator(implicit renkuUrl: RenkuUrl): Gen[CliAgent.Person]   = cliPersonGen.map(CliAgent.apply)
 
   def agentGenerator(implicit renkuUrl: RenkuUrl): Gen[CliAgent] =
     Gen.oneOf(agentSoftwareGenerator, agentPersonGenerator)

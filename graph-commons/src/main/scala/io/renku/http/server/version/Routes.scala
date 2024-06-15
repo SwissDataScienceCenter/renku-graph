@@ -26,13 +26,13 @@ import org.http4s.Uri.Path
 import org.http4s.dsl.Http4sDsl
 
 trait Routes[F[_]] {
-  def apply(): HttpRoutes[F]
+  def apply():        HttpRoutes[F]
   def on(path: Path): HttpRoutes[F]
 }
 
 class RoutesImpl[F[_]: MonadThrow](endpoint: Endpoint[F]) extends Http4sDsl[F] with Routes[F] {
   import endpoint._
-  override def apply(): HttpRoutes[F] = HttpRoutes.of[F] { case GET -> Root / "version" => `GET /version` }
+  override def apply():        HttpRoutes[F] = HttpRoutes.of[F] { case GET -> Root / "version" => `GET /version` }
   override def on(path: Path): HttpRoutes[F] = HttpRoutes.of[F] { case GET -> `path` => `GET /version` }
 }
 

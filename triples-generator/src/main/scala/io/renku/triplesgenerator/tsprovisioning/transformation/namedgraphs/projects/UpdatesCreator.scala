@@ -30,7 +30,7 @@ import io.renku.triplesstore.client.syntax._
 
 private trait UpdatesCreator {
   def prepareUpdates(project:       Project, kgData: ProjectMutableData): List[SparqlQuery]
-  def postUpdates(project:          Project): List[SparqlQuery]
+  def postUpdates(project:          Project):                             List[SparqlQuery]
   def dateCreatedDeletion(project:  Project, kgData: ProjectMutableData): List[SparqlQuery]
   def dateModifiedDeletion(project: Project, kgData: ProjectMutableData): List[SparqlQuery]
 }

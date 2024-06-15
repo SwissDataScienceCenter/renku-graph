@@ -33,8 +33,8 @@ trait LabeledGauge[F[_], LabelValue] extends Gauge[F] {
   def update(labelValue:    (LabelValue, Double)): F[Unit]
   def increment(labelValue: LabelValue):           F[Unit]
   def decrement(labelValue: LabelValue):           F[Unit]
-  def reset(): F[Unit]
-  def clear(): F[Unit]
+  def reset():                                     F[Unit]
+  def clear():                                     F[Unit]
 }
 
 class PositiveValuesLabeledGauge[F[_]: Async, LabelValue](val name: String Refined NonEmpty,

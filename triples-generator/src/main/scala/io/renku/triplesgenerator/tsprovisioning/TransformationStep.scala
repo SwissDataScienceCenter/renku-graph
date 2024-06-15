@@ -51,7 +51,7 @@ private object TransformationStep {
   }
 
   object Queries {
-    val empty: Queries = Queries(Nil, Nil)
+    val empty:                                           Queries = Queries(Nil, Nil)
     def preDataQueriesOnly(queries:  List[SparqlQuery]): Queries = Queries(queries, Nil)
     def postDataQueriesOnly(queries: List[SparqlQuery]): Queries = Queries(Nil, queries)
 

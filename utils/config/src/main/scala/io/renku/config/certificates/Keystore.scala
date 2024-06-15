@@ -24,7 +24,7 @@ import java.security.KeyStore
 
 private trait Keystore[F[_]] {
   def load(certificate: Certificate): F[Unit]
-  def toJavaKeyStore: KeyStore
+  def toJavaKeyStore:                 KeyStore
 }
 
 private object Keystore {

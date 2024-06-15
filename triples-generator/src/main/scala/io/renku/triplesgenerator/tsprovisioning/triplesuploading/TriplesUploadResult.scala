@@ -47,7 +47,7 @@ object TriplesUploadResult {
         with NonRecoverableFailure
 
     def apply(message: String, cause: Throwable): NonRecoverableFailure = NonRecoverableFailureWithCause(message, cause)
-    def apply(message: String): NonRecoverableFailure = NonRecoverableFailureWithoutCause(message)
+    def apply(message: String):                   NonRecoverableFailure = NonRecoverableFailureWithoutCause(message)
 
     def unapply(nonRecoverableFailure: NonRecoverableFailure): Option[(String, Option[Throwable])] =
       nonRecoverableFailure match {

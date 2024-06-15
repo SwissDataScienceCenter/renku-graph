@@ -254,7 +254,7 @@ object datasets {
       with EntityIdJsonLDOps[PartResourceId]
 
   sealed trait CreatedOrPublished extends Any with TinyType {
-    def instant: Instant
+    def instant:                                             Instant
     def fold[A](c: DateCreated => A, p: DatePublished => A): A
   }
   object CreatedOrPublished {
@@ -277,8 +277,8 @@ object datasets {
   }
 
   final class DateCreated private (val value: Instant) extends AnyVal with CreatedOrPublished with InstantTinyType {
-    override def instant: Instant = value
-    def fold[A](c: DateCreated => A, p: DatePublished => A): A = c(this)
+    override def instant:                                    Instant = value
+    def fold[A](c: DateCreated => A, p: DatePublished => A): A       = c(this)
   }
   implicit object DateCreated
       extends TinyTypeFactory[DateCreated](new DateCreated(_))
@@ -292,8 +292,8 @@ object datasets {
       extends AnyVal
       with CreatedOrPublished
       with LocalDateTinyType {
-    override def instant: Instant = value.atStartOfDay().toInstant(ZoneOffset.UTC)
-    def fold[A](c: DateCreated => A, p: DatePublished => A): A = p(this)
+    override def instant:                                    Instant = value.atStartOfDay().toInstant(ZoneOffset.UTC)
+    def fold[A](c: DateCreated => A, p: DatePublished => A): A       = p(this)
   }
   implicit object DatePublished
       extends TinyTypeFactory[DatePublished](new DatePublished(_))

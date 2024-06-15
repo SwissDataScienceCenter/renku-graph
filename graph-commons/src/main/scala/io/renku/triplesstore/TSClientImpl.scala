@@ -46,9 +46,9 @@ import org.typelevel.log4cats.Logger
 import scala.concurrent.duration._
 
 trait TSClient[F[_]] {
-  def updateWithNoResult(updateQuery:         SparqlQuery): F[Unit]
+  def updateWithNoResult(updateQuery:         SparqlQuery):                                        F[Unit]
   def queryExpecting[ResultType](selectQuery: SparqlQuery)(implicit decoder: Decoder[ResultType]): F[ResultType]
-  def upload(jsonLD:                          JsonLD): F[Unit]
+  def upload(jsonLD:                          JsonLD):                                             F[Unit]
 
   def pagedResultsFinder[ResultType](
       query:           SparqlQuery,

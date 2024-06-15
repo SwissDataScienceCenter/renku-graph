@@ -53,7 +53,7 @@ object model {
   }
 
   object MaybeAuthUser {
-    val noUser: MaybeAuthUser = new MaybeAuthUser(None)
+    val noUser:                        MaybeAuthUser = new MaybeAuthUser(None)
     def apply(user: Option[AuthUser]): MaybeAuthUser = new MaybeAuthUser(user)
     def apply(user: AuthUser):         MaybeAuthUser = apply(Some(user))
   }

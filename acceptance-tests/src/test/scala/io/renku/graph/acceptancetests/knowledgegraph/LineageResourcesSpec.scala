@@ -120,7 +120,10 @@ class LineageResourcesSpec extends AcceptanceSpec with ApplicationServices with 
       When("user fetches the lineage of the project he is a member of")
 
       val response =
-        knowledgeGraphClient GET (s"knowledge-graph/projects/${project.slug}/files/${urlEncode(accessibleExemplarData.`grid_plot entity`.location)}/lineage", user.accessToken)
+        knowledgeGraphClient GET (
+          s"knowledge-graph/projects/${project.slug}/files/${urlEncode(accessibleExemplarData.`grid_plot entity`.location)}/lineage",
+          user.accessToken
+        )
 
       Then("he should get OK response with project lineage in Json")
       response.status shouldBe Ok

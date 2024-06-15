@@ -27,7 +27,7 @@ import io.renku.triplesstore.client.model.TripleObjectEncoder
 import io.renku.triplesstore.client.syntax._
 
 sealed trait UserId extends Product {
-  lazy val widen: UserId = this
+  lazy val widen:                                                        UserId = this
   def fold[A](glidF: persons.GitLabId => A, emailF: persons.Email => A): A
 }
 

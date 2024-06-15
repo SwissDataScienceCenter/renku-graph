@@ -26,7 +26,7 @@ import io.renku.eventlog.api.events.StatusChangeEvent
 import skunk.Session
 
 private trait DBUpdater[F[_], E <: StatusChangeEvent] {
-  def updateDB(event:   E): UpdateOp[F]
+  def updateDB(event:   E):                                  UpdateOp[F]
   def onRollback(event: E)(implicit sr: SessionResource[F]): RollbackOp[F]
 }
 

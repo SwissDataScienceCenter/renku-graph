@@ -26,8 +26,8 @@ import io.renku.events.{CategoryName, EventRequestContent}
 
 trait EventConsumersRegistry[F[_]] {
   def handle(requestContent: EventRequestContent): F[EventSchedulingResult]
-  def renewAllSubscriptions(): F[Unit]
-  def run:                     F[Unit]
+  def renewAllSubscriptions():                     F[Unit]
+  def run:                                         F[Unit]
 }
 
 class EventConsumersRegistryImpl[F[_]: MonadThrow: Parallel](

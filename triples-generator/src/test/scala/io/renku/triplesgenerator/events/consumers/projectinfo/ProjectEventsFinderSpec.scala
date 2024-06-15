@@ -100,9 +100,10 @@ class ProjectEventsFinderSpec
 
       mapResponse(Status.Ok, Request[IO](), Response[IO]().withEntity(events.asJson.noSpaces))
         .unsafeRunSync() shouldBe (events.map(
-        _.asNormalPushEvent
-      ),
-      PagingInfo(None, None))
+                                     _.asNormalPushEvent
+                                   ),
+                                   PagingInfo(None, None)
+      )
     }
 
     "take commitFrom if commitTo doesn't exist on the event" in new TestCase {
@@ -115,9 +116,10 @@ class ProjectEventsFinderSpec
 
       mapResponse(Status.Ok, Request[IO](), Response[IO]().withEntity(events.asJson.noSpaces))
         .unsafeRunSync() shouldBe (events.map(
-        _.asNormalPushEvent
-      ),
-      PagingInfo(None, None))
+                                     _.asNormalPushEvent
+                                   ),
+                                   PagingInfo(None, None)
+      )
     }
 
     "parse the response headers for 'next page' and 'total pages'" in new TestCase {

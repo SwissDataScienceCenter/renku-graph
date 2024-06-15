@@ -36,10 +36,10 @@ import org.typelevel.log4cats.Logger
 import scala.concurrent.duration._
 
 trait ReProvisioningStatus[F[_]] {
-  def underReProvisioning(): F[Boolean]
-  def setRunning(on: MicroserviceBaseUrl): F[Unit]
-  def clear():                     F[Unit]
-  def findReProvisioningService(): F[Option[MicroserviceBaseUrl]]
+  def underReProvisioning():                                           F[Boolean]
+  def setRunning(on:                        MicroserviceBaseUrl):      F[Unit]
+  def clear():                                                         F[Unit]
+  def findReProvisioningService():                                     F[Option[MicroserviceBaseUrl]]
   def registerForNotification(subscription: SubscriptionMechanism[F]): F[Unit]
 }
 

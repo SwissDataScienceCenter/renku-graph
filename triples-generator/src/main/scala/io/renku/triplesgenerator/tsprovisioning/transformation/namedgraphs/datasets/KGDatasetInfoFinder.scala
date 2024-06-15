@@ -30,15 +30,15 @@ import org.typelevel.log4cats.Logger
 private trait KGDatasetInfoFinder[F[_]] {
 
   def findParentTopmostSameAs(idSameAs: datasets.InternalSameAs): F[Option[datasets.TopmostSameAs]]
-  def findTopmostSameAs(projectId:      projects.ResourceId, dsId: datasets.ResourceId): F[Set[datasets.TopmostSameAs]]
-  def findDatasetCreators(projectId:    projects.ResourceId, dsId: datasets.ResourceId): F[Set[persons.ResourceId]]
+  def findTopmostSameAs(projectId:   projects.ResourceId, dsId: datasets.ResourceId): F[Set[datasets.TopmostSameAs]]
+  def findDatasetCreators(projectId: projects.ResourceId, dsId: datasets.ResourceId): F[Set[persons.ResourceId]]
   def findDatasetOriginalIdentifiers(projectId: projects.ResourceId,
                                      dsId:      datasets.ResourceId
   ): F[Set[datasets.OriginalIdentifier]]
   def findDatasetDateCreated(projectId:  projects.ResourceId, dsId: datasets.ResourceId): F[Set[datasets.DateCreated]]
   def findDatasetDescriptions(projectId: projects.ResourceId, dsId: datasets.ResourceId): F[Set[datasets.Description]]
   def findDatasetSameAs(projectId:       projects.ResourceId, dsId: datasets.ResourceId): F[Set[datasets.SameAs]]
-  def findWhereNotInvalidated(dsId:      datasets.ResourceId): F[Set[projects.ResourceId]]
+  def findWhereNotInvalidated(dsId:      datasets.ResourceId):                            F[Set[projects.ResourceId]]
   def checkPublicationEventsExist(projectId: projects.ResourceId, dsId: datasets.ResourceId): F[Boolean]
 }
 

@@ -71,7 +71,7 @@ object EventLogClient {
 
     def success[A](value: A):      Result[A] = Success(value)
     def failure[A](error: String): Result[A] = Failure(error)
-    def unavailable[A]: Result[A] = Unavailable
+    def unavailable[A]:            Result[A] = Unavailable
   }
 
   final case class SearchCriteria(

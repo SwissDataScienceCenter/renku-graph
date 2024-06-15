@@ -280,25 +280,25 @@ class PostgresLockSpec extends AsyncWordSpec with AsyncIOSpec with should.Matche
 
 object PostgresLockSpec {
   abstract class TestSession extends Session[IO] {
-    override def execute[A, B](query:  Query[A, B])(args:      A): IO[List[B]] = ???
-    override def option[A, B](query:   Query[A, B])(args:      A): IO[Option[B]] = ???
-    override def stream[A, B](command: Query[A, B])(args:      A, chunkSize: Int): fs2.Stream[IO, B] = ???
-    override def cursor[A, B](query:   Query[A, B])(args:      A): Resource[IO, Cursor[IO, B]] = ???
-    override def execute[A](command:   Command[A])(args:       A): IO[Completion] = ???
-    override def pipe[A](command:      Command[A]): Pipe[IO, A, Completion] = ???
-    override def pipe[A, B](query:     Query[A, B], chunkSize: Int): Pipe[IO, A, B] = ???
-    override def parameters: concurrent.Signal[IO, Map[String, String]] = ???
-    override def parameter(key: String): fs2.Stream[IO, String] = ???
-    override def transactionStatus: concurrent.Signal[IO, TransactionStatus] = ???
-    override def execute[A](query:    Query[skunk.Void, A]): IO[List[A]] = ???
-    override def unique[A](query:     Query[skunk.Void, A]): IO[A] = ???
-    override def unique[A, B](query:  Query[A, B])(args: A): IO[B] = ???
-    override def option[A](query:     Query[skunk.Void, A]): IO[Option[A]] = ???
-    override def execute(command:     Command[skunk.Void]): IO[Completion] = ???
-    override def prepare[A, B](query: Query[A, B]): IO[PreparedQuery[IO, A, B]] = ???
-    override def prepare[A](command:  Command[A]): IO[PreparedCommand[IO, A]] = ???
-    override def channel(name:        Identifier): Channel[IO, String, String] = ???
-    override def transaction[A]: Resource[IO, Transaction[IO]] = ???
+    override def execute[A, B](query:  Query[A, B])(args:      A):                 IO[List[B]]                 = ???
+    override def option[A, B](query:   Query[A, B])(args:      A):                 IO[Option[B]]               = ???
+    override def stream[A, B](command: Query[A, B])(args:      A, chunkSize: Int): fs2.Stream[IO, B]           = ???
+    override def cursor[A, B](query:   Query[A, B])(args:      A):                 Resource[IO, Cursor[IO, B]] = ???
+    override def execute[A](command:   Command[A])(args:       A):                 IO[Completion]              = ???
+    override def pipe[A](command:      Command[A]):                                Pipe[IO, A, Completion]     = ???
+    override def pipe[A, B](query:     Query[A, B], chunkSize: Int):               Pipe[IO, A, B]              = ???
+    override def parameters:                                 concurrent.Signal[IO, Map[String, String]] = ???
+    override def parameter(key:       String):               fs2.Stream[IO, String]                     = ???
+    override def transactionStatus:                          concurrent.Signal[IO, TransactionStatus]   = ???
+    override def execute[A](query:    Query[skunk.Void, A]): IO[List[A]]                                = ???
+    override def unique[A](query:     Query[skunk.Void, A]): IO[A]                                      = ???
+    override def unique[A, B](query:  Query[A, B])(args: A): IO[B]                                      = ???
+    override def option[A](query:     Query[skunk.Void, A]): IO[Option[A]]                              = ???
+    override def execute(command:     Command[skunk.Void]):  IO[Completion]                             = ???
+    override def prepare[A, B](query: Query[A, B]):          IO[PreparedQuery[IO, A, B]]                = ???
+    override def prepare[A](command:  Command[A]):           IO[PreparedCommand[IO, A]]                 = ???
+    override def channel(name:        Identifier):           Channel[IO, String, String]                = ???
+    override def transaction[A]:                             Resource[IO, Transaction[IO]]              = ???
     override def transaction[A](
         isolationLevel: TransactionIsolationLevel,
         accessMode:     TransactionAccessMode

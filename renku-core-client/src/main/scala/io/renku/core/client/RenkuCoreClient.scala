@@ -34,8 +34,8 @@ trait RenkuCoreClient[F[_]] {
   def findCoreUri(projectUrl:  projects.GitHttpUrl,
                   userInfo:    UserInfo,
                   accessToken: AccessToken
-  ): F[Result[RenkuCoreUri.Versioned]]
-  def findCoreUri(schemaVersion: SchemaVersion): F[Result[RenkuCoreUri.Versioned]]
+  ):                                                                        F[Result[RenkuCoreUri.Versioned]]
+  def findCoreUri(schemaVersion: SchemaVersion):                            F[Result[RenkuCoreUri.Versioned]]
   def createProject(newProject:  NewProject, accessToken: UserAccessToken): F[Result[Unit]]
   def updateProject(coreUri:     RenkuCoreUri.Versioned,
                     updates:     ProjectUpdates,

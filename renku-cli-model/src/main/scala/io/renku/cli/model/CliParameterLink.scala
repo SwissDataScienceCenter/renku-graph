@@ -37,7 +37,7 @@ final case class CliParameterLink(
 object CliParameterLink {
 
   sealed trait Sink {
-    def resourceId: commandParameters.ResourceId
+    def resourceId:                                                      commandParameters.ResourceId
     def fold[A](fa: CliCommandInput => A, fb: CliCommandParameter => A): A
   }
 

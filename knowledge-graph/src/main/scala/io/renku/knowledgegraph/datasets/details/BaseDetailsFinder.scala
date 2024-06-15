@@ -42,8 +42,8 @@ import org.typelevel.log4cats.Logger
 private trait BaseDetailsFinder[F[_]] {
   def findBaseDetails(identifier: RequestedDataset, authContext: AuthContext[RequestedDataset]): F[Option[Dataset]]
   def findInitialTag(dataset:     Dataset, authContext:          AuthContext[RequestedDataset]): F[Option[Tag]]
-  def findKeywords(dataset:       Dataset): F[List[Keyword]]
-  def findImages(dataset:         Dataset): F[List[ImageUri]]
+  def findKeywords(dataset:       Dataset):                                                      F[List[Keyword]]
+  def findImages(dataset:         Dataset):                                                      F[List[ImageUri]]
 }
 
 private class BaseDetailsFinderImpl[F[_]: Async: Logger: SparqlQueryTimeRecorder](storeConfig: ProjectsConnectionConfig)

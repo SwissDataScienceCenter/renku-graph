@@ -34,7 +34,7 @@ import org.http4s.dsl.Http4sDsl
 import org.typelevel.log4cats.Logger
 
 trait TriplesGeneratorClient[F[_]] {
-  def createProject(newProject: NewProject): F[Result[Unit]]
+  def createProject(newProject: NewProject):                             F[Result[Unit]]
   def updateProject(slug:       projects.Slug, updates: ProjectUpdates): F[Result[Unit]]
 }
 
