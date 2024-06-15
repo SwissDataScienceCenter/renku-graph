@@ -35,8 +35,8 @@ import org.http4s.dsl.Http4sDsl
 import org.typelevel.log4cats.Logger
 
 trait TokenRepositoryClient[F[_]] {
-  def findAccessToken(projectId:   projects.GitLabId): F[Option[AccessToken]]
-  def findAccessToken(projectSlug: projects.Slug): F[Option[AccessToken]]
+  def findAccessToken(projectId:   projects.GitLabId):                               F[Option[AccessToken]]
+  def findAccessToken(projectSlug: projects.Slug):                                   F[Option[AccessToken]]
   def removeAccessToken(projectId: GitLabId, maybeAccessToken: Option[AccessToken]): F[Unit]
   def storeAccessToken(projectId:  GitLabId, accessToken:      AccessToken):         F[Unit]
 }

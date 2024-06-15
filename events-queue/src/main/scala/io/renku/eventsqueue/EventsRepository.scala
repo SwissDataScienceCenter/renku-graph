@@ -34,9 +34,9 @@ import scala.concurrent.duration._
 private trait EventsRepository[F[_]] {
   def insert(category:             CategoryName, payload:   Json): CommandDef[F]
   def fetchEvents(category:        CategoryName, chunkSize: Int):  QueryDef[F, List[DequeuedEvent]]
-  def markUnderProcessing(eventId: Int): CommandDef[F]
-  def returnToQueue(eventId:       Int): CommandDef[F]
-  def delete(eventId:              Int): CommandDef[F]
+  def markUnderProcessing(eventId: Int):                           CommandDef[F]
+  def returnToQueue(eventId:       Int):                           CommandDef[F]
+  def delete(eventId:              Int):                           CommandDef[F]
 }
 
 private object EventsRepository {

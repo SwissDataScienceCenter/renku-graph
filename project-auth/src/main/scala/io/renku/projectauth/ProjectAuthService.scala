@@ -44,7 +44,7 @@ trait ProjectAuthService[F[_]] {
   def updateAll: Pipe[F, ProjectAuthData, Nothing]
 
   def remove(slugs: NonEmptyList[Slug]): F[Unit]
-  def remove(slug:  Slug, more: Slug*): F[Unit] = remove(NonEmptyList(slug, more.toList))
+  def remove(slug:  Slug, more: Slug*):  F[Unit] = remove(NonEmptyList(slug, more.toList))
 
   def getAll(filter: QueryFilter, chunkSize: Int = 100): Stream[F, ProjectAuthData]
 }

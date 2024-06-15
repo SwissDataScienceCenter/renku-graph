@@ -34,7 +34,12 @@ private case object PersonsQuery extends EntityQuery[model.Entity.Person] {
   override val selectVariables: Set[String] = Set("?entityType", "?matchingScore", "?name")
 
   override def query(criteria: Criteria): Option[Fragment] =
-    (criteria.filters whenRequesting (entityType, criteria.filters.withNoOrPublicVisibility, criteria.filters.namespaces.isEmpty, criteria.filters.maybeSince.isEmpty, criteria.filters.maybeUntil.isEmpty)) {
+    (criteria.filters whenRequesting (entityType,
+                                      criteria.filters.withNoOrPublicVisibility,
+                                      criteria.filters.namespaces.isEmpty,
+                                      criteria.filters.maybeSince.isEmpty,
+                                      criteria.filters.maybeUntil.isEmpty
+    )) {
       import criteria._
       sparql"""|{
                |  SELECT DISTINCT ?entityType ?matchingScore ?name

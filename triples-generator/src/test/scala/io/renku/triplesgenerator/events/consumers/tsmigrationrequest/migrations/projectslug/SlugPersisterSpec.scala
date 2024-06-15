@@ -75,7 +75,7 @@ class SlugPersisterSpec
       migrationNeedChecker.checkMigrationNeeded.asserting(_ shouldBe a[ConditionedMigration.MigrationRequired.No])
   }
 
-  implicit override lazy val ioLogger: Logger[IO] = TestLogger[IO]()
+  implicit override lazy val ioLogger:            Logger[IO] = TestLogger[IO]()
   private def persister(implicit pcc:            ProjectsConnectionConfig) = new SlugPersisterImpl[IO](tsClient)
   private def migrationNeedChecker(implicit pcc: ProjectsConnectionConfig) = new MigrationNeedCheckerImpl[IO](tsClient)
 

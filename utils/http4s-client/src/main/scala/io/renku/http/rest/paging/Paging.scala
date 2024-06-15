@@ -41,6 +41,6 @@ object Paging {
 
   trait PagedResultsFinder[F[_], Result] {
     def findResults(paging: PagingRequest): F[List[Result]]
-    def findTotal(): F[Total]
+    def findTotal():                        F[Total]
   }
 }

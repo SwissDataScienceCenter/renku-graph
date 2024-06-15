@@ -21,7 +21,7 @@ package io.renku.cache
 import scala.concurrent.duration.FiniteDuration
 
 sealed trait EvictStrategy {
-  private[cache] def keyOrder[A]: Ordering[Key[A]]
+  private[cache] def keyOrder[A]:                                                              Ordering[Key[A]]
   private[cache] def isExpired(key: Key[_], ttl: FiniteDuration, currentTime: FiniteDuration): Boolean
 }
 

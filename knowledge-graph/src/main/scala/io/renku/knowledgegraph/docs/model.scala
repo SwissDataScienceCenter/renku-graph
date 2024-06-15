@@ -49,7 +49,7 @@ object model {
   }
 
   object Paths {
-    lazy val empty: Paths = new Paths(Map.empty)
+    lazy val empty:        Paths = new Paths(Map.empty)
     def apply(path: Path): Paths = Paths.empty.add(path)
   }
 
@@ -118,11 +118,11 @@ object model {
   }
 
   private[model] case class Uri(parts: List[UriPart]) {
-    def show: Show[Uri] = Show.show(_ => parts.map(_.show).mkString("/"))
-    def /(nextPart:  Parameter.Path):  Uri = copy(parts :+ ParameterPart(nextPart))
-    def /(nextPart:  String):          Uri = copy(parts :+ StringPart(nextPart))
-    def :?(nextPart: Parameter.Query): Uri = copy(parts :+ ParameterPart(nextPart))
-    def &(nextPart:  Parameter.Query): Uri = copy(parts :+ ParameterPart(nextPart))
+    def show:                          Show[Uri] = Show.show(_ => parts.map(_.show).mkString("/"))
+    def /(nextPart:  Parameter.Path):  Uri       = copy(parts :+ ParameterPart(nextPart))
+    def /(nextPart:  String):          Uri       = copy(parts :+ StringPart(nextPart))
+    def :?(nextPart: Parameter.Query): Uri       = copy(parts :+ ParameterPart(nextPart))
+    def &(nextPart:  Parameter.Query): Uri       = copy(parts :+ ParameterPart(nextPart))
   }
 
   trait UriPart {

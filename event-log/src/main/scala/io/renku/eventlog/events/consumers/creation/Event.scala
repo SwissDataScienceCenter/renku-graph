@@ -32,7 +32,7 @@ private sealed trait Event {
   def status:    EventStatus
 
   def withBatchDate(batchDate: BatchDate): Event
-  lazy val compoundEventId: CompoundEventId = CompoundEventId(id, project.id)
+  lazy val compoundEventId:                CompoundEventId = CompoundEventId(id, project.id)
 }
 
 private object Event {
@@ -56,8 +56,8 @@ private object Event {
       body:      EventBody,
       message:   EventMessage
   ) extends Event {
-    val status: EventStatus = EventStatus.Skipped
-    override def withBatchDate(batchDate: BatchDate): Event = this.copy(batchDate = batchDate)
+    val status:                                       EventStatus = EventStatus.Skipped
+    override def withBatchDate(batchDate: BatchDate): Event       = this.copy(batchDate = batchDate)
   }
 
   implicit val show: Show[Event] = Show.show { e =>

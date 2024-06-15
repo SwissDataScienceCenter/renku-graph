@@ -108,15 +108,15 @@ private object Commands {
 
   trait Git[F[_]] {
     def checkout(commitId:                           CommitId)(implicit repositoryDirectory: RepositoryPath): F[Unit]
-    def `reset --hard`(implicit repositoryDirectory: RepositoryPath): F[Unit]
-    def `rm --cached`(implicit repositoryDirectory:  RepositoryPath): F[Unit]
-    def `add -A`(implicit repositoryDirectory:       RepositoryPath): F[Unit]
+    def `reset --hard`(implicit repositoryDirectory: RepositoryPath):                                         F[Unit]
+    def `rm --cached`(implicit repositoryDirectory:  RepositoryPath):                                         F[Unit]
+    def `add -A`(implicit repositoryDirectory:       RepositoryPath):                                         F[Unit]
     def commit(message:                              String)(implicit repositoryDirectory:   RepositoryPath): F[Unit]
     def clone(
         repositoryUrl: ServiceUrl,
         workDirectory: Path
-    )(implicit destinationDirectory: RepositoryPath): EitherT[F, ProcessingRecoverableError, Unit]
-    def rm(fileName:                         Path)(implicit repositoryDirectory: RepositoryPath): F[Unit]
+    )(implicit destinationDirectory: RepositoryPath):                     EitherT[F, ProcessingRecoverableError, Unit]
+    def rm(fileName: Path)(implicit repositoryDirectory: RepositoryPath): F[Unit]
     def status(implicit repositoryDirectory: RepositoryPath): F[String]
   }
 
@@ -240,7 +240,7 @@ private object Commands {
   }
 
   trait Renku[F[_]] {
-    def migrate(commitEvent:            CommitEvent)(implicit destinationDirectory: RepositoryPath): F[Unit]
+    def migrate(commitEvent: CommitEvent)(implicit destinationDirectory: RepositoryPath): F[Unit]
     def graphExport(implicit directory: RepositoryPath): EitherT[F, ProcessingRecoverableError, JsonLD]
   }
 

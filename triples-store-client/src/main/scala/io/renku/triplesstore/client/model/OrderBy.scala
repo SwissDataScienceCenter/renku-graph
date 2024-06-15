@@ -32,8 +32,8 @@ final case class OrderBy(sorting: NonEmptyList[Sort]) {
 object OrderBy {
 
   sealed trait Direction extends Product {
-    final val name: String = productPrefix.toUpperCase
-    def apply(property: Property): Sort = Sort(property, this)
+    final val name:                String = productPrefix.toUpperCase
+    def apply(property: Property): Sort   = Sort(property, this)
   }
   object Direction {
     case object Asc  extends Direction

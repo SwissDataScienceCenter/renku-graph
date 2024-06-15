@@ -50,7 +50,7 @@ private sealed trait Dataset extends Product with Serializable {
   val keywords:           List[Keyword]
   val images:             List[ImageUri]
 
-  lazy val widen: Dataset = this
+  lazy val widen:                                                                      Dataset = this
   def fold[A](fnm: Dataset.NonModifiedDataset => A, fm: Dataset.ModifiedDataset => A): A
 }
 

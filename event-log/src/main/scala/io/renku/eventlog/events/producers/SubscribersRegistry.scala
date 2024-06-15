@@ -33,12 +33,12 @@ import scala.jdk.CollectionConverters._
 import scala.util.Random
 
 private trait SubscribersRegistry[F[_]] {
-  def add(subscriber: Subscription.Subscriber): F[Boolean]
-  def findAvailableSubscriber(): F[Deferred[F, SubscriberUrl]]
-  def delete(subscriberUrl:   SubscriberUrl): F[Boolean]
-  def markBusy(subscriberUrl: SubscriberUrl): F[Unit]
-  def subscriberCount(): Int
-  def getTotalCapacity:  Option[TotalCapacity]
+  def add(subscriber:         Subscription.Subscriber): F[Boolean]
+  def findAvailableSubscriber():                        F[Deferred[F, SubscriberUrl]]
+  def delete(subscriberUrl:   SubscriberUrl):           F[Boolean]
+  def markBusy(subscriberUrl: SubscriberUrl):           F[Unit]
+  def subscriberCount():                                Int
+  def getTotalCapacity:                                 Option[TotalCapacity]
 }
 
 private class SubscribersRegistryImpl[F[_]: MonadThrow: Temporal: Logger](

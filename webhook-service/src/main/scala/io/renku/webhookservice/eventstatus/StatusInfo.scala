@@ -37,8 +37,8 @@ private sealed trait StatusInfo extends Product {
 private object StatusInfo {
 
   final case class ActivatedProject(progress: Progress, details: Details) extends StatusInfo {
-    override val activated: Boolean = true
-    def fold[A](whenActivated: StatusInfo.ActivatedProject => A, notActivated: => A): A = whenActivated(this)
+    override val activated:                                                           Boolean = true
+    def fold[A](whenActivated: StatusInfo.ActivatedProject => A, notActivated: => A): A       = whenActivated(this)
   }
 
   def activated(event: EventInfo): StatusInfo.ActivatedProject =
@@ -48,9 +48,9 @@ private object StatusInfo {
     ActivatedProject(Progress.Zero, Details("in-progress", "Webhook has been installed.", maybeDetails = None))
 
   final case object NotActivated extends StatusInfo {
-    override val activated: Boolean  = false
-    override val progress:  Progress = Progress.Zero
-    def fold[A](whenActivated: StatusInfo.ActivatedProject => A, whenNotActivated: => A): A = whenNotActivated
+    override val activated:                                                               Boolean  = false
+    override val progress:                                                                Progress = Progress.Zero
+    def fold[A](whenActivated: StatusInfo.ActivatedProject => A, whenNotActivated: => A): A        = whenNotActivated
   }
 
   implicit def encoder[PS <: StatusInfo]: Encoder[PS] =

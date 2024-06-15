@@ -111,8 +111,8 @@ private[consumers] object Author {
   final case class AuthorWithName(name: persons.Name)           extends Author
 
   def apply(username:    persons.Name, email: Email): Author = FullAuthor(username, email)
-  def withName(username: persons.Name): Author = AuthorWithName(username)
-  def withEmail(email:   Email): Author = FullAuthor(email.extractName, email)
+  def withName(username: persons.Name):               Author = AuthorWithName(username)
+  def withEmail(email:   Email):                      Author = FullAuthor(email.extractName, email)
 }
 
 private[consumers] sealed trait Committer extends Person
@@ -121,6 +121,6 @@ private[consumers] object Committer {
   final case class CommitterWithName(name: persons.Name)           extends Committer
 
   def apply(username:    persons.Name, email: Email): Committer = FullCommitter(username, email)
-  def withName(username: persons.Name): Committer = CommitterWithName(username)
-  def withEmail(email:   Email): Committer = FullCommitter(email.extractName, email)
+  def withName(username: persons.Name):               Committer = CommitterWithName(username)
+  def withEmail(email:   Email):                      Committer = FullCommitter(email.extractName, email)
 }

@@ -196,7 +196,7 @@ private class EventsFinderImpl[F[_]: Async: NonEmptyParallel: SessionResource: Q
                   executionDateDecoder ~ eventMessageDecoder.opt ~ int8
               )
               .map {
-                case (eventId:   EventId) ~
+                case (eventId: EventId) ~
                     (projectIds: EventInfo.ProjectIds) ~
                     (status: EventStatus) ~
                     (eventDate: EventDate) ~

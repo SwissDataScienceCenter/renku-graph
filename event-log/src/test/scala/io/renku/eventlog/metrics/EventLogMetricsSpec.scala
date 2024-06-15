@@ -128,8 +128,8 @@ class EventLogMetricsSpec
       override def update(labelValue:    (CategoryName, Double)) = fail("Spec shouldn't be calling that")
       override def increment(labelValue: CategoryName)           = fail("Spec shouldn't be calling that")
       override def decrement(labelValue: CategoryName)           = fail("Spec shouldn't be calling that")
-      override def reset() = fail("Spec shouldn't be calling that")
-      override def clear() = categoryNameValues.clear().pure[IO]
+      override def reset()                                       = fail("Spec shouldn't be calling that")
+      override def clear()                                       = categoryNameValues.clear().pure[IO]
     }
 
     lazy val statusesGauge = new LabeledGauge[IO, EventStatus] {
@@ -142,15 +142,15 @@ class EventLogMetricsSpec
       override def update(labelValue:    (EventStatus, Double)) = fail("Spec shouldn't be calling that")
       override def increment(labelValue: EventStatus)           = fail("Spec shouldn't be calling that")
       override def decrement(labelValue: EventStatus)           = fail("Spec shouldn't be calling that")
-      override def reset() = fail("Spec shouldn't be calling that")
-      override def clear() = statusValues.clear().pure[IO]
+      override def reset()                                      = fail("Spec shouldn't be calling that")
+      override def clear()                                      = statusValues.clear().pure[IO]
 
       override val name = "status gauge"
       override val help = "statuses help"
     }
 
     lazy val totalGauge = new SingleValueGauge[IO] {
-      val values = new ConcurrentLinkedQueue[Double]()
+      val values                      = new ConcurrentLinkedQueue[Double]()
       override def set(value: Double) = values.add(value).pure[IO].void
 
       override val name = "total"

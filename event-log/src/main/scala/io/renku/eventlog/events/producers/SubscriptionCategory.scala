@@ -27,9 +27,9 @@ import io.renku.events.{CategoryName, Subscription}
 
 private trait SubscriptionCategory[F[_]] {
   val categoryName: CategoryName
-  def run(): F[Unit]
+  def run():                   F[Unit]
   def register(payload: Json): F[RegistrationResult]
-  def getStatus: F[EventProducerStatus]
+  def getStatus:               F[EventProducerStatus]
 }
 
 private[producers] object SubscriptionCategory {

@@ -44,8 +44,8 @@ private trait LowLevelApis[F[_]] {
                         projectGitHttpUrl: projects.GitHttpUrl,
                         userInfo:          UserInfo,
                         accessToken:       AccessToken
-  ):               F[Result[ProjectMigrationCheck]]
-  def getVersions: F[Result[List[SchemaVersion]]]
+  ):                                                                           F[Result[ProjectMigrationCheck]]
+  def getVersions:                                                             F[Result[List[SchemaVersion]]]
   def postProjectCreate(newProject: NewProject, accessToken: UserAccessToken): F[Result[Unit]]
   def postProjectUpdate(coreUri:     RenkuCoreUri.Versioned,
                         updates:     ProjectUpdates,
