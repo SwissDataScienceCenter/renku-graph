@@ -39,7 +39,7 @@ object Dependencies {
     val skunk                  = "0.6.4"
     val swaggerParser          = "2.1.22"
     val widoco                 = "1.4.24"
-    val wiremock               = "3.6.0"
+    val wiremock               = "3.7.0"
   }
 
   val monocle = Seq(
