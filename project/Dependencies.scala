@@ -35,7 +35,7 @@ object Dependencies {
     val scalamock              = "6.0.0"
     val scalatest              = "3.2.19"
     val scalatestScalacheck    = "3.2.14.0"
-    val sentryLogback          = "7.10.0"
+    val sentryLogback          = "7.11.0"
     val skunk                  = "0.6.4"
     val swaggerParser          = "2.1.22"
     val widoco                 = "1.4.24"
