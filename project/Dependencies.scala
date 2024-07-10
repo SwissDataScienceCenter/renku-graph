@@ -28,7 +28,7 @@ object Dependencies {
     val owlapi                 = "5.5.0"
     val prometheus             = "0.16.0"
     val pureconfig             = "0.17.7"
-    val rdf4jQueryParserSparql = "4.3.12"
+    val rdf4jQueryParserSparql = "5.0.0"
     val refined                = "0.11.2"
     val refinedPureconfig      = "0.11.2"
     val scalacheck             = "1.18.0"
