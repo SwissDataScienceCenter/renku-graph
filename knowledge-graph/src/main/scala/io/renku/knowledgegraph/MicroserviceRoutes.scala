@@ -115,7 +115,7 @@ private class MicroserviceRoutes[F[_]: Async](
         }
     }
 
-  private lazy val `GET /datasets/*` : AuthedRoutes[MaybeAuthUser, F] =
+  private lazy val `GET /datasets/*`: AuthedRoutes[MaybeAuthUser, F] =
     AuthedRoutes.of { case GET -> Root / "knowledge-graph" / "datasets" / RequestedDataset(dsId) as maybeUser =>
       fetchDataset(dsId, maybeUser.option)
     }
@@ -128,8 +128,8 @@ private class MicroserviceRoutes[F[_]: Async](
     AuthedRoutes.of {
       case req @ GET -> Root / "knowledge-graph" / "entities"
         :? query(maybeQuery) +& entityTypes(maybeTypes) +& creatorNames(maybeCreators) +& roles(maybeRoles)
-        +& visibilities(maybeVisibilities) +& namespaces(maybeNamespaces) 
-        +& since(maybeSince) +& until(maybeUntil) 
+        +& visibilities(maybeVisibilities) +& namespaces(maybeNamespaces)
+        +& since(maybeSince) +& until(maybeUntil)
         +& sort(maybeSort) +& page(maybePage) +& perPage(maybePerPage) as maybeUser =>
         searchForEntities(maybeQuery, maybeTypes, maybeCreators, maybeRoles, maybeVisibilities, maybeNamespaces,
           maybeSince, maybeUntil, maybeSort, maybePage, maybePerPage, maybeUser.option, req.req)
@@ -137,7 +137,7 @@ private class MicroserviceRoutes[F[_]: Async](
   }
   // format: on
 
-  private lazy val `GET /users/*` : AuthedRoutes[MaybeAuthUser, F] = {
+  private lazy val `GET /users/*`: AuthedRoutes[MaybeAuthUser, F] = {
     import users.binders._
     import users.projects.Endpoint.Criteria.Filters
     import users.projects.Endpoint.Criteria.Filters.ActivationState._
@@ -158,7 +158,7 @@ private class MicroserviceRoutes[F[_]: Async](
     }
   }
 
-  private lazy val `GET /projects/*` : AuthedRoutes[MaybeAuthUser, F] = AuthedRoutes.of {
+  private lazy val `GET /projects/*`: AuthedRoutes[MaybeAuthUser, F] = AuthedRoutes.of {
 
     case authReq @ POST -> Root / "knowledge-graph" / "projects" as maybeUser =>
       maybeUser.withUserOrNotFound {
