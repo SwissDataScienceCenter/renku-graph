@@ -43,7 +43,7 @@ object Dependencies {
   }
 
   val monocle = Seq(
-    "dev.optics" %% "monocle-core" % "3.2.0"
+    "dev.optics" %% "monocle-core" % "3.3.0"
   )
 
   val prometheus = Seq(
