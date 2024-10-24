@@ -10,20 +10,20 @@ object Dependencies {
     val catsEffectScalaTest    = "1.5.0"
     val catsEffectMunit        = "2.0.0"
     val scalacheckEffectMunit  = "2.0.0-M2"
-    val circeCore              = "0.14.9"
-    val circeGenericExtras     = "0.14.3"
+    val circeCore              = "0.14.10"
+    val circeGenericExtras     = "0.14.4"
     val circeOptics            = "0.15.0"
     val diffx                  = "0.9.0"
-    val fs2                    = "3.10.2"
-    val http4s                 = "0.23.27"
-    val http4sEmber            = "0.23.27"
-    val http4sPrometheus       = "0.24.7"
+    val fs2                    = "3.11.0"
+    val http4s                 = "0.23.28"
+    val http4sEmber            = "0.23.28"
+    val http4sPrometheus       = "0.25.0"
     val ip4s                   = "3.6.0"
     val jsonld4s               = "0.15.0"
     val log4cats               = "2.7.0"
-    val log4jCore              = "2.23.1"
-    val logback                = "1.5.6"
-    val luceneQueryParser      = "9.11.1"
+    val log4jCore              = "2.24.1"
+    val logback                = "1.5.11"
+    val luceneQueryParser      = "10.0.0"
     val monocle                = "3.2.0"
     val owlapi                 = "5.5.0"
     val prometheus             = "0.16.0"
@@ -35,7 +35,7 @@ object Dependencies {
     val scalamock              = "6.0.0"
     val scalatest              = "3.2.19"
     val scalatestScalacheck    = "3.2.14.0"
-    val sentryLogback          = "7.11.0"
+    val sentryLogback          = "7.16.0"
     val skunk                  = "0.6.4"
     val swaggerParser          = "2.1.22"
     val widoco                 = "1.4.25"
@@ -43,7 +43,7 @@ object Dependencies {
   }
 
   val monocle = Seq(
-    "dev.optics" %% "monocle-core" % "3.2.0"
+    "dev.optics" %% "monocle-core" % "3.3.0"
   )
 
   val prometheus = Seq(

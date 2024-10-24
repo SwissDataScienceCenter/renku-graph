@@ -19,7 +19,6 @@
 package io.renku.eventlog.init
 
 import cats.data.Kleisli
-import cats.data.Kleisli._
 import cats.effect.MonadCancelThrow
 import cats.syntax.all._
 import io.renku.eventlog.EventLogDB.SessionResource
@@ -56,13 +55,13 @@ private class TimestampZoneAdderImpl[F[_]: MonadCancelThrow: Logger: SessionReso
   private def migrateIfNeeded(table: String, column: String): Kleisli[F, Session[F], Unit] = {
     findCurrentType(table, column) >>= {
       case "timestamp with time zone" =>
-        liftF(Logger[F].info(s"$table.$column already migrated to 'timestamp with time zone'"))
+        Kleisli.liftF(Logger[F].info(s"$table.$column already migrated to 'timestamp with time zone'"))
       case columnType =>
-        liftF[F, Session[F], Unit](Logger[F].info(s"$table.$column in '$columnType', migrating")) >>=
+        Kleisli.liftF[F, Session[F], Unit](Logger[F].info(s"$table.$column in '$columnType', migrating")) >>=
           (_ => migrate(table, column))
     }
   } recoverWith { case NonFatal(e) =>
-    liftF(Logger[F].error(e)(s"$table.$column migration failed")) >> liftF(e.raiseError[F, Unit])
+    Kleisli.liftF(Logger[F].error(e)(s"$table.$column migration failed") >> e.raiseError[F, Unit])
   }
 
   private def findCurrentType(table: String, column: String): Kleisli[F, Session[F], String] = {
