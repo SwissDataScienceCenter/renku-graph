@@ -32,7 +32,7 @@ class PayloadConverterSpec extends AnyFlatSpec with should.Matchers with ScalaCh
   private implicit val renkuUrl: RenkuUrl = renkuUrls.generateOne
   private val converter = new PayloadConverterImpl
 
-  it should s"turn the NewProject into a Project entity" in {
+  it should s"turn the NewProject into a Project entity" in
     forAll(newProjectsGen) { newProject =>
       val resourceId = projects.ResourceId(newProject.slug)
       val creator    = entities.Person(newProject.creator.name, newProject.creator.id)
@@ -51,5 +51,4 @@ class PayloadConverterSpec extends AnyFlatSpec with should.Matchers with ScalaCh
         Image.projectImage(resourceId, newProject.images)
       )
     }
-  }
 }

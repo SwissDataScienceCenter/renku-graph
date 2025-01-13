@@ -225,8 +225,7 @@ class GitLabClientSpec
     }
   }
 
-  "post(Multipart)" should {
-
+  "post(Multipart)" should
     forAll(tokenScenarios) { (tokenType, accessToken: AccessToken) =>
       s"send the given multipart request with the $tokenType to the endpoint" in new TestCase {
 
@@ -261,10 +260,8 @@ class GitLabClientSpec
           .unsafeRunSync() shouldBe ()
       }
     }
-  }
 
-  "put" should {
-
+  "put" should
     forAll(tokenScenarios) { (tokenType, accessToken: AccessToken) =>
       s"send the given multipart request with the $tokenType to the endpoint" in new TestCase {
 
@@ -299,7 +296,6 @@ class GitLabClientSpec
           .unsafeRunSync() shouldBe ()
       }
     }
-  }
 
   "delete" should {
 

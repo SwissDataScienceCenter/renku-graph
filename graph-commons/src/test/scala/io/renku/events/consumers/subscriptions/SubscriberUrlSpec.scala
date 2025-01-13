@@ -42,11 +42,10 @@ class SubscriberUrlSpec extends AnyWordSpec with should.Matchers with ScalaCheck
 
   "to MicroserviceBaseUrl conversion" should {
 
-    "successfully convert MicroserviceBaseUrl if well defined" in {
+    "successfully convert MicroserviceBaseUrl if well defined" in
       forAll(httpUrls(pathGenerator = ""), relativePaths(minSegments = 0, maxSegments = 2)) { (url, path) =>
         val pathValidated = if (path.isEmpty) "" else s"/$path"
         SubscriberUrl(s"$url$pathValidated").toUnsafe[MicroserviceBaseUrl] shouldBe MicroserviceBaseUrl(url)
       }
-    }
   }
 }

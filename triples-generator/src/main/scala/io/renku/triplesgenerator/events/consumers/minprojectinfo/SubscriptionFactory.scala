@@ -37,9 +37,11 @@ import org.typelevel.log4cats.Logger
 
 object SubscriptionFactory {
 
-  def apply[F[
-      _
-  ]: Async: NonEmptyParallel: Parallel: ReProvisioningStatus: GitLabClient: MetricsRegistry: Logger: SparqlQueryTimeRecorder](
+  def apply[
+      F[
+          _
+      ]: Async: NonEmptyParallel: Parallel: ReProvisioningStatus: GitLabClient: MetricsRegistry: Logger: SparqlQueryTimeRecorder
+  ](
       tsWriteLock:         TsWriteLock[F],
       topSameAsLock:       Lock[F, datasets.TopmostSameAs],
       projectSparqlClient: ProjectSparqlClient[F],

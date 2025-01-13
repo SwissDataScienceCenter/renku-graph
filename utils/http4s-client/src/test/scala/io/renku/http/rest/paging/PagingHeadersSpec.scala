@@ -47,97 +47,89 @@ class PagingHeadersSpec
   "from" should {
 
     s"generate $Total, $TotalPages, $PerPage, $Page, $NextPage, $PrevPage and $Link headers " +
-      "if current page is neither the first nor the last page" in {
+      "if current page is neither the first nor the last page" in
+      forAll(currentPageNeitherFirstNorLast) { response =>
+        import response._
+        import response.pagingInfo._
+        import response.pagingInfo.pagingRequest._
 
-        forAll(currentPageNeitherFirstNorLast) { response =>
-          import response._
-          import response.pagingInfo._
-          import response.pagingInfo.pagingRequest._
+        implicit val resourceUrl: UrlTestType = resourceUrlFrom(page, perPage)
 
-          implicit val resourceUrl: UrlTestType = resourceUrlFrom(page, perPage)
-
-          val totalPages = findTotalPages(pagingInfo)
-          PagingHeaders.from(response) should contain theSameElementsAs Set(
-            Header.Raw(ci"Total", total.toString),
-            Header.Raw(ci"Total-Pages", totalPages.toString),
-            Header.Raw(ci"Per-Page", perPage.toString),
-            Header.Raw(ci"Page", page.toString),
-            Header.Raw(ci"Next-Page", (page.value + 1).toString),
-            Header.Raw(ci"Prev-Page", (page.value - 1).toString),
-            Header.Raw(ci"Link", s"""<${resourceUrl ? (pageParamName -> (page.value + 1))}>; rel="next""""),
-            Header.Raw(ci"Link", s"""<${resourceUrl ? (pageParamName -> (page.value - 1))}>; rel="prev""""),
-            Header.Raw(ci"Link", s"""<${resourceUrl ? (pageParamName -> first.value)}>; rel="first""""),
-            Header.Raw(ci"Link", s"""<${resourceUrl ? (pageParamName -> totalPages)}>; rel="last"""")
-          )
-        }
+        val totalPages = findTotalPages(pagingInfo)
+        PagingHeaders.from(response) should contain theSameElementsAs Set(
+          Header.Raw(ci"Total", total.toString),
+          Header.Raw(ci"Total-Pages", totalPages.toString),
+          Header.Raw(ci"Per-Page", perPage.toString),
+          Header.Raw(ci"Page", page.toString),
+          Header.Raw(ci"Next-Page", (page.value + 1).toString),
+          Header.Raw(ci"Prev-Page", (page.value - 1).toString),
+          Header.Raw(ci"Link", s"""<${resourceUrl ? (pageParamName -> (page.value + 1))}>; rel="next""""),
+          Header.Raw(ci"Link", s"""<${resourceUrl ? (pageParamName -> (page.value - 1))}>; rel="prev""""),
+          Header.Raw(ci"Link", s"""<${resourceUrl ? (pageParamName -> first.value)}>; rel="first""""),
+          Header.Raw(ci"Link", s"""<${resourceUrl ? (pageParamName -> totalPages)}>; rel="last"""")
+        )
       }
 
     s"generate $Total, $TotalPages, $PerPage, $Page, $PrevPage and $Link headers " +
-      "if current page is the last page" in {
+      "if current page is the last page" in
+      forAll(currentPageLast) { response =>
+        import response._
+        import response.pagingInfo._
+        import response.pagingInfo.pagingRequest._
 
-        forAll(currentPageLast) { response =>
-          import response._
-          import response.pagingInfo._
-          import response.pagingInfo.pagingRequest._
+        implicit val resourceUrl: UrlTestType = resourceUrlFrom(page, perPage)
 
-          implicit val resourceUrl: UrlTestType = resourceUrlFrom(page, perPage)
-
-          val totalPages = findTotalPages(pagingInfo)
-          PagingHeaders.from(response) should contain theSameElementsAs Set(
-            Header.Raw(ci"Total", total.toString),
-            Header.Raw(ci"Total-Pages", totalPages.toString),
-            Header.Raw(ci"Per-Page", perPage.toString),
-            Header.Raw(ci"Page", page.toString),
-            Header.Raw(ci"Prev-Page", (page.value - 1).toString),
-            Header.Raw(ci"Link", s"""<${resourceUrl ? (pageParamName -> (page.value - 1))}>; rel="prev""""),
-            Header.Raw(ci"Link", s"""<${resourceUrl ? (pageParamName -> first.value)}>; rel="first""""),
-            Header.Raw(ci"Link", s"""<${resourceUrl ? (pageParamName -> totalPages)}>; rel="last"""")
-          )
-        }
+        val totalPages = findTotalPages(pagingInfo)
+        PagingHeaders.from(response) should contain theSameElementsAs Set(
+          Header.Raw(ci"Total", total.toString),
+          Header.Raw(ci"Total-Pages", totalPages.toString),
+          Header.Raw(ci"Per-Page", perPage.toString),
+          Header.Raw(ci"Page", page.toString),
+          Header.Raw(ci"Prev-Page", (page.value - 1).toString),
+          Header.Raw(ci"Link", s"""<${resourceUrl ? (pageParamName -> (page.value - 1))}>; rel="prev""""),
+          Header.Raw(ci"Link", s"""<${resourceUrl ? (pageParamName -> first.value)}>; rel="first""""),
+          Header.Raw(ci"Link", s"""<${resourceUrl ? (pageParamName -> totalPages)}>; rel="last"""")
+        )
       }
 
     s"generate $Total, $TotalPages, $PerPage, $Page, $NextPage and $Link headers " +
-      "if current page is the first page" in {
+      "if current page is the first page" in
+      forAll(currentPageFirst) { response =>
+        import response._
+        import response.pagingInfo._
+        import response.pagingInfo.pagingRequest._
 
-        forAll(currentPageFirst) { response =>
-          import response._
-          import response.pagingInfo._
-          import response.pagingInfo.pagingRequest._
+        implicit val resourceUrl: UrlTestType = resourceUrlFrom(page, perPage)
 
-          implicit val resourceUrl: UrlTestType = resourceUrlFrom(page, perPage)
-
-          val totalPages = findTotalPages(pagingInfo)
-          PagingHeaders.from(response) should contain theSameElementsAs Set(
-            Header.Raw(ci"Total", total.toString),
-            Header.Raw(ci"Total-Pages", totalPages.toString),
-            Header.Raw(ci"Per-Page", perPage.toString),
-            Header.Raw(ci"Page", page.toString),
-            Header.Raw(ci"Next-Page", (page.value + 1).toString),
-            Header.Raw(ci"Link", s"""<${resourceUrl ? (pageParamName -> (page.value + 1))}>; rel="next""""),
-            Header.Raw(ci"Link", s"""<${resourceUrl ? (pageParamName -> first.value)}>; rel="first""""),
-            Header.Raw(ci"Link", s"""<${resourceUrl ? (pageParamName -> totalPages)}>; rel="last"""")
-          )
-        }
+        val totalPages = findTotalPages(pagingInfo)
+        PagingHeaders.from(response) should contain theSameElementsAs Set(
+          Header.Raw(ci"Total", total.toString),
+          Header.Raw(ci"Total-Pages", totalPages.toString),
+          Header.Raw(ci"Per-Page", perPage.toString),
+          Header.Raw(ci"Page", page.toString),
+          Header.Raw(ci"Next-Page", (page.value + 1).toString),
+          Header.Raw(ci"Link", s"""<${resourceUrl ? (pageParamName -> (page.value + 1))}>; rel="next""""),
+          Header.Raw(ci"Link", s"""<${resourceUrl ? (pageParamName -> first.value)}>; rel="first""""),
+          Header.Raw(ci"Link", s"""<${resourceUrl ? (pageParamName -> totalPages)}>; rel="last"""")
+        )
       }
 
     s"generate $Total, $TotalPages, $PerPage, $Page and $Link headers " +
-      "if there's one page only" in {
+      "if there's one page only" in
+      forAll(onePageOnly) { response =>
+        import response.pagingInfo._
+        import response.pagingInfo.pagingRequest._
 
-        forAll(onePageOnly) { response =>
-          import response.pagingInfo._
-          import response.pagingInfo.pagingRequest._
+        implicit val resourceUrl: UrlTestType = resourceUrlFrom(page, perPage)
 
-          implicit val resourceUrl: UrlTestType = resourceUrlFrom(page, perPage)
-
-          PagingHeaders.from(response) should contain theSameElementsAs Set(
-            Header.Raw(ci"Total", total.toString),
-            Header.Raw(ci"Total-Pages", "1"),
-            Header.Raw(ci"Per-Page", perPage.toString),
-            Header.Raw(ci"Page", page.toString),
-            Header.Raw(ci"Link", s"""<${resourceUrl ? (pageParamName -> first.value)}>; rel="first""""),
-            Header.Raw(ci"Link", s"""<${resourceUrl ? (pageParamName -> 1)}>; rel="last"""")
-          )
-        }
+        PagingHeaders.from(response) should contain theSameElementsAs Set(
+          Header.Raw(ci"Total", total.toString),
+          Header.Raw(ci"Total-Pages", "1"),
+          Header.Raw(ci"Per-Page", perPage.toString),
+          Header.Raw(ci"Page", page.toString),
+          Header.Raw(ci"Link", s"""<${resourceUrl ? (pageParamName -> first.value)}>; rel="first""""),
+          Header.Raw(ci"Link", s"""<${resourceUrl ? (pageParamName -> 1)}>; rel="last"""")
+        )
       }
 
     s"generate $Total, $TotalPages, $PerPage, $Page and $Link headers " +

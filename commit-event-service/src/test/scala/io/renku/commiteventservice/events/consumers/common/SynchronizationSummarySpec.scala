@@ -31,7 +31,7 @@ class SynchronizationSummarySpec extends AnyWordSpec with should.Matchers with S
 
   "get & updated" should {
 
-    "return count for the given key" in {
+    "return count for the given key" in
       forAll(resultsAndMaybeCountList) { countsAndResults =>
         val summary = countsAndResults
           .foldLeft(SynchronizationSummary()) {
@@ -44,12 +44,11 @@ class SynchronizationSummarySpec extends AnyWordSpec with should.Matchers with S
           case (None, result)        => summary.get(result) shouldBe 0
         }
       }
-    }
   }
 
   "increment" should {
 
-    "increment the count for the given key" in {
+    "increment the count for the given key" in
       forAll(summaries, updateResults.toGeneratorOfList(max = 10)) { (initialSummary, results) =>
         val summary = results.foldLeft(initialSummary)(_.incrementCount(_))
 
@@ -60,7 +59,6 @@ class SynchronizationSummarySpec extends AnyWordSpec with should.Matchers with S
         val failed = Failed(nonEmptyStrings().generateOne, exceptions.generateOne)
         summary.get(failed) shouldBe initialSummary.get(failed) + results.count(_.isInstanceOf[Failed])
       }
-    }
   }
 
   "show" should {

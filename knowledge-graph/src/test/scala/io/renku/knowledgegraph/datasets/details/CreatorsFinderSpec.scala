@@ -36,21 +36,19 @@ class CreatorsFinderSpec extends AnyWordSpec with ScalaCheckPropertyChecks with 
 
   "dataset creator decoder" should {
 
-    "decode result-set with a blank affiliation to a DatasetCreator object" in {
+    "decode result-set with a blank affiliation to a DatasetCreator object" in
       forAll(personEmails, personNames, blankStrings()) { (email, name, affiliation) =>
         resultSet(email, name, affiliation).as[NonEmptyList[DatasetCreator]] shouldBe Right {
           NonEmptyList.of(DatasetCreator(Some(email), name, None))
         }
       }
-    }
 
-    "decode result-set with a non-blank affiliation to a DatasetCreator object" in {
+    "decode result-set with a non-blank affiliation to a DatasetCreator object" in
       forAll(personEmails, personNames, personAffiliations) { (email, name, affiliation) =>
         resultSet(email, name, affiliation.toString).as[NonEmptyList[DatasetCreator]] shouldBe Right {
           NonEmptyList.of(DatasetCreator(Some(email), name, Some(affiliation)))
         }
       }
-    }
   }
 
   private def resultSet(email: Email, name: Name, blank: String) = json"""{

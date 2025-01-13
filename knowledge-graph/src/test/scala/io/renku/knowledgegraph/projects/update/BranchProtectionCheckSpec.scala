@@ -144,10 +144,9 @@ class BranchProtectionCheckSpec
       .asserting(_ shouldBe Nil)
   }
 
-  it should "return an empty list if GL returns 404 NOT_FOUND" in {
+  it should "return an empty list if GL returns 404 NOT_FOUND" in
     mapResponse(NotFound, Request[IO](), Response[IO](NotFound))
       .asserting(_ shouldBe Nil)
-  }
 
   private implicit val glClient: GitLabClient[IO] = mock[GitLabClient[IO]]
   private lazy val finder = new BranchProtectionCheckImpl[IO]

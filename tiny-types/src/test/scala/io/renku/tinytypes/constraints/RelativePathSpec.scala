@@ -34,17 +34,15 @@ class RelativePathSpec extends AnyWordSpec with ScalaCheckPropertyChecks with sh
       RelativePathString shouldBe a[NonBlank[_]]
     }
 
-    "be instantiatable when values are not starting and ending with '/'" in {
+    "be instantiatable when values are not starting and ending with '/'" in
       forAll(nonEmptyStrings()) { someValue =>
         RelativePathString(someValue).toString shouldBe someValue
       }
-    }
 
-    "be instantiatable when values are not starting but ending with '/' and having the '/' sign inside" in {
+    "be instantiatable when values are not starting but ending with '/' and having the '/' sign inside" in
       forAll(relativePaths().map(v => s"$v/")) { someValue =>
         RelativePathString(someValue).toString shouldBe someValue
       }
-    }
 
     "throw an IllegalArgumentException for values starting with a protocol" in {
       s"http://${relativePaths().generateOne}" :: httpUrls().generateOne :: s"ftp://${relativePaths().generateOne}" :: Nil foreach {

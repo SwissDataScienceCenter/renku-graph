@@ -28,11 +28,10 @@ class NonBlankSpec extends AnyWordSpec with ScalaCheckPropertyChecks with should
 
   "NonBlank" should {
 
-    "be instantiatable when values are not blank" in {
+    "be instantiatable when values are not blank" in
       forAll(nonEmptyStrings()) { someValue =>
         NonBlankString(someValue).toString shouldBe someValue
       }
-    }
 
     "throw an IllegalArgumentException for empty String values" in {
       intercept[IllegalArgumentException](

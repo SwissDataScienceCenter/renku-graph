@@ -118,7 +118,7 @@ class ProjectAuthServiceSpec
     }
   }
 
-  it should "search by member id" in {
+  it should "search by member id" in
     withProjectAuthServiceData(randomData(1, suchThat = _.members.nonEmpty)).use { case (s, original) =>
       for {
         found <- s.getAll(QueryFilter.all.withMember(original.head.members.head.gitLabId)).compile.lastOrError
@@ -134,5 +134,4 @@ class ProjectAuthServiceSpec
         _ = nf    shouldBe None
       } yield ()
     }
-  }
 }

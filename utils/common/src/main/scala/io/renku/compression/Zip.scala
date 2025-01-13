@@ -30,8 +30,8 @@ import scala.util.Try
 import scala.util.control.NonFatal
 
 trait Zip {
-  def zip[F[_]: Sync](content: String): F[Array[Byte]]
-  def unzip(bytes: Array[Byte]): Either[Exception, String]
+  def zip[F[_]: Sync](content: String):      F[Array[Byte]]
+  def unzip(bytes:             Array[Byte]): Either[Exception, String]
 }
 
 object Zip extends Zip {

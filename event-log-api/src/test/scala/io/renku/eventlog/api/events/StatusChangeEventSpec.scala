@@ -82,13 +82,12 @@ class StatusChangeEventSpec extends AnyWordSpec with should.Matchers with ScalaC
     }
   }
   "encode" should {
-    "encode a discriminator value" in {
+    "encode a discriminator value" in
       forAll(StatusChangeGenerators.statusChangeEvents) { event =>
         val json        = event.asJson
         val subCategory = json.asObject.flatMap(_.apply("subCategory"))
         subCategory shouldBe Some(event.subCategoryName.asJson)
       }
-    }
 
     "encode a discriminator value when using specific codec" in {
       val event: RollbackToAwaitingDeletion = StatusChangeGenerators.rollbackToAwaitingDeletionEvents.generateOne

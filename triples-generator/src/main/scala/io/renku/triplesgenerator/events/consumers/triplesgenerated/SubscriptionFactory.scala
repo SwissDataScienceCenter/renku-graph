@@ -37,9 +37,11 @@ import io.renku.triplesstore.{ProjectSparqlClient, SparqlQueryTimeRecorder}
 import org.typelevel.log4cats.Logger
 
 object SubscriptionFactory {
-  def apply[F[
-      _
-  ]: Async: NonEmptyParallel: Parallel: ReProvisioningStatus: GitLabClient: Logger: MetricsRegistry: SparqlQueryTimeRecorder](
+  def apply[
+      F[
+          _
+      ]: Async: NonEmptyParallel: Parallel: ReProvisioningStatus: GitLabClient: Logger: MetricsRegistry: SparqlQueryTimeRecorder
+  ](
       tsWriteLock:         TsWriteLock[F],
       topSameAsLock:       Lock[F, datasets.TopmostSameAs],
       projectSparqlClient: ProjectSparqlClient[F],

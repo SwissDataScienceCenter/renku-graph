@@ -44,17 +44,15 @@ class CliProjectSpec
   private val projectGen = ProjectGenerators.projectGen(Instant.EPOCH)
 
   "decode/encode" should {
-    "be compatible" in {
+    "be compatible" in
       forAll(projectGen) { cliProject =>
         assertCompatibleCodec(cliProject)
       }
-    }
 
-    "work on multiple items" in {
+    "work on multiple items" in
       forAll(projectGen, projectGen) { (cliProject1, cliProject2) =>
         assertCompatibleCodec(cliProject1, cliProject2)
       }
-    }
 
     "return a DecodingFailure when there's a Person entity that cannot be decoded" in {
       val project = projectGen.generateOne
@@ -81,7 +79,7 @@ class CliProjectSpec
 
   "dateModified" should {
 
-    "be the max of Project's dateCreated, Plans' dateModified, Datasets' dateModified and Activities' startTime" in {
+    "be the max of Project's dateCreated, Plans' dateModified, Datasets' dateModified and Activities' startTime" in
       forAll(projectGen) { cliProject =>
         cliProject.dateModified shouldBe projects.DateModified {
           (
@@ -94,6 +92,5 @@ class CliProjectSpec
           ).max
         }
       }
-    }
   }
 }

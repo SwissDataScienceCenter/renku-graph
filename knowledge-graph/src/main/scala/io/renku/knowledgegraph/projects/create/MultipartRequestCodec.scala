@@ -63,7 +63,7 @@ private trait MultipartRequestEncoder[F[_]] {
 }
 
 private object MultipartRequestEncoder {
-  def apply[F[_]: Sync]: MultipartRequestEncoder[F] = forSync(implicitly[Sync[F]])
+  def apply[F[_]: Sync]:                           MultipartRequestEncoder[F] = forSync(implicitly[Sync[F]])
   implicit def forSync[F[_]](implicit F: Sync[F]): MultipartRequestEncoder[F] = new MultipartRequestEncoderImpl[F]
 }
 
@@ -96,7 +96,7 @@ private trait MultipartRequestDecoder[F[_]] {
 }
 
 private object MultipartRequestDecoder {
-  def apply[F[_]: Async]: MultipartRequestDecoder[F] = forAsync[F]
+  def apply[F[_]: Async]:                            MultipartRequestDecoder[F] = forAsync[F]
   implicit def forAsync[F[_]](implicit F: Async[F]): MultipartRequestDecoder[F] = new MultipartRequestDecoderImpl[F]
 }
 

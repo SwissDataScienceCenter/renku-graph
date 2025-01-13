@@ -41,11 +41,10 @@ class ProjectGitLabIdSpec extends AnyWordSpec with ScalaCheckPropertyChecks with
 
   "instantiation" should {
 
-    "be successful for non-negative values" in {
+    "be successful for non-negative values" in
       forAll(nonNegativeInts()) { id =>
         GitLabId(id.value).value shouldBe id.value
       }
-    }
 
     "fail for negative ids" in {
       an[IllegalArgumentException] shouldBe thrownBy {
@@ -65,11 +64,10 @@ class SlugSpec extends AnyWordSpec with ScalaCheckPropertyChecks with should.Mat
 
   "instantiation" should {
 
-    "be successful for relative paths with min number of 2 segments" in {
+    "be successful for relative paths with min number of 2 segments" in
       forAll(relativePaths(minSegments = 2, maxSegments = 22, partsGenerator)) { path =>
         Slug(path).value shouldBe path
       }
-    }
 
     "fail for relative paths of single segment" in {
       an[IllegalArgumentException] shouldBe thrownBy {
@@ -91,28 +89,25 @@ class SlugSpec extends AnyWordSpec with ScalaCheckPropertyChecks with should.Mat
   }
 
   "toPath" should {
-    "extract the very last path segment" in {
+    "extract the very last path segment" in
       forAll(projectNamespaces.toGeneratorOfNonEmptyList(), projectPaths) { (namespaces, path) =>
         Slug(s"${namespaces.map(_.show).nonEmptyIntercalate("/")}/$path").toPath shouldBe path
       }
-    }
   }
 
   "toNamespaces" should {
-    "extract all the slug segments except the last one" in {
+    "extract all the slug segments except the last one" in
       forAll(projectNamespaces.toGeneratorOfNonEmptyList(), projectPaths) { (namespaces, path) =>
         Slug(s"${namespaces.map(_.show).nonEmptyIntercalate("/")}/$path").toNamespaces shouldBe namespaces.toList
       }
-    }
   }
 
   "toNamespace" should {
-    "extract the namespace from the slug" in {
+    "extract the namespace from the slug" in
       forAll(projectNamespaces.toGeneratorOfNonEmptyList(), projectNames) { (namespaces, name) =>
         val namespaceAsString = namespaces.map(_.show).nonEmptyIntercalate("/")
         Slug(s"$namespaceAsString/$name").toNamespace shouldBe Namespace(namespaceAsString)
       }
-    }
   }
 
   private lazy val partsGenerator = {
@@ -152,8 +147,7 @@ class VisibilitySpec extends AnyWordSpec with should.Matchers with TableDrivenPr
     }
   }
 
-  "ordering" should {
-
+  "ordering" should
     forAll {
       Table(
         ("in", "out", "result"),
@@ -173,7 +167,6 @@ class VisibilitySpec extends AnyWordSpec with should.Matchers with TableDrivenPr
         implicitly[Ordering[Visibility]].compare(in, out) shouldBe result
       }
     }
-  }
 }
 
 class ProjectResourceIdSpec
@@ -191,11 +184,10 @@ class ProjectResourceIdSpec
 
   "instantiation" should {
 
-    "be successful for URLs ending with a project slug" in {
+    "be successful for URLs ending with a project slug" in
       forAll(httpUrls(pathGenerator = pathGenerator)) { url =>
         ResourceId(url).value shouldBe url
       }
-    }
 
     "fail for relative paths" in {
       an[IllegalArgumentException] shouldBe thrownBy {
@@ -212,20 +204,18 @@ class ProjectResourceIdSpec
 
   "toProjectSlug converter" should {
 
-    "convert any Project Resource to ProjectSlug" in {
+    "convert any Project Resource to ProjectSlug" in
       forAll { (renkuUrl: RenkuUrl, projectSlug: Slug) =>
         ResourceId(projectSlug)(renkuUrl).as[Try, Slug] shouldBe projectSlug.pure[Try]
       }
-    }
   }
 
   "showAs[RdfResource]" should {
 
-    "URI encode and wrap the ResourceId in <>" in {
+    "URI encode and wrap the ResourceId in <>" in
       forAll { resourceId: ResourceId =>
         resourceId.showAs[RdfResource] shouldBe s"<${URIref.encode(resourceId.value)}>"
       }
-    }
   }
 
   private lazy val pathGenerator = projectSlugs.map(slug => s"projects/$slug")
@@ -235,12 +225,11 @@ class GitHttpUrlSpec extends AnyWordSpec with should.Matchers with EitherValues 
 
   "HttpUrl" should {
 
-    "instantiate for valid absolute git urls" in {
+    "instantiate for valid absolute git urls" in
       forAll(httpUrls(), projectSlugs) { (httpUrl, projectSlug) =>
         val url = s"$httpUrl/$projectSlug.git"
         GitHttpUrl.from(url).map(_.value) shouldBe Right(url)
       }
-    }
 
     "fail instantiation for non-absolute urls" in {
 

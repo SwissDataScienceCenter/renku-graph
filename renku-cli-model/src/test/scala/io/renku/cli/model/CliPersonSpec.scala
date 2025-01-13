@@ -41,19 +41,17 @@ class CliPersonSpec
   private val personGen = PersonGenerators.cliPersonGen
 
   "decode/encode" should {
-    "be compatible" in {
+    "be compatible" in
       forAll(personGen) { cliPerson =>
         assertCompatibleCodec(cliPerson)
       }
-    }
 
-    "work on multiple items" in {
+    "work on multiple items" in
       forAll(personGen, personGen) { (cliPerson1, cliPerson2) =>
         assertCompatibleCodec(cliPerson1, cliPerson2)
       }
-    }
 
-    "fail when there is no name" in {
+    "fail when there is no name" in
       forAll(personGen) { person =>
         val jsonLDPerson = JsonLD.entity(
           person.resourceId.asEntityId,
@@ -65,7 +63,6 @@ class CliPersonSpec
         failure         shouldBe a[DecodingFailure]
         failure.message shouldBe show"No name on Person ${person.resourceId}"
       }
-    }
 
     "support multiple names, picking any" in {
       val resourceId = RenkuTinyTypeGenerators.personNameResourceId.generateOne

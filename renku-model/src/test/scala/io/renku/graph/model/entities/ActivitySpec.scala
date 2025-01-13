@@ -45,7 +45,7 @@ class ActivitySpec
 
   "fromCli" should {
 
-    "turn CliActivity entity into the Activity object" in {
+    "turn CliActivity entity into the Activity object" in
       forAll(
         activityEntities(stepPlanEntities(planCommands, cliShapedPersons), cliShapedPersons)(
           projectCreatedDates().generateOne
@@ -56,7 +56,6 @@ class ActivitySpec
 
         modelActivity shouldMatchToValid activity.to[entities.Activity]
       }
-    }
 
     "fail if there are Input Parameter Values for non-existing Usage Entities" in {
       val location = entityLocations.generateOne

@@ -41,7 +41,7 @@ class AssociationSpec
 
   "fromCli" should {
 
-    "turn CliAssociation entity with Renku agent into the Association object" in {
+    "turn CliAssociation entity with Renku agent into the Association object" in
       forAll(
         activityEntities(stepPlanEntities(planCommands, cliShapedPersons), cliShapedPersons)(
           projectCreatedDates().generateOne
@@ -50,7 +50,6 @@ class AssociationSpec
         val cliAssoc = association.to[CliAssociation]
         entities.Association.fromCli(cliAssoc) shouldMatchToValid association.to[entities.Association]
       }
-    }
 
     "turn CliAssociation entity with Person agent into the Association object" in {
       val (association, _, _) = generateAssociationWithPersonAgent

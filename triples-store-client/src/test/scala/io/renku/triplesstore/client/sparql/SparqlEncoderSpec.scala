@@ -85,18 +85,16 @@ class SparqlEncoderSpec extends AnyWordSpec with should.Matchers with ScalaCheck
       obj.asSparql.sparql shouldBe s"<${URIref.encode(obj.show)}>"
     }
 
-    "be able to encode a Triple as Fragment" in {
+    "be able to encode a Triple as Fragment" in
       forAll { (triple: Triple) =>
         triple.asSparql.sparql shouldBe
           s"<${URIref.encode(triple.subject.show)}> <${URIref.encode(triple.predicate.show)}> ${triple.obj.asSparql.sparql}.\n"
       }
-    }
 
-    "be able to encode a Quad as Fragment" in {
+    "be able to encode a Quad as Fragment" in
       forAll { (quad: Quad) =>
         quad.asSparql.sparql shouldBe
           s"GRAPH <${URIref.encode(quad.graphId.show)}> { ${quad.triple.asSparql.sparql} }"
       }
-    }
   }
 }

@@ -32,11 +32,10 @@ class NewProjectSpec extends AnyWordSpec with should.Matchers with ScalaCheckPro
 
   "encode/decode" should {
 
-    "work for any NewProject " in {
+    "work for any NewProject " in
       forAll(newProjectsGen) { newProject =>
         newProject.asJson.hcursor.as[NewProject].value shouldBe newProject
       }
-    }
   }
 
   "show" should {

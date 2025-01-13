@@ -33,12 +33,11 @@ class modelSpec extends AnyWordSpec with ScalaCheckPropertyChecks with should.Ma
 
   "SshUrl" should {
 
-    "instantiate for valid absolute ssh urls" in {
+    "instantiate for valid absolute ssh urls" in
       forAll(nonEmptyList(nonBlankStrings()), projectSlugs) { (hostParts, projectSlug) =>
         val url = s"git@${hostParts.toList.mkString(".")}:$projectSlug.git"
         SshUrl.from(url).map(_.value) shouldBe Right(url)
       }
-    }
 
     "fail instantiation for non-ssh urls" in {
       val url = s"${gitLabUrls.generateOne}/${projectSlugs.generateOne}.git"

@@ -50,7 +50,7 @@ class PersonSpec
 
   "apply(Name, GitLabId)" should {
 
-    "instantiate a Person.WithGitLabId" in {
+    "instantiate a Person.WithGitLabId" in
       forAll(personNames, personGitLabIds) { (name, glId) =>
         entities.Person(name, glId) shouldBe entities.Person.WithGitLabId(persons.ResourceId(glId),
                                                                           glId,
@@ -60,19 +60,17 @@ class PersonSpec
                                                                           maybeAffiliation = None
         )
       }
-    }
   }
 
   "fromCli" should {
 
-    "turn CliPerson entity into the Person object" in {
+    "turn CliPerson entity into the Person object" in
       forAll(cliShapedPersons) { person: Person =>
         val cliPerson = person.to[CliPerson]
         entities.Person.fromCli(cliPerson) shouldMatchToValid person.to[entities.Person]
       }
-    }
 
-    "fail if person's ResourceId does not match the Email or Orcid based ResourceId if no GitLabId but Email given" in {
+    "fail if person's ResourceId does not match the Email or Orcid based ResourceId if no GitLabId but Email given" in
       forAll(Gen.oneOf(personGitLabResourceId, personNameResourceId).widen[persons.ResourceId],
              personEmails,
              personNames
@@ -84,9 +82,8 @@ class PersonSpec
             show"orcidId = ${Option.empty[persons.OrcidId]}, email = ${email.some}, affiliation = None"
         )
       }
-    }
 
-    "fail if person's ResourceId does not match the Name or Orcid based ResourceId if no GitLabId and Email given" in {
+    "fail if person's ResourceId does not match the Name or Orcid based ResourceId if no GitLabId and Email given" in
       forAll(Gen.oneOf(personGitLabResourceId, personEmailResourceId).widen[persons.ResourceId], personNames) {
         (invalidResourceId, name) =>
           val cliPerson = CliPerson(CliPersonResourceId(invalidResourceId.value), name, None, None)
@@ -96,7 +93,6 @@ class PersonSpec
               show"orcidId = ${Option.empty[persons.OrcidId]}, email = ${Option.empty[persons.Email]}, affiliation = None"
           )
       }
-    }
   }
 
   "entityFunctions.findAllPersons" should {

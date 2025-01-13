@@ -37,15 +37,13 @@ class CliCommandInputSpec
   private val commandInputGen = CommandParameterGenerators.commandInputGen
 
   "decode/encode" should {
-    "be compatible" in {
+    "be compatible" in
       forAll(commandInputGen) { cliParam =>
         assertCompatibleCodec(cliParam)
       }
-    }
-    "work on multiple items" in {
+    "work on multiple items" in
       forAll(commandInputGen, commandInputGen) { (cliParam1, cliParam2) =>
         assertCompatibleCodec(cliParam1, cliParam2)
       }
-    }
   }
 }

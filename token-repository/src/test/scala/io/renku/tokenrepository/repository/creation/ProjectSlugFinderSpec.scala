@@ -86,9 +86,8 @@ class ProjectSlugFinderSpec
   }
 
   Status.Unauthorized :: Status.Forbidden :: Status.NotFound :: Nil foreach { status =>
-    it should s"map $status response to None" in {
+    it should s"map $status response to None" in
       mapResponse(status, Request[IO](), Response[IO](status)).asserting(_ shouldBe None)
-    }
   }
 
   it should "map UNAUTHORIZED response to None" in {

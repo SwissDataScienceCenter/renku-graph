@@ -223,7 +223,7 @@ class ProjectSpec
       }
     }
 
-    "turn non-renku CliProject entity without parent into the NonRenkuProject object" in {
+    "turn non-renku CliProject entity without parent into the NonRenkuProject object" in
       forAll(gitLabProjectInfos.map(projectInfoMaybeParent.replace(None))) { projectInfo =>
         val creator = projectMembersWithEmail.generateOne
         val members = gitLabProjectMembers.generateSet()
@@ -242,7 +242,6 @@ class ProjectSpec
               maybeCreator = creator.toPerson.some
             )
       }
-    }
 
     "turn non-renku CliProject entity with parent into the NonRenkuProject object" in {
       forAll(gitLabProjectInfos.map(projectInfoMaybeParent.replace(projectSlugs.generateSome))) { projectInfo =>
@@ -1010,7 +1009,7 @@ class ProjectSpec
 
     implicit val graph: GraphClass = GraphClass.Default
 
-    "produce JsonLD with all the relevant properties of a Renku Project" in {
+    "produce JsonLD with all the relevant properties of a Renku Project" in
       forAll(renkuProjectEntitiesWithDatasetsAndActivities.map(_.to[entities.RenkuProject])) { project =>
         val maybeParentId = project match {
           case p: entities.RenkuProject.WithParent => p.parentResourceId.some
@@ -1044,9 +1043,8 @@ class ProjectSpec
           )
           .toJson
       }
-    }
 
-    "produce JsonLD with all the relevant properties or a non-Renku Project" in {
+    "produce JsonLD with all the relevant properties or a non-Renku Project" in
       forAll(anyNonRenkuProjectEntities.map(_.to[entities.NonRenkuProject])) { project =>
         val maybeParentId = project match {
           case p: entities.NonRenkuProject.WithParent => p.parentResourceId.some
@@ -1075,7 +1073,6 @@ class ProjectSpec
           )
           .toJson
       }
-    }
   }
 
   "encode for the Project Graph" should {
@@ -1083,7 +1080,7 @@ class ProjectSpec
     import persons.ResourceId.entityIdEncoder
     implicit val graph: GraphClass = GraphClass.Project
 
-    "produce JsonLD with all the relevant properties and only links to Person entities" in {
+    "produce JsonLD with all the relevant properties and only links to Person entities" in
       forAll(
         renkuProjectEntitiesWithDatasetsAndActivities
           .modify(replaceMembers(projectMemberEntities(withoutGitLabId).generateFixedSizeSet(ofSize = 1)))
@@ -1121,9 +1118,8 @@ class ProjectSpec
           )
           .toJson
       }
-    }
 
-    "produce JsonLD with all the relevant properties or a non-Renku Project" in {
+    "produce JsonLD with all the relevant properties or a non-Renku Project" in
       forAll(
         anyNonRenkuProjectEntities
           .modify(replaceMembers(projectMemberEntities(withoutGitLabId).generateFixedSizeSet(ofSize = 1)))
@@ -1156,9 +1152,8 @@ class ProjectSpec
           )
           .toJson
       }
-    }
 
-    "produce JsonLD with all the relevant properties without images" in {
+    "produce JsonLD with all the relevant properties without images" in
       forAll(
         anyNonRenkuProjectEntities
           .modify(replaceMembers(projectMemberEntities(withoutGitLabId).generateFixedSizeSet(ofSize = 1)))
@@ -1198,7 +1193,6 @@ class ProjectSpec
           )
           .toJson
       }
-    }
   }
 
   "entityFunctions.findAllPersons" should {

@@ -36,11 +36,10 @@ class ProjectJsonLDEncoderSpec extends AnyWordSpec with should.Matchers with Sca
 
   "encode" should {
 
-    "convert the model.Project object to Json" in {
+    "convert the model.Project object to Json" in
       forAll { project: Project =>
         (ProjectJsonLDEncoder encode project).cursor.as(decoder(project)) shouldBe project.asRight
       }
-    }
   }
 
   private def decoder(project: Project): JsonLDDecoder[Project] = JsonLDDecoder.entity(entities.Project.entityTypes) {

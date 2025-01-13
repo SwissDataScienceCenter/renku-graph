@@ -37,15 +37,13 @@ class CliParameterLinkSpec
   private val parameterLinkGen = CommandParameterGenerators.parameterLinkGen
 
   "decode/encode" should {
-    "be compatible" in {
+    "be compatible" in
       forAll(parameterLinkGen) { cliParam =>
         assertCompatibleCodec(cliParam)
       }
-    }
-    "work on multiple items" in {
+    "work on multiple items" in
       forAll(parameterLinkGen, parameterLinkGen) { (cliParam1, cliParam2) =>
         assertCompatibleCodec(cliParam1, cliParam2)
       }
-    }
   }
 }

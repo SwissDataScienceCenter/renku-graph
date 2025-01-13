@@ -48,7 +48,7 @@ class PagingResponseSpec
 
   "from" should {
 
-    "fail if the number of results > perPage" in {
+    "fail if the number of results > perPage" in
       forAll(perPages, pages) { (perPage, page) =>
         val results = nonEmptyStrings().generateList(min = perPage.value + 1, max = perPage.value * 2)
         val total   = Total((page.value - 1) * perPage.value + results.size)
@@ -59,9 +59,8 @@ class PagingResponseSpec
         result.failure.exception shouldBe an[IllegalArgumentException]
         result.failure.exception.getMessage shouldBe s"PagingResponse cannot be instantiated for ${results.size} results, total: $total, page: $page and perPage: $perPage"
       }
-    }
 
-    "fix the total if results is not empty and (page - 1) * perPage + results.size > total" in {
+    "fix the total if results is not empty and (page - 1) * perPage + results.size > total" in
       forAll(perPages.retryUntil(_.value > 1), pages.retryUntil(_.value > 1)) { (perPage, page) =>
         val results = nonEmptyStrings().generateNonEmptyList(max = perPage.value).toList
         val total   = positiveInts((page.value - 1) * perPage.value + results.size - 1).map(_.value).generateAs(Total)
@@ -73,9 +72,8 @@ class PagingResponseSpec
         result.success.value.pagingInfo.pagingRequest shouldBe request
         result.success.value.pagingInfo.total         shouldBe Total((page.value - 1) * perPage.value + results.size)
       }
-    }
 
-    "instantiate successfully if results list is empty and (page - 1) * perPage > total" in {
+    "instantiate successfully if results list is empty and (page - 1) * perPage > total" in
       forAll(perPages.retryUntil(_.value > 1), pages.retryUntil(_.value > 1)) { (perPage, page) =>
         val results = List.empty[String]
         val total   = positiveInts((page.value - 1) * perPage.value + results.size - 1).map(_.value).generateAs(Total)
@@ -87,9 +85,8 @@ class PagingResponseSpec
         result.success.value.pagingInfo.pagingRequest shouldBe request
         result.success.value.pagingInfo.total         shouldBe total
       }
-    }
 
-    "instantiate successfully in other cases" in {
+    "instantiate successfully in other cases" in
       forAll(perPages, pages) { (perPage, page) =>
         val results = nonEmptyStrings().generateNonEmptyList(max = perPage.value).toList
         val total   = ints(min = (page.value - 1) * perPage.value + results.size).generateAs(Total)
@@ -101,7 +98,6 @@ class PagingResponseSpec
         result.success.value.pagingInfo.pagingRequest shouldBe request
         result.success.value.pagingInfo.total         shouldBe total
       }
-    }
   }
 
   "from with no total given" should {

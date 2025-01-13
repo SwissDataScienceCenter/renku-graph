@@ -31,11 +31,10 @@ class DurationNotNegativeSpec extends AnyWordSpec with ScalaCheckPropertyChecks 
 
   "DurationNotNegative" should {
 
-    "be instantiatable when values are positive durations" in {
+    "be instantiatable when values are positive durations" in
       forAll(notNegativeJavaDurations) { someValue =>
         DurationNotNegativeType(someValue).value shouldBe someValue
       }
-    }
 
     "throw an IllegalArgumentException for negative duration" in {
       intercept[IllegalArgumentException] {

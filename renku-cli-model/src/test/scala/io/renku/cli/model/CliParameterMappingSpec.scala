@@ -37,17 +37,15 @@ class CliParameterMappingSpec
   private val parameterMappingGen = CommandParameterGenerators.parameterMappingGen
 
   "decode/encode" should {
-    "be compatible" in {
+    "be compatible" in
       forAll(parameterMappingGen) { cliParam =>
         assertCompatibleCodec(allMappings _)(cliParam)
       }
-    }
 
-    "work on multiple items" in {
+    "work on multiple items" in
       forAll(parameterMappingGen, parameterMappingGen) { (cliParam1, cliParam2) =>
         assertCompatibleCodec(allMappings _)(cliParam1, cliParam2)
       }
-    }
   }
 
   def allMappings(cliParam: CliParameterMapping): List[CliParameterMapping] =

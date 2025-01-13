@@ -44,7 +44,7 @@ class PersonMergerSpec extends AnyWordSpec with should.Matchers with ScalaCheckP
       error.getMessage shouldBe s"Persons ${model.resourceId} and ${kg.resourceId} do not have matching identifiers"
     }
 
-    "prefer model values if they exist in case of Person with GitLabId" in {
+    "prefer model values if they exist in case of Person with GitLabId" in
       forAll(personEntities(withGitLabId) map (_.toMaybe[entities.Person.WithGitLabId])) {
         case Some(model) =>
           val kg = model.copy(
@@ -61,9 +61,8 @@ class PersonMergerSpec extends AnyWordSpec with should.Matchers with ScalaCheckP
             .pure[Try]
         case None => fail("Cannot convert to entities.person")
       }
-    }
 
-    "prefer model values if they exist in case of Person with Email but no GitLabId" in {
+    "prefer model values if they exist in case of Person with Email but no GitLabId" in
       forAll(personEntities(withoutGitLabId, withEmail) map (_.toMaybe[entities.Person.WithEmail])) {
         case Some(model) =>
           val kg = model.copy(
@@ -78,9 +77,8 @@ class PersonMergerSpec extends AnyWordSpec with should.Matchers with ScalaCheckP
             .pure[Try]
         case None => fail("Cannot convert to entities.person")
       }
-    }
 
-    "prefer model values if they exist in case of Person without Email and GitLabId" in {
+    "prefer model values if they exist in case of Person without Email and GitLabId" in
       forAll(personEntities(withoutGitLabId, withoutEmail) map (_.toMaybe[entities.Person.WithNameOnly])) {
         case Some(model) =>
           val kg = model.copy(
@@ -95,6 +93,5 @@ class PersonMergerSpec extends AnyWordSpec with should.Matchers with ScalaCheckP
             .pure[Try]
         case None => fail("Cannot convert to entities.person")
       }
-    }
   }
 }

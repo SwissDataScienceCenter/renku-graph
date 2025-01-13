@@ -35,11 +35,10 @@ class ImageUrisEncoderSpec
     with ScalaCheckPropertyChecks
     with ImageUrisEncoder {
 
-  it should "encode the List[ImageUri] -> slug tuples to JSON" in {
+  it should "encode the List[ImageUri] -> slug tuples to JSON" in
     forAll(imageUris.toGeneratorOfList()) { images =>
       (images -> projectSlug).asJson shouldBe imagesEncoder(images)
     }
-  }
 
   private lazy val imagesEncoder: Encoder[List[ImageUri]] = Encoder.instance[List[ImageUri]] { images =>
     Json.fromValues(

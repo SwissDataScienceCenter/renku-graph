@@ -64,11 +64,10 @@ class ProjectAuthRecordsFinderSpec
     }
   }
 
-  it should "return empty when project is not found" in {
+  it should "return empty when project is not found" in
     withProjectAuthService.use { s =>
       val finder = ProjectAuthRecordsFinder(s)
       val slug   = Slug("p/c")
       finder(slug, None).asserting(_ shouldBe Nil)
     }
-  }
 }

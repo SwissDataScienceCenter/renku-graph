@@ -35,21 +35,19 @@ class CliParameterValueSpec
   val parameterValueGen = ParameterValueGenerators.parameterValueGen
 
   "decode/encode" should {
-    "be compatible" in {
+    "be compatible" in
       forAll(parameterValueGen) { cliParameterValue =>
         assertCompatibleCodec(cliParameterValue)
       }
-    }
 
-    "work on multiple items" in {
+    "work on multiple items" in
       forAll(parameterValueGen, parameterValueGen) { (cliParam1, cliParam2) =>
         assertCompatibleCodec(cliParam1, cliParam2)
       }
-    }
   }
 
   "asString" should {
-    "return the plain value as a string " in {
+    "return the plain value as a string " in
       List("blabla".asJson -> "blabla", 124.asJson -> 124, true.asJson -> true, 12.04.asJson -> 12.04).foreach {
         case (jsonValue, plainValue) =>
           val jsonLDString =
@@ -79,6 +77,5 @@ class CliParameterValueSpec
             .fold(throw _, identity)
           result.value.asString shouldBe plainValue.toString
       }
-    }
   }
 }

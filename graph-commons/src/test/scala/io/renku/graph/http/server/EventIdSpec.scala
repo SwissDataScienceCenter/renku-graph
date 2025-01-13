@@ -30,11 +30,10 @@ class EventIdSpec extends AnyWordSpec with ScalaCheckPropertyChecks with should.
 
   "unapply" should {
 
-    "convert valid eventId as string to EventId" in {
+    "convert valid eventId as string to EventId" in
       forAll { id: events.EventId =>
         EventId.unapply(id.toString) shouldBe Some(id)
       }
-    }
 
     "return None if string value is blank" in {
       EventId.unapply(" ") shouldBe None

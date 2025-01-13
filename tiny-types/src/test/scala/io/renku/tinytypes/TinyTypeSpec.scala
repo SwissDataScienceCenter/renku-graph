@@ -47,22 +47,20 @@ class TinyTypeSpec extends AnyWordSpec with ScalaCheckPropertyChecks with should
 
   "stringTinyTypeConverter" should {
 
-    "url encode the given value and convert it to a single element list of PathSegment" in {
+    "url encode the given value and convert it to a single element list of PathSegment" in
       forAll(nonEmptyStrings(), Gen.oneOf("\\", " "), nonEmptyStrings()) { (part1, part2, part3) =>
         val tinyType = new StringTinyType { val value = s"$part1$part2$part3" }
         StringTinyType.stringTinyTypeConverter(tinyType) shouldBe List(PathSegment(tinyType.value))
       }
-    }
   }
 
   "relativePathTinyTypeConverter" should {
 
-    "do not url encode the given value and convert it to a multiple elements list of PathSegment" in {
+    "do not url encode the given value and convert it to a multiple elements list of PathSegment" in
       forAll(nonEmptyList(nonEmptyStrings())) { segments =>
         val tinyType = new RelativePathTinyType { val value = segments.toList.mkString("/") }
         RelativePathTinyType.relativePathTinyTypeConverter(tinyType) shouldBe segments.toList.map(PathSegment.apply)
       }
-    }
   }
 
   private lazy val arbitraryValues: List[Any] =

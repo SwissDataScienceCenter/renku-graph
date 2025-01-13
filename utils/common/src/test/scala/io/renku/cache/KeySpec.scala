@@ -40,7 +40,7 @@ class KeySpec extends AnyWordSpec with should.Matchers with IOSpec with ScalaChe
       key.accessedAt shouldBe key.createdAt
     }
 
-    "retain order based on the respective property" in {
+    "retain order based on the respective property" in
       forAll { values: List[String] =>
         val keys = values.distinct.zipWithIndex.map { case (v, ts) =>
           new Key(v, ts, values.size - ts)
@@ -49,9 +49,8 @@ class KeySpec extends AnyWordSpec with should.Matchers with IOSpec with ScalaChe
         keys.sorted(Key.Order.oldest[String])            shouldBe keys.sortBy(_.createdAt)
         keys.sorted(Key.Order.leastRecentlyUsed[String]) shouldBe keys.sortBy(_.accessedAt)
       }
-    }
 
-    "distinguish different values with same properties" in {
+    "distinguish different values with same properties" in
       forAll { values: List[String] =>
         val keys = values.distinct.map(v => new Key(v, 1, 1))
 
@@ -59,6 +58,5 @@ class KeySpec extends AnyWordSpec with should.Matchers with IOSpec with ScalaChe
         TreeSet.from(keys)(Key.Order.oldest[String]).size            shouldBe keys.size
         TreeSet.from(keys)(Key.Order.leastRecentlyUsed[String]).size shouldBe keys.size
       }
-    }
   }
 }

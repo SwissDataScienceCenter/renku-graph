@@ -259,19 +259,18 @@ class EventFinderSpec
     "return no Event " +
       "- case when there are multiple rows for the same version " +
       "one in Sent for less than SentStatusTimeout" +
-      "but also one in RecoverableFailure for more than RecoverableStatusTimeout" in testDBResource.use {
-        implicit cfg =>
-          for {
-            _ <- insertSubscriptionRecord(subscriberUrls.generateOne, version, Sent, less(than = sentStatusTimeout))
-            _ <- insertSubscriptionRecord(subscriberUrls.generateOne,
-                                          version,
-                                          RecoverableFailure,
-                                          more(than = recoverableStatusTimeout)
-                 )
-            _ <- insertSubscriptionRecord(url, version, New, ChangeDate(now))
+      "but also one in RecoverableFailure for more than RecoverableStatusTimeout" in testDBResource.use { implicit cfg =>
+        for {
+          _ <- insertSubscriptionRecord(subscriberUrls.generateOne, version, Sent, less(than = sentStatusTimeout))
+          _ <- insertSubscriptionRecord(subscriberUrls.generateOne,
+                                        version,
+                                        RecoverableFailure,
+                                        more(than = recoverableStatusTimeout)
+               )
+          _ <- insertSubscriptionRecord(url, version, New, ChangeDate(now))
 
-            _ <- finder.popEvent().asserting(_ shouldBe None)
-          } yield ()
+          _ <- finder.popEvent().asserting(_ shouldBe None)
+        } yield ()
       }
 
     "return Migration Request Event for the most recent version row with Sent " +

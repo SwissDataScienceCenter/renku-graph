@@ -31,22 +31,20 @@ class versionsSpec extends AnyWordSpec with ScalaCheckPropertyChecks with should
 
   "from" should {
 
-    "return Right for a valid released version" in {
+    "return Right for a valid released version" in
       forAll(Generators.semanticVersions) { version =>
         CliVersion.from(version).map(_.show) shouldBe version.asRight
       }
-    }
 
-    "return Right for a valid dev version" in {
+    "return Right for a valid dev version" in
       forAll(devVersions()) { version =>
         CliVersion.from(version).map(_.show) shouldBe version.asRight
       }
-    }
   }
 
   "major, minor and bugfix" should {
 
-    "extract the relevant version parts from a released version" in {
+    "extract the relevant version parts from a released version" in
       forAll(Generators.semanticVersions) { version =>
         val cli                      = CliVersion(version)
         val s"$major.$minor.$bugfix" = version
@@ -54,9 +52,8 @@ class versionsSpec extends AnyWordSpec with ScalaCheckPropertyChecks with should
         cli.minor  shouldBe minor
         cli.bugfix shouldBe bugfix
       }
-    }
 
-    "extract the relevant version parts from a dev version" in {
+    "extract the relevant version parts from a dev version" in
       forAll(devVersions()) { version =>
         val cli                      = CliVersion(version)
         val s"$major.$minor.$bugfix" = version
@@ -64,12 +61,11 @@ class versionsSpec extends AnyWordSpec with ScalaCheckPropertyChecks with should
         cli.minor  shouldBe minor
         cli.bugfix shouldBe bugfix
       }
-    }
   }
 
   "ordering" should {
 
-    "consider the major only if different" in {
+    "consider the major only if different" in
       forAll(cliVersions, cliVersions) { (version1, version2) =>
         whenever(version1.major != version2.major) {
           val list = List(version1, version2)
@@ -78,9 +74,8 @@ class versionsSpec extends AnyWordSpec with ScalaCheckPropertyChecks with should
           else list.sorted                                 shouldBe list.reverse
         }
       }
-    }
 
-    "consider the minor only if majors are the same" in {
+    "consider the minor only if majors are the same" in
       forAll(cliVersions, cliVersions) { (version1, version2) =>
         whenever(version1.minor != version2.minor) {
           val version2SameMajor = CliVersion(version2.show.replaceFirst(s"${version2.major}.", s"${version1.major}."))
@@ -91,9 +86,8 @@ class versionsSpec extends AnyWordSpec with ScalaCheckPropertyChecks with should
           else list.sorted                                          shouldBe list.reverse
         }
       }
-    }
 
-    "consider the bugfix only if majors and minors are the same" in {
+    "consider the bugfix only if majors and minors are the same" in
       forAll(cliVersions, cliVersions) { (version1, version2) =>
         whenever(version1.bugfix != version2.bugfix) {
           val version2SameMajorMinor = CliVersion(
@@ -107,7 +101,6 @@ class versionsSpec extends AnyWordSpec with ScalaCheckPropertyChecks with should
           else list.sorted                                                 shouldBe list.reverse
         }
       }
-    }
 
     "consider the dev part if all majors, minors and bugfix are the same" in {
       val semanticVersion = Generators.semanticVersions.generateOne

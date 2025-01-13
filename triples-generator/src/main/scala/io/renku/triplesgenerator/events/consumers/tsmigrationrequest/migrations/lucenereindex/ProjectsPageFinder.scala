@@ -72,7 +72,7 @@ private class ProjectsPageFinderImpl[F[_]: Monad](migrationName: Migration.Name,
              |""".stripMargin
   )
 
-  private implicit lazy val decoder: Decoder[List[projects.Slug]] = ResultsDecoder[List, projects.Slug] {
-    implicit cur => extract[projects.Slug]("slug")
+  private implicit lazy val decoder: Decoder[List[projects.Slug]] = ResultsDecoder[List, projects.Slug] { implicit cur =>
+    extract[projects.Slug]("slug")
   }
 }

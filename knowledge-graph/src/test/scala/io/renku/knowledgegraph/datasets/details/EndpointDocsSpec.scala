@@ -32,9 +32,8 @@ class EndpointDocsSpec extends AnyWordSpec {
 
   "path" should {
 
-    "return a valid Path object" in {
+    "return a valid Path object" in
       validatePath(new EndpointDocsImpl().path)
-    }
   }
 
   private implicit lazy val renkuApiUrl: renku.ApiUrl = renkuApiUrls.generateOne

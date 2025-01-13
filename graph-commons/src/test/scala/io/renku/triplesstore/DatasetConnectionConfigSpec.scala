@@ -35,7 +35,7 @@ class DatasetConnectionConfigSpec extends AnyWordSpec with ScalaCheckPropertyChe
 
   "AdminConnectionConfig.apply" should {
 
-    "read 'services.fuseki.url', 'services.fuseki.admin.username' and 'services.fuseki.admin.password' to instantiate the AdminConnectionConfig" in {
+    "read 'services.fuseki.url', 'services.fuseki.admin.username' and 'services.fuseki.admin.password' to instantiate the AdminConnectionConfig" in
       forAll(adminConnectionConfigs) { storeConfig =>
         val config = ConfigFactory.parseMap(
           Map(
@@ -57,7 +57,6 @@ class DatasetConnectionConfigSpec extends AnyWordSpec with ScalaCheckPropertyChe
         actual.authCredentials.username shouldBe storeConfig.authCredentials.username
         actual.authCredentials.password shouldBe storeConfig.authCredentials.password
       }
-    }
 
     "fail if url invalid" in {
       val config = ConfigFactory.parseMap(
@@ -127,7 +126,7 @@ class DatasetConnectionConfigSpec extends AnyWordSpec with ScalaCheckPropertyChe
       credentials <- basicAuthCredentials
     } yield ProjectsConnectionConfig(url, credentials)
 
-    "read 'services.fuseki.url', 'services.fuseki.renku.username' and 'services.fuseki.renku.password' to instantiate the RenkuConnectionConfig" in {
+    "read 'services.fuseki.url', 'services.fuseki.renku.username' and 'services.fuseki.renku.password' to instantiate the RenkuConnectionConfig" in
       forAll(projectsConnectionConfig) { storeConfig =>
         val config = ConfigFactory.parseMap(
           Map(
@@ -150,7 +149,6 @@ class DatasetConnectionConfigSpec extends AnyWordSpec with ScalaCheckPropertyChe
         actual.authCredentials.username shouldBe storeConfig.authCredentials.username
         actual.authCredentials.password shouldBe storeConfig.authCredentials.password
       }
-    }
 
     "fail if url invalid" in {
       val config = ConfigFactory.parseMap(
@@ -220,7 +218,7 @@ class DatasetConnectionConfigSpec extends AnyWordSpec with ScalaCheckPropertyChe
       credentials <- basicAuthCredentials
     } yield MigrationsConnectionConfig(url, credentials)
 
-    "read 'services.fuseki.url', 'services.fuseki.admin.username' and 'services.fuseki.admin.password' to instantiate the RenkuConnectionConfig" in {
+    "read 'services.fuseki.url', 'services.fuseki.admin.username' and 'services.fuseki.admin.password' to instantiate the RenkuConnectionConfig" in
       forAll(migrationsConnectionConfig) { storeConfig =>
         val config = ConfigFactory.parseMap(
           Map(
@@ -243,6 +241,5 @@ class DatasetConnectionConfigSpec extends AnyWordSpec with ScalaCheckPropertyChe
         actual.authCredentials.username shouldBe storeConfig.authCredentials.username
         actual.authCredentials.password shouldBe storeConfig.authCredentials.password
       }
-    }
   }
 }

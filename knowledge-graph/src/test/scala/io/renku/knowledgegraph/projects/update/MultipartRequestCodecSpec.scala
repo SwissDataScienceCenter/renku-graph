@@ -40,9 +40,8 @@ class MultipartRequestCodecSpec
   private val codec: MultipartRequestCodec[IO] = MultipartRequestCodec[IO]
 
   forAll(projectUpdatesGen, countingGen) { (updates, cnt) =>
-    it should s"decode/encode the multipart request with multiple values #$cnt" in {
+    it should s"decode/encode the multipart request with multiple values #$cnt" in
       (codec.encode(updates) >>= (MultipartRequestCodec[IO].decode(_))).asserting(_ shouldBe updates)
-    }
   }
 
   it should "decode/encode the multipart request for empty updates" in {
