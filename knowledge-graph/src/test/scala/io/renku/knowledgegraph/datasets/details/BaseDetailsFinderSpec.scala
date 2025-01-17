@@ -73,7 +73,7 @@ class BaseDetailsFinderSpec extends AnyWordSpec with ScalaCheckPropertyChecks wi
 
   "modified dataset decoder" should {
 
-    "decode result-set with a blank description, url, sameAs, and images to a Dataset object" in {
+    "decode result-set with a blank description, url, sameAs, and images to a Dataset object" in
       forAll(
         anyRenkuProjectEntities.addDatasetAndModification(datasetEntities(provenanceNonModified)),
         blankStrings()
@@ -90,7 +90,6 @@ class BaseDetailsFinderSpec extends AnyWordSpec with ScalaCheckPropertyChecks wi
             .some
             .asRight
       }
-    }
   }
 
   private def nonModifiedToResultSet(project:     testentities.RenkuProject,

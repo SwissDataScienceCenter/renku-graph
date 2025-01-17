@@ -41,7 +41,7 @@ class BoundedInstantSpec extends AnyWordSpec with ScalaCheckPropertyChecks with 
       protected[this] override def maybeMax:        Option[Instant] = Some(max)
     }
 
-    "be instantiatable instants from within the defined boundaries" in {
+    "be instantiatable instants from within the defined boundaries" in
       forAll(
         timestamps(
           min = Instant.now().minus(24, HOURS).plus(2, SECONDS),
@@ -50,9 +50,8 @@ class BoundedInstantSpec extends AnyWordSpec with ScalaCheckPropertyChecks with 
       ) { value =>
         Type.from(value).map(_.value) shouldBe Right(value)
       }
-    }
 
-    "fail if outside the left boundary" in {
+    "fail if outside the left boundary" in
       forAll(
         timestamps(
           max = Instant.now().minus(24, HOURS).minus(2, SECONDS)
@@ -63,9 +62,8 @@ class BoundedInstantSpec extends AnyWordSpec with ScalaCheckPropertyChecks with 
         exception            shouldBe an[IllegalArgumentException]
         exception.getMessage shouldBe s"${Type.typeName} has to be >= ${Type.min} and <= ${Type.max}"
       }
-    }
 
-    "fail if outside the right boundary" in {
+    "fail if outside the right boundary" in
       forAll(
         timestamps(
           min = Instant.now().plus(24, HOURS).plus(2, SECONDS)
@@ -76,7 +74,6 @@ class BoundedInstantSpec extends AnyWordSpec with ScalaCheckPropertyChecks with 
         exception            shouldBe an[IllegalArgumentException]
         exception.getMessage shouldBe s"${Type.typeName} has to be >= ${Type.min} and <= ${Type.max}"
       }
-    }
   }
 
   "BoundedInstant - with min" should {
@@ -89,15 +86,14 @@ class BoundedInstantSpec extends AnyWordSpec with ScalaCheckPropertyChecks with 
       protected[this] override def maybeMin:        Option[Instant] = Some(min)
     }
 
-    "be instantiatable instants from within the defined boundaries" in {
+    "be instantiatable instants from within the defined boundaries" in
       forAll(
         timestamps(min = Instant.now().minus(24, HOURS).plus(2, SECONDS))
       ) { value =>
         Type.from(value).map(_.value) shouldBe Right(value)
       }
-    }
 
-    "fail if outside the boundary" in {
+    "fail if outside the boundary" in
       forAll(
         timestamps(
           max = Instant.now().minus(24, HOURS).minus(2, SECONDS)
@@ -108,7 +104,6 @@ class BoundedInstantSpec extends AnyWordSpec with ScalaCheckPropertyChecks with 
         exception            shouldBe an[IllegalArgumentException]
         exception.getMessage shouldBe s"${Type.typeName} has to be >= ${Type.min}"
       }
-    }
   }
 
   "BoundedInstant - with max" should {
@@ -121,15 +116,14 @@ class BoundedInstantSpec extends AnyWordSpec with ScalaCheckPropertyChecks with 
       protected[this] override def maybeMax:        Option[Instant] = Some(max)
     }
 
-    "be instantiatable instants from within the defined boundaries" in {
+    "be instantiatable instants from within the defined boundaries" in
       forAll(
         timestamps(max = Instant.now().plus(24, HOURS).minus(2, SECONDS))
       ) { value =>
         Type.from(value).map(_.value) shouldBe Right(value)
       }
-    }
 
-    "fail if outside the boundary" in {
+    "fail if outside the boundary" in
       forAll(
         timestamps(
           min = Instant.now().plus(24, HOURS).plus(2, SECONDS)
@@ -140,6 +134,5 @@ class BoundedInstantSpec extends AnyWordSpec with ScalaCheckPropertyChecks with 
         exception            shouldBe an[IllegalArgumentException]
         exception.getMessage shouldBe s"${Type.typeName} has to be <= ${Type.max}"
       }
-    }
   }
 }

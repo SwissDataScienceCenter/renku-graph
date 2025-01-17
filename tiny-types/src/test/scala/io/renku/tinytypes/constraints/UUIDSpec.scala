@@ -34,27 +34,24 @@ class UUIDSpec extends AnyWordSpec with ScalaCheckPropertyChecks with should.Mat
       UUIDString shouldBe a[NonBlank[_]]
     }
 
-    "be instantiatable when values are valid UUIDs" in {
+    "be instantiatable when values are valid UUIDs" in
       forAll(uuid) { expected =>
         val Right(UUIDString(actual)) = UUIDString.from(expected.toString)
         actual shouldBe expected.toString
       }
-    }
 
-    "be instantiatable when values are UUIDs without dashes" in {
+    "be instantiatable when values are UUIDs without dashes" in
       forAll(noDashUuid) { expected =>
         val Right(UUIDString(actual)) = UUIDString.from(expected)
         actual shouldBe expected
       }
-    }
 
-    "fail instantiation for non-UUID values" in {
+    "fail instantiation for non-UUID values" in
       forAll(nonEmptyStrings()) { value =>
         intercept[IllegalArgumentException] {
           UUIDString(value)
         }.getMessage shouldBe s"'$value' is not a valid UUID value for io.renku.tinytypes.constraints.UUIDString"
       }
-    }
   }
 }
 

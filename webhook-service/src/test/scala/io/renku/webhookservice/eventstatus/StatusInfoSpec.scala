@@ -35,8 +35,7 @@ class StatusInfoSpec extends AnyWordSpec with should.Matchers with ScalaCheckPro
 
   "encode" should {
 
-    "produce Json from a StatusInfo of an activated project with a NonZero progress" in {
-
+    "produce Json from a StatusInfo of an activated project with a NonZero progress" in
       forAll(eventInfos()) { eventInfo =>
         val info = StatusInfo.activated(eventInfo)
 
@@ -54,7 +53,6 @@ class StatusInfoSpec extends AnyWordSpec with should.Matchers with ScalaCheckPro
           }
         }""".deepDropNullValues
       }
-    }
 
     "produce Json from a StatusInfo of a non-activated project" in {
 
@@ -76,7 +74,7 @@ class ProgressSpec extends AnyWordSpec with should.Matchers with ScalaCheckPrope
 
   "from" should {
 
-    "return Progress.NonZero for the given EventStatus" in {
+    "return Progress.NonZero for the given EventStatus" in
       forAll { (eventStatus: EventStatus) =>
         val progressStatus = Progress.from(eventStatus)
 
@@ -84,7 +82,6 @@ class ProgressSpec extends AnyWordSpec with should.Matchers with ScalaCheckPrope
         progressStatus.total        shouldBe EventStatusProgress.Stage.Final.value
         progressStatus.completion   shouldBe EventStatusProgress(eventStatus).completion
       }
-    }
   }
 
   "Progress.Zero to have final stage set to EventStatusProgress.Stage.Final" in {
@@ -94,8 +91,7 @@ class ProgressSpec extends AnyWordSpec with should.Matchers with ScalaCheckPrope
 
 class DetailsSpec extends AnyWordSpec with should.Matchers with TableDrivenPropertyChecks {
 
-  "Details" should {
-
+  "Details" should
     forAll(
       Table(
         ("eventStatus", "status", "message", "maybeMessage"),
@@ -130,5 +126,4 @@ class DetailsSpec extends AnyWordSpec with should.Matchers with TableDrivenPrope
         details.maybeDetails shouldBe maybeEventMessage.map(_.value)
       }
     }
-  }
 }

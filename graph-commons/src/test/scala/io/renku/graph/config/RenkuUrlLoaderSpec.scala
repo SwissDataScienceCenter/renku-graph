@@ -37,7 +37,7 @@ class RenkuUrlLoaderSpec extends AnyWordSpec with ScalaCheckPropertyChecks with 
 
   "apply" should {
 
-    "return a renkuUrl if there's a value for 'services.renku.url'" in {
+    "return a renkuUrl if there's a value for 'services.renku.url'" in
       forAll(httpUrls()) { url =>
         val config = ConfigFactory.parseMap(
           Map(
@@ -51,7 +51,6 @@ class RenkuUrlLoaderSpec extends AnyWordSpec with ScalaCheckPropertyChecks with 
 
         RenkuUrlLoader[Try](config) shouldBe Success(RenkuUrl(url))
       }
-    }
 
     "fail if there's no value for the 'services.renku.url'" in {
       val Failure(exception) = RenkuUrlLoader[Try](ConfigFactory.empty())
@@ -77,10 +76,9 @@ class RenkuUrlLoaderSpec extends AnyWordSpec with ScalaCheckPropertyChecks with 
 
   "showAs[RdfResource]" should {
 
-    "URI encode and wrap the url in <>" in {
+    "URI encode and wrap the url in <>" in
       forAll { url: RenkuUrl =>
         url.showAs[RdfResource] shouldBe s"<${URIref.encode(url.value)}>"
       }
-    }
   }
 }

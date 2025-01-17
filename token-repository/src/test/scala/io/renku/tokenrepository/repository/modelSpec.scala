@@ -34,7 +34,7 @@ class ProjectTokenDuePeriodSpec extends AnyWordSpec with should.Matchers with Sc
 
   "apply" should {
 
-    "read 'project-token-due-period' as Period from the config" in {
+    "read 'project-token-due-period' as Period from the config" in
       forAll(ints(min = 1, max = 2 * 365)) { duration =>
         val config = ConfigFactory.parseMap(
           Map("project-token-due-period" -> s"$duration days").asJava
@@ -42,7 +42,6 @@ class ProjectTokenDuePeriodSpec extends AnyWordSpec with should.Matchers with Sc
 
         ProjectTokenDuePeriod[Try](config) shouldBe Period.ofDays(duration).pure[Try]
       }
-    }
   }
 }
 

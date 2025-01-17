@@ -48,10 +48,9 @@ class TotalCapacitySpec extends AnyWordSpec with should.Matchers with ScalaCheck
 
   "*" should {
 
-    "multiple the Capacity's value by the given value" in {
+    "multiple the Capacity's value by the given value" in
       forAll { (totalCapacity: TotalCapacity, value: Double) =>
         totalCapacity * value shouldBe totalCapacity.value * value
       }
-    }
   }
 }

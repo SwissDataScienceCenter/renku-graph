@@ -34,16 +34,14 @@ class CliSoftwareAgentSpec
   private val agentGen = SoftwareAgentGenerators.softwareAgentGen
 
   "decode/encode" should {
-    "be compatible" in {
+    "be compatible" in
       forAll(agentGen) { cliAgent =>
         assertCompatibleCodec(cliAgent)
       }
-    }
 
-    "work on multiple items" in {
+    "work on multiple items" in
       forAll(agentGen, agentGen) { (cliAgent1, cliAgent2) =>
         assertCompatibleCodec(cliAgent1, cliAgent2)
       }
-    }
   }
 }

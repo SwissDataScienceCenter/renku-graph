@@ -45,12 +45,11 @@ private class ExpiryAndCreatedDatesAdder[F[_]: Spawn: Logger: SessionResource] e
       case false => addColumn(column, columnType)
     }
 
-  private def addColumn(column: String, columnType: String): Kleisli[F, Session[F], Unit] = Kleisli {
-    implicit session =>
-      for {
-        _ <- execute(sql"ALTER TABLE projects_tokens ADD COLUMN IF NOT EXISTS #$column #$columnType".command)
-        _ <- execute(sql"CREATE INDEX IF NOT EXISTS idx_#$column ON projects_tokens(#$column)".command)
-        _ <- Logger[F].info(s"'$column' column added")
-      } yield ()
+  private def addColumn(column: String, columnType: String): Kleisli[F, Session[F], Unit] = Kleisli { implicit session =>
+    for {
+      _ <- execute(sql"ALTER TABLE projects_tokens ADD COLUMN IF NOT EXISTS #$column #$columnType".command)
+      _ <- execute(sql"CREATE INDEX IF NOT EXISTS idx_#$column ON projects_tokens(#$column)".command)
+      _ <- Logger[F].info(s"'$column' column added")
+    } yield ()
   }
 }

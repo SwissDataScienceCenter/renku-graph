@@ -44,8 +44,7 @@ class RequestedDatasetSpec
     "External sameAs" -> RequestedDataset(datasetExternalSameAs.generateOne)
   )
 
-  "url codec" should {
-
+  "url codec" should
     forAll(idTypeScenarios) { (idType, id) =>
       s"url encode and decode Dataset identifier of $idType type" in {
 
@@ -54,14 +53,11 @@ class RequestedDatasetSpec
         RequestedDataset.unapply(encoded.encoded).value shouldBe id
       }
     }
-  }
 
-  "json codec" should {
-
+  "json codec" should
     forAll(idTypeScenarios) { (idType, id) =>
       s"json encode and decode Dataset identifier of $idType type" in {
         id.asJson.hcursor.as[RequestedDataset].value shouldBe id
       }
     }
-  }
 }

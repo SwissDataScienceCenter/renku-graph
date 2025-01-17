@@ -47,7 +47,7 @@ class DatasetPartSpec
       }
     }
 
-    "turn CliDatasetFile with InvalidationTime entity into the DatasetPart object" in {
+    "turn CliDatasetFile with InvalidationTime entity into the DatasetPart object" in
       forAll(datasetEntities(provenanceNonModified(cliShapedPersons)).decoupledFromProject) { dataset =>
         val datasetPart      = datasetPartEntities(dataset.provenance.date.instant).generateOne
         val invalidationTime = invalidationTimes(datasetPart.dateCreated.value).generateOne
@@ -61,7 +61,6 @@ class DatasetPartSpec
           _.to[entities.DatasetPart]
         )
       }
-    }
 
     "fail if invalidationTime is older than the part" in {
       val datasetPart_ = datasetPartEntities(timestampsNotInTheFuture.generateOne).generateOne

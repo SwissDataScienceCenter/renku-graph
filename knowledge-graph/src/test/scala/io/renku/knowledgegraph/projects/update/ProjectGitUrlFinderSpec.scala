@@ -73,10 +73,9 @@ class ProjectGitUrlFinderSpec
       .asserting(_ shouldBe Some(gitUrl))
   }
 
-  it should "return no gitUrl if GL returns 404 NOT_FOUND" in {
+  it should "return no gitUrl if GL returns 404 NOT_FOUND" in
     mapResponse(NotFound, Request[IO](), Response[IO](NotFound))
       .asserting(_ shouldBe None)
-  }
 
   private implicit val glClient: GitLabClient[IO] = mock[GitLabClient[IO]]
   private lazy val finder = new ProjectGitUrlFinderImpl[IO]

@@ -168,7 +168,7 @@ class SparqlSnippetsSpec
     }
   }
 
-  it should "update visibility on a project" in {
+  it should "update visibility on a project" in
     clientAndData.use { case (client, data) =>
       val el       = data.head
       val otherVis = (Visibility.all - el.visibility).head
@@ -183,13 +183,12 @@ class SparqlSnippetsSpec
         _ = r.visibility shouldBe otherVis
       } yield ()
     }
-  }
 
   val allVisibilities =
     (Visibility.all.map(Set(_)) ++ Visibility.all.toList.permutations.map(_.tail.toSet)) ++ Set(Visibility.all)
 
   allVisibilities.foreach { givenVisibility =>
-    it should s"select projects with given visibility $givenVisibility" in {
+    it should s"select projects with given visibility $givenVisibility" in
       clientAndData.use { case (client, data) =>
         for {
           existingUser <- IO(selectUserFrom(data).generateSome)
@@ -201,10 +200,9 @@ class SparqlSnippetsSpec
           _        = found shouldBe expected
         } yield ()
       }
-    }
   }
 
-  it should "select projects given a member" in {
+  it should "select projects given a member" in
     clientAndData.use { case (client, data) =>
       for {
         existingUser    <- IO(selectUserFrom(data).generateOne)
@@ -224,7 +222,6 @@ class SparqlSnippetsSpec
         _ = r2      shouldBe Nil
       } yield ()
     }
-  }
 
   def projectFilter(user: Option[persons.GitLabId], givenVisibility: Set[Visibility])(p: ProjectAuthData): Boolean =
     givenVisibility.contains(p.visibility) && (p.visibility match {

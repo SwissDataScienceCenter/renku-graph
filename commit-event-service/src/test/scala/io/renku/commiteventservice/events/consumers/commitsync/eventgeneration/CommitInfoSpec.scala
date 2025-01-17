@@ -33,7 +33,7 @@ class CommitInfoSpec extends AnyWordSpec with ScalaCheckPropertyChecks with shou
 
   "CommitInfo Decoder" should {
 
-    "decode valid JSON to a CommitInfo object" in {
+    "decode valid JSON to a CommitInfo object" in
       forAll { commitInfo: CommitInfo =>
         json"""{
           "id":              ${commitInfo.id.value},
@@ -46,7 +46,6 @@ class CommitInfoSpec extends AnyWordSpec with ScalaCheckPropertyChecks with shou
           "parent_ids":      ${commitInfo.parents.map(_.value)}
         }""".as[CommitInfo] shouldBe Right(commitInfo)
       }
-    }
 
     "decode valid JSON with blank emails to a CommitInfo object" in {
       val commitInfo        = commitInfos.generateOne

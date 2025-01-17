@@ -478,17 +478,17 @@ trait ModelOps extends Dataset.ProvenanceOps {
     prov.copy(creators = (creatorGen.generateOne.copy(name = userName) :: prov.creators).sortBy(_.name))
   }
 
-  implicit val creatorUsernameUpdaterImportedInternalAncestorInternal
-      : (persons.Name,
-         Dataset.Provenance.ImportedInternalAncestorInternal
-      ) => Dataset.Provenance.ImportedInternalAncestorInternal = { case (userName, prov) =>
+  implicit val creatorUsernameUpdaterImportedInternalAncestorInternal: (
+      persons.Name,
+      Dataset.Provenance.ImportedInternalAncestorInternal
+  ) => Dataset.Provenance.ImportedInternalAncestorInternal = { case (userName, prov) =>
     prov.copy(creators = (personEntities.generateOne.copy(name = userName) :: prov.creators).sortBy(_.name))
   }
 
-  implicit val creatorUsernameUpdaterImportedInternalAncestorExternal
-      : (persons.Name,
-         Dataset.Provenance.ImportedInternalAncestorExternal
-      ) => Dataset.Provenance.ImportedInternalAncestorExternal = { case (userName, prov) =>
+  implicit val creatorUsernameUpdaterImportedInternalAncestorExternal: (
+      persons.Name,
+      Dataset.Provenance.ImportedInternalAncestorExternal
+  ) => Dataset.Provenance.ImportedInternalAncestorExternal = { case (userName, prov) =>
     prov.copy(creators = (personEntities.generateOne.copy(name = userName) :: prov.creators).sortBy(_.name))
   }
 

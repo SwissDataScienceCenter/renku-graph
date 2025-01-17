@@ -28,7 +28,7 @@ class ProjectSearchInfoSpec extends AnyWordSpec with should.Matchers with ScalaC
 
   "show" should {
 
-    "return a String representation of the Info" in {
+    "return a String representation of the Info" in
       forAll(projectSearchInfoObjects) {
         case info @ ProjectSearchInfo(id,
                                       name,
@@ -60,6 +60,5 @@ class ProjectSearchInfoSpec extends AnyWordSpec with should.Matchers with ScalaC
             }
           ).flatten.mkString(", ")
       }
-    }
   }
 }

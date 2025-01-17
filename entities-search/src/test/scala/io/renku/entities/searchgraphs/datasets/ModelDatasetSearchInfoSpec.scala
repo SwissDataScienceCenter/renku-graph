@@ -29,7 +29,7 @@ class ModelDatasetSearchInfoSpec extends AnyWordSpec with should.Matchers with S
 
   "show" should {
 
-    "return String representation of the Info" in {
+    "return String representation of the Info" in
       forAll(modelDatasetSearchInfoObjects) {
         case info @ ModelDatasetSearchInfo(topSameAs,
                                            name,
@@ -65,6 +65,5 @@ class ModelDatasetSearchInfoSpec extends AnyWordSpec with should.Matchers with S
             show"link = $link".some
           ).flatten.mkString(", ")
       }
-    }
   }
 }

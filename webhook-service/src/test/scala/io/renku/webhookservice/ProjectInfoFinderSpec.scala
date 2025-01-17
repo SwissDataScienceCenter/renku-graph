@@ -82,10 +82,9 @@ class ProjectInfoFinderSpec
     ) shouldBe a[MatchError]
   }
 
-  it should "return an Exception if remote client responds with unexpected body" in {
+  it should "return an Exception if remote client responds with unexpected body" in
     mapResponse(Status.Ok, Request(), Response().withEntity(json"{}"))
       .assertThrowsError[Exception](_.getMessage should startWith("Invalid message body: Could not decode JSON"))
-  }
 
   private lazy val project   = consumerProjects.generateOne
   private lazy val projectId = project.id

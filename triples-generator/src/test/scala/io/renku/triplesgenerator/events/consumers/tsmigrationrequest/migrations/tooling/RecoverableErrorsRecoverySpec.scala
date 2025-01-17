@@ -34,8 +34,7 @@ import scala.util.{Success, Try}
 private class RecoverableErrorsRecoverySpec extends AnyWordSpec with should.Matchers with TableDrivenPropertyChecks {
   import RecoverableErrorsRecovery._
 
-  "maybeRecoverableError" should {
-
+  "maybeRecoverableError" should
     forAll(
       Table(
         "Problem name"       -> "Exception",
@@ -58,5 +57,4 @@ private class RecoverableErrorsRecoverySpec extends AnyWordSpec with should.Matc
         failure.cause   shouldBe exception.getCause
       }
     }
-  }
 }

@@ -192,7 +192,7 @@ class CalculatorInfoSetSpec
 
   "show" should {
 
-    "return String containing project id and slug along with model and TS search info" in {
+    "return String containing project id and slug along with model and TS search info" in
       forAll(anyProjectEntities.map(_.to[entities.Project])) { project =>
         val modelInfo = modelDatasetSearchInfoObjects(withLinkTo = project).generateOne
 
@@ -209,7 +209,6 @@ class CalculatorInfoSetSpec
           maybeTSInfo.map(tsi => show"tsInfo = [$tsi]")
         ).flatten.mkString(", ")
       }
-    }
   }
 
   private def searchIntoToString(info: ModelDatasetSearchInfo) = List(

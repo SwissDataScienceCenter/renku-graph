@@ -32,17 +32,15 @@ class linksSpec extends AnyWordSpec with ScalaCheckPropertyChecks with should.Ma
 
   "links" should {
 
-    "be serializable to Json" in {
+    "be serializable to Json" in
       forAll { links: Links =>
         links.asJson shouldBe Json.arr(links.links.map(_.asJson).toList: _*)
       }
-    }
 
-    "be deserializable from Json" in {
+    "be deserializable from Json" in
       forAll { links: Links =>
         Json.arr(links.links.map(_.asJson).toList: _*).as[Links] shouldBe Right(links)
       }
-    }
 
     "be deserializable from Json with no 'method'" in {
       val link = linkObjects.generateOne.copy(method = Links.Method.GET)
@@ -60,7 +58,7 @@ class linksSpec extends AnyWordSpec with ScalaCheckPropertyChecks with should.Ma
 
   "_links" should {
 
-    "create a Json object with '_links' property and the given Rel and Href tuples as the value" in {
+    "create a Json object with '_links' property and the given Rel and Href tuples as the value" in
       forAll { links: Links =>
         val relHrefTuple +: relHrefTuples = links.links.map { case Link(rel, href, _) =>
           rel -> href
@@ -70,23 +68,20 @@ class linksSpec extends AnyWordSpec with ScalaCheckPropertyChecks with should.Ma
           "_links": ${Links(links.links.map(_.copy(method = Links.Method.GET)))}
         }"""
       }
-    }
 
-    "create a Json object with '_links' property and the given Links as the value" in {
+    "create a Json object with '_links' property and the given Links as the value" in
       forAll { links: Links =>
         _links(links) shouldBe json"""{
           "_links": $links
         }"""
       }
-    }
 
-    "create a Json object with '_links' property when links given as varargs" in {
+    "create a Json object with '_links' property when links given as varargs" in
       forAll { links: Links =>
         _links(links.links.head, links.links.tail: _*) shouldBe json"""{
           "_links": $links
         }"""
       }
-    }
   }
 
   "get" should {

@@ -92,11 +92,10 @@ class ProjectViewedEventSpec
 
   "json codec" should {
 
-    "encode and decode" in {
+    "encode and decode" in
       forAll(projectViewedEvents) { event =>
         event.asJson.hcursor.as[ProjectViewedEvent].value shouldBe event
       }
-    }
 
     "be able to decode json valid from the contract point of view - user GL id case" in {
       json"""{

@@ -47,7 +47,7 @@ class GenerationSpec
       )
     }
 
-    "turn valid CliGeneration into Generation object" in {
+    "turn valid CliGeneration into Generation object" in
       forAll(locationCommandOutputObjects) { commandOutput =>
         val testActivity =
           activityEntities(stepPlanEntities(planCommands, cliShapedPersons, commandOutput), cliShapedPersons)(
@@ -58,6 +58,5 @@ class GenerationSpec
         val cliGeneration = generation.to[CliGeneration]
         entities.Generation.fromCli(cliGeneration) shouldMatchToValid generation.to[entities.Generation]
       }
-    }
   }
 }

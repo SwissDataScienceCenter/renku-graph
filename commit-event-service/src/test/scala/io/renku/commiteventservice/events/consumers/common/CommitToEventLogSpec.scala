@@ -152,7 +152,8 @@ class CommitToEventLogSpec extends AnyWordSpec with MockFactory with should.Matc
             "body":      $body,
             "status":    ${event.status}
           }"""
-        case (event: SkippedCommitEvent, body) => json"""{
+        case (event: SkippedCommitEvent, body) =>
+          json"""{
             "categoryName": "CREATION",
             "id":        ${event.id},
             "project": {

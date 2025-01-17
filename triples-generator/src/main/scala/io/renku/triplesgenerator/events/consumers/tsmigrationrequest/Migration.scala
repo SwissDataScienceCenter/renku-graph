@@ -47,8 +47,8 @@ private object Migration {
 
     implicit val decoder: Decoder[Name] = stringDecoder(Name)
 
-    implicit def entityIdEncoder(implicit renkuUrl: RenkuUrl): EntityIdEncoder[Name] = EntityIdEncoder.instance {
-      name => EntityId.of((renkuUrl / "migration" / name.asUrlPart).toString)
+    implicit def entityIdEncoder(implicit renkuUrl: RenkuUrl): EntityIdEncoder[Name] = EntityIdEncoder.instance { name =>
+      EntityId.of((renkuUrl / "migration" / name.asUrlPart).toString)
     }
 
     private implicit class MigrationNameOps(name: Migration.Name) {

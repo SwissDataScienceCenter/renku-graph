@@ -50,7 +50,7 @@ class ParameterValueSpec
     )
 
   "fromCli" should {
-    "turn cli VariableParameterValue entity into the VariableParameterValue object " in {
+    "turn cli VariableParameterValue entity into the VariableParameterValue object " in
       forAll(nonEmptyStrings().toGeneratorOf(ParameterDefaultValue), parameterValueOverrides) {
         (defaultValue, valueOverride) =>
           val activity =
@@ -67,9 +67,8 @@ class ParameterValueSpec
           result shouldMatchToValid entitiesActivity.parameters
           entitiesActivity.parameters.foreach(_ shouldBe a[entities.ParameterValue.CommandParameterValue])
       }
-    }
 
-    "turn cli InputParameterValue entity into the InputParameterValue object " in {
+    "turn cli InputParameterValue entity into the InputParameterValue object " in
       forAll(entityLocations, entityChecksums) { (location, checksum) =>
         val activity = executionPlannerGen(CommandInput.fromLocation(location)).generateOne
           .planInputParameterValuesFromChecksum(location -> checksum)
@@ -84,9 +83,8 @@ class ParameterValueSpec
         result shouldMatchToValid entitiesActivity.parameters
         entitiesActivity.parameters.foreach(_ shouldBe a[entities.ParameterValue.CommandInputValue])
       }
-    }
 
-    "turn JsonLD OutputParameterValue entity into the OutputParameterValue object " in {
+    "turn JsonLD OutputParameterValue entity into the OutputParameterValue object " in
       forAll(entityLocations) { location =>
         val activity = executionPlannerGen(CommandOutput.fromLocation(location)).generateOne
           .buildProvenanceUnsafe()
@@ -100,7 +98,6 @@ class ParameterValueSpec
         result shouldMatchToValid entitiesActivity.parameters
         entitiesActivity.parameters.foreach(_ shouldBe a[entities.ParameterValue.CommandOutputValue])
       }
-    }
 
     "fail if there are VariableParameterValue for non-existing CommandParameters" in {
       val defaultValue  = nonEmptyStrings().toGeneratorOf(ParameterDefaultValue).generateOne

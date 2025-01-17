@@ -28,11 +28,10 @@ class PositiveIntSpec extends AnyWordSpec with ScalaCheckPropertyChecks with sho
 
   "PositiveInt" should {
 
-    "be instantiatable when values are greater than zero" in {
+    "be instantiatable when values are greater than zero" in
       forAll(Gen.choose(1, 100000)) { someValue =>
         PositiveIntTest(someValue).value shouldBe someValue
       }
-    }
 
     "throw an IllegalArgumentException for 0" in {
       intercept[IllegalArgumentException](

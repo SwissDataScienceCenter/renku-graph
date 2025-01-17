@@ -91,7 +91,7 @@ class EndpointSpec
 
   "getRecentlyViewedEntities" should {
 
-    "respond with OK and the found entities" in {
+    "respond with OK and the found entities" in
       forAll(Generators.listOf(modelEntities)) { results =>
         val finder = makeFinderFor(IO(results))
 
@@ -104,7 +104,6 @@ class EndpointSpec
 
         response.as[Json].unsafeRunSync() shouldMatchTo results.asJson
       }
-    }
 
     "respond with INTERNAL_SERVER_ERROR when finding entities fails" in {
       val exception = new Exception("boom")

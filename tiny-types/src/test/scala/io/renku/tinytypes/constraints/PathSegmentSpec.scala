@@ -42,11 +42,10 @@ class PathSegmentSpec extends AnyWordSpec with ScalaCheckPropertyChecks with sho
 
   "apply" should {
 
-    "url encode the given value and successfully instantiate" in {
+    "url encode the given value and successfully instantiate" in
       forAll(nonEmptyStrings(), Gen.oneOf("\\/", " "), nonEmptyStrings()) { (part1, part2, part3) =>
         val raw = s"$part1$part2$part3"
         PathSegment(raw).value shouldBe urlEncode(raw)
       }
-    }
   }
 }

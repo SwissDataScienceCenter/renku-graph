@@ -64,9 +64,11 @@ private object EventHandler {
   import eu.timepit.refined.pureconfig._
   import io.renku.config.ConfigLoader.find
 
-  def apply[F[
-      _
-  ]: Async: NonEmptyParallel: Parallel: ReProvisioningStatus: GitLabClient: MetricsRegistry: Logger: SparqlQueryTimeRecorder](
+  def apply[
+      F[
+          _
+      ]: Async: NonEmptyParallel: Parallel: ReProvisioningStatus: GitLabClient: MetricsRegistry: Logger: SparqlQueryTimeRecorder
+  ](
       subscriptionMechanism: SubscriptionMechanism[F],
       tsWriteLock:           TsWriteLock[F],
       topSameAsLock:         Lock[F, datasets.TopmostSameAs],

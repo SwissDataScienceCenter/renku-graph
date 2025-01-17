@@ -32,61 +32,54 @@ class ProjectUpdatesSpec extends AnyWordSpec with should.Matchers with ScalaChec
 
   "onlyGLUpdateNeeded" should {
 
-    "return true if at least image and/or visibility is updated but not desc and keywords" in {
+    "return true if at least image and/or visibility is updated but not desc and keywords" in
       forAll(
         projectUpdatesGen
           .suchThat(u => (u.newImage orElse u.newVisibility).isDefined)
           .map(_.copy(newDescription = None, newKeywords = None))
       )(_.onlyGLUpdateNeeded shouldBe true)
-    }
 
-    "return false otherwise" in {
+    "return false otherwise" in
       forAll(
         projectUpdatesGen
           .suchThat(u => (u.newDescription orElse u.newKeywords).isDefined)
       )(_.onlyGLUpdateNeeded shouldBe false)
-    }
   }
 
   "glUpdateNeeded" should {
 
-    "return true if at least image and/or visibility is updated" in {
+    "return true if at least image and/or visibility is updated" in
       forAll(
         projectUpdatesGen
           .suchThat(u => (u.newImage orElse u.newVisibility).isDefined)
       )(_.glUpdateNeeded shouldBe true)
-    }
 
-    "return false otherwise" in {
+    "return false otherwise" in
       forAll(projectUpdatesGen.map(_.copy(newImage = None, newVisibility = None)))(
         _.glUpdateNeeded shouldBe false
       )
-    }
   }
 
   "coreUpdateNeeded" should {
 
-    "return true if at least description and/or keywords is updated" in {
+    "return true if at least description and/or keywords is updated" in
       forAll(
         projectUpdatesGen
           .suchThat(u => (u.newDescription orElse u.newKeywords).isDefined)
       )(_.coreUpdateNeeded shouldBe true)
-    }
 
-    "return false otherwise" in {
+    "return false otherwise" in
       forAll(projectUpdatesGen.map(_.copy(newDescription = None, newKeywords = None)))(
         _.coreUpdateNeeded shouldBe false
       )
-    }
   }
 
   "JSON encode/decode" should {
 
-    "encode/decode all standard cases" in {
+    "encode/decode all standard cases" in
       forAll(projectUpdatesGen.suchThat(_.newImage.isEmpty)) { updates =>
         updates.asJson.hcursor.as[ProjectUpdates].value shouldBe updates
       }
-    }
 
     "lack of the description property to be considered as no-op for the property" in {
 

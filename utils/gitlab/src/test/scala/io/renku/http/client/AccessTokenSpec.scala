@@ -42,11 +42,10 @@ class AccessTokenSpec extends AnyWordSpec with ScalaCheckPropertyChecks with sho
       personalAccessTokens.generateOne shouldBe a[Sensitive]
     }
 
-    "be instantiatable from a non-blank String" in {
+    "be instantiatable from a non-blank String" in
       forAll(nonEmptyStrings()) { value =>
         PersonalAccessToken.from(value).map(_.value) shouldBe Right(value)
       }
-    }
 
     "fail instantiation for a blank String" in {
       val Left(exception) = PersonalAccessToken.from(" ")
@@ -61,11 +60,10 @@ class AccessTokenSpec extends AnyWordSpec with ScalaCheckPropertyChecks with sho
       userOAuthAccessTokens.generateOne shouldBe a[Sensitive]
     }
 
-    "be instantiatable from a non-blank String" in {
+    "be instantiatable from a non-blank String" in
       forAll(nonEmptyStrings()) { value =>
         UserOAuthAccessToken.from(value).map(_.value) shouldBe Right(value)
       }
-    }
 
     "fail instantiation for a blank String" in {
       val Left(exception) = UserOAuthAccessToken.from(" ")
@@ -80,11 +78,10 @@ class AccessTokenSpec extends AnyWordSpec with ScalaCheckPropertyChecks with sho
       projectAccessTokens.generateOne shouldBe a[Sensitive]
     }
 
-    "be instantiatable from a non-blank String" in {
+    "be instantiatable from a non-blank String" in
       forAll(nonEmptyStrings()) { value =>
         ProjectAccessToken.from(value).map(_.value) shouldBe Right(value)
       }
-    }
 
     "fail instantiation for a blank String" in {
       val Left(exception) = ProjectAccessToken.from(" ")

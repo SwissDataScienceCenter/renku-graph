@@ -33,10 +33,11 @@ import org.typelevel.log4cats.Logger
 
 private[producers] object SubscriptionCategory {
 
-  def apply[F[
-      _
-  ]: Async: Parallel: SessionResource: DefaultSubscriberTracker: Logger: MetricsRegistry: QueriesExecutionTimes: EventStatusGauges]
-      : F[SubscriptionCategory[F]] = for {
+  def apply[
+      F[
+          _
+      ]: Async: Parallel: SessionResource: DefaultSubscriberTracker: Logger: MetricsRegistry: QueriesExecutionTimes: EventStatusGauges
+  ]: F[SubscriptionCategory[F]] = for {
     implicit0(subscribers: DefaultSubscribers[F]) <- DefaultSubscribers[F](categoryName)
     eventDelivery <- eventdelivery.EventDelivery[F, CleanUpEvent](
                        eventDeliveryIdExtractor = (event: CleanUpEvent) => DeletingProjectDeliverId(event.project.id)

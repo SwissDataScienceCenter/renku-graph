@@ -45,8 +45,7 @@ class SecretConfigReaderSpec
 
     val keyName = "secret"
 
-    "read an ASCII secret" in {
-
+    "read an ASCII secret" in
       forAll(aesCryptoSecrets) { secret =>
         val config = ConfigFactory.parseMap(
           Map(keyName -> secret.decodeAscii.fold(throw _, identity)).asJava
@@ -54,7 +53,6 @@ class SecretConfigReaderSpec
 
         ConfigSource.fromConfig(config).at(keyName).load[Secret].value shouldBe secret
       }
-    }
 
     // we need to keep this functionality due to backward compatibility
     // where Base64 encoded values were coming to the reader
