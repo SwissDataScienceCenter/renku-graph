@@ -5,7 +5,7 @@ object Dependencies {
 
   object V {
     val ammonite               = "2.4.1"
-    val catsCore               = "2.12.0"
+    val catsCore               = "2.13.0"
     val catsEffect             = "3.5.7"
     val catsEffectScalaTest    = "1.5.0"
     val catsEffectMunit        = "2.0.0"
