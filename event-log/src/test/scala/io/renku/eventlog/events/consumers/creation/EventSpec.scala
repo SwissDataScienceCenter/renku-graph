@@ -29,10 +29,9 @@ class EventSpec extends AnyWordSpec with ScalaCheckPropertyChecks with should.Ma
 
   "compoundEventId" should {
 
-    "create a CompoundEventId from the event's id and project id" in {
+    "create a CompoundEventId from the event's id and project id" in
       forAll { event: Event =>
         event.compoundEventId shouldBe CompoundEventId(event.id, event.project.id)
       }
-    }
   }
 }

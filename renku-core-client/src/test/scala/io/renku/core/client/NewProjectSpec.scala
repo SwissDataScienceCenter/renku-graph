@@ -28,7 +28,7 @@ import org.scalatestplus.scalacheck.ScalaCheckPropertyChecks
 
 class NewProjectSpec extends AnyFlatSpec with should.Matchers with EitherValues with ScalaCheckPropertyChecks {
 
-  it should "encode to JSON" in {
+  it should "encode to JSON" in
     forAll(newProjectsGen) { newProject =>
       newProject.asJson shouldBe
         json"""{
@@ -44,5 +44,4 @@ class NewProjectSpec extends AnyFlatSpec with should.Matchers with EitherValues 
           "initial_branch":      ${newProject.branch}
         }""".dropNullValues
     }
-  }
 }

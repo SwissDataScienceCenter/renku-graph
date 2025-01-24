@@ -45,12 +45,11 @@ class ZipSpec extends AsyncWordSpec with AsyncIOSpec with should.Matchers with E
 
   "zip" should {
 
-    "fail with a meaningful error if zipping fails" in {
+    "fail with a meaningful error if zipping fails" in
       Zip.zip[IO](null).assertThrowsError[Exception] { exception =>
         exception.getMessage       shouldBe "Zipping content failed"
         Option(exception.getCause) shouldBe a[Some[_]]
       }
-    }
   }
 
   "unzip" should {

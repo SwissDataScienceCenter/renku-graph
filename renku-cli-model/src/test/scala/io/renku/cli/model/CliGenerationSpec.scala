@@ -39,24 +39,21 @@ class CliGenerationSpec
   val generationGen = GenerationGenerators.generationGen()
 
   "decode/encode" should {
-    "be compatible" in {
+    "be compatible" in
       forAll(generationGen) { cliGen =>
         assertCompatibleCodec(cliGen)
       }
-    }
 
-    "work on multiple items" in {
+    "work on multiple items" in
       forAll(generationGen, generationGen) { (cliGen1, cliGen2) =>
         assertCompatibleCodec(cliGen1, cliGen2)
       }
-    }
 
-    "work for a specific activity only" in {
+    "work for a specific activity only" in
       forAll(generationGen, generationGen) { (gen1, gen2) =>
         val decoder = JsonLDDecoder.decodeList(CliGeneration.decoderForActivity(gen1.activityResourceId))
         val result  = List(gen1, gen2).asFlattenedJsonLD.cursor.as[List[CliGeneration]](decoder)
         result.value shouldMatchTo List(gen1)
       }
-    }
   }
 }

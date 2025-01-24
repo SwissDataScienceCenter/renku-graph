@@ -49,21 +49,19 @@ class PlanSpec
 
   "fromCli (StepEntity)" should {
 
-    "turn CliStepPlan of a non-modified Plan entity into the StepPlan object" in {
+    "turn CliStepPlan of a non-modified Plan entity into the StepPlan object" in
       forAll(stepPlans) { plan =>
         val prodPlan = plan.to[entities.StepPlan]
         val cliPlan  = plan.to[CliStepPlan]
         entities.StepPlan.fromCli(cliPlan) shouldMatchToValid prodPlan
       }
-    }
 
-    "turn CliStepPlan of a modified Plan entity into the StepPlan object" in {
+    "turn CliStepPlan of a modified Plan entity into the StepPlan object" in
       forAll(stepPlans.map(_.createModification())) { (plan: StepPlan) =>
         val prodPlan = plan.to[entities.StepPlan]
         val cliPlan  = plan.to[CliStepPlan]
         entities.StepPlan.fromCli(cliPlan) shouldMatchToValid prodPlan
       }
-    }
 
     "convert if invalidation after the creation date" in {
 
@@ -115,30 +113,27 @@ class PlanSpec
 
   "fromCli (CompositePlan)" should {
 
-    "work for a non-modified composite plan" in {
+    "work for a non-modified composite plan" in
       forAll(compositePlanGen(cliShapedPersons)) { plan =>
         val expected = plan.to[entities.CompositePlan]
         val cliPlan  = plan.to[CliCompositePlan]
 
         entities.CompositePlan.fromCli(cliPlan) shouldMatchToValid expected
       }
-    }
 
-    "work for a modified composite plan" in {
+    "work for a modified composite plan" in
       forAll(compositePlanGen(cliShapedPersons).map(_.createModification())) { plan =>
         val expected = plan.to[entities.CompositePlan]
         val cliPlan  = plan.to[CliCompositePlan]
         entities.CompositePlan.fromCli(cliPlan) shouldMatchToValid expected
       }
-    }
 
-    "work if invalidation after the creation date" in {
+    "work if invalidation after the creation date" in
       forAll(compositePlanGen(cliShapedPersons).map(_.createModification().invalidate())) { plan =>
         val expected = plan.to[entities.CompositePlan]
         val cliPlan  = plan.to[CliCompositePlan]
         entities.CompositePlan.fromCli(cliPlan) shouldMatchToValid expected
       }
-    }
 
     "work for any Plan entity subtypes" in {
       val testCp = compositePlanGen(cliShapedPersons).generateOne

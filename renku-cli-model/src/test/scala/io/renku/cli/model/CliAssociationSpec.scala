@@ -39,15 +39,13 @@ class CliAssociationSpec
   private val associationGen = AssociationGenerators.associationGen(Instant.EPOCH)
 
   "decode/encode" should {
-    "be compatible" in {
+    "be compatible" in
       forAll(associationGen) { cliAssoc =>
         assertCompatibleCodec(cliAssoc)
       }
-    }
-    "work on multiple items" in {
+    "work on multiple items" in
       forAll(associationGen, associationGen) { (cliAssoc1, cliAssoc2) =>
         assertCompatibleCodec(cliAssoc1, cliAssoc2)
       }
-    }
   }
 }

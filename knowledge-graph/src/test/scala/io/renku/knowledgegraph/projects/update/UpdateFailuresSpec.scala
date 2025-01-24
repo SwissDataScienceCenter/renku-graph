@@ -35,7 +35,7 @@ class UpdateFailuresSpec extends AnyWordSpec with should.Matchers with ScalaChec
 
   "corePushedToNonDefaultBranch" should {
 
-    "return a Conflict Failure with a JSON message containing the branch Core pushed to" in {
+    "return a Conflict Failure with a JSON message containing the branch Core pushed to" in
       forAll(tgUpdatesGen, defaultBranchInfos.toGeneratorOfOptions, branches) {
         (tgUpdates, maybeDefaultBranch, corePushBranch) =>
           val failure = UpdateFailures.corePushedToNonDefaultBranch(tgUpdates, maybeDefaultBranch, corePushBranch)
@@ -58,6 +58,5 @@ class UpdateFailuresSpec extends AnyWordSpec with should.Matchers with ScalaChec
             }"""
           }
       }
-    }
   }
 }

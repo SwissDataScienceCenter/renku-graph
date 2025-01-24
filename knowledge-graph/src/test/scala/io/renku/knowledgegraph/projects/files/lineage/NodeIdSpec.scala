@@ -31,10 +31,9 @@ class NodeIdSpec extends AnyWordSpec with ScalaCheckPropertyChecks with should.M
 
   "showAs[RdfResource]" should {
 
-    "wrap the Node.Id in <>" in {
+    "wrap the Node.Id in <>" in
       forAll { resourceId: Node.Id =>
         resourceId.showAs[RdfResource] shouldBe s"<${URIref.encode(resourceId.value)}>"
       }
-    }
   }
 }

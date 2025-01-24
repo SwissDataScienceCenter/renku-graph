@@ -29,17 +29,15 @@ class SparqlLiteralEncoderSpec extends AnyWordSpec with ScalaCheckPropertyChecks
 
   "iriEncode" should {
 
-    "do nothing for letter chars" in {
+    "do nothing for letter chars" in
       forAll(alphaStr) { s =>
         sparqlEncode(s) shouldBe s
       }
-    }
 
-    "do nothing for digit chars" in {
+    "do nothing for digit chars" in
       forAll(numStr) { s =>
         sparqlEncode(s) shouldBe s
       }
-    }
 
     "escape ' with \\" in {
       sparqlEncode("a'b") shouldBe """a\'b"""

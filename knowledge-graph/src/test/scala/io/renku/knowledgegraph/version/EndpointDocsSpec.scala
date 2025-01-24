@@ -24,7 +24,6 @@ import org.scalatest.matchers.should
 
 class EndpointDocsSpec extends AnyFlatSpec with should.Matchers {
 
-  it should "return a valid Path object" in {
+  it should "return a valid Path object" in
     validatePath(EndpointDocs.path)
-  }
 }

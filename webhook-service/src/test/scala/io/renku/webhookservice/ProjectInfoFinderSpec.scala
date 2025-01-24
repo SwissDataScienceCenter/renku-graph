@@ -64,13 +64,11 @@ class ProjectInfoFinderSpec
     projectInfoFinder.findProjectInfo(projectId)(mat).asserting(_.value shouldBe project)
   }
 
-  it should "decode project info from a valid OK response" in {
+  it should "decode project info from a valid OK response" in
     mapResponse(Status.Ok, Request(), Response().withEntity(projectJson)).asserting(_.value shouldBe project)
-  }
 
-  it should "decode to none if remote returns NotFound" in {
+  it should "decode to none if remote returns NotFound" in
     mapResponse(Status.NotFound, Request(), Response()).asserting(_ shouldBe None)
-  }
 
   it should "fail with an UnauthorizedException if remote responds with UNAUTHORIZED" in {
     mapResponse(Status.Unauthorized, Request(), Response()).assertThrows[UnauthorizedException]
@@ -82,10 +80,9 @@ class ProjectInfoFinderSpec
     ) shouldBe a[MatchError]
   }
 
-  it should "return an Exception if remote client responds with unexpected body" in {
+  it should "return an Exception if remote client responds with unexpected body" in
     mapResponse(Status.Ok, Request(), Response().withEntity(json"{}"))
       .assertThrowsError[Exception](_.getMessage should startWith("Invalid message body: Could not decode JSON"))
-  }
 
   private lazy val project   = consumerProjects.generateOne
   private lazy val projectId = project.id

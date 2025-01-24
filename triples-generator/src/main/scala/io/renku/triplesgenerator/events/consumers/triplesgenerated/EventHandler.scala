@@ -59,9 +59,11 @@ private class EventHandler[F[_]: MonadCancelThrow: Logger](
 
 private object EventHandler {
 
-  def apply[F[
-      _
-  ]: Async: NonEmptyParallel: Parallel: ReProvisioningStatus: GitLabClient: Logger: MetricsRegistry: SparqlQueryTimeRecorder](
+  def apply[
+      F[
+          _
+      ]: Async: NonEmptyParallel: Parallel: ReProvisioningStatus: GitLabClient: Logger: MetricsRegistry: SparqlQueryTimeRecorder
+  ](
       subscriptionMechanism:     SubscriptionMechanism[F],
       concurrentProcessesNumber: ConcurrentProcessesNumber,
       tsWriteLock:               TsWriteLock[F],

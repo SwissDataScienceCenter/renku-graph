@@ -49,7 +49,7 @@ class ProjectJsonEncoderSpec extends AnyWordSpec with should.Matchers with Scala
 
   "encode" should {
 
-    "convert the model.Project object to Json" in {
+    "convert the model.Project object to Json" in
       forAll { project: Project =>
         val json = encoder encode project
 
@@ -62,7 +62,6 @@ class ProjectJsonEncoderSpec extends AnyWordSpec with should.Matchers with Scala
         )
 
       }
-    }
   }
 
   private lazy val renkuApiUrl: renku.ApiUrl = renkuApiUrls.generateOne

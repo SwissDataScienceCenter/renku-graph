@@ -34,11 +34,10 @@ import org.scalatestplus.scalacheck.ScalaCheckPropertyChecks
 
 class ProjectDatasetSpec extends AnyFlatSpec with should.Matchers with ScalaCheckPropertyChecks with ImageUrisEncoder {
 
-  it should "encode to JSON" in {
+  it should "encode to JSON" in
     forAll(projectDatasetGen) { datasets =>
       datasets.asJson(ProjectDataset.encoder(projectSlug)) shouldBe toJson(datasets)
     }
-  }
 
   private lazy val toJson: ProjectDataset => Json = {
     case ProjectDataset(id, originalId, name, slug, createdOrPublished, _, Left(sameAs), images) =>

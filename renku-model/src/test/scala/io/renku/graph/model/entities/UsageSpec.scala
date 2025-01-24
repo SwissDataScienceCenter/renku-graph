@@ -40,7 +40,7 @@ class UsageSpec
   "fromCli" should {
     implicit val renkuUrl: RenkuUrl = renkuUrls.generateOne
 
-    "turn CliUsage entity into the Usage object" in {
+    "turn CliUsage entity into the Usage object" in
       forAll(entityLocations, entityChecksums) { (location, checksum) =>
         val activity = executionPlanners(
           stepPlanEntities(planCommands, cliShapedPersons, CommandInput.fromLocation(location)),
@@ -55,6 +55,5 @@ class UsageSpec
 
         result shouldMatchToValid activity.usages.map(_.to[entities.Usage])
       }
-    }
   }
 }

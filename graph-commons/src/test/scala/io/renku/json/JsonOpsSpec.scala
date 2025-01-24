@@ -33,7 +33,7 @@ class JsonOpsSpec extends AnyWordSpec with ScalaCheckPropertyChecks with should.
 
   "addIfDefined extension method" should {
 
-    "be adding the property to the JSON being called on if the given value is defined" in {
+    "be adding the property to the JSON being called on if the given value is defined" in
       forAll(nonBlankStrings(), nonBlankStrings()) { (property, value) =>
         val newJson = existingJson addIfDefined (property.value -> Some(value.toString()))
 
@@ -42,7 +42,6 @@ class JsonOpsSpec extends AnyWordSpec with ScalaCheckPropertyChecks with should.
           property.value -> value.toString().asJson
         )
       }
-    }
 
     "not be adding the property to the JSON being called on if the given value is empty" in {
 

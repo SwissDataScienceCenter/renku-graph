@@ -35,29 +35,25 @@ class RateLimitSpec extends AnyWordSpec with RateLimitGenerators with ScalaCheck
 
   "from" should {
 
-    "instantiate from '<number>/seq' value" in {
+    "instantiate from '<number>/seq' value" in
       forAll(positiveLongs(max = Integer.MAX_VALUE)) { int =>
         RateLimit.from[EitherWithThrowable, Target](s"$int/sec") shouldBe Right(RateLimit(int, Second))
       }
-    }
 
-    "instantiate from '<number>/min' value" in {
+    "instantiate from '<number>/min' value" in
       forAll(positiveLongs(max = Integer.MAX_VALUE)) { int =>
         RateLimit.from[EitherWithThrowable, Target](s"$int/min") shouldBe Right(RateLimit(int, Minute))
       }
-    }
 
-    "instantiate from '<number>/hour' value" in {
+    "instantiate from '<number>/hour' value" in
       forAll(positiveLongs(max = Integer.MAX_VALUE)) { int =>
         RateLimit.from[EitherWithThrowable, Target](s"$int/hour") shouldBe Right(RateLimit(int, Hour))
       }
-    }
 
-    "instantiate from '<number>/day' value" in {
+    "instantiate from '<number>/day' value" in
       forAll(positiveLongs(max = Integer.MAX_VALUE)) { int =>
         RateLimit.from[EitherWithThrowable, Target](s"$int/day") shouldBe Right(RateLimit(int, Day))
       }
-    }
 
     "return failure if 0" in {
       val Left(exception) = RateLimit.from[EitherWithThrowable, Target]("0/sec")
@@ -90,19 +86,18 @@ class RateLimitSpec extends AnyWordSpec with RateLimitGenerators with ScalaCheck
 
   "toString" should {
 
-    "produce a string in format '<number>/<unit>'" in {
+    "produce a string in format '<number>/<unit>'" in
       forAll(rateLimits) {
         case rateLimit @ RateLimit(rate, Second) => rateLimit.toString shouldBe s"$rate/sec"
         case rateLimit @ RateLimit(rate, Minute) => rateLimit.toString shouldBe s"$rate/min"
         case rateLimit @ RateLimit(rate, Hour)   => rateLimit.toString shouldBe s"$rate/hour"
         case rateLimit @ RateLimit(rate, Day)    => rateLimit.toString shouldBe s"$rate/day"
       }
-    }
   }
 
   "/" should {
 
-    "make the rate limit x times slower than initially" in {
+    "make the rate limit x times slower than initially" in
       forAll(rateLimits[Target], positiveInts()) { (rateLimit, divider) =>
         whenever {
           (rateLimit.items.value * (1 day).toMillis / (rateLimit.per.multiplierFor(MILLISECONDS) * divider)).toLong > 0
@@ -118,7 +113,6 @@ class RateLimitSpec extends AnyWordSpec with RateLimitGenerators with ScalaCheck
           }
         }
       }
-    }
 
     "fail if resulting RateLimit below 1/day" in {
       val Left(exception) = RateLimit(1L, per = Day) / 2

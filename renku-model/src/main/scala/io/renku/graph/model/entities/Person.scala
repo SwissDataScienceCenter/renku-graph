@@ -127,9 +127,8 @@ object Person {
     val maybeOrcidId         = OrcidId.from(cli.resourceId.value).toOption
     val maybeOrcidResourceId = maybeOrcidId.map(persons.ResourceId(_)).map(_.asRight[NonEmptyList[String]])
 
-    val cliResourceId = maybeOrcidResourceId getOrElse {
+    val cliResourceId = maybeOrcidResourceId getOrElse
       persons.ResourceId.from(cli.resourceId.value).leftMap(err => NonEmptyList.one(err.getMessage))
-    }
 
     cliResourceId
       .flatMap(Person.from(_, cli.name, cli.email, None, maybeOrcidId, cli.affiliation).toEither)

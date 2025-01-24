@@ -28,11 +28,10 @@ class FiniteFloatSpec extends AnyWordSpec with should.Matchers with ScalaCheckPr
 
   "FiniteFloat" should {
 
-    "be instantiatable when values are finite float numbers" in {
+    "be instantiatable when values are finite float numbers" in
       forAll(Gen.choose(Float.MinValue, Float.MaxValue)) { someValue =>
         FloatTestType(someValue).value shouldBe someValue
       }
-    }
 
     Float.PositiveInfinity :: Float.NegativeInfinity :: Float.NaN :: Nil foreach { infiniteValue =>
       s"throw an IllegalArgumentException for $infiniteValue" in {

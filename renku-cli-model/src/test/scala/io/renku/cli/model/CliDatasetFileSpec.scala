@@ -36,15 +36,13 @@ class CliDatasetFileSpec
   private val datasetFileGen = DatasetFileGenerators.datasetFileGen(Instant.EPOCH)
 
   "decode/encode" should {
-    "be compatible" in {
+    "be compatible" in
       forAll(datasetFileGen) { cliDatasetFile =>
         assertCompatibleCodec(cliDatasetFile)
       }
-    }
-    "work on multiple items" in {
+    "work on multiple items" in
       forAll(datasetFileGen, datasetFileGen) { (cliFile1, cliFile2) =>
         assertCompatibleCodec(cliFile1, cliFile2)
       }
-    }
   }
 }

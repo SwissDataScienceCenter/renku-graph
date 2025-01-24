@@ -108,10 +108,9 @@ class GLProjectMembersFinderSpec
     ).asserting(_ shouldBe (members, None))
   }
 
-  it should "return an empty set when service responds with NOT_FOUND" in {
+  it should "return an empty set when service responds with NOT_FOUND" in
     mapResponse(Status.NotFound, Request(), Response())
       .asserting(_ shouldBe (Set.empty[GitLabProjectMember], None))
-  }
 
   Forbidden +: Unauthorized +: Nil foreach { status =>
     it should s"return an empty set when service responds with $status" in {

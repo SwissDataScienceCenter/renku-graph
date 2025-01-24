@@ -31,11 +31,10 @@ class UrlSpec extends AnyWordSpec with ScalaCheckPropertyChecks with should.Matc
 
   "Url" should {
 
-    "be instantiatable for valid urls" in {
+    "be instantiatable for valid urls" in
       forAll(httpUrls()) { url =>
         UrlType(url).toString shouldBe url
       }
-    }
 
     "throw an IllegalArgumentException for invalid urls" in {
       intercept[IllegalArgumentException](

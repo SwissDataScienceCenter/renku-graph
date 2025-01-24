@@ -77,19 +77,17 @@ class ChangeDateSpec extends AnyWordSpec with should.Matchers with ScalaCheckPro
 
   "instantiation" should {
 
-    "succeed for timestamps not in the future" in {
+    "succeed for timestamps not in the future" in
       forAll(timestamps(max = Instant.now())) { value =>
         ChangeDate.from(value).map(_.value) shouldBe Right(value)
       }
-    }
 
-    "fail for timestamps from the future" in {
+    "fail for timestamps from the future" in
       forAll(timestamps(min = Instant.now().plus(1, SECONDS))) { value =>
         val Left(exception) = ChangeDate.from(value).map(_.value)
         exception            shouldBe an[IllegalArgumentException]
         exception.getMessage shouldBe s"${ChangeDate.typeName} cannot be in the future"
       }
-    }
   }
 }
 
@@ -101,16 +99,14 @@ class MigrationMessageSpec extends AnyWordSpec with ScalaCheckPropertyChecks wit
       MigrationMessage shouldBe an[NonBlank[_]]
     }
 
-    "be instantiatable from any non-blank string" in {
+    "be instantiatable from any non-blank string" in
       forAll(nonEmptyStrings()) { body =>
         MigrationMessage.from(body).map(_.value) shouldBe Right(body)
       }
-    }
 
-    "be instantiatable from an exception and contain the stack trace" in {
+    "be instantiatable from an exception and contain the stack trace" in
       forAll(nestedExceptions) { exception =>
         MigrationMessage(exception).value shouldBe Message.Error.fromStackTrace(exception).show
       }
-    }
   }
 }

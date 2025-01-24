@@ -28,8 +28,7 @@ import org.scalatest.wordspec.AnyWordSpec
 
 class TripleObjectSpec extends AnyWordSpec with should.Matchers with TableDrivenPropertyChecks {
 
-  "show" should {
-
+  "show" should
     forAll {
       Table(
         "type"      -> "value generator",
@@ -50,5 +49,4 @@ class TripleObjectSpec extends AnyWordSpec with should.Matchers with TableDriven
         obj.show shouldBe obj.value.toString
       }
     }
-  }
 }

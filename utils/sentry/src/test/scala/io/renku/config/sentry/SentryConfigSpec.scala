@@ -52,27 +52,26 @@ class SentryConfigSpec extends AnyWordSpec with ScalaCheckPropertyChecks with sh
     }
 
     "return a SentryConfig if 'services.sentry.enabled' is 'true' and all " +
-      "'services.sentry.url', 'services.sentry.environment', 'service-name' and 'version' are set" in {
-        forAll(sentryConfigs) { sentryConfig: SentryConfig =>
-          val config = ConfigFactory.parseMap(
-            Map[String, AnyRef](
-              "service-name" -> sentryConfig.serviceName.value,
-              "services" -> Map(
-                "sentry" -> Map(
-                  "enabled"     -> "true",
-                  "dsn"         -> sentryConfig.baseUrl.value,
-                  "environment" -> sentryConfig.environmentName.value
-                ).asJava
+      "'services.sentry.url', 'services.sentry.environment', 'service-name' and 'version' are set" in
+      forAll(sentryConfigs) { sentryConfig: SentryConfig =>
+        val config = ConfigFactory.parseMap(
+          Map[String, AnyRef](
+            "service-name" -> sentryConfig.serviceName.value,
+            "services" -> Map(
+              "sentry" -> Map(
+                "enabled"     -> "true",
+                "dsn"         -> sentryConfig.baseUrl.value,
+                "environment" -> sentryConfig.environmentName.value
               ).asJava
             ).asJava
-          )
+          ).asJava
+        )
 
-          val versionConfig = ConfigFactory.parseMap(
-            Map("version" -> sentryConfig.serviceVersion.value).asJava
-          )
+        val versionConfig = ConfigFactory.parseMap(
+          Map("version" -> sentryConfig.serviceVersion.value).asJava
+        )
 
-          SentryConfig[Try](config, versionConfig.some) shouldBe sentryConfig.some.pure[Try]
-        }
+        SentryConfig[Try](config, versionConfig.some) shouldBe sentryConfig.some.pure[Try]
       }
 
     "fail if 'services.sentry.enabled' is 'true' but 'services.sentry.dsn' is invalid" in {

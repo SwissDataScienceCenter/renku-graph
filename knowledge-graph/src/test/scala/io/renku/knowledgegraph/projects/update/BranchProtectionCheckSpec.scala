@@ -139,15 +139,13 @@ class BranchProtectionCheckSpec
       .asserting(_ shouldBe branches)
   }
 
-  it should "return an empty list if GL returns 200 with an empty list of branches" in {
+  it should "return an empty list if GL returns 200 with an empty list of branches" in
     mapResponse(Ok, Request[IO](), Response[IO](Ok).withEntity(List.empty[BranchInfo].asJson))
       .asserting(_ shouldBe Nil)
-  }
 
-  it should "return an empty list if GL returns 404 NOT_FOUND" in {
+  it should "return an empty list if GL returns 404 NOT_FOUND" in
     mapResponse(NotFound, Request[IO](), Response[IO](NotFound))
       .asserting(_ shouldBe Nil)
-  }
 
   private implicit val glClient: GitLabClient[IO] = mock[GitLabClient[IO]]
   private lazy val finder = new BranchProtectionCheckImpl[IO]

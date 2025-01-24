@@ -28,11 +28,10 @@ class GitShaSpec extends AnyWordSpec with ScalaCheckPropertyChecks with should.M
 
   "GitSha" should {
 
-    "be instantiatable for a valid sha" in {
+    "be instantiatable for a valid sha" in
       forAll(shas) { sha =>
         SomeGitSha(sha).toString shouldBe sha
       }
-    }
 
     "throw an IllegalArgumentException for non-sha values" in {
       intercept[IllegalArgumentException] {

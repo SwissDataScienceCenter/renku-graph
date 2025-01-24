@@ -30,11 +30,10 @@ import org.scalatestplus.scalacheck.ScalaCheckPropertyChecks
 
 class ProjectUpdatesSpec extends AnyFlatSpec with should.Matchers with ScalaCheckPropertyChecks with EitherValues {
 
-  it should "encode/decode " in {
+  it should "encode/decode " in
     forAll(projectUpdatesGen) { updates =>
       updates.asJson.hcursor.as[ProjectUpdates].value shouldBe updates
     }
-  }
 
   it should "lack of description property to be considered as no-op for the property" in {
 

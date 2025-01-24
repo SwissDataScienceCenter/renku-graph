@@ -41,7 +41,7 @@ class SparqlClientSpec extends AsyncFlatSpec with AsyncIOSpec with JenaSpec with
                           |  }
                           |} LIMIT 100""".stripMargin
 
-  it should "run sparql queries" in {
+  it should "run sparql queries" in
     testDSResource.use { c =>
       for {
         _ <- c.update(
@@ -69,7 +69,6 @@ class SparqlClientSpec extends AsyncFlatSpec with AsyncIOSpec with JenaSpec with
             )
       } yield ()
     }
-  }
 
   it should "upload jsonld" in {
     val data = Data("http://localhost/project/123", Instant.now())

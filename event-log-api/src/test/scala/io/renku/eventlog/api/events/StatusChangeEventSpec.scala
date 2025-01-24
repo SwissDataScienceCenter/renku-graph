@@ -32,7 +32,7 @@ class StatusChangeEventSpec extends AnyWordSpec with should.Matchers with ScalaC
 
   "StatusChangeEvent" should {
 
-    "be serializable and deserializable to and from Json" in {
+    "be serializable and deserializable to and from Json" in
       forAll(StatusChangeGenerators.statusChangeEvents) { event =>
         val ev = event match {
           case ttg: ToTriplesGenerated => ttg.copy(payload = ZippedEventPayload.empty)
@@ -41,7 +41,6 @@ class StatusChangeEventSpec extends AnyWordSpec with should.Matchers with ScalaC
 
         ev.asJson.as[StatusChangeEvent] shouldBe Right(ev)
       }
-    }
 
     Set(
       StatusChangeGenerators.toTripleStoreEvents,
@@ -82,13 +81,12 @@ class StatusChangeEventSpec extends AnyWordSpec with should.Matchers with ScalaC
     }
   }
   "encode" should {
-    "encode a discriminator value" in {
+    "encode a discriminator value" in
       forAll(StatusChangeGenerators.statusChangeEvents) { event =>
         val json        = event.asJson
         val subCategory = json.asObject.flatMap(_.apply("subCategory"))
         subCategory shouldBe Some(event.subCategoryName.asJson)
       }
-    }
 
     "encode a discriminator value when using specific codec" in {
       val event: RollbackToAwaitingDeletion = StatusChangeGenerators.rollbackToAwaitingDeletionEvents.generateOne

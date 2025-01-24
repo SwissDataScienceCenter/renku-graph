@@ -47,11 +47,10 @@ class EmailSpec extends AnyWordSpec with ScalaCheckPropertyChecks with should.Ma
 
   "instantiation" should {
 
-    "be successful for valid emails" in {
+    "be successful for valid emails" in
       forAll(emailStrings) { email =>
         Email(email).value shouldBe email
       }
-    }
 
     "fail blank emails" in {
       val Left(exception) = Email.from(blankStrings().generateOne)
@@ -76,11 +75,10 @@ class EmailSpec extends AnyWordSpec with ScalaCheckPropertyChecks with should.Ma
 
   "extract username" should {
 
-    "return the username part from the email" in {
+    "return the username part from the email" in
       forAll { email: Email =>
         email.extractName.value shouldBe email.value.substring(0, email.value.indexOf("@"))
       }
-    }
   }
 
   private implicit lazy val emailStrings: Gen[String] = {
@@ -161,21 +159,19 @@ class PersonResourceIdSpec
 
   "showAs[RdfResource]" should {
 
-    "URI encode and wrap the ResourceId in <> if the id doesn't contain email" in {
+    "URI encode and wrap the ResourceId in <> if the id doesn't contain email" in
       forAll(Gen.oneOf(personGitLabResourceId, personOrcidResourceId, personNameResourceId).widen[persons.ResourceId]) {
         resourceId =>
           resourceId.showAs[RdfResource] shouldBe s"<${URIref.encode(resourceId.show)}>"
       }
-    }
 
-    "encrypt the local part of the email ResourceId, URI encode it and wrap in <>" in {
+    "encrypt the local part of the email ResourceId, URI encode it and wrap in <>" in
       forAll { email: Email =>
         val username   = email.extractName.value
         val resourceId = ResourceId(email)
 
         resourceId.showAs[RdfResource] shouldBe s"<${resourceId.value.replace(username, URIref.encode(username))}>"
       }
-    }
   }
 }
 
@@ -185,11 +181,10 @@ class PersonGitLabIdSpec extends AnyWordSpec with ScalaCheckPropertyChecks with 
 
   "parse" should {
 
-    "return a GitLabId for valid id in String" in {
+    "return a GitLabId for valid id in String" in
       forAll(RenkuTinyTypeGenerators.personGitLabIds) { gitLabId =>
         GitLabId.parse(gitLabId.toString) shouldBe Right(gitLabId)
       }
-    }
 
     "fail for invalid id in String" in {
       val value = nonBlankStrings().generateOne.value

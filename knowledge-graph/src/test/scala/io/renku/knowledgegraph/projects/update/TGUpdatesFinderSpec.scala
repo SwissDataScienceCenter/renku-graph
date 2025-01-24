@@ -95,23 +95,21 @@ class TGUpdatesFinderSpec extends AnyWordSpec with should.Matchers with TryValue
 
     "map the Core updatable values from the Project updates " +
       "if there are only Core updatable values and " +
-      "it's confirmed Core pushed to the default branch" in {
+      "it's confirmed Core pushed to the default branch" in
+      forAll(projectUpdatesGen.suchThat(_.coreUpdateNeeded).map(_.copy(newImage = None, newVisibility = None))) {
+        updates =>
+          val branch = branches.generateOne
 
-        forAll(projectUpdatesGen.suchThat(_.coreUpdateNeeded).map(_.copy(newImage = None, newVisibility = None))) {
-          updates =>
-            val branch = branches.generateOne
-
-            findTGProjectUpdates(updates,
-                                 maybeGLUpdatedProject = None,
-                                 maybeDefaultBranch = DefaultBranch.Unprotected(branch).some,
-                                 corePushBranch = branch
-            ).success.value shouldBe TGProjectUpdates(
-              newDescription = updates.newDescription,
-              newImages = None,
-              newKeywords = updates.newKeywords,
-              newVisibility = None
-            )
-        }
+          findTGProjectUpdates(updates,
+                               maybeGLUpdatedProject = None,
+                               maybeDefaultBranch = DefaultBranch.Unprotected(branch).some,
+                               corePushBranch = branch
+          ).success.value shouldBe TGProjectUpdates(
+            newDescription = updates.newDescription,
+            newImages = None,
+            newKeywords = updates.newKeywords,
+            newVisibility = None
+          )
       }
 
     "return an empty TG updates object " +

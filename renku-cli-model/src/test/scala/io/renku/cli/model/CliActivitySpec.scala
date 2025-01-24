@@ -42,17 +42,15 @@ class CliActivitySpec
   private val activityGen = ActivityGenerators.activityGen(Instant.EPOCH)
 
   "decode/encode" should {
-    "be compatible" in {
+    "be compatible" in
       forAll(activityGen) { cliActivity =>
         assertCompatibleCodec(cliActivity)
       }
-    }
 
-    "work on multiple items" in {
+    "work on multiple items" in
       forAll(activityGen, activityGen) { (act1, act2) =>
         assertCompatibleCodec(act1, act2)
       }
-    }
 
     "fail if there is no Agent entity" in {
       import io.renku.jsonld.syntax._

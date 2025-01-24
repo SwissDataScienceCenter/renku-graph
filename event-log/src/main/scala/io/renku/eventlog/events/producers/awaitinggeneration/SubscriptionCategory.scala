@@ -39,10 +39,11 @@ private[producers] object SubscriptionCategory {
 
   val categoryName: CategoryName = CategoryName("AWAITING_GENERATION")
 
-  def apply[F[
-      _
-  ]: Async: Parallel: SessionResource: DefaultSubscriberTracker: Logger: MetricsRegistry: QueriesExecutionTimes: EventStatusGauges]
-      : F[producers.SubscriptionCategory[F]] = for {
+  def apply[
+      F[
+          _
+      ]: Async: Parallel: SessionResource: DefaultSubscriberTracker: Logger: MetricsRegistry: QueriesExecutionTimes: EventStatusGauges
+  ]: F[producers.SubscriptionCategory[F]] = for {
     implicit0(subscribers: DefaultSubscribers[F]) <- DefaultSubscribers[F](categoryName)
     eventFetcher                                  <- EventFinder[F]
     dispatchRecovery                              <- DispatchRecovery[F]

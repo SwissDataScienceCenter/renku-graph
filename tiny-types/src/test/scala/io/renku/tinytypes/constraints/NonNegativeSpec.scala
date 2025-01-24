@@ -28,11 +28,10 @@ class NonNegativeSpec extends AnyWordSpec with ScalaCheckPropertyChecks with sho
 
   "NonNegativeInt" should {
 
-    "be instantiatable when values are greater or equal zero" in {
+    "be instantiatable when values are greater or equal zero" in
       forAll(Gen.choose(0, 100000)) { someValue =>
         TestNonNegativeInt(someValue).value shouldBe someValue
       }
-    }
 
     "throw an IllegalArgumentException for negative value" in {
       intercept[IllegalArgumentException](
@@ -43,11 +42,10 @@ class NonNegativeSpec extends AnyWordSpec with ScalaCheckPropertyChecks with sho
 
   "NonNegativeLong" should {
 
-    "be instantiatable when values are greater or equal zero" in {
+    "be instantiatable when values are greater or equal zero" in
       forAll(Gen.choose(0, 100000)) { someValue =>
         TestNonNegativeLong(someValue).value shouldBe someValue
       }
-    }
 
     "throw an IllegalArgumentException for negative value" in {
       intercept[IllegalArgumentException](

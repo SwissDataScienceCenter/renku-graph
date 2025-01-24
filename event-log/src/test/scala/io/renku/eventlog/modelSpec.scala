@@ -33,19 +33,17 @@ class EventDateSpec extends AnyWordSpec with should.Matchers with ScalaCheckProp
 
   "instantiation" should {
 
-    "succeed if less than a day in the future" in {
+    "succeed if less than a day in the future" in
       forAll(timestamps(max = Instant.now().plus(24, HOURS).minus(1, SECONDS))) { value =>
         EventDate.from(value).map(_.value) shouldBe Right(value)
       }
-    }
 
-    "fail if further than a day in the future" in {
+    "fail if further than a day in the future" in
       forAll(timestamps(min = Instant.now().plus(24, HOURS).plus(1, SECONDS))) { value =>
         val Left(exception) = EventDate.from(value).map(_.value)
         exception          shouldBe an[IllegalArgumentException]
         exception.getMessage should startWith(s"${EventDate.typeName} has to be <= ")
       }
-    }
   }
 }
 
@@ -57,11 +55,10 @@ class CreatedDateSpec extends AnyWordSpec with ScalaCheckPropertyChecks with sho
       CreatedDate shouldBe an[InstantNotInTheFuture[_]]
     }
 
-    "be instantiatable from any Instant not from the future" in {
+    "be instantiatable from any Instant not from the future" in
       forAll(timestampsNotInTheFuture) { instant =>
         CreatedDate.from(instant).map(_.value) shouldBe Right(instant)
       }
-    }
   }
 }
 
@@ -69,11 +66,10 @@ class ExecutionDateSpec extends AnyWordSpec with ScalaCheckPropertyChecks with s
 
   "ExecutionDate" should {
 
-    "be instantiatable from any Instant" in {
+    "be instantiatable from any Instant" in
       forAll(timestamps) { instant =>
         ExecutionDate.from(instant).map(_.value) shouldBe Right(instant)
       }
-    }
   }
 }
 
@@ -85,16 +81,14 @@ class EventMessageSpec extends AnyWordSpec with ScalaCheckPropertyChecks with sh
       EventMessage shouldBe an[NonBlank[_]]
     }
 
-    "be instantiatable from any non-blank string" in {
+    "be instantiatable from any non-blank string" in
       forAll(nonEmptyStrings()) { body =>
         EventMessage.from(body).map(_.value) shouldBe Right(body)
       }
-    }
 
-    "be instantiatable from an exception and contain the stack trace" in {
+    "be instantiatable from an exception and contain the stack trace" in
       forAll(nestedExceptions) { exception =>
         EventMessage(exception).value shouldBe Message.Error.fromStackTrace(exception).show
       }
-    }
   }
 }

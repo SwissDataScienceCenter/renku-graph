@@ -25,8 +25,7 @@ class EndpointDocsSpec extends AnyWordSpec {
 
   "path" should {
 
-    "return a valid Path object" in {
+    "return a valid Path object" in
       validatePath(new EndpointDocsImpl().path)
-    }
   }
 }

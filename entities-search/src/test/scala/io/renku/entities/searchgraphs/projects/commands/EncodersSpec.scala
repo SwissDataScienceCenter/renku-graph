@@ -38,8 +38,7 @@ class EncodersSpec extends AnyWordSpec with should.Matchers with ScalaCheckPrope
 
   "searchInfoEncoder" should {
 
-    "turn a SearchInfo object into a Set of relevant Quads" in {
-
+    "turn a SearchInfo object into a Set of relevant Quads" in
       forAll(projectSearchInfoObjects) { searchInfo =>
         searchInfo.asQuads shouldBe Set(
           ProjectsQuad(searchInfo.id, rdf / "type", renku / "DiscoverableProject"),
@@ -55,7 +54,6 @@ class EncodersSpec extends AnyWordSpec with should.Matchers with ScalaCheckPrope
           maybeKeywordsConcatToQuad(searchInfo).toSet ++
           maybeImagesConcatToQuad(searchInfo).toSet
       }
-    }
 
   }
 

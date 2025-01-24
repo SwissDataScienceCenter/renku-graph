@@ -97,10 +97,9 @@ class GLDataFinderSpec
   }
 
   Unauthorized :: Forbidden :: NotFound :: Nil foreach { status =>
-    it should show"decode to None for $status status" in {
+    it should show"decode to None for $status status" in
       mapResponse(status, Request[IO](), Response[IO]())
         .asserting(_ shouldBe None)
-    }
   }
 
   private implicit val glClient: GitLabClient[IO]          = mock[GitLabClient[IO]]

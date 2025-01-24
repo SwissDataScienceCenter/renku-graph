@@ -72,7 +72,7 @@ class SparqlSnippetsSpec
     insertData(pa, randomData(10)).map(data => (sc, data))
   }
 
-  it should "select public projects if no user is given" in {
+  it should "select public projects if no user is given" in
     clientAndData.use { case (client, data) =>
       for {
         r <- client.queryDecode[ProjectAuthDataRow](
@@ -81,9 +81,8 @@ class SparqlSnippetsSpec
         _ = r.map(_.visibility).toSet shouldBe data.filter(_.visibility == Visibility.Public).map(_.visibility).toSet
       } yield ()
     }
-  }
 
-  it should "select public and internal if a user is given that is no member" in {
+  it should "select public and internal if a user is given that is no member" in
     clientAndData.use { case (client, data) =>
       for {
         nonExistingUser <- IO(selectUserNotIn(data).generateOne)
@@ -94,9 +93,8 @@ class SparqlSnippetsSpec
         _ = r.map(_.visibility).max shouldBe nonPrivate.map(_.visibility).max
       } yield ()
     }
-  }
 
-  it should "select projects where user is member and public/internal" in {
+  it should "select projects where user is member and public/internal" in
     clientAndData.use { case (client, data) =>
       for {
         existingUser <- IO(selectUserFrom(data).generateOne)
@@ -110,7 +108,6 @@ class SparqlSnippetsSpec
         _        = found shouldBe expected
       } yield ()
     }
-  }
 
   it should "select no projects if given visibilities results in empty constraints" in {
     val internal: Set[Visibility] = Set(Visibility.Internal)
@@ -124,7 +121,7 @@ class SparqlSnippetsSpec
     }
   }
 
-  it should "select public projects if no visibilities and no user are given" in {
+  it should "select public projects if no visibilities and no user are given" in
     clientAndData.use { case (client, data) =>
       for {
         r <- client.queryDecode[ProjectAuthDataRow](
@@ -135,9 +132,8 @@ class SparqlSnippetsSpec
         _        = found shouldBe expected
       } yield ()
     }
-  }
 
-  it should "select all possible projects if no visibilities are given" in {
+  it should "select all possible projects if no visibilities are given" in
     clientAndData.use { case (client, data) =>
       for {
         user <- IO(selectUserFrom(data).generateSome)
@@ -149,7 +145,6 @@ class SparqlSnippetsSpec
         _        = found shouldBe expected
       } yield ()
     }
-  }
 
   it should "select possible projects when no members exist" in {
     def clientAndData = testDSResource.evalMap { sc =>
@@ -168,7 +163,7 @@ class SparqlSnippetsSpec
     }
   }
 
-  it should "update visibility on a project" in {
+  it should "update visibility on a project" in
     clientAndData.use { case (client, data) =>
       val el       = data.head
       val otherVis = (Visibility.all - el.visibility).head
@@ -183,13 +178,12 @@ class SparqlSnippetsSpec
         _ = r.visibility shouldBe otherVis
       } yield ()
     }
-  }
 
   val allVisibilities =
     (Visibility.all.map(Set(_)) ++ Visibility.all.toList.permutations.map(_.tail.toSet)) ++ Set(Visibility.all)
 
   allVisibilities.foreach { givenVisibility =>
-    it should s"select projects with given visibility $givenVisibility" in {
+    it should s"select projects with given visibility $givenVisibility" in
       clientAndData.use { case (client, data) =>
         for {
           existingUser <- IO(selectUserFrom(data).generateSome)
@@ -201,10 +195,9 @@ class SparqlSnippetsSpec
           _        = found shouldBe expected
         } yield ()
       }
-    }
   }
 
-  it should "select projects given a member" in {
+  it should "select projects given a member" in
     clientAndData.use { case (client, data) =>
       for {
         existingUser    <- IO(selectUserFrom(data).generateOne)
@@ -224,7 +217,6 @@ class SparqlSnippetsSpec
         _ = r2      shouldBe Nil
       } yield ()
     }
-  }
 
   def projectFilter(user: Option[persons.GitLabId], givenVisibility: Set[Visibility])(p: ProjectAuthData): Boolean =
     givenVisibility.contains(p.visibility) && (p.visibility match {

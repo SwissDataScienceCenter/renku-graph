@@ -89,9 +89,8 @@ class NamespaceFinderSpec
   }
 
   NotFound :: Forbidden :: Nil foreach { status =>
-    it should s"return None if GL returns $status" in {
+    it should s"return None if GL returns $status" in
       mapResponse(status, Request[IO](), Response[IO](status)).asserting(_ shouldBe None)
-    }
   }
 
   private implicit val glClient: GitLabClient[IO] = mock[GitLabClient[IO]]

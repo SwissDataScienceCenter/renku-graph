@@ -71,10 +71,9 @@ class UserInfoFinderSpec
       .asserting(_ shouldBe Some(userInfo))
   }
 
-  it should "return no user info if GL returns 404 NOT_FOUND" in {
+  it should "return no user info if GL returns 404 NOT_FOUND" in
     mapResponse(NotFound, Request[IO](), Response[IO](NotFound))
       .asserting(_ shouldBe None)
-  }
 
   private implicit val glClient: GitLabClient[IO] = mock[GitLabClient[IO]]
   private lazy val finder = new UserInfoFinderImpl[IO]

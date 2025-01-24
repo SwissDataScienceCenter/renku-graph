@@ -52,15 +52,13 @@ class DatasetSpec
 
   "fromCli" should {
 
-    "turn CliDataset entity into the Dataset object" in {
-
+    "turn CliDataset entity into the Dataset object" in
       forAll(datasetEntities(provenanceNonModified(cliShapedPersons)).decoupledFromProject) { testDs =>
         val modelDs = testDs.to[entities.Dataset[entities.Dataset.Provenance]]
         val cliDs   = testDs.to[CliDataset]
 
         entities.Dataset.fromCli(cliDs) shouldMatchToValid modelDs
       }
-    }
 
     "fail if originalIdentifier on an Imported External dataset is different than its identifier" in {
 
