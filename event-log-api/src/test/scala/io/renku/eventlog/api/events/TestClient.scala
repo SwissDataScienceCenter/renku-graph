@@ -73,6 +73,6 @@ class CollectingTestClient[F[_]: Async] extends Client[F] {
 }
 
 object TestClient {
-  def expectingMode[F[_]:  Async]: ExpectingTestClient[F]  = new ExpectingTestClient[F]
+  def expectingMode[F[_]: Async]:  ExpectingTestClient[F]  = new ExpectingTestClient[F]
   def collectingMode[F[_]: Async]: CollectingTestClient[F] = new CollectingTestClient[F]
 }

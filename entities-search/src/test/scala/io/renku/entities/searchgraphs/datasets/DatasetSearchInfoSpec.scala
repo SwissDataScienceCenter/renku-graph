@@ -40,7 +40,7 @@ class DatasetSearchInfoSpec extends AnyWordSpec with should.Matchers with ScalaC
 
   "show" should {
 
-    "return String representation of the Info" in {
+    "return String representation of the Info" in
       forAll(datasetSearchInfoObjects) {
         case info @ DatasetSearchInfo(topSameAs,
                                       name,
@@ -76,6 +76,5 @@ class DatasetSearchInfoSpec extends AnyWordSpec with should.Matchers with ScalaC
             show"links = [${links.mkString_("; ")}]".some
           ).flatten.mkString(", ")
       }
-    }
   }
 }

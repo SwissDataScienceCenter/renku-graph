@@ -45,23 +45,21 @@ class ProjectAuthServiceSpec
   def randomData(num: Int, suchThat: ProjectAuthData => Boolean = anyIsGood) =
     Generators.projectAuthDataGen.suchThat(suchThat).asStream.take(num)
 
-  it should "add data" in {
+  it should "add data" in
     withProjectAuthServiceData(randomData(20)).use { case (s, data) =>
       for {
         n <- s.getAll(QueryFilter.all, 15).compile.toVector
         _ = n shouldBe data.sortBy(_.slug)
       } yield ()
     }
-  }
 
-  it should "work with no members" in {
+  it should "work with no members" in
     withProjectAuthServiceData(randomData(2)).use { case (s, data) =>
       for {
         n <- s.getAll(QueryFilter.all).compile.toVector
         _ = n shouldBe data.sortBy(_.slug)
       } yield ()
     }
-  }
 
   it should "remove projects" in {
     val data = Generators.projectAuthData.withVisibility(Visibility.Internal).stream
@@ -76,7 +74,7 @@ class ProjectAuthServiceSpec
     }
   }
 
-  it should "remove selectively" in {
+  it should "remove selectively" in
     withProjectAuthServiceData(randomData(6)).use { case (s, data) =>
       val (toremove, tokeep) = data.splitAt(3)
       for {
@@ -84,7 +82,6 @@ class ProjectAuthServiceSpec
         _ <- s.getAll(QueryFilter.all).compile.toVector.asserting(v => v shouldBe tokeep.sortBy(_.slug))
       } yield ()
     }
-  }
 
   it should "update new properties" in {
     val data = Generators.projectAuthData.withVisibility(Visibility.Internal).stream
@@ -106,7 +103,7 @@ class ProjectAuthServiceSpec
     }
   }
 
-  it should "search for a specific project by slug" in {
+  it should "search for a specific project by slug" in
     withProjectAuthServiceData(randomData(1)).use { case (s, original) =>
       for {
         found <- s.getAll(QueryFilter.all.withSlug(original.head.slug)).compile.lastOrError
@@ -116,9 +113,8 @@ class ProjectAuthServiceSpec
         _ = nf    shouldBe None
       } yield ()
     }
-  }
 
-  it should "search by member id" in {
+  it should "search by member id" in
     withProjectAuthServiceData(randomData(1, suchThat = _.members.nonEmpty)).use { case (s, original) =>
       for {
         found <- s.getAll(QueryFilter.all.withMember(original.head.members.head.gitLabId)).compile.lastOrError
@@ -134,5 +130,4 @@ class ProjectAuthServiceSpec
         _ = nf    shouldBe None
       } yield ()
     }
-  }
 }

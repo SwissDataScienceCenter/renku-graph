@@ -62,35 +62,31 @@ class datasetsSpec extends AnyWordSpec with ScalaCheckPropertyChecks with should
 
   "ImageUri" should {
 
-    "instantiate as ImageUri.Relative for relative paths" in {
+    "instantiate as ImageUri.Relative for relative paths" in
       forAll(relativePaths()) { path =>
         val uri = ImageUri(path)
         uri                 shouldBe a[ImageUri.Relative]
         uri                 shouldBe a[RelativePathTinyType]
         ImageUri.from(path) shouldBe uri.asRight
       }
-    }
 
-    "instantiate as ImageUri.Absolute for absolute paths" in {
+    "instantiate as ImageUri.Absolute for absolute paths" in
       forAll(httpUrls()) { path =>
         val uri = ImageUri(path)
         uri                 shouldBe a[ImageUri.Absolute]
         uri                 shouldBe an[UrlTinyType]
         ImageUri.from(path) shouldBe uri.asRight
       }
-    }
 
-    "provide an implicit Json encoder" in {
+    "provide an implicit Json encoder" in
       forAll(imageUris) { uri =>
         uri.asJson shouldBe Json.fromString(uri.value)
       }
-    }
 
-    "provide an implicit Json decoder" in {
+    "provide an implicit Json decoder" in
       forAll(imageUris) { uri =>
         Json.fromString(uri.value).as[ImageUri] shouldBe uri.asRight
       }
-    }
   }
 
   "SameAs" should {
@@ -99,49 +95,44 @@ class datasetsSpec extends AnyWordSpec with ScalaCheckPropertyChecks with should
       datasetSameAs.generateOne shouldBe a[UrlTinyType]
     }
 
-    "allow to construct ExternalSameAs using the from factory" in {
+    "allow to construct ExternalSameAs using the from factory" in
       forAll(httpUrls()) { url =>
         val sameAs = SameAs.from(url).value
         sameAs         should (be(a[SameAs]) and be(a[ExternalSameAs]))
         sameAs.value shouldBe url
       }
-    }
 
-    "allow to construct InternalSameAs using the internal factory" in {
+    "allow to construct InternalSameAs using the internal factory" in
       forAll(renkuUrls) { url =>
         val sameAs = SameAs.internal(url).value
         sameAs         should (be(a[SameAs]) and be(a[InternalSameAs]))
         sameAs.value shouldBe url.value
       }
-    }
   }
 
   "SameAs.equals" should {
 
-    "return true for two SameAs having equal value regardless of the type - case of InternalSameAs" in {
+    "return true for two SameAs having equal value regardless of the type - case of InternalSameAs" in
       forAll { sameAs: InternalSameAs =>
         SameAs.internal(RenkuUrl(sameAs.value)) shouldBe SameAs.from(sameAs.value)
         SameAs.from(sameAs.value)               shouldBe SameAs.internal(RenkuUrl(sameAs.value))
       }
-    }
 
-    "return true for two SameAs having equal value regardless of the type - case of ImportedSameAs" in {
+    "return true for two SameAs having equal value regardless of the type - case of ImportedSameAs" in
       forAll { sameAs: ExternalSameAs =>
         SameAs.external(Refined.unsafeApply(sameAs.value)) shouldBe SameAs.from(sameAs.value)
         SameAs.from(sameAs.value)                          shouldBe SameAs.external(Refined.unsafeApply(sameAs.value))
       }
-    }
   }
 
   "SameAs.hashCode" should {
 
-    "return same values for two SameAs having equal value regardless of the type" in {
+    "return same values for two SameAs having equal value regardless of the type" in
       forAll(datasetSameAs) { sameAs =>
         SameAs.internal(RenkuUrl(sameAs.value)).map(_.hashCode()) shouldBe SameAs
           .external(Refined.unsafeApply(sameAs.value))
           .map(_.hashCode())
       }
-    }
   }
 
   "SameAs.internal" should {

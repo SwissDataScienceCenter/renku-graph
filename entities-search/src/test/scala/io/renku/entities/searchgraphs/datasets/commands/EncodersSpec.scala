@@ -66,8 +66,7 @@ class EncodersSpec extends AnyWordSpec with should.Matchers with ScalaCheckPrope
 
   "searchInfoEncoder" should {
 
-    "turn a SearchInfo object into a Set of relevant Quads" in {
-
+    "turn a SearchInfo object into a Set of relevant Quads" in
       forAll(datasetSearchInfoObjects) { searchInfo =>
         searchInfo.asQuads shouldBe Set(
           DatasetsQuad(searchInfo.topmostSameAs, rdf / "type", renku / "DiscoverableDataset"),
@@ -88,7 +87,6 @@ class EncodersSpec extends AnyWordSpec with should.Matchers with ScalaCheckPrope
           maybeImagesConcatToQuad(searchInfo).toSet ++
           linksToQuads(searchInfo)
       }
-    }
   }
 
   private def createdOrPublishedToQuad(topmostSameAs: datasets.TopmostSameAs): datasets.CreatedOrPublished => Quad = {

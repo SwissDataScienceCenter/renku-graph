@@ -90,7 +90,7 @@ private class MicroserviceRoutes[F[_]: Sync](
     case       GET  -> Root / "events" / EventId(eventId) / ProjectId(projectId)  => respond503IfMigrating(getDetails(CompoundEventId(eventId, projectId)))
     case       GET  -> Root / "events" / EventId(eventId) / ProjectSlug(projectSlug) / "payload"  => respond503IfMigrating(eventPayloadEndpoint.getEventPayload(eventId, projectSlug))
     case       GET  -> Root / "ping"                                              => Ok("pong")
-    case       GET  -> Root / "migration-status"                                  => isMigrating.get.flatMap {isMigrating => Ok(json"""{"isMigrating": $isMigrating}""")}
+    case       GET  -> Root / "migration-status"                                  => isMigrating.get.flatMap{isMigrating => Ok(json"""{"isMigrating": $isMigrating}""")}
     case       GET  -> Root / "status"                                            => respond503IfMigrating(`GET /status`)
     case req @ POST -> Root / "subscriptions"                                     => respond503IfMigrating(addSubscription(req))
   }.withMetrics.map(_  <+> versionRoutes())

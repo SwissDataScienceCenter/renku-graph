@@ -29,9 +29,8 @@ import org.scalatestplus.scalacheck.ScalaCheckPropertyChecks
 
 class SchemaApiVersionsSpec extends AnyFlatSpec with should.Matchers with EitherValues with ScalaCheckPropertyChecks {
 
-  it should "decode from JSON" in {
+  it should "decode from JSON" in
     forAll { apiVersions: SchemaApiVersions =>
       apiVersions.asJson.hcursor.as[SchemaApiVersions].value shouldBe apiVersions
     }
-  }
 }

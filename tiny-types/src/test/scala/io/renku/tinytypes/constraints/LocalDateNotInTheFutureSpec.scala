@@ -30,11 +30,10 @@ class LocalDateNotInTheFutureSpec extends AnyWordSpec with ScalaCheckPropertyChe
 
   "LocalDateNotInTheFuture" should {
 
-    "be instantiatable when values are LocalDates in the past" in {
+    "be instantiatable when values are LocalDates in the past" in
       forAll(localDatesNotInTheFuture) { someValue =>
         LocalDateNotInTheFutureType(someValue).value shouldBe someValue
       }
-    }
 
     "be instantiatable when values are LocalDate from now" in {
       val fixedNow = LocalDate.now

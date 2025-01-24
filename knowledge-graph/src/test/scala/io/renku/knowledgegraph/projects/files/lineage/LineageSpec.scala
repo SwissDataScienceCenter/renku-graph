@@ -39,7 +39,7 @@ class LineageSpec extends AnyWordSpec with ScalaCheckPropertyChecks with should.
 
   "from" should {
 
-    "succeed if all the edges have nodes definitions" in {
+    "succeed if all the edges have nodes definitions" in
       forAll(edgesSets) { edgesSet =>
         val nodesSet                                 = generateNodes(edgesSet)
         val Right(Lineage(actualEdges, actualNodes)) = Lineage.from[EitherLineage](edgesSet, nodesSet)
@@ -47,7 +47,6 @@ class LineageSpec extends AnyWordSpec with ScalaCheckPropertyChecks with should.
         actualEdges shouldBe edgesSet
         actualNodes shouldBe nodesSet
       }
-    }
 
     "fail if there are edges with no nodes definitions" in {
       val edgesSet        = edgesSets.generateOne
@@ -96,21 +95,19 @@ class LineageSpec extends AnyWordSpec with ScalaCheckPropertyChecks with should.
 
   "getNode" should {
 
-    "return a Node if there is one with the given location" in {
+    "return a Node if there is one with the given location" in
       forAll { lineage: Lineage =>
         val node = Random.shuffle(lineage.nodes.toList).head
 
         lineage.getNode(node.location) shouldBe node.some
       }
-    }
 
-    "return None if no node are found with the given location" in {
+    "return None if no node are found with the given location" in
       forAll { lineage: Lineage =>
         val location = nodeLocations.generateOne
 
         lineage.getNode(location) shouldBe None
       }
-    }
   }
 
   private lazy val edgesSets: Gen[Set[Edge]] = for {

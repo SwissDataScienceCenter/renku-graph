@@ -30,11 +30,10 @@ class AuthorSpec extends AnyWordSpec with ScalaCheckPropertyChecks with should.M
 
   "withEmail" should {
 
-    "instantiate a new Author with username extracted from the email" in {
+    "instantiate a new Author with username extracted from the email" in
       forAll { email: Email =>
         Author.withEmail(email) shouldBe Author(email.extractName, email)
       }
-    }
   }
 }
 
@@ -42,10 +41,9 @@ class CommitterSpec extends AnyWordSpec with ScalaCheckPropertyChecks with shoul
 
   "withEmail" should {
 
-    "instantiate a new Committer with username extracted from the email" in {
+    "instantiate a new Committer with username extracted from the email" in
       forAll { email: Email =>
         Committer.withEmail(email) shouldBe Committer(email.extractName, email)
       }
-    }
   }
 }

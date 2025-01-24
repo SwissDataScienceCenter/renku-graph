@@ -35,7 +35,7 @@ class ApiUrlSpec extends AnyWordSpec with ScalaCheckPropertyChecks with should.M
 
   "apply" should {
 
-    "return a ResourcesUrl if there's a value for 'services.renku.resource-url'" in {
+    "return a ResourcesUrl if there's a value for 'services.renku.resource-url'" in
       forAll(httpUrls()) { url =>
         val config = ConfigFactory.parseMap(
           Map(
@@ -48,7 +48,6 @@ class ApiUrlSpec extends AnyWordSpec with ScalaCheckPropertyChecks with should.M
         )
         ApiUrl[Try](config) shouldBe Success(ApiUrl(url))
       }
-    }
 
     "fail if there's no value for the 'services.renku.url'" in {
       val Failure(exception) = ApiUrl[Try](ConfigFactory.empty())

@@ -30,11 +30,10 @@ class InstantNotInTheFutureSpec extends AnyWordSpec with ScalaCheckPropertyCheck
 
   "InstantNotInTheFuture" should {
 
-    "be instantiatable when values are Instants in the past" in {
+    "be instantiatable when values are Instants in the past" in
       forAll(timestampsNotInTheFuture) { someValue =>
         InstantInThePastType(someValue).value shouldBe someValue
       }
-    }
 
     "be instantiatable when values are Instants from now" in {
       val systemZone = ZoneId.systemDefault

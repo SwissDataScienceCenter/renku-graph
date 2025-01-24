@@ -100,11 +100,10 @@ class LinkSpec extends AnyWordSpec with should.Matchers with ScalaCheckPropertyC
 
   "show" should {
 
-    "returns String representation" in {
+    "returns String representation" in
       forAll(linkObjectsGen(datasetTopmostSameAs.generateOne)) { link =>
         link.show shouldBe
           show"id = ${link.resourceId}, projectId = ${link.projectId}, datasetId = ${link.datasetId}, visibility = ${link.visibility}"
       }
-    }
   }
 }

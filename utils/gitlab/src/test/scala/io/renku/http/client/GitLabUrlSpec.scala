@@ -29,11 +29,10 @@ class GitLabUrlSpec extends AnyWordSpec with ScalaCheckPropertyChecks with shoul
 
   "from" should {
 
-    "instantiate GitLabUrl when valid url is given" in {
+    "instantiate GitLabUrl when valid url is given" in
       forAll(httpUrls()) { path =>
         GitLabUrl.from(path).map(_.value).value shouldBe path
       }
-    }
 
     "instantiate GitLabUrl when valid url is given with a slash at the end" in {
       val path = httpUrls().generateOne

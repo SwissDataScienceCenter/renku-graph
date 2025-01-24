@@ -38,13 +38,12 @@ class PagingRequestSpec
 
   "page" should {
 
-    "decode a valid page query parameter" in {
+    "decode a valid page query parameter" in
       forAll { page: Page =>
         Map("page" -> Seq(page.toString)) match {
           case PagingRequest.Decoders.page(actual) => actual shouldBe Some(Validated.validNel(page))
         }
       }
-    }
 
     "fail to decode a non-int page query parameter" in {
       Map("page" -> Seq("abc")) match {
@@ -73,13 +72,12 @@ class PagingRequestSpec
 
   "perPage" should {
 
-    "decode a valid per_page values" in {
+    "decode a valid per_page values" in
       forAll { perPage: PerPage =>
         Map("per_page" -> Seq(perPage.toString)) match {
           case PagingRequest.Decoders.perPage(actual) => actual shouldBe Some(Validated.validNel(perPage))
         }
       }
-    }
 
     "fail to decode a non-int values" in {
       Map("per_page" -> Seq("abc")) match {

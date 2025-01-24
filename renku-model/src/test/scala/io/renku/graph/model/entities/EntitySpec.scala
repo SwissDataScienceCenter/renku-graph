@@ -45,16 +45,15 @@ class EntitySpec
     )
 
   "fromCli" should {
-    "turn CliInputEntity entity into the Entity object " in {
+    "turn CliInputEntity entity into the Entity object " in
       forAll(inputEntities) { entity =>
         val cliEntity   = entity.to[CliEntity]
         val modelEntity = entity.to[entities.Entity.InputEntity]
 
         entities.Entity.fromCli(cliEntity) shouldMatchTo modelEntity
       }
-    }
 
-    "turn CliOutput entity into the Entity object " in {
+    "turn CliOutput entity into the Entity object " in
       forAll(locationCommandOutputObjects) { commandOutput =>
         val activity    = activityGenerator(commandOutput).generateOne
         val cliEntities = activity.to[CliActivity].generations.map(_.entity)
@@ -65,9 +64,8 @@ class EntitySpec
           _.entity.to[entities.Entity.OutputEntity]
         )
       }
-    }
 
-    "turn CliOutput entity with multiple Generations into the Entity object " in {
+    "turn CliOutput entity with multiple Generations into the Entity object " in
       forAll(locationCommandOutputObjects) { commandOutput =>
         val testActivity = activityGenerator(commandOutput).generateOne
         val updatedActivity = testActivity.copy(generationFactories =
@@ -83,6 +81,5 @@ class EntitySpec
 
         result should contain allElementsOf updatedActivity.generations.map(g => Entity.toEntity.apply(g.entity))
       }
-    }
   }
 }

@@ -42,16 +42,14 @@ class CliPublicationEventSpec
   private implicit val decoder: JsonLDDecoder[CliPublicationEvent] = CliPublicationEvent.decoder(dataset)
 
   "decode/encode" should {
-    "be compatible" in {
+    "be compatible" in
       forAll(entityGen) { entity =>
         assertCompatibleCodec(entity)
       }
-    }
 
-    "work on multiple items" in {
+    "work on multiple items" in
       forAll(entityGen, entityGen) { (entity1, entity2) =>
         assertCompatibleCodec(entity1, entity2)
       }
-    }
   }
 }

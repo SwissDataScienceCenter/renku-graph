@@ -33,18 +33,17 @@ class EventLogTableRenamerSpec extends AsyncFlatSpec with AsyncIOSpec with DbIni
 
   protected[init] override val runMigrationsUpTo: Class[_ <: DbMigrator[IO]] = classOf[EventLogTableRenamer[IO]]
 
-  it should "rename the 'event_log' table to 'event' when 'event' does not exist" in testDBResource.use {
-    implicit cfg =>
-      for {
-        _ <- tableExists("event_log").asserting(_ shouldBe true)
+  it should "rename the 'event_log' table to 'event' when 'event' does not exist" in testDBResource.use { implicit cfg =>
+    for {
+      _ <- tableExists("event_log").asserting(_ shouldBe true)
 
-        _ <- tableRenamer.run.assertNoException
+      _ <- tableRenamer.run.assertNoException
 
-        _ <- tableExists("event_log").asserting(_ shouldBe false)
-        _ <- tableExists("event").asserting(_ shouldBe true)
+      _ <- tableExists("event_log").asserting(_ shouldBe false)
+      _ <- tableExists("event").asserting(_ shouldBe true)
 
-        _ <- logger.loggedOnlyF(Info("'event_log' table renamed to 'event'"))
-      } yield Succeeded
+      _ <- logger.loggedOnlyF(Info("'event_log' table renamed to 'event'"))
+    } yield Succeeded
   }
 
   it should "do nothing if the 'event' table already exists and 'event_log' does not exist" in testDBResource.use {

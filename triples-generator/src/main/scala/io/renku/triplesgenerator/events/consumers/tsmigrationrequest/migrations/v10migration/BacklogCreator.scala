@@ -117,8 +117,8 @@ private class BacklogCreatorImpl[F[_]: Async](startTimeFinder: MigrationStartTim
         |""".stripMargin
   )
 
-  private implicit lazy val decoder: Decoder[List[projects.Slug]] = ResultsDecoder[List, projects.Slug] {
-    implicit cur => extract[projects.Slug]("slug")
+  private implicit lazy val decoder: Decoder[List[projects.Slug]] = ResultsDecoder[List, projects.Slug] { implicit cur =>
+    extract[projects.Slug]("slug")
   }
 
   private def storeInBacklog(currentPage: Ref[F, Int]): Option[SparqlQuery] => F[Unit] = {

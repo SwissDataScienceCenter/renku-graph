@@ -39,7 +39,7 @@ class ConcurrentProcessesNumberSpec
 
   "apply" should {
 
-    "return a GenerationProcessesNumber if there's a value for 'transformation-processes-number' in the config" in {
+    "return a GenerationProcessesNumber if there's a value for 'transformation-processes-number' in the config" in
       forAll(positiveInts()) { value =>
         val config = ConfigFactory.parseMap(
           Map("transformation-processes-number" -> value.value).asJava
@@ -47,7 +47,6 @@ class ConcurrentProcessesNumberSpec
 
         ConcurrentProcessesNumber[Try](config).success.value shouldBe ConcurrentProcessesNumber(value.value)
       }
-    }
 
     "fail if there's no value for the 'transformation-processes-number'" in {
       ConcurrentProcessesNumber[Try](ConfigFactory.empty()).failure.exception shouldBe an[ConfigLoadingException]

@@ -33,28 +33,25 @@ class CliVersionSpec extends AnyWordSpec with ScalaCheckPropertyChecks with shou
 
   "from" should {
 
-    "return Right for a valid released version" in {
+    "return Right for a valid released version" in
       forAll(semanticVersions) { version =>
         CliVersion.from(version).map(_.show).value shouldBe version
       }
-    }
 
-    "return Right for a valid rc version" in {
+    "return Right for a valid rc version" in
       forAll(rcVersions()) { version =>
         CliVersion.from(version).map(_.show).value shouldBe version
       }
-    }
 
-    "return Right for a valid dev version" in {
+    "return Right for a valid dev version" in
       forAll(devVersions()) { version =>
         CliVersion.from(version).map(_.show).value shouldBe version
       }
-    }
   }
 
   "major, minor and bugfix" should {
 
-    "extract the relevant version parts from a released version" in {
+    "extract the relevant version parts from a released version" in
       forAll(semanticVersions) { version =>
         val cli                      = CliVersion(version)
         val s"$major.$minor.$bugfix" = version
@@ -62,9 +59,8 @@ class CliVersionSpec extends AnyWordSpec with ScalaCheckPropertyChecks with shou
         cli.minor  shouldBe minor
         cli.bugfix shouldBe bugfix
       }
-    }
 
-    "extract the relevant version parts from an rc version" in {
+    "extract the relevant version parts from an rc version" in
       forAll(rcVersions()) { version =>
         val cli                      = CliVersion(version)
         val s"$major.$minor.$bugfix" = version
@@ -72,9 +68,8 @@ class CliVersionSpec extends AnyWordSpec with ScalaCheckPropertyChecks with shou
         cli.minor  shouldBe minor
         cli.bugfix shouldBe bugfix
       }
-    }
 
-    "extract the relevant version parts from a dev version" in {
+    "extract the relevant version parts from a dev version" in
       forAll(devVersions()) { version =>
         val cli                      = CliVersion(version)
         val s"$major.$minor.$bugfix" = version
@@ -82,12 +77,11 @@ class CliVersionSpec extends AnyWordSpec with ScalaCheckPropertyChecks with shou
         cli.minor  shouldBe minor
         cli.bugfix shouldBe bugfix
       }
-    }
   }
 
   "ordering" should {
 
-    "consider the major only if different" in {
+    "consider the major only if different" in
       forAll(cliVersions, cliVersions) { (version1, version2) =>
         whenever(version1.major != version2.major) {
           val list = List(version1, version2)
@@ -96,9 +90,8 @@ class CliVersionSpec extends AnyWordSpec with ScalaCheckPropertyChecks with shou
           else list.sorted                                 shouldBe list.reverse
         }
       }
-    }
 
-    "consider the minor only if majors are the same" in {
+    "consider the minor only if majors are the same" in
       forAll(cliVersions, cliVersions) { (version1, version2) =>
         whenever(version1.minor != version2.minor) {
           val version2SameMajor = CliVersion(version2.show.replaceFirst(s"${version2.major}.", s"${version1.major}."))
@@ -109,9 +102,8 @@ class CliVersionSpec extends AnyWordSpec with ScalaCheckPropertyChecks with shou
           else list.sorted                                          shouldBe list.reverse
         }
       }
-    }
 
-    "consider the bugfix only if majors and minors are the same" in {
+    "consider the bugfix only if majors and minors are the same" in
       forAll(cliVersions, cliVersions) { (version1, version2) =>
         whenever(version1.bugfix != version2.bugfix) {
           val version2SameMajorMinor = CliVersion(
@@ -125,7 +117,6 @@ class CliVersionSpec extends AnyWordSpec with ScalaCheckPropertyChecks with shou
           else list.sorted                                                 shouldBe list.reverse
         }
       }
-    }
 
     "consider the rc part if all majors, minors and bugfix are the same" in {
       val semanticVersion = semanticVersions.generateOne

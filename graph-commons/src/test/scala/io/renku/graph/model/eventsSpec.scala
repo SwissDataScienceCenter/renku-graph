@@ -111,8 +111,7 @@ class EventStatusSpec extends AnyWordSpec with ScalaCheckPropertyChecks with sho
 class EventStatusProgressSpec extends AnyWordSpec with TableDrivenPropertyChecks with should.Matchers {
 
   import EventStatusProgress._
-  "apply" should {
-
+  "apply" should
     forAll {
       Table(
         ("status", "stage", "completion"),
@@ -136,18 +135,16 @@ class EventStatusProgressSpec extends AnyWordSpec with TableDrivenPropertyChecks
         progress.completion.value shouldBe completion
       }
     }
-  }
 }
 
 class CompoundEventIdSpec extends AnyWordSpec with ScalaCheckPropertyChecks with should.Matchers {
 
   "toString" should {
 
-    "be of format 'id = <eventId>, projectId = <projectId>'" in {
+    "be of format 'id = <eventId>, projectId = <projectId>'" in
       forAll { commitEventId: CompoundEventId =>
         commitEventId.toString shouldBe s"id = ${commitEventId.id}, projectId = ${commitEventId.projectId}"
       }
-    }
   }
 }
 
@@ -155,19 +152,17 @@ class CommittedDateSpec extends AnyWordSpec with should.Matchers with ScalaCheck
 
   "instantiation" should {
 
-    "succeed if less than a day in the future" in {
+    "succeed if less than a day in the future" in
       forAll(timestamps(max = Instant.now().plus(24, HOURS).minus(1, SECONDS))) { value =>
         CommittedDate.from(value).map(_.value) shouldBe Right(value)
       }
-    }
 
-    "fail if further than a day in the future" in {
+    "fail if further than a day in the future" in
       forAll(timestamps(min = Instant.now().plus(24, HOURS).plus(1, SECONDS))) { value =>
         val Left(exception) = CommittedDate.from(value).map(_.value)
         exception          shouldBe an[IllegalArgumentException]
         exception.getMessage should startWith(s"${CommittedDate.typeName} has to be <= ")
       }
-    }
   }
 }
 
@@ -182,11 +177,10 @@ class EventBodySpec extends AnyWordSpec with ScalaCheckPropertyChecks with shoul
       EventBody shouldBe an[NonBlank[_]]
     }
 
-    "be instantiatable from any non-blank string" in {
+    "be instantiatable from any non-blank string" in
       forAll(nonEmptyStrings()) { body =>
         EventBody.from(body).map(_.value) shouldBe Right(body)
       }
-    }
   }
 
   "decodeAs" should {
@@ -300,13 +294,12 @@ class EventProcessingTimeSpec extends AnyWordSpec with ScalaCheckPropertyChecks 
       EventProcessingTime shouldBe an[DurationNotNegative[_]]
     }
 
-    "be instantiatable from any non negative finite durations" in {
+    "be instantiatable from any non negative finite durations" in
       forAll(notNegativeJavaDurations) { body =>
         EventProcessingTime.from(body).map(_.value) shouldBe Right(body)
       }
-    }
 
-    "throw an error if it is instantiated with a negative finite duration" in {
+    "throw an error if it is instantiated with a negative finite duration" in
       forAll(
         javaDurations(min = -2000, max = -1)
       ) { duration =>
@@ -314,28 +307,25 @@ class EventProcessingTimeSpec extends AnyWordSpec with ScalaCheckPropertyChecks 
         exception          shouldBe an[IllegalArgumentException]
         exception.getMessage should startWith(s"${EventProcessingTime.typeName} cannot have a negative duration")
       }
-    }
   }
 
   "*" should {
 
-    "multiply the given processing time by the given value" in {
+    "multiply the given processing time by the given value" in
       forAll(eventProcessingTimes, positiveInts()) { (processingTime, multiplier) =>
         processingTime * multiplier shouldBe EventProcessingTime(
           JavaDuration.ofMillis(processingTime.value.toMillis * multiplier.value)
         )
       }
-    }
   }
 
   "/" should {
 
-    "divide the given processing time by the given value" in {
+    "divide the given processing time by the given value" in
       forAll(eventProcessingTimes, positiveInts()) { (processingTime, multiplier) =>
         processingTime / multiplier shouldBe EventProcessingTime(
           JavaDuration.ofMillis(processingTime.value.toMillis / multiplier.value)
         )
       }
-    }
   }
 }

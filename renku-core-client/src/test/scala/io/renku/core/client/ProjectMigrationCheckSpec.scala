@@ -33,9 +33,8 @@ class ProjectMigrationCheckSpec
     with EitherValues
     with ScalaCheckPropertyChecks {
 
-  it should "decode from JSON" in {
+  it should "decode from JSON" in
     forAll { migrationCheck: ProjectMigrationCheck =>
       migrationCheck.asJson.hcursor.as[ProjectMigrationCheck].value shouldBe migrationCheck
     }
-  }
 }

@@ -41,7 +41,7 @@ class HttpServerSpec
 
   "run" should {
 
-    "create an http server to serve the given routes" in {
+    "create an http server to serve the given routes" in
       client
         .run(Request[IO](Method.GET, baseUri / "resource"))
         .use { response =>
@@ -50,9 +50,8 @@ class HttpServerSpec
             _ = response.status shouldBe Status.Ok
           } yield ()
         }
-    }
 
-    "create an http server which responds with NOT_FOUND and JSON body for non-existing resource" in {
+    "create an http server which responds with NOT_FOUND and JSON body for non-existing resource" in
       client
         .run(Request[IO](Method.GET, baseUri / "non-existing"))
         .use { response =>
@@ -62,7 +61,6 @@ class HttpServerSpec
             _ = response.contentType shouldBe Some(`Content-Type`(MediaType.application.json))
           } yield ()
         }
-    }
   }
 
   private lazy val port = httpPorts.generateOne

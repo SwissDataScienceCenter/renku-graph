@@ -40,32 +40,28 @@ class CliDatasetSpec
   private val datasetGen = DatasetGenerators.datasetGen
 
   "decode/encode" should {
-    "be compatible" in {
+    "be compatible" in
       forAll(datasetGen) { cliDataset =>
         assertCompatibleCodec(cliDataset)
       }
-    }
 
-    "be compatible with publication events" in {
+    "be compatible with publication events" in
       forAll(DatasetGenerators.datasetWithEventsGen) { cliDataset =>
         implicit val jsonEncoder = CliDataset.flatJsonLDEncoder
         assertCompatibleCodec(cliDataset)
       }
-    }
 
-    "work on multiple items" in {
+    "work on multiple items" in
       forAll(datasetGen, datasetGen) { (cliDataset1, cliDataset2) =>
         assertCompatibleCodec(cliDataset1, cliDataset2)
       }
-    }
 
-    "work on multiple items with publication events" in {
+    "work on multiple items with publication events" in
       forAll(DatasetGenerators.datasetWithEventsGen, DatasetGenerators.datasetWithEventsGen) {
         (cliDataset1, cliDataset2) =>
           implicit val jsonEncoder = CliDataset.flatJsonLDEncoder
           assertCompatibleCodec(cliDataset1, cliDataset2)
       }
-    }
 
     "skip publicationEvents that belong to a different dataset" in {
       val dataset                    = DatasetGenerators.datasetWithEventsGen.generateOne

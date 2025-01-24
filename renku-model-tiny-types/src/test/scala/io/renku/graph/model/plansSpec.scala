@@ -40,12 +40,11 @@ class ResourceIdSpec
 
   "toIdentifier converted" should {
 
-    "be successful for valid ResourceIds" in {
+    "be successful for valid ResourceIds" in
       forAll(planIdentifiers) { id =>
         val resourceId = plans.ResourceId(id)
         resourceId.as[Try, plans.Identifier].success.value shouldBe id
       }
-    }
 
     "fail for an unknown resourceIds" in {
       val resourceId = plans.ResourceId {

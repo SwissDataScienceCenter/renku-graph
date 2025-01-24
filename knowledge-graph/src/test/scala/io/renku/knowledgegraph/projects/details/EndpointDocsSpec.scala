@@ -30,10 +30,9 @@ class EndpointDocsSpec extends AnyWordSpec {
   implicit val gitLabUrl: GitLabUrl = EntitiesGenerators.gitLabUrl
 
   "path" should {
-    "return a valid Path object" in {
+    "return a valid Path object" in
       validatePath(
         new EndpointDocsImpl(new ProjectJsonEncoderImpl(renkuApiUrls.generateOne), ProjectJsonLDEncoder).path
       )
-    }
   }
 }

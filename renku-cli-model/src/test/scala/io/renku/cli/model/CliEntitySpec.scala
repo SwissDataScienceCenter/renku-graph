@@ -42,17 +42,15 @@ class CliEntitySpec
   private val collectionEntityGen = EntityGenerators.collectionEntityGen
 
   "entity decode/encode" should {
-    "be compatible" in {
+    "be compatible" in
       forAll(singleEntityGen) { cliEntity =>
         assertCompatibleCodec(cliEntity)
       }
-    }
 
-    "work on multiple items" in {
+    "work on multiple items" in
       forAll(singleEntityGen, singleEntityGen) { (cliEntity1, cliEntity2) =>
         assertCompatibleCodec(cliEntity1, cliEntity2)
       }
-    }
 
     "work for only a specific generation id" in {
       val entity1 :: entity2 :: _ =
@@ -67,15 +65,13 @@ class CliEntitySpec
   }
 
   "collection decode/encode" should {
-    "be compatible" in {
+    "be compatible" in
       forAll(collectionEntityGen) { cliEntity =>
         assertCompatibleCodec(cliEntity)
       }
-    }
-    "work on multiple items" in {
+    "work on multiple items" in
       forAll(collectionEntityGen, collectionEntityGen) { (cliColl1, cliColl2) =>
         assertCompatibleCodec(cliColl1, cliColl2)
       }
-    }
   }
 }

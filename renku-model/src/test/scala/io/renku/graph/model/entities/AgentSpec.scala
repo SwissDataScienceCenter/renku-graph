@@ -36,10 +36,9 @@ class AgentSpec
 
   "fromCli" should {
 
-    "turn CLiSoftwareAgent entity into the Agent object" in {
+    "turn CLiSoftwareAgent entity into the Agent object" in
       forAll { agent: Agent =>
         entities.Agent.fromCli(agent.to[CliSoftwareAgent]) shouldMatchToValid agent.to[entities.Agent]
       }
-    }
   }
 }

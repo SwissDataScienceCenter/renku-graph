@@ -30,11 +30,10 @@ class GitLabIdSpec extends AnyWordSpec with should.Matchers with ScalaCheckPrope
 
   "unapply" should {
 
-    "convert valid eventId as string to EventId" in {
+    "convert valid eventId as string to EventId" in
       forAll { id: persons.GitLabId =>
         binders.GitLabId.unapply(id.toString) shouldBe Some(id)
       }
-    }
 
     "return None if string value is not a valid GitLabId" in {
       binders.GitLabId.unapply(nonEmptyStrings().generateOne) shouldBe None

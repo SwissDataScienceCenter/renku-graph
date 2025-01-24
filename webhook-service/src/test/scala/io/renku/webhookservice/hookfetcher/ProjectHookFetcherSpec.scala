@@ -79,16 +79,14 @@ class ProjectHookFetcherSpec
       .asserting(_ shouldBe List(HookIdAndUrl(id, url)).some -> None)
   }
 
-  it should "return an empty list of hooks if the project does not exists" in {
+  it should "return an empty list of hooks if the project does not exists" in
     mapResponse(Status.NotFound, Request(), Response())
       .asserting(_ shouldBe List.empty[HookIdAndUrl].some -> None)
-  }
 
   Status.Unauthorized :: Status.Forbidden :: Nil foreach { status =>
-    it should show"return None if remote client responds with $status" in {
+    it should show"return None if remote client responds with $status" in
       mapResponse(status, Request(), Response())
         .asserting(_ shouldBe None -> None)
-    }
   }
 
   it should "return an Exception if remote client responds with status any of OK , NOT_FOUND, UNAUTHORIZED or FORBIDDEN" in {
@@ -97,10 +95,9 @@ class ProjectHookFetcherSpec
     } shouldBe a[MatchError]
   }
 
-  it should "return a RuntimeException if remote client responds with unexpected body" in {
+  it should "return a RuntimeException if remote client responds with unexpected body" in
     mapResponse((Status.Ok, Request(), Response().withEntity("""{}""")))
       .assertThrowsError[Exception](_.getMessage should include("Could not decode JSON"))
-  }
 
   private implicit val logger:   TestLogger[IO]   = TestLogger[IO]()
   private implicit val glClient: GitLabClient[IO] = mock[GitLabClient[IO]]
