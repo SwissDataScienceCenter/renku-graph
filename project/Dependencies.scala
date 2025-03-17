@@ -25,7 +25,7 @@ object Dependencies {
     val logback                = "1.5.12"
     val luceneQueryParser      = "10.0.0"
     val monocle                = "3.2.0"
-    val owlapi                 = "5.5.0"
+    val owlapi                 = "5.5.1"
     val prometheus             = "0.16.0"
     val pureconfig             = "0.17.8"
     val rdf4jQueryParserSparql = "4.3.15"
