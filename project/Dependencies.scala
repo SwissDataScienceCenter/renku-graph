@@ -23,7 +23,7 @@ object Dependencies {
     val log4cats               = "2.7.0"
     val log4jCore              = "2.24.2"
     val logback                = "1.5.12"
-    val luceneQueryParser      = "10.0.0"
+    val luceneQueryParser      = "10.2.0"
     val monocle                = "3.2.0"
     val owlapi                 = "5.5.0"
     val prometheus             = "0.16.0"
