@@ -12,7 +12,7 @@ object Dependencies {
     val scalacheckEffectMunit  = "2.0.0-M2"
     val circeCore              = "0.14.10"
     val circeGenericExtras     = "0.14.4"
-    val circeOptics            = "0.15.0"
+    val circeOptics            = "0.15.1"
     val diffx                  = "0.9.0"
     val fs2                    = "3.11.0"
     val http4s                 = "0.23.29"
